@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: cache directory emptied by hand, README in it :   1.0.2
+  - documents/inbox/raw can be emptied at any time (a missing mail is read again on the mail server): a README.txt
+    in it says so, written at the activation and by the nightly job.
+  - nightly job: lines of the cache without file and .eml files unknown to the module (older than a day) removed.
+- FIX: tests of the setup page :   1.0.1
+  - Message-ID pasted with its angle brackets was emptied by the HTML filter (« invalid Message-ID »).
+  - line breaks of the text of the mail shown as « \n » and « <br> ».
 - NEW: first version, mail foundation (Dolibarr 23+) :   1.0.0
   - one mail read in a mailbox declared in CRM Client Connector from its complete Message-ID, read only (BODY.PEEK,
     no flag, no move): inbox, sent, other folders, junk and trash last; exact Message-ID check after the IMAP search.

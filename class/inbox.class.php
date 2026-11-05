@@ -255,6 +255,7 @@ class Inbox
 			dol_syslog(__METHOD__.' cannot create '.$dir, LOG_WARNING);
 			return;
 		}
+		self::writeReadme($dir);
 		$sha1 = sha1($found['raw']);
 		$file = $sha1.'.eml';
 		if (file_put_contents($dir.'/'.$file, $found['raw']) === false) {
@@ -273,6 +274,32 @@ class Inbox
 			." ".(is_object($user) && !empty($user->id) ? (int) $user->id : "NULL").")";
 		if (!$this->db->query($sql)) {
 			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_WARNING);
+		}
+	}
+
+	/**
+	 * README of the cache directory: whoever looks at it on the server knows it can be emptied
+	 *
+	 * @param string $dir Directory of the cache
+	 * @return void
+	 */
+	public static function writeReadme($dir)
+	{
+		$file = $dir.'/README.txt';
+		if (is_file($file)) {
+			return;
+		}
+		$text = "Cache of the Inbox module (Dolibarr): raw mails read in the mailboxes by their Message-ID.\n"
+			."This directory can be emptied at any time: a mail missing here is read again on the mail server when needed.\n"
+			."It is purged every night (retention set in Setup > Modules > Inbox, 30 days by default).\n"
+			."Do not put other files here: the .eml files no longer known by the module are removed.\n"
+			."\n"
+			."Cache du module Inbox (Dolibarr) : mails bruts lus dans les boîtes par leur Message-ID.\n"
+			."Ce dossier peut être vidé à tout moment : un mail absent ici est relu sur le serveur de messagerie au besoin.\n"
+			."Il est purgé chaque nuit (durée réglée dans Configuration > Modules > Inbox, 30 jours par défaut).\n"
+			."Ne pas y mettre d'autres fichiers : les fichiers .eml que le module ne connaît plus sont supprimés.\n";
+		if (@file_put_contents($file, $text) !== false) {
+			dolChmod($file);
 		}
 	}
 
@@ -338,6 +365,28 @@ class Inbox
 		}
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_readlog WHERE entity = ".((int) $conf->entity)
 			." AND datec < '".$this->db->idate(dol_now() - $logDays * 86400)."'");
+
+		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
+		// be writing its line right now)
+		$known = array();
+		$rows = $this->db->getRows("SELECT rowid, filepath FROM ".$this->db->prefix()."inbox_message WHERE entity = ".((int) $conf->entity)." LIMIT 100000");
+		foreach (is_array($rows) ? $rows : array() as $row) {
+			$file = basename((string) $row->filepath);
+			if ($file === '' || !is_file($dir.'/'.$file)) {
+				$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_message WHERE rowid = ".((int) $row->rowid));
+				$removed++;
+				continue;
+			}
+			$known[$file] = true;
+		}
+		foreach (is_dir($dir) ? (array) glob($dir.'/*.eml') : array() as $path) {
+			if (!isset($known[basename($path)]) && filemtime($path) < dol_now() - 86400) {
+				@unlink($path);
+			}
+		}
+		if (is_dir($dir)) {
+			self::writeReadme($dir);
+		}
 		$this->output = $removed.' mail(s) removed from the cache';
 
 		return 0;

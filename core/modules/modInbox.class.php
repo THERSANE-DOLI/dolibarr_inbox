@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.0.0';
+		$this->version = '1.0.2';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
@@ -132,7 +132,17 @@ class modInbox extends DolibarrModules
 		$this->remove($options);
 
 		$sql = array();
-		return $this->_init($sql, $options);
+		$result = $this->_init($sql, $options);
+
+		// README of the cache directory (created by _init from $this->dirs)
+		if ($result > 0) {
+			dol_include_once('/inbox/class/inbox.class.php');
+			if (is_dir(Inbox::storageDir())) {
+				Inbox::writeReadme(Inbox::storageDir());
+			}
+		}
+
+		return $result;
 	}
 
 	/**
