@@ -29,6 +29,12 @@ INBOX_LOG_DAYSHelp = Who read which mail, from which mailbox, found or not.
 InboxCronPurge = Inbox: purge of the cache and of the journal
 InboxCronPurgeComment = Removes the mails read longer ago than the retention of the cache, and the old lines of the journal
 
+InboxCache = Cache of the mails read
+InboxCacheHelp = %s mail(s) in the cache (%s). Emptying it is harmless: a mail is read again on the mail server when needed.
+InboxClearCache = Empty the cache
+InboxClearCacheConfirm = Remove every mail of the cache? They will be read again on the mail server when needed. The journal of the readings is kept.
+InboxCacheCleared = %s mail(s) removed from the cache
+
 #
 # Tests
 #

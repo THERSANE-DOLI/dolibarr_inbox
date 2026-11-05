@@ -29,6 +29,12 @@ INBOX_LOG_DAYSHelp = Quién leyó qué correo, en qué buzón, encontrado o no.
 InboxCronPurge = Inbox: limpieza de la caché y del registro
 InboxCronPurgeComment = Elimina los correos leídos hace más tiempo que la duración de la caché y las líneas antiguas del registro
 
+InboxCache = Caché de los correos leídos
+InboxCacheHelp = %s correo(s) en caché (%s). Vaciarla no tiene riesgo: un correo se vuelve a leer en el servidor de correo cuando hace falta.
+InboxClearCache = Vaciar la caché
+InboxClearCacheConfirm = ¿Eliminar todos los correos de la caché? Se volverán a leer en el servidor de correo cuando haga falta. El registro de lecturas se conserva.
+InboxCacheCleared = %s correo(s) eliminado(s) de la caché
+
 #
 # Tests
 #

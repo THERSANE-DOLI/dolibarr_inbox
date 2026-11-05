@@ -278,6 +278,42 @@ class Inbox
 	}
 
 	/**
+	 * Whole cache emptied (setup page): the mails will be read again on the mail server when needed
+	 *
+	 * @return int Number of mails removed
+	 */
+	public function clearCache()
+	{
+		global $conf;
+
+		$dir = self::storageDir();
+		$count = 0;
+		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_message WHERE entity = ".((int) $conf->entity)." LIMIT 100000");
+		$count = is_array($rows) ? count($rows) : 0;
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_message WHERE entity = ".((int) $conf->entity));
+		foreach (is_dir($dir) ? (array) glob($dir.'/*.eml') : array() as $path) {
+			@unlink($path);
+		}
+		if (is_dir($dir)) {
+			self::writeReadme($dir);
+		}
+
+		return $count;
+	}
+
+	/**
+	 * @return array{count:int,size:int} Mails in the cache and their total size (bytes)
+	 */
+	public function cacheStats()
+	{
+		global $conf;
+
+		$obj = $this->db->getRow("SELECT COUNT(rowid) as nb, SUM(size) as total FROM ".$this->db->prefix()."inbox_message WHERE entity = ".((int) $conf->entity));
+
+		return array('count' => is_object($obj) ? (int) $obj->nb : 0, 'size' => is_object($obj) ? (int) $obj->total : 0);
+	}
+
+	/**
 	 * README of the cache directory: whoever looks at it on the server knows it can be emptied
 	 *
 	 * @param string $dir Directory of the cache

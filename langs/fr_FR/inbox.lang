@@ -29,6 +29,12 @@ INBOX_LOG_DAYSHelp = Qui a lu quel mail, dans quelle boîte, trouvé ou non.
 InboxCronPurge = Inbox : purge du cache et du journal
 InboxCronPurgeComment = Supprime les mails lus depuis plus longtemps que la durée du cache, et les anciennes lignes du journal
 
+InboxCache = Cache des mails lus
+InboxCacheHelp = %s mail(s) en cache (%s). Le vider est sans risque : un mail est relu sur le serveur de messagerie au besoin.
+InboxClearCache = Vider le cache
+InboxClearCacheConfirm = Supprimer tous les mails du cache ? Ils seront relus sur le serveur de messagerie au besoin. Le journal des lectures est conservé.
+InboxCacheCleared = %s mail(s) supprimé(s) du cache
+
 #
 # Tests
 #

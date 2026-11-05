@@ -29,6 +29,12 @@ INBOX_LOG_DAYSHelp = Wer welche E-Mail in welchem Postfach gelesen hat, gefunden
 InboxCronPurge = Inbox: Bereinigung des Caches und des Protokolls
 InboxCronPurgeComment = Entfernt die E-Mails, die vor längerer Zeit als die Cache-Dauer gelesen wurden, und die alten Protokollzeilen
 
+InboxCache = Cache der gelesenen E-Mails
+InboxCacheHelp = %s E-Mail(s) im Cache (%s). Das Leeren ist unbedenklich: eine E-Mail wird bei Bedarf erneut vom Mailserver gelesen.
+InboxClearCache = Cache leeren
+InboxClearCacheConfirm = Alle E-Mails aus dem Cache entfernen? Sie werden bei Bedarf erneut vom Mailserver gelesen. Das Protokoll der Lesevorgänge bleibt erhalten.
+InboxCacheCleared = %s E-Mail(s) aus dem Cache entfernt
+
 #
 # Tests
 #

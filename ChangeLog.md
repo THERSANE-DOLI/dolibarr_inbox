@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: cache emptied from the setup page :   1.1.0
+  - number and size of the mails in the cache shown, « Empty the cache » button after a confirmation (the journal of
+    the readings is kept).
 - FIX: cache directory emptied by hand, README in it :   1.0.2
   - documents/inbox/raw can be emptied at any time (a missing mail is read again on the mail server): a README.txt
     in it says so, written at the activation and by the nightly job.

@@ -107,6 +107,13 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 	exit;
 }
 
+if ($action == 'confirm_clearcache' && GETPOST('confirm', 'alpha') == 'yes') {
+	$removed = $inbox->clearCache();
+	setEventMessages($langs->trans('InboxCacheCleared', $removed), null, 'mesgs');
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
 if ($action == 'testread' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 	$testMessage = $inbox->getMessage($testMailbox, $testMessageId, $user, 'setup');
 	if ($testMessage === null) {
@@ -169,6 +176,17 @@ foreach ($numericConsts as $constName => $def) {
 print '</table>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans("Save").'"></div>';
 print '</form>';
+print '<br>';
+
+// Cache: what it holds, emptied on demand
+if ($action == 'clearcache') {
+	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans('InboxClearCache'), $langs->trans('InboxClearCacheConfirm'), 'confirm_clearcache', '', 0, 1);
+}
+$stats = $inbox->cacheStats();
+print load_fiche_titre($langs->trans('InboxCache'), '', '');
+print '<span class="opacitymedium">'.$langs->trans('InboxCacheHelp', $stats['count'], dol_print_size($stats['size'], 1, 1)).'</span><br><br>';
+print '<div class="center"><a class="button'.($stats['count'] ? '' : ' butActionRefused').'" href="'.($stats['count'] ? $_SERVER["PHP_SELF"].'?action=clearcache&token='.newToken() : '#').'">'
+	.$langs->trans('InboxClearCache').'</a></div>';
 print '<br>';
 
 // Test: one mail read by its Message-ID
