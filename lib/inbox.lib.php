@@ -85,7 +85,7 @@ function inboxMessageSummary(InboxMessage $message)
 	}
 	$out .= '<tr class="oddeven"><td>'.$langs->trans('InboxAttachments').' ('.count($message->attachments).')</td><td>'.implode('<br>', $files).'</td></tr>';
 	$out .= '<tr class="oddeven"><td>'.$langs->trans('InboxBodyText').'</td><td><div class="small" style="white-space: pre-wrap; max-height: 240px; overflow: auto;">'
-		.dol_escape_htmltag(dol_trunc($message->bodyText, 1500, 'right', 'UTF-8', 1)).'</div></td></tr>';
+		.dol_escape_htmltag(dol_trunc($message->bodyText, 1500, 'right', 'UTF-8', 1), 0, 1).'</div></td></tr>';
 	$out .= '</table>';
 
 	return $out;

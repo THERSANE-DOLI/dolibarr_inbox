@@ -81,7 +81,9 @@ $form = new Form($db);
 $inbox = new Inbox($db);
 $testMessage = null;
 $testMailbox = GETPOST('test_mailbox', 'alphanohtml');
-$testMessageId = GETPOST('test_message_id', 'alphanohtml');
+// Raw value: a Message-ID is often pasted with its angle brackets, that the HTML filters would remove as a tag. It is
+// checked by Inbox::normalizeMessageId() and only shown escaped
+$testMessageId = dol_trunc(trim(GETPOST('test_message_id', 'none')), 255, 'right', 'UTF-8', 1);
 
 
 /*
