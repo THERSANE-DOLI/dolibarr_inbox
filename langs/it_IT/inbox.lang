@@ -1,0 +1,66 @@
+# Copyright (C) 2026 John BOTELLA - GPLv3
+# Inbox
+
+#
+# Module
+#
+ModuleInboxName = Inbox
+ModuleInboxDesc = Base mail: lettura di una e-mail tramite il suo Message-ID, analisi dei file .eml e .msg
+ModuleInboxDescLong = Inbox legge una e-mail in una casella dichiarata in CRM Client Connector, a partire dal suo Message-ID, sempre in sola lettura (la e-mail resta non letta). Legge anche le e-mail fornite come file (.eml, .msg di Outlook) con i loro allegati. Altri moduli lo usano, per esempio per precompilare un preventivo da una richiesta del cliente.
+
+#
+# Permissions
+#
+InboxRightMessageRead = Leggere una e-mail a partire dal suo Message-ID
+Permission14193001 = Leggere una e-mail a partire dal suo Message-ID
+
+#
+# Setup
+#
+InboxSetup = Configurazione di Inbox
+InboxSetupHelp = Una e-mail viene letta solo se viene fornito il suo Message-ID completo: nessun elenco, nessuna ricerca per mittente o oggetto. Ogni lettura viene registrata nel registro.
+InboxMailboxes = Caselle di posta
+InboxNoCrmClientConnector = Il modulo CRM Client Connector non è attivo: è lì che si dichiarano le caselle e il loro accesso IMAP. Si possono leggere solo le e-mail fornite come file.
+InboxMailboxesHelp = %s casella/e dichiarata/e in CRM Client Connector. L'accesso IMAP si imposta nella scheda Anti-spam di ogni account e-mail.
+INBOX_CACHE_DAYS = Conservare in cache le e-mail lette per
+INBOX_CACHE_DAYSHelp = Una e-mail letta in una casella viene conservata sul server per non rileggerla sul server di posta. I moduli che la usano la allegano comunque alla loro scheda.
+INBOX_LOG_DAYS = Conservare il registro delle letture per
+INBOX_LOG_DAYSHelp = Chi ha letto quale e-mail, in quale casella, trovata o no.
+InboxCronPurge = Inbox: pulizia della cache e del registro
+InboxCronPurgeComment = Elimina le e-mail lette da più tempo della durata della cache e le vecchie righe del registro
+
+#
+# Tests
+#
+InboxTestRead = Test: leggere una e-mail a partire dal suo Message-ID
+InboxTestReadHelp = Sola lettura: la e-mail resta non letta nella casella. La lettura viene registrata nel registro.
+InboxTestReadButton = Leggi la e-mail
+InboxTestReadFound = E-mail trovata nella cartella %s
+InboxTestReadFoundCache = E-mail trovata nella cache (cartella %s)
+InboxTestReadFailed = E-mail non letta (%s): %s
+InboxTestFile = Test: analizzare un file .eml o .msg
+InboxTestFileHelp = Il file viene analizzato in memoria e non viene conservato.
+InboxTestFileButton = Analizza il file
+InboxTestFileMissing = Nessun file ricevuto
+InboxTestFileFailed = File non analizzato: %s
+InboxTestResult = E-mail letta
+InboxResult_found = trovata
+InboxResult_notfound = non trovata
+InboxResult_forbidden = non autorizzato
+InboxResult_invalid = casella o Message-ID non valido
+InboxResult_error = errore
+
+#
+# Mail
+#
+InboxMailbox = Casella di posta
+InboxMessageId = Message-ID
+InboxSource = Formato
+InboxSubject = Oggetto
+InboxFrom = Mittente
+InboxTo = Destinatari
+InboxEmbeddedMails = E-mail allegate
+InboxAttachments = Allegati
+InboxInline = nel corpo
+InboxFromEmbeddedMail = da una e-mail allegata
+InboxBodyText = Testo

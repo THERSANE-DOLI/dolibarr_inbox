@@ -1,0 +1,66 @@
+# Copyright (C) 2026 John BOTELLA - GPLv3
+# Inbox
+
+#
+# Module
+#
+ModuleInboxName = Inbox
+ModuleInboxDesc = Mail foundation: one mail read by its Message-ID, .eml and .msg files parsed
+ModuleInboxDescLong = Inbox reads one mail in a mailbox declared in CRM Client Connector, from its Message-ID, always read only (the mail stays unread). It also reads the mails given as files (.eml, Outlook .msg) with their attachments. Other modules use it, for example to prefill a quote from a customer request.
+
+#
+# Permissions
+#
+InboxRightMessageRead = Read a mail from its Message-ID
+Permission14193001 = Read a mail from its Message-ID
+
+#
+# Setup
+#
+InboxSetup = Inbox setup
+InboxSetupHelp = A mail is read only when its complete Message-ID is given: no listing, no search by sender or subject. Every reading is recorded in the journal.
+InboxMailboxes = Mailboxes
+InboxNoCrmClientConnector = The CRM Client Connector module is not enabled: the mailboxes and their IMAP access are set there. Only the mails given as files can be read.
+InboxMailboxesHelp = %s mailbox(es) declared in CRM Client Connector. IMAP access is set on the Anti-spam tab of each email account.
+INBOX_CACHE_DAYS = Keep the mails read in the cache for
+INBOX_CACHE_DAYSHelp = A mail read from a mailbox is kept on the server so that it is not read again on the mail server. Modules that use it attach it to their record anyway.
+INBOX_LOG_DAYS = Keep the journal of the readings for
+INBOX_LOG_DAYSHelp = Who read which mail, from which mailbox, found or not.
+InboxCronPurge = Inbox: purge of the cache and of the journal
+InboxCronPurgeComment = Removes the mails read longer ago than the retention of the cache, and the old lines of the journal
+
+#
+# Tests
+#
+InboxTestRead = Test: read a mail from its Message-ID
+InboxTestReadHelp = Read only: the mail stays unread in the mailbox. The reading is recorded in the journal.
+InboxTestReadButton = Read the mail
+InboxTestReadFound = Mail found in the folder %s
+InboxTestReadFoundCache = Mail found in the cache (folder %s)
+InboxTestReadFailed = Mail not read (%s): %s
+InboxTestFile = Test: parse a .eml or .msg file
+InboxTestFileHelp = The file is parsed in memory and not kept.
+InboxTestFileButton = Parse the file
+InboxTestFileMissing = No file received
+InboxTestFileFailed = File not parsed: %s
+InboxTestResult = Mail read
+InboxResult_found = found
+InboxResult_notfound = not found
+InboxResult_forbidden = not allowed
+InboxResult_invalid = invalid mailbox or Message-ID
+InboxResult_error = error
+
+#
+# Mail
+#
+InboxMailbox = Mailbox
+InboxMessageId = Message-ID
+InboxSource = Format
+InboxSubject = Subject
+InboxFrom = From
+InboxTo = To
+InboxEmbeddedMails = Attached mails
+InboxAttachments = Attachments
+InboxInline = in the body
+InboxFromEmbeddedMail = from an attached mail
+InboxBodyText = Text

@@ -1,0 +1,211 @@
+<?php
+/* Copyright (C) 2026 THERSANE www.thersane.fr
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \file    inbox/admin/setup.php
+ * \ingroup inbox
+ * \brief   Setup of Inbox: retention of the cache and of the journal, tests of reading
+ */
+
+// Load Dolibarr environment
+$res = 0;
+if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
+}
+$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
+$tmp2 = realpath(__FILE__);
+$i = strlen($tmp) - 1;
+$j = strlen($tmp2) - 1;
+while ($i > 0 && $j > 0 && isset($tmp[$i]) && isset($tmp2[$j]) && $tmp[$i] == $tmp2[$j]) {
+	$i--;
+	$j--;
+}
+if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1))."/main.inc.php")) {
+	$res = @include substr($tmp, 0, ($i + 1))."/main.inc.php";
+}
+if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php")) {
+	$res = @include dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php";
+}
+if (!$res && file_exists("../../main.inc.php")) {
+	$res = @include "../../main.inc.php";
+}
+if (!$res && file_exists("../../../main.inc.php")) {
+	$res = @include "../../../main.inc.php";
+}
+if (!$res) {
+	die("Include of main fails");
+}
+
+require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+require_once '../lib/inbox.lib.php';
+require_once '../class/inbox.class.php';
+
+/**
+ * @var Conf $conf
+ * @var DoliDB $db
+ * @var HookManager $hookmanager
+ * @var Translate $langs
+ * @var User $user
+ */
+
+$langs->loadLangs(array("admin", "inbox@inbox"));
+
+$hookmanager->initHooks(array('inboxsetup', 'globalsetup'));
+
+$action = GETPOST('action', 'aZ09');
+
+if (!$user->admin) {
+	accessforbidden();
+}
+
+$numericConsts = array(
+	'INBOX_CACHE_DAYS' => array('min' => 1, 'default' => 30),
+	'INBOX_LOG_DAYS' => array('min' => 1, 'default' => 365),
+);
+
+$form = new Form($db);
+$inbox = new Inbox($db);
+$testMessage = null;
+$testMailbox = GETPOST('test_mailbox', 'alphanohtml');
+$testMessageId = GETPOST('test_message_id', 'alphanohtml');
+
+
+/*
+ * Actions
+ */
+
+if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
+	$error = 0;
+	foreach ($numericConsts as $constName => $def) {
+		$value = max($def['min'], GETPOSTINT($constName));
+		if (dolibarr_set_const($db, $constName, $value, 'chaine', 0, '', $conf->entity) < 0) {
+			$error++;
+		}
+	}
+	if ($error) {
+		setEventMessages($langs->trans("Error"), null, 'errors');
+	} else {
+		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
+	}
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
+if ($action == 'testread' && $_SERVER['REQUEST_METHOD'] == 'POST') {
+	$testMessage = $inbox->getMessage($testMailbox, $testMessageId, $user, 'setup');
+	if ($testMessage === null) {
+		setEventMessages($langs->trans('InboxTestReadFailed', $langs->transnoentities('InboxResult_'.$inbox->result), $inbox->error), null, 'errors');
+	} else {
+		setEventMessages($langs->trans($inbox->fromCache ? 'InboxTestReadFoundCache' : 'InboxTestReadFound', $inbox->folder), null, 'mesgs');
+	}
+}
+
+if ($action == 'testfile' && $_SERVER['REQUEST_METHOD'] == 'POST') {
+	if (empty($_FILES['test_file']['tmp_name']) || !is_uploaded_file($_FILES['test_file']['tmp_name'])) {
+		setEventMessages($langs->trans('InboxTestFileMissing'), null, 'errors');
+	} else {
+		// Parsed in memory only: the file is not kept
+		$testMessage = $inbox->getMessageFromFile($_FILES['test_file']['tmp_name']);
+		if ($testMessage === null) {
+			setEventMessages($langs->trans('InboxTestFileFailed', $inbox->error), null, 'errors');
+		}
+	}
+}
+
+
+/*
+ * View
+ */
+
+$title = "InboxSetup";
+llxHeader('', $langs->trans($title), '', '', 0, 0, '', '', '', 'mod-inbox page-admin');
+
+$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"')
+	.'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
+print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
+
+$head = inboxAdminPrepareHead();
+print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'fa-inbox');
+
+print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br><br>';
+
+// Mailboxes: crmclientconnector
+$accounts = new InboxAccount($db);
+print load_fiche_titre($langs->trans('InboxMailboxes'), '', '');
+if (!InboxAccount::isAvailable()) {
+	print info_admin($langs->trans('InboxNoCrmClientConnector'), 0, 0, 'warning');
+} else {
+	$mailboxes = $accounts->listMailboxes();
+	print '<span class="opacitymedium">'.$langs->trans('InboxMailboxesHelp', count($mailboxes)).'</span><br>';
+}
+print '<br>';
+
+// Settings
+print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="update">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
+foreach ($numericConsts as $constName => $def) {
+	print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans($constName), $langs->trans($constName.'Help')).'</td>';
+	print '<td><input type="number" class="maxwidth75" min="'.$def['min'].'" name="'.$constName.'" value="'.getDolGlobalInt($constName, $def['default']).'"> '.$langs->trans('days').'</td></tr>';
+}
+print '</table>';
+print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans("Save").'"></div>';
+print '</form>';
+print '<br>';
+
+// Test: one mail read by its Message-ID
+print load_fiche_titre($langs->trans('InboxTestRead'), '', '');
+print '<span class="opacitymedium">'.$langs->trans('InboxTestReadHelp').'</span><br><br>';
+if (InboxAccount::isAvailable()) {
+	$options = array();
+	foreach ($accounts->listMailboxes() as $mailbox) {
+		$options[$mailbox['email']] = $mailbox['email'].($mailbox['label'] !== '' ? ' ('.$mailbox['label'].')' : '');
+	}
+	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="testread">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('InboxMailbox').'</td><td>'.$form->selectarray('test_mailbox', $options, $testMailbox, 1, 0, 0, '', 0, 0, 0, '', 'minwidth300', 1).'</td></tr>';
+	print '<tr class="oddeven"><td>'.$langs->trans('InboxMessageId').'</td><td><input type="text" class="minwidth500" name="test_message_id" value="'.dol_escape_htmltag($testMessageId).'" placeholder="abc123@example.com"></td></tr>';
+	print '</table>';
+	print '<div class="center"><input type="submit" class="button" value="'.$langs->trans('InboxTestReadButton').'"></div>';
+	print '</form>';
+}
+print '<br>';
+
+// Test: a .eml or .msg file parsed
+print load_fiche_titre($langs->trans('InboxTestFile'), '', '');
+print '<span class="opacitymedium">'.$langs->trans('InboxTestFileHelp').'</span><br><br>';
+print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'" enctype="multipart/form-data">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="testfile">';
+print '<input type="file" name="test_file" accept=".eml,.msg,message/rfc822,application/vnd.ms-outlook"> ';
+print '<input type="submit" class="button" value="'.$langs->trans('InboxTestFileButton').'">';
+print '</form>';
+
+if ($testMessage !== null) {
+	print '<br>';
+	print load_fiche_titre($langs->trans('InboxTestResult'), '', '');
+	print inboxMessageSummary($testMessage);
+}
+
+print dol_get_fiche_end();
+
+llxFooter();
+$db->close();

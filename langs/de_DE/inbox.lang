@@ -1,0 +1,66 @@
+# Copyright (C) 2026 John BOTELLA - GPLv3
+# Inbox
+
+#
+# Module
+#
+ModuleInboxName = Inbox
+ModuleInboxDesc = Mail-Grundlage: eine E-Mail über ihre Message-ID lesen, .eml- und .msg-Dateien auswerten
+ModuleInboxDescLong = Inbox liest eine E-Mail in einem in CRM Client Connector angelegten Postfach anhand ihrer Message-ID, immer nur lesend (die E-Mail bleibt ungelesen). Es liest auch als Datei übergebene E-Mails (.eml, Outlook .msg) mit ihren Anhängen. Andere Module nutzen es, zum Beispiel um ein Angebot aus einer Kundenanfrage vorzubefüllen.
+
+#
+# Permissions
+#
+InboxRightMessageRead = Eine E-Mail anhand ihrer Message-ID lesen
+Permission14193001 = Eine E-Mail anhand ihrer Message-ID lesen
+
+#
+# Setup
+#
+InboxSetup = Inbox-Einstellungen
+InboxSetupHelp = Eine E-Mail wird nur gelesen, wenn ihre vollständige Message-ID angegeben wird: keine Liste, keine Suche nach Absender oder Betreff. Jeder Lesevorgang wird im Protokoll erfasst.
+InboxMailboxes = Postfächer
+InboxNoCrmClientConnector = Das Modul CRM Client Connector ist nicht aktiviert: dort werden die Postfächer und ihr IMAP-Zugang angelegt. Nur als Datei übergebene E-Mails können gelesen werden.
+InboxMailboxesHelp = %s Postfach/Postfächer in CRM Client Connector angelegt. Der IMAP-Zugang wird im Reiter Anti-Spam jedes E-Mail-Kontos eingestellt.
+INBOX_CACHE_DAYS = Gelesene E-Mails im Cache behalten für
+INBOX_CACHE_DAYSHelp = Eine aus einem Postfach gelesene E-Mail wird auf dem Server behalten, damit sie nicht erneut vom Mailserver gelesen wird. Die nutzenden Module hängen sie ohnehin an ihren Datensatz an.
+INBOX_LOG_DAYS = Protokoll der Lesevorgänge behalten für
+INBOX_LOG_DAYSHelp = Wer welche E-Mail in welchem Postfach gelesen hat, gefunden oder nicht.
+InboxCronPurge = Inbox: Bereinigung des Caches und des Protokolls
+InboxCronPurgeComment = Entfernt die E-Mails, die vor längerer Zeit als die Cache-Dauer gelesen wurden, und die alten Protokollzeilen
+
+#
+# Tests
+#
+InboxTestRead = Test: eine E-Mail anhand ihrer Message-ID lesen
+InboxTestReadHelp = Nur lesend: die E-Mail bleibt im Postfach ungelesen. Der Lesevorgang wird im Protokoll erfasst.
+InboxTestReadButton = E-Mail lesen
+InboxTestReadFound = E-Mail im Ordner %s gefunden
+InboxTestReadFoundCache = E-Mail im Cache gefunden (Ordner %s)
+InboxTestReadFailed = E-Mail nicht gelesen (%s): %s
+InboxTestFile = Test: eine .eml- oder .msg-Datei auswerten
+InboxTestFileHelp = Die Datei wird im Speicher ausgewertet und nicht aufbewahrt.
+InboxTestFileButton = Datei auswerten
+InboxTestFileMissing = Keine Datei empfangen
+InboxTestFileFailed = Datei nicht ausgewertet: %s
+InboxTestResult = Gelesene E-Mail
+InboxResult_found = gefunden
+InboxResult_notfound = nicht gefunden
+InboxResult_forbidden = nicht erlaubt
+InboxResult_invalid = ungültiges Postfach oder ungültige Message-ID
+InboxResult_error = Fehler
+
+#
+# Mail
+#
+InboxMailbox = Postfach
+InboxMessageId = Message-ID
+InboxSource = Format
+InboxSubject = Betreff
+InboxFrom = Absender
+InboxTo = Empfänger
+InboxEmbeddedMails = Angehängte E-Mails
+InboxAttachments = Anhänge
+InboxInline = im Text
+InboxFromEmbeddedMail = aus einer angehängten E-Mail
+InboxBodyText = Text

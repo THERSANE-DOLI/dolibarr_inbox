@@ -1,0 +1,66 @@
+# Copyright (C) 2026 John BOTELLA - GPLv3
+# Inbox
+
+#
+# Module
+#
+ModuleInboxName = Inbox
+ModuleInboxDesc = Base de correo: lectura de un correo por su Message-ID, análisis de archivos .eml y .msg
+ModuleInboxDescLong = Inbox lee un correo en un buzón declarado en CRM Client Connector, a partir de su Message-ID, siempre en solo lectura (el correo sigue sin leer). También lee los correos entregados como archivo (.eml, .msg de Outlook) con sus adjuntos. Otros módulos lo usan, por ejemplo para rellenar un presupuesto a partir de una solicitud de cliente.
+
+#
+# Permissions
+#
+InboxRightMessageRead = Leer un correo a partir de su Message-ID
+Permission14193001 = Leer un correo a partir de su Message-ID
+
+#
+# Setup
+#
+InboxSetup = Configuración de Inbox
+InboxSetupHelp = Un correo solo se lee si se indica su Message-ID completo: sin lista, sin búsqueda por remitente o asunto. Cada lectura queda registrada en el registro.
+InboxMailboxes = Buzones
+InboxNoCrmClientConnector = El módulo CRM Client Connector no está activado: ahí se declaran los buzones y su acceso IMAP. Solo se pueden leer los correos entregados como archivo.
+InboxMailboxesHelp = %s buzón(es) declarado(s) en CRM Client Connector. El acceso IMAP se configura en la pestaña Anti-spam de cada cuenta de correo.
+INBOX_CACHE_DAYS = Conservar en caché los correos leídos durante
+INBOX_CACHE_DAYSHelp = Un correo leído en un buzón se conserva en el servidor para no volver a leerlo en el servidor de correo. Los módulos que lo usan lo adjuntan de todos modos a su ficha.
+INBOX_LOG_DAYS = Conservar el registro de lecturas durante
+INBOX_LOG_DAYSHelp = Quién leyó qué correo, en qué buzón, encontrado o no.
+InboxCronPurge = Inbox: limpieza de la caché y del registro
+InboxCronPurgeComment = Elimina los correos leídos hace más tiempo que la duración de la caché y las líneas antiguas del registro
+
+#
+# Tests
+#
+InboxTestRead = Prueba: leer un correo a partir de su Message-ID
+InboxTestReadHelp = Solo lectura: el correo sigue sin leer en el buzón. La lectura queda registrada en el registro.
+InboxTestReadButton = Leer el correo
+InboxTestReadFound = Correo encontrado en la carpeta %s
+InboxTestReadFoundCache = Correo encontrado en la caché (carpeta %s)
+InboxTestReadFailed = Correo no leído (%s): %s
+InboxTestFile = Prueba: analizar un archivo .eml o .msg
+InboxTestFileHelp = El archivo se analiza en memoria y no se conserva.
+InboxTestFileButton = Analizar el archivo
+InboxTestFileMissing = No se ha recibido ningún archivo
+InboxTestFileFailed = Archivo no analizado: %s
+InboxTestResult = Correo leído
+InboxResult_found = encontrado
+InboxResult_notfound = no encontrado
+InboxResult_forbidden = no autorizado
+InboxResult_invalid = buzón o Message-ID no válido
+InboxResult_error = error
+
+#
+# Mail
+#
+InboxMailbox = Buzón
+InboxMessageId = Message-ID
+InboxSource = Formato
+InboxSubject = Asunto
+InboxFrom = Remitente
+InboxTo = Destinatarios
+InboxEmbeddedMails = Correos adjuntos
+InboxAttachments = Adjuntos
+InboxInline = en el cuerpo
+InboxFromEmbeddedMail = de un correo adjunto
+InboxBodyText = Texto

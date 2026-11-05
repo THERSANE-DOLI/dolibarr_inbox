@@ -1,0 +1,66 @@
+# Copyright (C) 2026 John BOTELLA - GPLv3
+# Inbox
+
+#
+# Module
+#
+ModuleInboxName = Inbox
+ModuleInboxDesc = Fondation mail : lecture d'un mail par son Message-ID, analyse des fichiers .eml et .msg
+ModuleInboxDescLong = Inbox lit un mail dans une boîte déclarée dans CRM Client Connector, à partir de son Message-ID, toujours en lecture seule (le mail reste non lu). Il lit aussi les mails fournis en fichier (.eml, .msg Outlook) avec leurs pièces jointes. D'autres modules s'en servent, par exemple pour préremplir un devis à partir d'une demande client.
+
+#
+# Permissions
+#
+InboxRightMessageRead = Lire un mail à partir de son Message-ID
+Permission14193001 = Lire un mail à partir de son Message-ID
+
+#
+# Setup
+#
+InboxSetup = Configuration d'Inbox
+InboxSetupHelp = Un mail n'est lu que si son Message-ID complet est fourni : pas de liste, pas de recherche par expéditeur ou par sujet. Chaque lecture est enregistrée dans le journal.
+InboxMailboxes = Boîtes mail
+InboxNoCrmClientConnector = Le module CRM Client Connector n'est pas activé : c'est là que sont déclarées les boîtes et leurs accès IMAP. Seuls les mails fournis en fichier peuvent être lus.
+InboxMailboxesHelp = %s boîte(s) déclarée(s) dans CRM Client Connector. L'accès IMAP se règle dans l'onglet Anti-spam de chaque compte mail.
+INBOX_CACHE_DAYS = Garder les mails lus en cache pendant
+INBOX_CACHE_DAYSHelp = Un mail lu dans une boîte est gardé sur le serveur pour ne pas le relire sur le serveur de messagerie. Les modules qui s'en servent le joignent de toute façon à leur fiche.
+INBOX_LOG_DAYS = Garder le journal des lectures pendant
+INBOX_LOG_DAYSHelp = Qui a lu quel mail, dans quelle boîte, trouvé ou non.
+InboxCronPurge = Inbox : purge du cache et du journal
+InboxCronPurgeComment = Supprime les mails lus depuis plus longtemps que la durée du cache, et les anciennes lignes du journal
+
+#
+# Tests
+#
+InboxTestRead = Test : lire un mail à partir de son Message-ID
+InboxTestReadHelp = Lecture seule : le mail reste non lu dans la boîte. La lecture est enregistrée dans le journal.
+InboxTestReadButton = Lire le mail
+InboxTestReadFound = Mail trouvé dans le dossier %s
+InboxTestReadFoundCache = Mail trouvé dans le cache (dossier %s)
+InboxTestReadFailed = Mail non lu (%s) : %s
+InboxTestFile = Test : analyser un fichier .eml ou .msg
+InboxTestFileHelp = Le fichier est analysé en mémoire et n'est pas conservé.
+InboxTestFileButton = Analyser le fichier
+InboxTestFileMissing = Aucun fichier reçu
+InboxTestFileFailed = Fichier non analysé : %s
+InboxTestResult = Mail lu
+InboxResult_found = trouvé
+InboxResult_notfound = introuvable
+InboxResult_forbidden = non autorisé
+InboxResult_invalid = boîte ou Message-ID invalide
+InboxResult_error = erreur
+
+#
+# Mail
+#
+InboxMailbox = Boîte mail
+InboxMessageId = Message-ID
+InboxSource = Format
+InboxSubject = Sujet
+InboxFrom = Expéditeur
+InboxTo = Destinataires
+InboxEmbeddedMails = Mails joints
+InboxAttachments = Pièces jointes
+InboxInline = dans le corps
+InboxFromEmbeddedMail = d'un mail joint
+InboxBodyText = Texte
