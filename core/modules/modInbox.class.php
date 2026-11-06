@@ -51,11 +51,12 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.2.0';
+		$this->version = '1.3.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
-		$this->module_parts = array();
+		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
+		$this->module_parts = array('triggers' => 1);
 		// Raw mails kept for a while (never served by document.php: no read right at the root of the module)
 		$this->dirs = array('/inbox/raw');
 		$this->config_page_url = array("setup.php@inbox");
@@ -103,6 +104,22 @@ class modInbox extends DolibarrModules
 				'test' => 'isModEnabled("inbox")',
 				'priority' => 50,
 			),
+		);
+
+		// Synchronisation of the index of the mailboxes (read only), every minute, within a time budget
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronSync',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxsync.class.php',
+			'objectname' => 'InboxSync',
+			'method' => 'cronRun',
+			'parameters' => '',
+			'comment' => 'InboxCronSyncComment',
+			'frequency' => 1,
+			'unitfrequency' => 60,
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 40,
 		);
 
 		$this->rights = array();
@@ -164,6 +181,10 @@ class modInbox extends DolibarrModules
 			$this->error = $this->db->lasterror();
 			return -1;
 		}
+		if ($result > 0 && $this->migrate() < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
 
 		// README of the cache directory (created by _init from $this->dirs)
 		if ($result > 0) {
@@ -218,6 +239,34 @@ class modInbox extends DolibarrModules
 			}
 		}
 		dolibarr_set_const($this->db, 'INBOX_DEFAULT_TAGS_DONE', '1', 'chaine', 0, 'Default tags of Thunderbird installed once', $entity);
+		return 1;
+	}
+
+	/**
+	 * Changes of data between versions, each one run once: the constant INBOX_SCHEMA_VERSION (kept when the module is
+	 * disabled) says which ones were done, so that a reactivation never applies a change twice (a cap set on purpose
+	 * by an admin after the migration is never reset).
+	 *
+	 * @return int<-1,1> 1 if OK, -1 if KO
+	 */
+	private function migrate()
+	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		$done = getDolGlobalString('INBOX_SCHEMA_VERSION', '1.2.0');
+		$prefix = $this->db->prefix();
+		if (version_compare($done, '1.3.0', '<')) {
+			// 1.3.0: the whole mailbox is indexed by default; the caps of 1.2.0 left at their default become « everything »
+			$sql = "UPDATE ".$prefix."inbox_account SET sync_max_days = 0 WHERE sync_max_days = 365";
+			$sql2 = "UPDATE ".$prefix."inbox_account SET sync_max_mails = 0 WHERE sync_max_mails = 20000";
+			if (!$this->db->query($sql) || !$this->db->query($sql2)) {
+				return -1;
+			}
+			$done = '1.3.0';
+		}
+		dolibarr_set_const($this->db, 'INBOX_SCHEMA_VERSION', $done, 'chaine', 0, 'Data changes of inbox already done', $conf->entity);
+
 		return 1;
 	}
 

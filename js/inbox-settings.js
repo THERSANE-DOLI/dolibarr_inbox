@@ -60,6 +60,29 @@
 		}
 		return '<span class="ibx-status ibx-status--' + esc(result) + '">' + th('InboxTestResult_' + result) + '</span>';
 	}
+	/** State of the synchronisation, in words (never the colour alone) */
+	function syncBadge(r) {
+		if (r.status !== 1) {
+			return '<span class="ibx-muted">-</span>';
+		}
+		const state = r.sync_state || '';
+		if (!state) {
+			return '<span class="ibx-status">' + th('InboxSyncWaiting') + '</span>';
+		}
+		const cls = { ok: 'ok', first_sync: 'warning', auth_failed: 'error', unreachable: 'error', error: 'error' }[state] || '';
+		return '<span class="ibx-status' + (cls ? ' ibx-status--' + cls : '') + '" title="' + esc(r.sync_error || '') + '">' + th('InboxSyncState_' + state) + '</span>'
+			+ (r.date_sync ? '<div class="ibx-muted">' + esc(ago(r.date_sync)) + '</div>' : '');
+	}
+	function ago(ts) {
+		const sec = Math.max(0, Math.round(Date.now() / 1000 - ts));
+		if (sec < 60) {
+			return t('InboxAgoSeconds', sec);
+		}
+		if (sec < 3600) {
+			return t('InboxAgoMinutes', Math.round(sec / 60));
+		}
+		return new Date(ts * 1000).toLocaleString();
+	}
 	function levelLabel(level) {
 		return t('InboxLevel_' + level);
 	}
@@ -145,12 +168,13 @@
 			html += '<div class="ibx-empty" style="height:auto">' + ic('inbox', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxNoAccount') + '</div><div>'
 				+ th(isAdmin() ? 'InboxNoAccountAdmin' : 'InboxNoAccountManager') + '</div></div>';
 		} else {
-			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxAccount') + '</th><th>' + th('InboxAccountType') + '</th><th>' + th('InboxStatus') + '</th><th>' + th('InboxLastTest') + '</th><th>' + th('InboxAccesses') + '</th></tr></thead><tbody>';
+			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxAccount') + '</th><th>' + th('InboxAccountType') + '</th><th>' + th('InboxStatus') + '</th><th>' + th('InboxLastTest') + '</th><th>' + th('InboxSync') + '</th><th>' + th('InboxAccesses') + '</th></tr></thead><tbody>';
 			rows.forEach(r => {
 				html += '<tr><td><a href="#/settings/accounts/' + r.id + '/server"><b>' + esc(r.label || r.email) + '</b></a><div class="ibx-muted">' + esc(r.email) + '</div></td>'
 					+ '<td>' + th(r.type === 'personal' ? 'InboxTypePersonal' : 'InboxTypeShared') + (r.owner ? '<div class="ibx-muted">' + esc(r.owner) + '</div>' : '') + '</td>'
 					+ '<td>' + statusBadge(r.status) + (r.sync_state && r.sync_state !== 'ok' ? '<div><span class="ibx-status ibx-status--error">' + th('InboxSyncError') + '</span></div>' : '') + '</td>'
 					+ '<td>' + testBadge(r.last_test_result) + '</td>'
+					+ '<td>' + syncBadge(r) + '</td>'
 					+ '<td>' + (r.type === 'personal' ? th('InboxAccessOwnerPlus', r.accesses) : (r.accesses ? esc(r.accesses) : '<span class="ibx-status ibx-status--warning">' + th('InboxNoAccess') + '</span>')) + '</td></tr>';
 			});
 			html += '</tbody></table>';
@@ -165,6 +189,7 @@
 		{ id: 'identities', key: 'InboxTabIdentities', admin: false },
 		{ id: 'access', key: 'InboxTabAccess', admin: true },
 		{ id: 'tags', key: 'InboxTabTags', admin: false },
+		{ id: 'sync', key: 'InboxTabSync', admin: false },
 	];
 
 	async function renderAccountCard(main, id, tab) {
@@ -201,7 +226,7 @@
 		main.innerHTML = html;
 		$$('.ibx-tab[aria-disabled="true"]', main).forEach(a => a.addEventListener('click', e => e.preventDefault()));
 		const box = $('.ibx-js-tab', main);
-		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags };
+		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags, sync: tabSync };
 		fns[tab](box, account, main);
 	}
 
@@ -237,7 +262,7 @@
 	}
 
 	function tabServer(box, account, main) {
-		const a = account || { type: 'shared', imap_port: 993, imap_encryption: 'ssl', imap_auth_mode: 'login', imap_validate_cert: 1, smtp_port: 465, smtp_encryption: 'ssl', smtp_same_credentials: 1, sieve_port: 4190, sync_max_days: 365, sync_max_mails: 20000 };
+		const a = account || { type: 'shared', imap_port: 993, imap_encryption: 'ssl', imap_auth_mode: 'login', imap_validate_cert: 1, smtp_port: 465, smtp_encryption: 'ssl', smtp_same_credentials: 1, sieve_port: 4190, sync_max_days: 0, sync_max_mails: 0 };
 		const enc = [['ssl', t('InboxEncSsl')], ['tls', t('InboxEncTls')], ['none', t('InboxEncNone')]];
 		let html = '<form class="ibx-form" novalidate autocomplete="off">'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMailbox') + '</h2><div class="ibx-form">'
@@ -272,8 +297,8 @@
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMore') + '</h2><div class="ibx-form">'
 			+ field('sieve_port', t('InboxSievePort'), a.sieve_port, { type: 'number', min: 0, max: 65535, inputmode: 'numeric', help: t('InboxSievePortHelp'), cls: 'ibx-field--narrow' })
-			+ field('sync_max_days', t('InboxSyncMaxDays'), a.sync_max_days, { type: 'number', min: 1, max: 36500, inputmode: 'numeric', help: t('InboxSyncLimitsHelp'), cls: 'ibx-field--narrow' })
-			+ field('sync_max_mails', t('InboxSyncMaxMails'), a.sync_max_mails, { type: 'number', min: 1, max: 1000000, inputmode: 'numeric', cls: 'ibx-field--narrow' })
+			+ field('sync_max_days', t('InboxSyncMaxDays'), a.sync_max_days, { type: 'number', min: 0, max: 36500, inputmode: 'numeric', help: t('InboxSyncLimitsHelp'), cls: 'ibx-field--narrow' })
+			+ field('sync_max_mails', t('InboxSyncMaxMails'), a.sync_max_mails, { type: 'number', min: 0, max: 1000000, inputmode: 'numeric', cls: 'ibx-field--narrow' })
 			+ '</div></section>'
 			+ '<div class="ibx-js-testresult"></div>'
 			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-test">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>'
@@ -901,6 +926,108 @@
 					add.label.focus();
 				}
 			});
+		}
+	}
+
+	// ----- Tab Synchro -----
+	let syncTimer = 0;
+	async function tabSync(box, account) {
+		clearTimeout(syncTimer);
+		let st;
+		try {
+			st = await api('sync', 'status', { id: account.id });
+		} catch (err) {
+			box.replaceChildren(errorBox(err, () => tabSync(box, account)));
+			return;
+		}
+		const pct = st.progress.total ? Math.min(100, Math.round(100 * st.progress.indexed / st.progress.total)) : 0;
+		const stateCls = { ok: 'ok', first_sync: 'warning', auth_failed: 'error', unreachable: 'error', error: 'error' }[st.state] || '';
+		const roleKey = r => 'InboxFolderRole' + r.charAt(0).toUpperCase() + r.slice(1);
+		let html = '<p class="ibx-section__help">' + th('InboxSyncHelp') + '</p>';
+		if (!st.active) {
+			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxSyncNeedsActive') + '</div></div>';
+		}
+		if (st.error && stateCls === 'error') {
+			html += '<div class="ibx-notice ibx-notice--error" role="alert">' + ic('warning') + '<div class="ibx-notice__text"><b>' + th('InboxSyncState_' + st.state) + '</b> : ' + esc(st.error)
+				+ (st.retry_at ? '<br>' + th('InboxSyncRetryAt', new Date(st.retry_at * 1000).toLocaleTimeString()) : '') + '</div></div>';
+		}
+		html += '<div class="ibx-form"><div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>'
+			+ (st.state ? '<span class="ibx-status' + (stateCls ? ' ibx-status--' + stateCls : '') + '">' + th('InboxSyncState_' + st.state) + '</span>' : '<span class="ibx-status">' + th('InboxSyncWaiting') + '</span>')
+			+ (st.running ? ' · ' + th('InboxSyncRunning') : '') + (st.date_sync ? ' · ' + th('InboxSyncLast', ago(st.date_sync)) : '') + '</div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSyncIndexed') + '</span><div>'
+			+ '<progress max="100" value="' + pct + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxSyncIndexed') + '"></progress> '
+			+ th('InboxSyncIndexedOf', st.progress.indexed.toLocaleString(), st.progress.total.toLocaleString())
+			+ (st.progress.first_sync_left ? ' · ' + th('InboxSyncFoldersLeft', st.progress.first_sync_left) : '') + '</div></div></div>';
+		html += '<div class="ibx-formfoot" style="border-top:0"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-now"'
+			+ (st.active ? '' : ' aria-disabled="true" title="' + th('InboxSyncNeedsActive') + '"') + '>' + ic('check') + ' ' + th('InboxSyncNow') + '</button>'
+			+ '<span class="ibx-formfoot__spacer"></span>' + (isAdmin() ? '<button type="button" class="ibx-btn ibx-js-rebuild">' + th('InboxSyncRebuild') + '</button>' : '') + '</div>';
+		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSyncFolders') + '</h2><p class="ibx-section__help">' + th('InboxSyncFoldersHelp') + '</p>';
+		if (!st.folders.length) {
+			html += '<p class="ibx-muted">' + th('InboxSyncNoFolder') + '</p>';
+		} else {
+			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxFolder') + '</th><th>' + th('InboxSyncFollowed') + '</th><th>' + th('InboxSyncMails') + '</th><th>'
+				+ th('InboxSyncIndexed') + '</th><th>' + th('InboxSyncLastPass') + '</th></tr></thead><tbody>'
+				+ st.folders.map(f => '<tr><td>' + (f.role === 'inbox' ? th('InboxFolderRoleInbox') : esc(f.label) + (f.role ? ' <span class="ibx-muted">(' + th(roleKey(f.role)) + ')</span>' : ''))
+					+ (f.error ? '<div class="ibx-formrow__error">' + esc(f.error) + '</div>' : '') + '</td>'
+					+ '<td>' + (f.selectable ? '<button type="button" class="ibx-switch" role="switch" data-folder="' + f.id + '" aria-checked="' + (f.sync_enabled ? 'true' : 'false')
+						+ '" aria-label="' + th('InboxSyncFollowed') + ' ' + esc(f.label) + '"></button>' : '<span class="ibx-muted">-</span>') + '</td>'
+					+ '<td>' + esc(f.total.toLocaleString()) + (f.unread ? ' <span class="ibx-muted">(' + th('InboxSyncUnread', f.unread) + ')</span>' : '') + '</td>'
+					+ '<td>' + (f.sync_enabled ? esc(f.indexed.toLocaleString()) + (f.first_sync_done ? '' : ' <span class="ibx-status ibx-status--warning">' + th('InboxSyncInProgress') + '</span>') : '<span class="ibx-muted">-</span>') + '</td>'
+					+ '<td class="ibx-muted">' + (f.date_sync ? esc(ago(f.date_sync)) : '-') + '</td></tr>').join('')
+				+ '</tbody></table>';
+		}
+		html += '</section>';
+		box.innerHTML = html;
+		const now = $('.ibx-js-now', box);
+		now.addEventListener('click', async () => {
+			if (now.getAttribute('aria-disabled') === 'true') {
+				toast(now.title, { error: true });
+				return;
+			}
+			now.setAttribute('aria-disabled', 'true');
+			now.innerHTML = ic('check') + ' ' + th('InboxSyncRunning');
+			try {
+				const r = await post('sync', 'now', { id: account.id });
+				toast(t('InboxSyncDone', r.stats.new, r.stats.changed, r.stats.deleted));
+				I.changed('account', account.id);
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			tabSync(box, account);
+		});
+		const rebuild = $('.ibx-js-rebuild', box);
+		if (rebuild) {
+			rebuild.addEventListener('click', async () => {
+				const ok = await confirmDialog({ title: t('InboxSyncRebuildTitle', account.email), text: t('InboxSyncRebuildText'), confirm: t('InboxSyncRebuild') });
+				if (ok) {
+					try {
+						await post('sync', 'rebuild', { id: account.id });
+						toast(t('InboxSyncRebuilt'));
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+					tabSync(box, account);
+				}
+			});
+		}
+		$$('[data-folder]', box).forEach(sw => sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				await post('sync', 'folder', { id: account.id, folder_id: sw.dataset.folder, enabled: on ? 1 : 0 });
+				toast(t(on ? 'InboxSyncFolderOn' : 'InboxSyncFolderOff'));
+			} catch (err) {
+				sw.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
+			}
+		}));
+		// Follow the first indexing while the tab is shown
+		if (st.running || st.state === 'first_sync') {
+			syncTimer = setTimeout(() => {
+				if (box.isConnected && !document.hidden) {
+					tabSync(box, account);
+				}
+			}, 5000);
 		}
 	}
 

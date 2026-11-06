@@ -24,6 +24,7 @@
 require_once __DIR__.'/inboxconnector.class.php';
 require_once dirname(__DIR__).'/inboxoauth.class.php';
 require_once dirname(__DIR__).'/inboxmimeparser.class.php';
+require_once dirname(__DIR__).'/inboxheaderparser.class.php';
 
 /**
  * IMAP connector, through the Webklex php-imap library shipped with Dolibarr (2.7.2, same from Dolibarr 18 to 24).
@@ -70,7 +71,7 @@ class InboxImapConnector extends InboxConnector
 	 */
 	protected function supportedCapabilities()
 	{
-		$caps = array(self::CAP_READ, self::CAP_FOLDERS, self::CAP_SERVER_SEARCH);
+		$caps = array(self::CAP_READ, self::CAP_FOLDERS, self::CAP_SERVER_SEARCH, self::CAP_CHANGES);
 		$server = $this->serverCapabilities;
 		if (!$server) {
 			$info = $this->account->getServerInfo();
@@ -859,6 +860,327 @@ class InboxImapConnector extends InboxConnector
 		}
 	}
 
+	/** Header fields read by the synchronisation (never the body) */
+	const SYNC_HEADERS = 'FROM TO CC REPLY-TO SUBJECT DATE MESSAGE-ID IN-REPLY-TO REFERENCES CONTENT-TYPE';
+
+	/** Mails read per FETCH */
+	const FETCH_CHUNK = 200;
+
+	/**
+	 * @param string $folder Folder path
+	 * @return array{total:int,unread:int,changed:bool,token:string,uidvalidity:int,uidnext:int,modseq:string}|null
+	 */
+	public function folderStatus($folder)
+	{
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			return null;
+		}
+		$items = in_array('CONDSTORE', $this->serverCapabilities, true) ? '(MESSAGES UIDNEXT UIDVALIDITY UNSEEN HIGHESTMODSEQ)' : '(MESSAGES UIDNEXT UIDVALIDITY UNSEEN)';
+		try {
+			// STATUS of the folder open in this connection can answer old numbers: close it first (it was examined,
+			// read only: CLOSE removes nothing)
+			if ($this->examined !== '') {
+				$this->client->getConnection()->requestAndResponse(in_array('UNSELECT', $this->serverCapabilities, true) ? 'UNSELECT' : 'CLOSE');
+				$this->examined = '';
+			}
+			$response = $this->client->getConnection()->requestAndResponse('STATUS', array($this->client->getConnection()->escapeString($folder), $items));
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		}
+		foreach (is_array($response) ? $response : array() as $line) {
+			if (is_array($line) && isset($line[0], $line[2]) && $line[0] === 'STATUS' && is_array($line[2])) {
+				$v = array();
+				for ($i = 0; $i + 1 < count($line[2]); $i += 2) {
+					$v[strtoupper((string) $line[2][$i])] = (string) $line[2][$i + 1];
+				}
+				$token = ($v['UIDVALIDITY'] ?? '').':'.($v['UIDNEXT'] ?? '').':'.($v['MESSAGES'] ?? '').':'.($v['HIGHESTMODSEQ'] ?? '').':'.($v['UNSEEN'] ?? '');
+				return array('total' => (int) ($v['MESSAGES'] ?? 0), 'unread' => (int) ($v['UNSEEN'] ?? 0), 'changed' => true, 'token' => $token,
+					'uidvalidity' => (int) ($v['UIDVALIDITY'] ?? 0), 'uidnext' => (int) ($v['UIDNEXT'] ?? 0), 'modseq' => (string) ($v['HIGHESTMODSEQ'] ?? ''));
+			}
+		}
+		$this->error = 'STATUS without answer';
+
+		return null;
+	}
+
+	/**
+	 * @param string              $folder  Folder path
+	 * @param string              $cursor  Cursor
+	 * @param array<string,mixed> $options Options (see the interface)
+	 * @return array<string,mixed>|null
+	 */
+	public function getChanges($folder, $cursor, array $options = array())
+	{
+		$this->error = '';
+		$max = max(1, (int) ($options['max'] ?? 1000));
+		$since = (int) ($options['since'] ?? 0);
+		$status = $this->folderStatus($folder);
+		if ($status === null) {
+			return null;
+		}
+		$c = json_decode((string) $cursor, true);
+		$c = is_array($c) ? $c : array();
+		$out = array('cursor' => '', 'reset' => false, 'new' => array(), 'changed' => array(), 'deleted' => array(), 'more' => false,
+			'total' => $status['total'], 'unread' => $status['unread']);
+		// Nothing changed since the last call, and the first indexing is done: nothing to read
+		if (!empty($c['token']) && $c['token'] === $status['token'] && !empty($c['done'])) {
+			$out['cursor'] = (string) $cursor;
+			return $out;
+		}
+		if (!empty($c) && (int) ($c['v'] ?? 0) !== $status['uidvalidity']) {
+			// The server numbered the mails of this folder again: the index of the folder is rebuilt
+			$out['reset'] = true;
+			$c = array();
+		}
+		$condstore = in_array('CONDSTORE', $this->serverCapabilities, true) && $status['modseq'] !== '';
+		try {
+			$conn = $this->client->getConnection();
+			if ($condstore) {
+				$conn->requestAndResponse('ENABLE', array('CONDSTORE'));
+			}
+			// Always examined again: a folder examined earlier in this connection would not show the new mails
+			$this->examined = '';
+			if (!$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$v = $status['uidvalidity'];
+			$read = 0;
+			if (empty($c)) {
+				// First call: every UID of the folder, the most recent read first
+				$all = $this->searchUids($since > 0 ? array('SINCE', date('d-M-Y', $since)) : array('ALL'));
+				rsort($all);
+				$take = array_slice($all, 0, $max);
+				$out['new'] = $this->fetchMails($take, $v);
+				$read = count($take);
+				$c = array('v' => $v, 'next' => $status['uidnext'], 'low' => $take ? min($take) : $status['uidnext'], 'done' => count($all) <= $max, 'modseq' => $status['modseq']);
+			} else {
+				// New mails since the last call
+				if ($status['uidnext'] > (int) $c['next']) {
+					$uids = $this->searchUids(array('UID', ((int) $c['next']).':*'));
+					$uids = array_values(array_filter($uids, function ($u) use ($c) {
+						return $u >= (int) $c['next'];
+					}));
+					sort($uids);
+					$take = array_slice($uids, 0, $max);
+					$out['new'] = $this->fetchMails($take, $v);
+					$read = count($take);
+					if (count($uids) > $max) {
+						// Budget reached: the next call goes on from the first mail not read
+						$c['next'] = max($take) + 1;
+						$out['more'] = true;
+					} else {
+						$c['next'] = $status['uidnext'];
+					}
+				}
+				// Flags changed elsewhere
+				if ($condstore && !empty($c['modseq']) && $c['modseq'] !== $status['modseq']) {
+					$out['changed'] = $this->fetchFlags(((int) $c['low']).':*', $v, $c['modseq']);
+				} elseif (!$condstore && !empty($options['flags'])) {
+					$out['changed'] = $this->fetchFlags(((int) $c['low']).':*', $v, '');
+				}
+				$c['modseq'] = $status['modseq'];
+				// Older mails not indexed yet (first indexing), within what is left of the budget
+				if (empty($c['done']) && !empty($options['backfill']) && $read < $max && (int) $c['low'] > 1) {
+					$older = $this->searchUids(array('UID', '1:'.((int) $c['low'] - 1)));
+					$older = array_values(array_filter($older, function ($u) use ($c) {
+						return $u < (int) $c['low'];
+					}));
+					if ($since > 0) {
+						$recent = $this->searchUids(array('SINCE', date('d-M-Y', $since)));
+						$older = array_values(array_intersect($older, $recent));
+					}
+					rsort($older);
+					$take = array_slice($older, 0, $max - $read);
+					$out['new'] = array_merge($out['new'], $this->fetchMails($take, $v));
+					if ($take) {
+						$c['low'] = min($take);
+					}
+					$c['done'] = count($older) <= count($take);
+				} elseif (empty($c['done']) && (int) $c['low'] <= 1) {
+					$c['done'] = true;
+				}
+				// Mails removed or moved elsewhere: the index is compared only when the numbers differ
+				if (isset($options['known']) && is_callable($options['known'])) {
+					// indexed: number of mails of the folder in the index; the list is asked only when it differs
+					$expected = (int) ($options['indexed'] ?? -1) + count($out['new']);
+					$present = $this->searchUids(array('UID', ((int) $c['low']).':*'));
+					$present = array_values(array_filter($present, function ($u) use ($c) {
+						return $u >= (int) $c['low'];
+					}));
+					if ($expected !== count($present)) {
+						$known = call_user_func($options['known']);
+						$here = array_flip(array_map(function ($u) use ($v) {
+							return $v.':'.$u;
+						}, $present));
+						foreach ($known as $remoteId) {
+							if (!isset($here[$remoteId])) {
+								$out['deleted'][] = $remoteId;
+							}
+						}
+					}
+				}
+			}
+			if (empty($c['done'])) {
+				// Mails left to index (first indexing not finished)
+				$out['more'] = true;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		}
+		$c['token'] = $status['token'];
+		$out['cursor'] = (string) json_encode($c);
+
+		return $out;
+	}
+
+	/**
+	 * UIDs answered by a UID SEARCH in the examined folder
+	 *
+	 * @param array<int,string> $criteria Criteria (ALL, SINCE date, UID set)
+	 * @return int[]
+	 */
+	protected function searchUids(array $criteria)
+	{
+		$response = $this->client->getConnection()->requestAndResponse('UID SEARCH', $criteria);
+		$uids = array();
+		foreach (is_array($response) ? $response : array() as $line) {
+			if (is_array($line) && isset($line[0]) && $line[0] === 'SEARCH') {
+				foreach (array_slice($line, 1) as $u) {
+					if (is_string($u) && ctype_digit($u)) {
+						$uids[] = (int) $u;
+					}
+				}
+			}
+		}
+
+		return $uids;
+	}
+
+	/**
+	 * Headers, flags, dates, size, structure of mails, read only, by chunks
+	 *
+	 * @param int[] $uids        UIDs in the examined folder
+	 * @param int   $uidvalidity Uidvalidity of the folder
+	 * @return array<int,array<string,mixed>> Common format (InboxHeaderParser + remote_id, sort_key, flags...)
+	 */
+	protected function fetchMails(array $uids, $uidvalidity)
+	{
+		$out = array();
+		$preview = in_array('PREVIEW', $this->serverCapabilities, true) ? ' PREVIEW' : '';
+		foreach (array_chunk($uids, self::FETCH_CHUNK) as $chunk) {
+			$set = implode(',', array_map('intval', $chunk));
+			$response = $this->client->getConnection()->requestAndResponse('UID FETCH', array($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.')])'));
+			foreach ($this->fetchItems($response) as $item) {
+				if (empty($item['UID'])) {
+					continue;
+				}
+				$mail = InboxHeaderParser::parse((string) ($item['HEADER'] ?? ''), isset($item['BODYSTRUCTURE']) && is_array($item['BODYSTRUCTURE']) ? $item['BODYSTRUCTURE'] : null);
+				$mail['remote_id'] = $uidvalidity.':'.((int) $item['UID']);
+				$mail['sort_key'] = (int) $item['UID'];
+				$mail['date_received'] = !empty($item['INTERNALDATE']) ? (int) strtotime((string) $item['INTERNALDATE']) : (int) $mail['date_mail'];
+				$mail['size'] = (int) ($item['RFC822.SIZE'] ?? 0);
+				$mail['snippet'] = isset($item['PREVIEW']) && is_string($item['PREVIEW']) ? InboxHeaderParser::bound($item['PREVIEW'], 200) : '';
+				$out[] = $mail + self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Flags of mails (changed since a modseq with CONDSTORE)
+	 *
+	 * @param string $set         UID set
+	 * @param int    $uidvalidity Uidvalidity
+	 * @param string $modseq      Changed since this modseq, '' for all
+	 * @return array<int,array<string,mixed>> remote_id + flag fields
+	 */
+	protected function fetchFlags($set, $uidvalidity, $modseq)
+	{
+		$args = array($set, '(UID FLAGS)');
+		if ($modseq !== '') {
+			$args[] = '(CHANGEDSINCE '.preg_replace('/\D/', '', $modseq).')';
+		}
+		$out = array();
+		foreach ($this->fetchItems($this->client->getConnection()->requestAndResponse('UID FETCH', $args)) as $item) {
+			if (!empty($item['UID'])) {
+				$out[] = array('remote_id' => $uidvalidity.':'.((int) $item['UID'])) + self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Items of the FETCH answers: name => value; the header literal under HEADER (the library cuts the name
+	 * BODY[HEADER.FIELDS (...)] in pieces, the literal is the last string of the list that follows)
+	 *
+	 * @param mixed $response Answer of requestAndResponse()
+	 * @return array<int,array<string,mixed>>
+	 */
+	protected function fetchItems($response)
+	{
+		$out = array();
+		foreach (is_array($response) ? $response : array() as $line) {
+			if (!is_array($line) || !isset($line[1], $line[2]) || $line[1] !== 'FETCH' || !is_array($line[2])) {
+				continue;
+			}
+			$t = $line[2];
+			$item = array();
+			$n = count($t);
+			for ($i = 0; $i < $n; $i++) {
+				$name = is_string($t[$i]) ? strtoupper($t[$i]) : '';
+				if (strpos($name, 'BODY[HEADER') === 0) {
+					$value = $t[$i + 1] ?? null;
+					if (is_string($value)) {
+						$item['HEADER'] = $value;
+					} elseif (is_array($value)) {
+						$last = end($value);
+						$item['HEADER'] = is_string($last) ? $last : '';
+					}
+					$i++;
+				} elseif ($name !== '' && $i + 1 < $n) {
+					$item[$name] = $t[$i + 1];
+					$i++;
+				}
+			}
+			$out[] = $item;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param array<int,mixed> $flags Flags and keywords of IMAP
+	 * @return array{seen:int,answered:int,flagged:int,draft:int,keywords:string[]}
+	 */
+	public static function flagFields(array $flags)
+	{
+		$out = array('seen' => 0, 'answered' => 0, 'flagged' => 0, 'draft' => 0, 'keywords' => array());
+		foreach ($flags as $f) {
+			if (!is_string($f)) {
+				continue;
+			}
+			$l = strtolower($f);
+			if ($l === '\\seen') {
+				$out['seen'] = 1;
+			} elseif ($l === '\\answered') {
+				$out['answered'] = 1;
+			} elseif ($l === '\\flagged') {
+				$out['flagged'] = 1;
+			} elseif ($l === '\\draft') {
+				$out['draft'] = 1;
+			} elseif ($f !== '' && $f[0] !== '\\' && preg_match('/^[\x21-\x7E]{1,64}$/', $f)) {
+				$out['keywords'][] = $f;
+			}
+		}
+
+		return $out;
+	}
+
 	/**
 	 * A folder path can be stored and shown: no quote, angle bracket, line break nor NUL (it is chosen by the owner
 	 * of the mailbox)
@@ -895,8 +1217,10 @@ class InboxImapConnector extends InboxConnector
 		global $langs;
 
 		$langs->load('inbox@inbox');
+		$this->errorCode = 'connect';
 		foreach ($warnings as $warning) {
 			if (stripos($warning, 'certificate verify failed') !== false) {
+				$this->errorCode = 'certificate';
 				return $langs->transnoentities('InboxErrorImapCertificate');
 			}
 		}
@@ -911,6 +1235,7 @@ class InboxImapConnector extends InboxConnector
 			}
 		}
 		if ($authFailed) {
+			$this->errorCode = 'auth';
 			$key = array(InboxAccount::AUTH_MASTER => 'InboxErrorImapAuthMaster', InboxAccount::AUTH_OAUTH => 'InboxErrorImapAuthOAuth');
 			return $langs->transnoentities(isset($key[$this->account->imap_auth_mode]) ? $key[$this->account->imap_auth_mode] : 'InboxErrorImapAuthLogin');
 		}

@@ -41,6 +41,10 @@ function inboxPrintJsContext(array $vars)
 	} else {
 		return false;
 	}
+	// The interface of the translations answers with an HTTP cache of one day: a path suffix that changes with the
+	// language file of inbox makes the browser ask it again after an update (the PHP file is the same)
+	$langFile = dirname(__DIR__).'/langs/'.$langs->getDefaultLang().'/inbox.lang';
+	$langUrl .= '/ibx'.(is_file($langFile) ? filemtime($langFile) : '0');
 	$ext = 'v='.urlencode(DOL_VERSION);
 	foreach (array('dolibarr-context.umd.js', 'dolibarr-tool.seteventmessage.js', 'dolibarr-tool.langs.js') as $file) {
 		print '<script nonce="'.getNonce().'" src="'.$path.'/'.$file.'?'.$ext.'"></script>'."\n";
@@ -89,5 +93,7 @@ function inboxAppContextVars(User $user)
 		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#1d6a8a'),
 		'INBOX_DOLIBARR_URL' => DOL_URL_ROOT.'/',
 		'INBOX_COMPANY' => getDolGlobalString('MAIN_INFO_SOCIETE_NOM'),
+		// Changes with the language file: the page clears the translations cached by the browser when it changed
+		'INBOX_LANG_STAMP' => $moduleVersion.'-'.@filemtime(dirname(__DIR__).'/langs/'.$GLOBALS['langs']->getDefaultLang().'/inbox.lang'),
 	);
 }

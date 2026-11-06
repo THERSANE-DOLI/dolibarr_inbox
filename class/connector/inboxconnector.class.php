@@ -40,6 +40,9 @@ abstract class InboxConnector implements InboxConnectorInterface
 	/** @var string */
 	protected $error = '';
 
+	/** @var string Kind of the last error: auth (credentials refused), connect (server unreachable), certificate, '' */
+	protected $errorCode = '';
+
 	/** @var bool */
 	protected $notFound = false;
 
@@ -109,6 +112,14 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
+	 * @return string Kind of the last error (auth, connect, certificate) or ''
+	 */
+	public function getErrorCode()
+	{
+		return $this->errorCode;
+	}
+
+	/**
 	 * @return bool
 	 */
 	public function notFound()
@@ -131,13 +142,23 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
-	 * @param string $folder Folder
-	 * @param string $cursor Cursor
+	 * @param string              $folder  Folder
+	 * @param string              $cursor  Cursor
+	 * @param array<string,mixed> $options Options
 	 * @return null
 	 */
-	public function getChanges($folder, $cursor)
+	public function getChanges($folder, $cursor, array $options = array())
 	{
 		return $this->unsupported('getChanges');
+	}
+
+	/**
+	 * @param string $folder Folder
+	 * @return null
+	 */
+	public function folderStatus($folder)
+	{
+		return $this->unsupported('folderStatus');
 	}
 
 	/**

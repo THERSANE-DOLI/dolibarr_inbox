@@ -1,0 +1,336 @@
+<?php
+/* Copyright (C) 2026 THERSANE www.thersane.fr
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \file    inbox/class/inboxsync.class.php
+ * \ingroup inbox
+ * \brief   Synchronisation of the index of the mailboxes (read only)
+ */
+
+require_once __DIR__.'/inboxaccount.class.php';
+require_once __DIR__.'/inboxfolder.class.php';
+require_once __DIR__.'/inboxmail.class.php';
+require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
+
+/**
+ * A pass on a mailbox (analyse-lot-w2 §3): lock, folders, changes of each followed folder, index written, state.
+ * Read only on the server. Order of the folders: inbox and sent at every pass, the others every 15 min, then the
+ * first indexing of the older mails, within the time budget.
+ */
+class InboxSync
+{
+	/** Pass considered dead after this time (lock taken again) */
+	const LOCK_SECONDS = 600;
+
+	/** Folders other than inbox and sent: every */
+	const OTHER_FOLDERS_SECONDS = 900;
+
+	/** List of the folders read again every */
+	const LIST_SECONDS = 900;
+
+	/** Mails read per call of the connector */
+	const CHUNK = 500;
+
+	/** Waits after errors in a row: 5 min, 15 min, then every hour */
+	const RETRY = array(300, 900, 3600);
+
+	/** @var DoliDB */
+	protected $db;
+
+	/** @var string */
+	public $error = '';
+
+	/** @var array<string,int> Counters of the last pass */
+	public $stats = array();
+
+	/**
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct(DoliDB $db)
+	{
+		$this->db = $db;
+	}
+
+	/**
+	 * Take the lock of a mailbox: only one pass at a time (scheduled job, button, application)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return bool
+	 */
+	protected function lock($accountId)
+	{
+		$now = dol_now();
+		$sql = "UPDATE ".$this->db->prefix()."inbox_account SET sync_lock = '".$this->db->idate($now)."'";
+		$sql .= " WHERE rowid = ".((int) $accountId)." AND (sync_lock IS NULL OR sync_lock < '".$this->db->idate($now - self::LOCK_SECONDS)."')";
+
+		return $this->db->query($sql) && (int) $this->db->affected_rows(true) === 1;
+	}
+
+	/**
+	 * @param int $accountId Mailbox
+	 * @return void
+	 */
+	protected function unlock($accountId)
+	{
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET sync_lock = NULL WHERE rowid = ".((int) $accountId));
+	}
+
+	/**
+	 * State of the mailbox after a pass
+	 *
+	 * @param int    $accountId Mailbox
+	 * @param string $state     ok, first_sync, auth_failed, unreachable, error
+	 * @param string $error     Message (never a password)
+	 * @return void
+	 */
+	protected function saveState($accountId, $state, $error = '')
+	{
+		$p = $this->db->prefix();
+		$now = dol_now();
+		if (in_array($state, array('ok', 'first_sync'), true)) {
+			$sql = "UPDATE ".$p."inbox_account SET sync_state = '".$this->db->escape($state)."', sync_error = NULL, date_sync = '".$this->db->idate($now)."', sync_fail_count = 0, sync_retry_at = NULL WHERE rowid = ".((int) $accountId);
+		} else {
+			$row = $this->db->getRow("SELECT sync_fail_count FROM ".$p."inbox_account WHERE rowid = ".((int) $accountId));
+			$fails = (is_object($row) ? (int) $row->sync_fail_count : 0) + 1;
+			$wait = self::RETRY[min($fails, count(self::RETRY)) - 1];
+			$sql = "UPDATE ".$p."inbox_account SET sync_state = '".$this->db->escape($state)."', sync_error = '".$this->db->escape(dol_trunc($error, 1000, 'right', 'UTF-8', 1))."',";
+			$sql .= " date_sync_error = '".$this->db->idate($now)."', sync_fail_count = ".$fails.", sync_retry_at = '".$this->db->idate($now + $wait)."' WHERE rowid = ".((int) $accountId);
+		}
+		$this->db->query($sql);
+	}
+
+	/**
+	 * One pass on a mailbox
+	 *
+	 * @param InboxAccount $account  Mailbox (active)
+	 * @param int          $deadline Timestamp (microtime) not to go beyond
+	 * @param array<string,mixed> $options force (bool: even during the wait after an error, every folder now),
+	 *                                      phase (1: inbox and sent only; 2: the others and the first indexing; 0: both)
+	 * @return int 1 done, 0 skipped (lock, wait after an error), -1 error
+	 */
+	public function run(InboxAccount $account, $deadline, array $options = array())
+	{
+		$this->error = '';
+		$this->stats = array('folders' => 0, 'new' => 0, 'changed' => 0, 'deleted' => 0);
+		$force = !empty($options['force']);
+		$phase = (int) ($options['phase'] ?? 0);
+		if (!$account->isActive()) {
+			return 0;
+		}
+		$account->loadSyncState();
+		if (!$force && $account->sync_retry_at && $account->sync_retry_at > dol_now()) {
+			return 0;
+		}
+		if (!$this->lock((int) $account->id)) {
+			return 0;
+		}
+		try {
+			return $this->pass($account, $deadline, $force, $phase);
+		} finally {
+			$this->unlock((int) $account->id);
+		}
+	}
+
+	/**
+	 * @param InboxAccount $account  Mailbox
+	 * @param float        $deadline Microtime limit
+	 * @param bool         $force    Every folder now
+	 * @param int          $phase    0, 1, 2
+	 * @return int
+	 */
+	protected function pass(InboxAccount $account, $deadline, $force, $phase)
+	{
+		global $langs;
+
+		$error = '';
+		$connector = InboxConnectorFactory::forAccount($this->db, $account, $error);
+		if (!$connector || !$connector->can(InboxConnectorInterface::CAP_CHANGES)) {
+			$this->saveState((int) $account->id, 'error', $connector ? $langs->transnoentities('InboxErrorNotSupported', 'getChanges') : $error);
+			return -1;
+		}
+		if (!$connector->connect()) {
+			$msg = $connector->getError();
+			$state = method_exists($connector, 'getErrorCode') && $connector->getErrorCode() === 'auth' ? 'auth_failed' : 'unreachable';
+			$this->saveState((int) $account->id, $state, $msg);
+			$this->error = $msg;
+			return -1;
+		}
+		$folders = new InboxFolder($this->db);
+		$mails = new InboxMail($this->db);
+		$p = $this->db->prefix();
+		// Folders of the server
+		if ($force || !$account->date_folders || $account->date_folders < dol_now() - self::LIST_SECONDS || !$folders->listForAccount((int) $account->id)) {
+			$list = $connector->listFolders();
+			if ($list === null) {
+				$this->saveState((int) $account->id, 'error', $connector->getError());
+				return -1;
+			}
+			$folders->syncTree($account, $list);
+			$this->db->query("UPDATE ".$p."inbox_account SET date_folders = '".$this->db->idate(dol_now())."' WHERE rowid = ".((int) $account->id));
+		}
+		$rows = array_filter($folders->listForAccount((int) $account->id), function ($f) {
+			return (int) $f->selectable === 1 && (int) $f->sync_enabled === 1;
+		});
+		// Order: inbox and sent first, then the others (due ones), then the first indexing
+		$first = array();
+		$others = array();
+		foreach ($rows as $f) {
+			if (in_array((string) $f->role, array('inbox', 'sent'), true)) {
+				$first[] = $f;
+			} else {
+				$others[] = $f;
+			}
+		}
+		$queue = array();
+		if ($phase !== 2) {
+			foreach ($first as $f) {
+				$queue[] = array($f, false);
+			}
+		}
+		if ($phase !== 1) {
+			foreach ($others as $f) {
+				$due = $force || !$f->date_sync || $this->db->jdate($f->date_sync) < dol_now() - self::OTHER_FOLDERS_SECONDS;
+				if ($due) {
+					$queue[] = array($f, false);
+				}
+			}
+			foreach (array_merge($first, $others) as $f) {
+				if (!(int) $f->first_sync_done) {
+					$queue[] = array($f, true);
+				}
+			}
+		}
+		$maxDays = (int) $account->sync_max_days;
+		$firstSyncLeft = false;
+		$done = array();
+		foreach ($queue as $item) {
+			list($f, $backfill) = $item;
+			if (microtime(true) > $deadline) {
+				$firstSyncLeft = true;
+				break;
+			}
+			if (!$backfill && isset($done[$f->rowid])) {
+				continue;
+			}
+			$done[$f->rowid] = true;
+			$since = 0;
+			if (in_array((string) $f->role, InboxFolder::SHORT_ROLES, true)) {
+				$since = dol_now() - 30 * 86400;
+			} elseif ($maxDays > 0) {
+				$since = dol_now() - $maxDays * 86400;
+			}
+			$folderId = (int) $f->rowid;
+			$stats = $mails->folderStats($folderId);
+			$maxMails = (int) $account->sync_max_mails;
+			$allowed = $maxMails > 0 ? max(0, $maxMails - $stats['count']) : self::CHUNK;
+			$res = $connector->getChanges((string) $f->path, (string) $f->sync_cursor, array(
+				'max' => max(1, min(self::CHUNK, $allowed ?: 1)),
+				'backfill' => $backfill && $allowed > 0,
+				'since' => $since,
+				'indexed' => $stats['count'],
+				'known' => function () use ($mails, $folderId) {
+					return $mails->remoteIds($folderId);
+				},
+			));
+			if ($res === null) {
+				$folders->saveState($folderId, array('sync_error' => $connector->getError()));
+				continue;
+			}
+			if ($res['reset']) {
+				$mails->clearFolder($folderId);
+			}
+			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
+			$this->stats['deleted'] += $mails->removeMany($folderId, $res['deleted']);
+			$this->stats['folders']++;
+			$after = $mails->folderStats($folderId);
+			$cursor = json_decode((string) $res['cursor'], true);
+			$complete = is_array($cursor) && !empty($cursor['done']) || ($maxMails > 0 && $after['count'] >= $maxMails);
+			$folders->saveState($folderId, array(
+				'sync_cursor' => $res['cursor'], 'total' => $res['total'], 'unread' => $res['unread'], 'indexed' => $after['count'],
+				'oldest_indexed' => $after['oldest'], 'first_sync_done' => $complete ? 1 : 0, 'sync_error' => '',
+			));
+			$f->first_sync_done = $complete ? 1 : 0;
+			$f->sync_cursor = $res['cursor'];
+			if (!$complete) {
+				$firstSyncLeft = true;
+			}
+		}
+		$connector->disconnect();
+		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND status = 1 AND selectable = 1 AND sync_enabled = 1 AND first_sync_done = 0");
+		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
+
+		return 1;
+	}
+
+	/**
+	 * Progress of the mailbox (tab Synchro)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return array{indexed:int,total:int,folders:int,first_sync_left:int}
+	 */
+	public function progress($accountId)
+	{
+		$row = $this->db->getRow("SELECT SUM(indexed) AS i, SUM(total) AS t, COUNT(rowid) AS n, SUM(CASE WHEN first_sync_done = 0 AND sync_enabled = 1 AND selectable = 1 THEN 1 ELSE 0 END) AS left_n"
+			." FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $accountId)." AND status = 1");
+
+		return array('indexed' => (int) ($row->i ?? 0), 'total' => (int) ($row->t ?? 0), 'folders' => (int) ($row->n ?? 0), 'first_sync_left' => (int) ($row->left_n ?? 0));
+	}
+
+	/**
+	 * Scheduled job « Synchronise the mailboxes » (every minute): inbox and sent of every active mailbox first, then the
+	 * other folders and the first indexing, within the time budget (INBOX_SYNC_BUDGET, 45 s by default)
+	 *
+	 * @return int 0 if OK (output in $this->output)
+	 */
+	public function cronRun()
+	{
+		global $conf;
+
+		$start = microtime(true);
+		$deadline = $start + max(10, getDolGlobalInt('INBOX_SYNC_BUDGET', 45));
+		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." AND status = ".InboxAccount::STATUS_ACTIVE." ORDER BY date_sync, rowid LIMIT 500");
+		$accounts = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$a = new InboxAccount($this->db);
+			if ($a->fetch((int) $r->rowid) > 0) {
+				$accounts[] = $a;
+			}
+		}
+		$total = array('new' => 0, 'changed' => 0, 'deleted' => 0, 'errors' => 0);
+		foreach (array(1, 2) as $phase) {
+			foreach ($accounts as $a) {
+				if (microtime(true) > $deadline) {
+					break 2;
+				}
+				$res = $this->run($a, $deadline, array('phase' => $phase));
+				if ($res < 0) {
+					$total['errors']++;
+				}
+				foreach (array('new', 'changed', 'deleted') as $k) {
+					$total[$k] += $this->stats[$k] ?? 0;
+				}
+			}
+		}
+		$this->output = count($accounts).' mailbox(es), '.$total['new'].' new, '.$total['changed'].' changed, '.$total['deleted'].' removed, '.$total['errors'].' error(s), '.round(microtime(true) - $start, 1).' s';
+
+		return 0;
+	}
+
+	/** @var string Output of the scheduled job */
+	public $output = '';
+}

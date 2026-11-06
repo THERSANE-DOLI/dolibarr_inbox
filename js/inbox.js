@@ -443,6 +443,23 @@
 		try {
 			// The langs tool reads the language when its file loads, before the values of the page: set it here
 			await Dolibarr.tools.langs.setLocale(ctx('MAIN_LANG_DEFAULT', 'en_US'), true);
+			// The langs tool keeps the translations in the browser until Dolibarr itself changes version: after an
+			// update of inbox, its new texts would show their keys. Cache cleared when the language file changed.
+			const stamp = ctx('INBOX_LANG_STAMP', '') + '|' + ctx('DOL_LANG_INTERFACE_URL', '');
+			let known = '';
+			try {
+				known = localStorage.getItem('inbox-lang-stamp') || '';
+			} catch (e) {
+				known = '';
+			}
+			if (stamp && stamp !== known && Dolibarr.tools.langs.clearCache) {
+				await Dolibarr.tools.langs.clearCache(true);
+				try {
+					localStorage.setItem('inbox-lang-stamp', stamp);
+				} catch (e) {
+					// private window: cleared again next time, harmless
+				}
+			}
 			await Dolibarr.tools.langs.load('inbox@inbox');
 		} catch (e) {
 			// Keys shown as they are: the application still works

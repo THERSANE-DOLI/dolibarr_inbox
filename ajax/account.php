@@ -101,6 +101,8 @@ function inboxAccountSummary(InboxAccount $account, $level)
 		'last_test_result' => (string) $account->last_test_result,
 		'date_last_test' => $account->date_last_test ? (int) $account->date_last_test : null,
 		'sync_state' => (string) $account->sync_state,
+		'sync_error' => (string) $account->sync_error,
+		'date_sync' => $account->date_sync ? (int) $account->date_sync : null,
 		'accesses' => is_object($row) ? (int) $row->n : 0,
 		'level' => $level,
 	);

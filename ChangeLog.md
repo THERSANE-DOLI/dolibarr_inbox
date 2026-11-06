@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: synchronisation of the index of the mailboxes :   1.3.0
+  - index in the database of the folders and of the headers of the mails (sender, recipients, subject, dates,
+    size, attachments, flags, tags), never their body; the mail server stays the reference, read only.
+  - scheduled job every minute: inbox and sent folders at each run, the others every 15 minutes, then the first
+    indexing of the whole mailbox in the background, the recent mails first, within a time budget.
+  - changes made elsewhere followed: new mails, flags and tags (CONDSTORE), mails removed or moved, folders
+    created or removed; folder renumbered by the server indexed again.
+  - mailbox in error (login refused, server unreachable): state with the reason, next tries more and more
+    spaced, the other mailboxes go on.
+  - thirdparty and contact recognised by the exact address of the sender, updated when a contact or a thirdparty
+    changes.
+  - tab Synchronisation of a mailbox: state, progress, folders followed, « Synchronise now », « Rebuild the
+    index »; the caps of the indexing are optional (0 = everything by default).
+  - translations of the application asked again after an update of the module (cache of the browser).
 - NEW: mailboxes of inbox, inbox application (settings) :   1.2.0
   - mailboxes managed in inbox (IMAP connector, SMTP, Sieve): personal or shared, passwords encrypted and never
     sent to the browser, connection test step by step (read only), folder roles, enabled after a successful test.

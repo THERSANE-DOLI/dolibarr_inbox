@@ -110,13 +110,26 @@ interface InboxConnectorInterface
 	public function listFolders();
 
 	/**
-	 * Changes of a folder since a cursor (lot W2)
+	 * Counters of a folder, without opening it
 	 *
 	 * @param string $folder Folder path
-	 * @param string $cursor Cursor given by the previous call, '' the first time
-	 * @return array{cursor:string,reset:bool,new:array<int,array<string,mixed>>,changed:array<int,array<string,mixed>>,deleted:string[]}|null
+	 * @return array{total:int,unread:int,changed:bool,token:string}|null token: opaque, equal when nothing changed
 	 */
-	public function getChanges($folder, $cursor);
+	public function folderStatus($folder);
+
+	/**
+	 * Changes of a folder since a cursor (lot W2), read only. The new mails first, then the older ones not indexed yet
+	 * (first indexing, from the most recent to the oldest), within the limits of \$options.
+	 *
+	 * @param string              $folder  Folder path
+	 * @param string              $cursor  Cursor given by the previous call, '' the first time
+	 * @param array<string,mixed> $options max (mails to read at most), backfill (bool: older mails), since (timestamp:
+	 *                                     not older), indexed (number of mails of the folder in the index), known
+	 *                                     (callable returning their remote_id, asked only when the numbers differ),
+	 *                                     flags (bool: read every flag when the server cannot say what changed)
+	 * @return array{cursor:string,reset:bool,new:array<int,array<string,mixed>>,changed:array<int,array<string,mixed>>,deleted:string[],more:bool,total:int,unread:int}|null
+	 */
+	public function getChanges($folder, $cursor, array $options = array());
 
 	/**
 	 * RFC 822 source of a mail, read only (the mail stays unread)

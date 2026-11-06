@@ -94,16 +94,13 @@ class InboxAccount extends CommonObject
 		'sieve_port' => array('type' => 'integer', 'label' => 'InboxSievePort', 'enabled' => 1, 'position' => 130, 'notnull' => 0, 'default' => '4190', 'visible' => 0),
 		'server_info' => array('type' => 'text', 'label' => 'InboxServerInfo', 'enabled' => 1, 'position' => 140, 'notnull' => 0, 'visible' => 0),
 		'folder_roles' => array('type' => 'text', 'label' => 'InboxFolderRoles', 'enabled' => 1, 'position' => 141, 'notnull' => 0, 'visible' => 0),
-		'sync_max_days' => array('type' => 'integer', 'label' => 'InboxSyncMaxDays', 'enabled' => 1, 'position' => 150, 'notnull' => 0, 'default' => '365', 'visible' => 0),
-		'sync_max_mails' => array('type' => 'integer', 'label' => 'InboxSyncMaxMails', 'enabled' => 1, 'position' => 151, 'notnull' => 0, 'default' => '20000', 'visible' => 0),
+		'sync_max_days' => array('type' => 'integer', 'label' => 'InboxSyncMaxDays', 'enabled' => 1, 'position' => 150, 'notnull' => 0, 'default' => '0', 'visible' => 0),
+		'sync_max_mails' => array('type' => 'integer', 'label' => 'InboxSyncMaxMails', 'enabled' => 1, 'position' => 151, 'notnull' => 0, 'default' => '0', 'visible' => 0),
 		'tags_mode' => array('type' => 'varchar(8)', 'label' => 'InboxTagsMode', 'enabled' => 1, 'position' => 160, 'notnull' => 1, 'default' => 'global', 'visible' => 0),
 		'status' => array('type' => 'integer', 'label' => 'Status', 'enabled' => 1, 'position' => 500, 'notnull' => 1, 'default' => '0', 'visible' => 1, 'arrayofkeyval' => array(0 => 'Draft', 1 => 'Enabled', 9 => 'Disabled')),
 		'date_last_test' => array('type' => 'datetime', 'label' => 'InboxDateLastTest', 'enabled' => 1, 'position' => 510, 'notnull' => 0, 'visible' => 0),
 		'last_test_result' => array('type' => 'varchar(16)', 'label' => 'InboxLastTestResult', 'enabled' => 1, 'position' => 511, 'notnull' => 0, 'visible' => 0),
 		'last_error' => array('type' => 'text', 'label' => 'InboxLastError', 'enabled' => 1, 'position' => 512, 'notnull' => 0, 'visible' => 0),
-		'sync_state' => array('type' => 'varchar(16)', 'label' => 'InboxSyncState', 'enabled' => 1, 'position' => 520, 'notnull' => 0, 'visible' => 0),
-		'sync_error' => array('type' => 'text', 'label' => 'InboxSyncError', 'enabled' => 1, 'position' => 521, 'notnull' => 0, 'visible' => 0),
-		'date_sync_error' => array('type' => 'datetime', 'label' => 'InboxDateSyncError', 'enabled' => 1, 'position' => 522, 'notnull' => 0, 'visible' => 0),
 		'date_creation' => array('type' => 'datetime', 'label' => 'DateCreation', 'enabled' => 1, 'position' => 900, 'notnull' => 1, 'visible' => 0),
 		'tms' => array('type' => 'timestamp', 'label' => 'DateModification', 'enabled' => 1, 'position' => 901, 'notnull' => 0, 'visible' => 0),
 		'fk_user_creat' => array('type' => 'integer:User:user/class/user.class.php', 'label' => 'UserAuthor', 'enabled' => 1, 'position' => 910, 'notnull' => 1, 'visible' => 0),
@@ -161,10 +158,10 @@ class InboxAccount extends CommonObject
 	public $server_info;
 	/** @var string|null JSON, role => real folder */
 	public $folder_roles;
-	/** @var int */
-	public $sync_max_days = 365;
-	/** @var int */
-	public $sync_max_mails = 20000;
+	/** @var int Optional cap of the indexing, days (0 = everything) */
+	public $sync_max_days = 0;
+	/** @var int Optional cap of the indexing, mails (0 = everything) */
+	public $sync_max_mails = 0;
 	/** @var string global|own */
 	public $tags_mode = 'global';
 	/** @var int */
@@ -181,6 +178,16 @@ class InboxAccount extends CommonObject
 	public $sync_error;
 	/** @var int|string|null */
 	public $date_sync_error;
+	/** @var int|string|null Last pass of the synchronisation that ended */
+	public $date_sync;
+	/** @var int|string|null Last reading of the folders (LIST) */
+	public $date_folders;
+	/** @var int|string|null Lock of a pass in progress */
+	public $sync_lock;
+	/** @var int|string|null After an error: no new try before */
+	public $sync_retry_at;
+	/** @var int Errors in a row */
+	public $sync_fail_count = 0;
 	/** @var int|string */
 	public $date_creation;
 	/** @var int */
@@ -191,6 +198,10 @@ class InboxAccount extends CommonObject
 	public $import_key;
 	/** @var string Level of the current user on this mailbox, set by InboxAccess::getAccounts() */
 	public $access_level = '';
+
+	/** @var string[] State of the synchronisation: written only by InboxSync (never by create / update, so that saving
+	 * the card during a pass does not write old values over it), loaded by fetch() */
+	const SYNC_FIELDS = array('sync_state', 'sync_error', 'date_sync_error', 'date_sync', 'date_folders', 'sync_lock', 'sync_retry_at', 'sync_fail_count');
 
 	/** @var string[] Columns of the server: a change is written in the journal (values, never a password) */
 	const SERVER_FIELDS = array('imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert',
@@ -251,7 +262,30 @@ class InboxAccount extends CommonObject
 		}
 
 		// Always the current entity, also by id: a mailbox of another entity does not exist here
-		return $this->fetchCommon($id, $ref, " AND t.entity = ".((int) $conf->entity));
+		$result = $this->fetchCommon($id, $ref, " AND t.entity = ".((int) $conf->entity));
+		if ($result > 0) {
+			$this->loadSyncState();
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Load the state of the synchronisation (columns out of $fields, see SYNC_FIELDS)
+	 *
+	 * @return void
+	 */
+	public function loadSyncState()
+	{
+		$row = $this->db->getRow("SELECT ".implode(', ', self::SYNC_FIELDS)." FROM ".$this->db->prefix().$this->table_element." WHERE rowid = ".((int) $this->id));
+		if (!is_object($row)) {
+			return;
+		}
+		foreach (self::SYNC_FIELDS as $field) {
+			$value = $row->$field;
+			$this->$field = (strpos($field, 'date_') === 0 || in_array($field, array('sync_lock', 'sync_retry_at'), true)) ? ($value ? (int) $this->db->jdate($value) : null) : $value;
+		}
+		$this->sync_fail_count = (int) $this->sync_fail_count;
 	}
 
 	/**
@@ -352,7 +386,9 @@ class InboxAccount extends CommonObject
 		}
 
 		$this->db->begin();
-		foreach (array('inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam') as $table) {
+		// Index of the mailbox (rebuilt from the server at any time) with it
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$this->db->prefix()."inbox_mail WHERE fk_account = ".((int) $this->id).")");
+		foreach (array('inbox_mail', 'inbox_folder', 'inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam') as $table) {
 			if (!$this->db->query("DELETE FROM ".$this->db->prefix().$table." WHERE fk_account = ".((int) $this->id))) {
 				$this->error = $this->db->lasterror();
 				$this->db->rollback();
@@ -708,6 +744,8 @@ class InboxAccount extends CommonObject
 			'sync_state' => (string) $this->sync_state,
 			'sync_error' => (string) $this->sync_error,
 			'date_sync_error' => $this->date_sync_error ? (int) $this->date_sync_error : null,
+			'date_sync' => $this->date_sync ? (int) $this->date_sync : null,
+			'sync_retry_at' => $this->sync_retry_at ? (int) $this->sync_retry_at : null,
 		);
 		$config = array();
 		foreach ($this->getConnectorConfig() as $key => $value) {
