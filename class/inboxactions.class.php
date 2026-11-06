@@ -1,0 +1,631 @@
+<?php
+/* Copyright (C) 2026 THERSANE www.thersane.fr
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \file    inbox/class/inboxactions.class.php
+ * \ingroup inbox
+ * \brief   Actions on mails (lot W4): flags, tags, move, archive, remove, junk, with their undo
+ */
+
+require_once __DIR__.'/inboxaccess.class.php';
+require_once __DIR__.'/inboxaccount.class.php';
+require_once __DIR__.'/inboxfolder.class.php';
+require_once __DIR__.'/inboxmail.class.php';
+require_once __DIR__.'/inboxreader.class.php';
+require_once __DIR__.'/inboxactionlog.class.php';
+require_once __DIR__.'/inboxsync.class.php';
+require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
+
+/**
+ * Every write follows the same order (P8): write on the mail server, check, then the index. Never the index first.
+ * The rights are checked here, per mailbox: « read » for read / unread and starred, « manage » for the rest (lot W4
+ * §10 point 2). Each action gives back the steps of its undo (other actions, checked the same way).
+ */
+class InboxActions
+{
+	/** Mails per call (the browser sends larger selections by batches of this size) */
+	const MAX = 200;
+
+	/** @var DoliDB */
+	protected $db;
+
+	/** @var string */
+	public $error = '';
+
+	/** @var array<string,InboxConnectorInterface> Connectors opened during the call, per mailbox */
+	protected $connectors = array();
+
+	/** @var array<int,InboxAccount> */
+	protected $accounts = array();
+
+	/**
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct(DoliDB $db)
+	{
+		$this->db = $db;
+	}
+
+	/**
+	 * @return void
+	 */
+	public function __destruct()
+	{
+		foreach ($this->connectors as $c) {
+			$c->disconnect();
+		}
+	}
+
+	/**
+	 * Run an action
+	 *
+	 * @param User                $user    User
+	 * @param string              $action  seen, flag, tag, move, archive, delete, junk, notjunk
+	 * @param int[]               $mailIds Rows of the index
+	 * @param array<string,mixed> $params  expand (rows of folded conversations); on (seen, flag); add, remove (tag); folder (move: target folder row); confirm (delete in the trash)
+	 * @return array{ok:bool,count:int,undo:array<int,array<string,mixed>>,error:string,ids:array<int,int>,rest:int[]}
+	 */
+	public function run(User $user, $action, array $mailIds, array $params = array())
+	{
+		$this->error = '';
+		$mailIds = array_slice(array_values(array_unique(array_filter(array_map('intval', $mailIds)))), 0, self::MAX);
+		$out = array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => '', 'ids' => array(), 'rest' => array());
+		if (!$mailIds) {
+			$out['error'] = 'No mail';
+			return $out;
+		}
+		// A conversation folded in the list: the action goes to all its mails of the same folder
+		$expand = array_values(array_intersect($mailIds, array_map('intval', (array) ($params['expand'] ?? array()))));
+		if ($expand) {
+			$p = $this->db->prefix();
+			$more = $this->db->getRows("SELECT DISTINCT o.rowid FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_mail as o ON o.fk_folder = m.fk_folder AND o.thread_key = m.thread_key"
+				." WHERE m.rowid IN (".implode(',', $expand).") AND m.thread_key IS NOT NULL LIMIT ".self::MAX);
+			foreach (is_array($more) ? $more : array() as $o) {
+				$mailIds[] = (int) $o->rowid;
+			}
+			$mailIds = array_slice(array_values(array_unique($mailIds)), 0, self::MAX);
+		}
+		$rows = $this->rows($user, $mailIds, in_array($action, array('seen', 'flag'), true) ? InboxAccess::LEVEL_READ : InboxAccess::LEVEL_MANAGE);
+		if ($rows === null) {
+			$out['error'] = $this->error;
+			return $out;
+		}
+		// By folder: one write on the server per folder
+		$groups = array();
+		foreach ($rows as $r) {
+			$groups[(int) $r->fk_folder][] = $r;
+		}
+		foreach ($groups as $folderId => $list) {
+			$res = null;
+			switch ($action) {
+				case 'seen':
+				case 'flag':
+					$res = $this->flag($user, $list, !empty($params['on']), $action === 'seen' ? '\\Seen' : '\\Flagged');
+					break;
+				case 'tag':
+					$res = $this->tag($user, $list, (array) ($params['add'] ?? array()), (array) ($params['remove'] ?? array()));
+					break;
+				case 'move':
+					$res = $this->moveTo($user, $list, (int) ($params['folder'] ?? 0), 'move');
+					break;
+				case 'archive':
+					$res = $this->archive($user, $list);
+					break;
+				case 'delete':
+					$res = $this->delete($user, $list, !empty($params['confirm']));
+					break;
+				case 'junk':
+				case 'notjunk':
+					$res = $this->junk($user, $list, $action === 'junk');
+					break;
+				default:
+					$this->error = 'Unknown action';
+			}
+			if ($res === null) {
+				$out['error'] = $this->error;
+				// What was done before stays done (and undoable): the list is told
+				$out['ok'] = $out['count'] > 0;
+				return $out;
+			}
+			$out['count'] += $res['count'];
+			$out['undo'] = array_merge($out['undo'], $res['undo']);
+			$out['ids'] += $res['ids'] ?? array();
+			if (!empty($res['rest'])) {
+				// Another mailbox, out of time: the browser sends the rest in the next call
+				$out['rest'] = array_merge($out['rest'], $res['rest']);
+				if (!empty($res['partial_error'])) {
+					$out['error'] = $res['partial_error'];
+				}
+			}
+		}
+		$out['ok'] = true;
+
+		return $out;
+	}
+
+	/**
+	 * Rows of the index with their folder and mailbox, all in mailboxes where the user has the level
+	 *
+	 * @param User   $user    User
+	 * @param int[]  $mailIds Rows
+	 * @param string $level   Level needed
+	 * @return object[]|null
+	 */
+	protected function rows(User $user, array $mailIds, $level)
+	{
+		$p = $this->db->prefix();
+		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.remote_id, m.sort_key, m.message_id, m.subject, m.date_mail, m.date_received, m.seen, m.answered,"
+			." m.flagged, m.keywords, f.path, f.role, f.delimiter FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
+			." WHERE m.rowid IN (".implode(',', $mailIds).") LIMIT ".(self::MAX + 1));
+		if (!is_array($rows) || count($rows) !== count($mailIds)) {
+			$this->error = 'InboxMailNotFound';
+			return null;
+		}
+		$access = new InboxAccess($this->db);
+		foreach ($rows as $r) {
+			if (!$access->check($user, (int) $r->fk_account, $level)) {
+				// A mail of a mailbox without access is « not found »; with « read » only, the reason is said
+				$this->error = $access->check($user, (int) $r->fk_account, InboxAccess::LEVEL_READ) ? 'InboxErrorNeedManage' : 'InboxMailNotFound';
+				return null;
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * @param int $accountId Mailbox
+	 * @return InboxConnectorInterface|null
+	 */
+	protected function connector($accountId)
+	{
+		if (isset($this->connectors[$accountId])) {
+			return $this->connectors[$accountId];
+		}
+		$account = $this->account($accountId);
+		if (!$account) {
+			return null;
+		}
+		$error = '';
+		$c = InboxConnectorFactory::forAccount($this->db, $account, $error);
+		if (!$c) {
+			$this->error = $error;
+			return null;
+		}
+		$this->connectors[$accountId] = $c;
+
+		return $c;
+	}
+
+	/**
+	 * @param int $accountId Mailbox
+	 * @return InboxAccount|null
+	 */
+	protected function account($accountId)
+	{
+		if (!isset($this->accounts[$accountId])) {
+			$a = new InboxAccount($this->db);
+			if ($a->fetch((int) $accountId) <= 0 || !$a->isActive()) {
+				$this->error = 'InboxMailNotFound';
+				return null;
+			}
+			$this->accounts[$accountId] = $a;
+		}
+
+		return $this->accounts[$accountId];
+	}
+
+	/**
+	 * Read / unread or starred, on several mails (one mail opened: InboxReader::setSeen)
+	 *
+	 * @param User     $user User
+	 * @param object[] $list Rows of one folder
+	 * @param bool     $on   Flag set
+	 * @param string   $flag \\Seen or \\Flagged
+	 * @return array<string,mixed>|null
+	 */
+	protected function flag(User $user, array $list, $on, $flag)
+	{
+		$first = $list[0];
+		$c = $this->connector((int) $first->fk_account);
+		if (!$c) {
+			return null;
+		}
+		$ids = array_map(function ($r) {
+			return (string) $r->remote_id;
+		}, $list);
+		if (!$c->setFlags((string) $first->path, $ids, $on ? array($flag) : array(), $on ? array() : array($flag))) {
+			$this->error = $c->getError();
+			return null;
+		}
+		$col = $flag === '\\Seen' ? 'seen' : 'flagged';
+		// Undo: only the mails that changed get their state back
+		$changed = array();
+		foreach ($list as $r) {
+			if ((int) $r->$col !== ($on ? 1 : 0)) {
+				$changed[] = (int) $r->rowid;
+			}
+		}
+		if ($changed) {
+			$p = $this->db->prefix();
+			$this->db->query("UPDATE ".$p."inbox_mail SET ".$col." = ".($on ? 1 : 0)." WHERE rowid IN (".implode(',', $changed).")");
+			if ($col === 'seen') {
+				$this->db->query("UPDATE ".$p."inbox_folder SET unread = GREATEST(0, unread ".($on ? '-' : '+')." ".count($changed).") WHERE rowid = ".((int) $first->fk_folder));
+			}
+		}
+		$this->trigger($user, 'INBOX_MAIL_FLAG', (int) $first->fk_account, array('ids' => $changed, 'flag' => $col, 'on' => $on));
+
+		return array('count' => count($list), 'undo' => $changed ? array(array('action' => $col === 'seen' ? 'seen' : 'flag', 'ids' => $changed, 'on' => $on ? 0 : 1)) : array());
+	}
+
+	/**
+	 * Tags (IMAP keywords): the index follows the server
+	 *
+	 * @param User     $user   User
+	 * @param object[] $list   Rows of one folder
+	 * @param string[] $add    Keywords added
+	 * @param string[] $remove Keywords removed
+	 * @return array<string,mixed>|null
+	 */
+	protected function tag(User $user, array $list, array $add, array $remove)
+	{
+		$first = $list[0];
+		$c = $this->connector((int) $first->fk_account);
+		if (!$c) {
+			return null;
+		}
+		$add = array_values(array_filter(array_map('strval', $add), function ($k) {
+			return preg_match('/^[A-Za-z0-9$_.\-]{1,64}$/', $k);
+		}));
+		$remove = array_values(array_filter(array_map('strval', $remove), function ($k) {
+			return preg_match('/^[A-Za-z0-9$_.\-]{1,64}$/', $k);
+		}));
+		if (!$add && !$remove) {
+			$this->error = 'Invalid tags';
+			return null;
+		}
+		$ids = array_map(function ($r) {
+			return (string) $r->remote_id;
+		}, $list);
+		if (!$c->setTags((string) $first->path, $ids, $add, $remove)) {
+			$this->error = $c->getError();
+			return null;
+		}
+		$p = $this->db->prefix();
+		$undo = array();
+		foreach ($list as $r) {
+			$before = array_values(array_filter(explode(' ', (string) $r->keywords)));
+			$lower = array_map('strtolower', $before);
+			$after = array_values(array_filter($before, function ($k) use ($remove) {
+				return !in_array(strtolower($k), array_map('strtolower', $remove), true);
+			}));
+			foreach ($add as $k) {
+				if (!in_array(strtolower($k), array_map('strtolower', $after), true)) {
+					$after[] = $k;
+				}
+			}
+			$this->db->query("UPDATE ".$p."inbox_mail SET keywords = ".($after ? "'".$this->db->escape(dol_trunc(implode(' ', $after), 1024, 'right', 'UTF-8', 1))."'" : "NULL")." WHERE rowid = ".((int) $r->rowid));
+			// Undo: give back what this mail had (a tag it had already stays)
+			$undo[] = array('action' => 'tag', 'ids' => array((int) $r->rowid),
+				'add' => array_values(array_filter($remove, function ($k) use ($lower) {
+					return in_array(strtolower($k), $lower, true);
+				})),
+				'remove' => array_values(array_filter($add, function ($k) use ($lower) {
+					return !in_array(strtolower($k), $lower, true);
+				})));
+		}
+		$undo = array_values(array_filter($undo, function ($u) {
+			return $u['add'] || $u['remove'];
+		}));
+		InboxActionLog::add($this->db, $user, (int) $first->fk_account, 'tag', $list, (string) $first->path, '', 0, trim(($add ? '+'.implode(' +', $add) : '').' '.($remove ? '-'.implode(' -', $remove) : '')));
+		$this->trigger($user, 'INBOX_MAIL_TAG', (int) $first->fk_account, array('ids' => array_map('intval', array_column($list, 'rowid')), 'add' => $add, 'remove' => $remove));
+
+		return array('count' => count($list), 'undo' => $undo);
+	}
+
+	/**
+	 * Move to a folder of the same mailbox (or of another one: InboxMover)
+	 *
+	 * @param User     $user     User
+	 * @param object[] $list     Rows of one folder
+	 * @param int      $folderId Target folder
+	 * @param string   $kind     Action written in the journal (move, archive, delete, junk, notjunk)
+	 * @return array<string,mixed>|null
+	 */
+	protected function moveTo(User $user, array $list, $folderId, $kind)
+	{
+		$first = $list[0];
+		$p = $this->db->prefix();
+		$target = $this->db->getRow("SELECT rowid, fk_account, path, role FROM ".$p."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1 AND selectable = 1");
+		if (!is_object($target)) {
+			$this->error = 'InboxErrorFolderNotFound';
+			return null;
+		}
+		if ((int) $target->rowid === (int) $first->fk_folder) {
+			return array('count' => 0, 'undo' => array());
+		}
+		if ((int) $target->fk_account !== (int) $first->fk_account) {
+			require_once __DIR__.'/inboxmover.class.php';
+			$access = new InboxAccess($this->db);
+			if (!$access->check($user, (int) $target->fk_account, InboxAccess::LEVEL_MANAGE)) {
+				$this->error = 'InboxErrorNeedManageTarget';
+				return null;
+			}
+			$mover = new InboxMover($this->db);
+			$res = $mover->move($user, $list, $target, $kind);
+			if ($res === null) {
+				$this->error = $mover->error;
+			}
+			return $res;
+		}
+		$c = $this->connector((int) $first->fk_account);
+		if (!$c) {
+			return null;
+		}
+		$ids = array_map(function ($r) {
+			return (string) $r->remote_id;
+		}, $list);
+		$map = $c->move((string) $first->path, $ids, (string) $target->path);
+		if ($map === null) {
+			$this->error = $c->getError();
+			return null;
+		}
+		// Index: the row follows the mail when the server told its new identifier, else it leaves and the folder
+		// is read again now (the mail comes back with its new identifier)
+		$unknown = false;
+		$newIds = array();
+		foreach ($list as $r) {
+			$new = $map[(string) $r->remote_id] ?? '';
+			if ($new !== '' && preg_match('/^\d+:(\d+)$/', $new, $m)) {
+				$this->db->query("DELETE FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $target->rowid)." AND remote_id = '".$this->db->escape($new)."'");
+				$this->db->query("UPDATE ".$p."inbox_mail SET fk_folder = ".((int) $target->rowid).", remote_id = '".$this->db->escape($new)."', sort_key = ".((int) $m[1])
+					." WHERE rowid = ".((int) $r->rowid));
+				$newIds[(int) $r->rowid] = (int) $r->rowid;
+			} else {
+				$unknown = true;
+				$this->db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail = ".((int) $r->rowid));
+				$this->db->query("DELETE FROM ".$p."inbox_mail WHERE rowid = ".((int) $r->rowid));
+			}
+		}
+		$this->counters((int) $first->fk_folder, (int) $target->rowid, $list);
+		if ($unknown) {
+			$sync = new InboxSync($this->db);
+			$sync->run($this->account((int) $first->fk_account), microtime(true) + 8, array('folder_id' => (int) $target->rowid));
+			foreach ($list as $r) {
+				if (!isset($newIds[(int) $r->rowid]) && (string) $r->message_id !== '') {
+					$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $target->rowid)." AND message_id = '".$this->db->escape((string) $r->message_id)."' ORDER BY sort_key DESC");
+					if (is_object($row)) {
+						$newIds[(int) $r->rowid] = (int) $row->rowid;
+					}
+				}
+			}
+		}
+		InboxActionLog::add($this->db, $user, (int) $first->fk_account, $kind, $list, (string) $first->path, (string) $target->path);
+		$this->trigger($user, 'INBOX_MAIL_MOVE', (int) $first->fk_account, array('from' => (string) $first->path, 'to' => (string) $target->path, 'account_to' => (int) $target->fk_account,
+			'message_ids' => array_values(array_filter(array_map('strval', array_column($list, 'message_id'))))));
+
+		return array('count' => count($list), 'ids' => $newIds,
+			'undo' => $newIds ? array(array('action' => 'move', 'ids' => array_values($newIds), 'folder' => (int) $first->fk_folder)) : array());
+	}
+
+	/**
+	 * Counters of the folders follow at once (the next pass of the synchronisation reads the real ones)
+	 *
+	 * @param int      $from Source folder
+	 * @param int      $to   Target folder
+	 * @param object[] $list Rows moved
+	 * @return void
+	 */
+	protected function counters($from, $to, array $list)
+	{
+		$n = count($list);
+		$u = count(array_filter($list, function ($r) {
+			return !(int) $r->seen;
+		}));
+		$p = $this->db->prefix();
+		$this->db->query("UPDATE ".$p."inbox_folder SET total = GREATEST(0, total - ".$n."), unread = GREATEST(0, unread - ".$u."), indexed = GREATEST(0, indexed - ".$n.") WHERE rowid = ".((int) $from));
+		if ($to) {
+			$this->db->query("UPDATE ".$p."inbox_folder SET total = total + ".$n.", unread = unread + ".$u.", indexed = indexed + ".$n." WHERE rowid = ".((int) $to));
+		}
+	}
+
+	/**
+	 * Folder of a role in a mailbox
+	 *
+	 * @param int    $accountId Mailbox
+	 * @param string $role      inbox, trash, junk, archive...
+	 * @return object|null
+	 */
+	protected function roleFolder($accountId, $role)
+	{
+		$f = $this->db->getRow("SELECT rowid, path, delimiter, role FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $accountId)." AND role = '".$this->db->escape($role)."'"
+			." AND status = 1 AND selectable = 1 ORDER BY CASE WHEN flags LIKE '%\\\\\\\\".$this->db->escape($role)."%' THEN 0 ELSE 1 END, LENGTH(path)");
+
+		return is_object($f) ? $f : null;
+	}
+
+	/**
+	 * Archive: Archives / <year of the mail>, created when missing (as the usual mail clients)
+	 *
+	 * @param User     $user User
+	 * @param object[] $list Rows of one folder
+	 * @return array<string,mixed>|null
+	 */
+	protected function archive(User $user, array $list)
+	{
+		$first = $list[0];
+		$accountId = (int) $first->fk_account;
+		$base = $this->roleFolder($accountId, 'archive');
+		$c = $this->connector($accountId);
+		if (!$c) {
+			return null;
+		}
+		$delim = $base ? (string) $base->delimiter : (string) $first->delimiter;
+		if ($delim === '') {
+			$delim = '.';
+		}
+		$basePath = $base ? (string) $base->path : ((stripos((string) $first->path, 'INBOX'.$delim) === 0 || strtoupper((string) $first->path) === 'INBOX') ? 'INBOX'.$delim.'Archives' : 'Archives');
+		$byYear = array();
+		foreach ($list as $r) {
+			$date = $r->date_mail ? $r->date_mail : $r->date_received;
+			$year = $date ? dol_print_date($this->db->jdate($date), '%Y') : date('Y');
+			$byYear[$year][] = $r;
+		}
+		$out = array('count' => 0, 'undo' => array(), 'ids' => array());
+		foreach ($byYear as $year => $rows) {
+			$path = $basePath.$delim.$year;
+			$folder = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".$accountId." AND path = '".$this->db->escape($path)."' AND status = 1");
+			if (!is_object($folder)) {
+				if (!$base && !$c->createFolder($basePath)) {
+					$this->error = $c->getError();
+					return null;
+				}
+				if (!$c->createFolder($path)) {
+					$this->error = $c->getError();
+					return null;
+				}
+				$tree = $c->listFolders();
+				if (is_array($tree)) {
+					$folders = new InboxFolder($this->db);
+					$folders->syncTree($this->account($accountId), $tree);
+				}
+				$folder = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".$accountId." AND path = '".$this->db->escape($path)."' AND status = 1");
+				if (!is_object($folder)) {
+					$this->error = 'InboxErrorFolderNotFound';
+					return null;
+				}
+				if (!$base) {
+					$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET role = 'archive' WHERE fk_account = ".$accountId." AND path = '".$this->db->escape($basePath)."'");
+				}
+			}
+			$res = $this->moveTo($user, $rows, (int) $folder->rowid, 'archive');
+			if ($res === null) {
+				return $out['count'] ? $out : null;
+			}
+			$out['count'] += $res['count'];
+			$out['undo'] = array_merge($out['undo'], $res['undo']);
+			$out['ids'] += $res['ids'] ?? array();
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Remove: to the trash (undo), or for good from the trash (confirmation asked, no undo)
+	 *
+	 * @param User     $user    User
+	 * @param object[] $list    Rows of one folder
+	 * @param bool     $confirm The user confirmed the removal for good
+	 * @return array<string,mixed>|null
+	 */
+	protected function delete(User $user, array $list, $confirm)
+	{
+		$first = $list[0];
+		if ((string) $first->role !== 'trash') {
+			$trash = $this->roleFolder((int) $first->fk_account, 'trash');
+			if (!$trash) {
+				$this->error = 'InboxErrorNoTrash';
+				return null;
+			}
+			return $this->moveTo($user, $list, (int) $trash->rowid, 'delete');
+		}
+		if (!$confirm) {
+			$this->error = 'InboxErrorConfirmDelete';
+			return null;
+		}
+		$c = $this->connector((int) $first->fk_account);
+		if (!$c) {
+			return null;
+		}
+		$ids = array_map(function ($r) {
+			return (string) $r->remote_id;
+		}, $list);
+		if (!$c->deleteMails((string) $first->path, $ids)) {
+			$this->error = $c->getError();
+			return null;
+		}
+		$p = $this->db->prefix();
+		$rowIds = array_map('intval', array_column($list, 'rowid'));
+		InboxActionLog::add($this->db, $user, (int) $first->fk_account, 'destroy', $list, (string) $first->path);
+		$this->db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (".implode(',', $rowIds).")");
+		$this->db->query("DELETE FROM ".$p."inbox_mail WHERE rowid IN (".implode(',', $rowIds).")");
+		$this->counters((int) $first->fk_folder, 0, $list);
+		$this->trigger($user, 'INBOX_MAIL_DELETE', (int) $first->fk_account, array('folder' => (string) $first->path,
+			'message_ids' => array_values(array_filter(array_map('strval', array_column($list, 'message_id'))))));
+
+		return array('count' => count($list), 'undo' => array());
+	}
+
+	/**
+	 * Junk / not junk: keywords $Junk / $NotJunk (as the other mail clients and the antispam), then the move to Junk
+	 * (or back to the inbox)
+	 *
+	 * @param User     $user User
+	 * @param object[] $list Rows of one folder
+	 * @param bool     $junk Junk
+	 * @return array<string,mixed>|null
+	 */
+	protected function junk(User $user, array $list, $junk)
+	{
+		$first = $list[0];
+		$target = $this->roleFolder((int) $first->fk_account, $junk ? 'junk' : 'inbox');
+		if (!$target) {
+			$this->error = $junk ? 'InboxErrorNoJunk' : 'InboxErrorFolderNotFound';
+			return null;
+		}
+		// One line in the journal (junk), not the keywords too
+		$paused = InboxActionLog::$paused;
+		InboxActionLog::$paused = true;
+		$tags = $this->tag($user, $list, $junk ? array('$Junk') : array('$NotJunk'), $junk ? array('$NotJunk') : array('$Junk'));
+		InboxActionLog::$paused = $paused;
+		if ($tags === null) {
+			return null;
+		}
+		$moved = $this->moveTo($user, $list, (int) $target->rowid, $junk ? 'junk' : 'notjunk');
+		if ($moved === null) {
+			return null;
+		}
+		// Undo: back to the folder, then the keywords as they were
+		$undo = $moved['undo'];
+		foreach ($tags['undo'] as $u) {
+			$u['ids'] = array_values(array_map(function ($id) use ($moved) {
+				return $moved['ids'][$id] ?? $id;
+			}, $u['ids']));
+			$undo[] = $u;
+		}
+
+		return array('count' => $moved['count'], 'undo' => $undo, 'ids' => $moved['ids'] ?? array());
+	}
+
+	/**
+	 * Trigger of inbox (P9: the other modules plug in), on the mailbox
+	 *
+	 * @param User                $user      User
+	 * @param string              $code      INBOX_MAIL_...
+	 * @param int                 $accountId Mailbox
+	 * @param array<string,mixed> $data      Data of the action (in $object->context['inbox'])
+	 * @return void
+	 */
+	protected function trigger(User $user, $code, $accountId, array $data)
+	{
+		$account = $this->account($accountId);
+		if ($account) {
+			$account->context['inbox'] = $data;
+			$account->call_trigger($code, $user);
+		}
+	}
+}

@@ -1,5 +1,22 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: actions on the mails, written on the mail server and checked :   1.6.0
+  - starred, tags (the same keywords as the other mail clients), archive into Archives / year of the mail (created when
+    missing), move, junk / not junk, delete to the trash then for good with a confirmation naming the number.
+  - every action is seen at once, written on the server, checked, then in the index; refused = the mail comes back
+    with the reason and « Retry »; « Undo » for 8 s puts the server back as it was.
+  - rights per mailbox: « read » may mark read / unread and starred, « manage » is needed for the rest, checked by the
+    server at each call; an action refused is greyed with its reason.
+  - move to another mailbox: copy with its flags, tags and date, the source removed only once the copy is found on
+    the target server; a copy refused leaves the source as it was.
+  - only the mails aimed are expunged (MOVE, else COPY and UID EXPUNGE): a mail marked deleted by another client stays.
+  - bulk bar from 2 mails, whole folder by batches of 200, drag and drop on the folders (folder opened after 600 ms,
+    reason shown when the drop is refused), right-click menu, keys S A J Shift+J Del Shift+M 1 to 9 and 0, a phone
+    card slid left or right (setting per user), mail selected next or previous after one leaves the list.
+  - journal of the actions in the card of the mailbox (who, what, folders, number of mails, undone), filters by person,
+    action, period, subject; kept 12 months by default (general settings).
+  - tooltips of inbox on the bars of icons and in the context menus (below the actions of the mail read, none on the
+    « ⋯ » buttons nor over an open menu), native titles elsewhere.
 - NEW: conversations, context menus, pictures of the correspondents, presence :   1.5.0
   - conversation of each mail found by its references, its copies, the answers arrived before it, else the same
     subject and correspondent within 30 days; threads merged when a mail links them; mails already indexed done by

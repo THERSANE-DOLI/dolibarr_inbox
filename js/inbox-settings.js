@@ -18,7 +18,7 @@
  * Settings space of the inbox application (lot W1, analyse-lot-w1 §5):
  *   #/settings/accounts                list of the mailboxes
  *   #/settings/accounts/new            new mailbox (tab Server)
- *   #/settings/accounts/<id>/<tab>     card of a mailbox: server, folders, identities, access, tags
+ *   #/settings/accounts/<id>/<tab>     card of a mailbox: server, folders, identities, access, tags, sync, journal
  *   #/settings/import                  import from the sources declared by other modules
  *   #/settings/general                 defaults of the webmail (admins of the mailboxes)
  *   #/settings/me                      settings of the current user
@@ -190,6 +190,7 @@
 		{ id: 'access', key: 'InboxTabAccess', admin: true },
 		{ id: 'tags', key: 'InboxTabTags', admin: false },
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
+		{ id: 'journal', key: 'InboxTabJournal', admin: false },
 	];
 
 	async function renderAccountCard(main, id, tab) {
@@ -229,8 +230,91 @@
 			bindStatusSwitch(main, account, tab);
 		}
 		const box = $('.ibx-js-tab', main);
-		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags, sync: tabSync };
+		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags, sync: tabSync, journal: tabJournal };
 		fns[tab](box, account, main);
+	}
+
+	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag'];
+	async function tabJournal(box, account) {
+		const f = { user: 0, what: '', from: '', to: '', q: '' };
+		let offset = 0;
+		let lines = [];
+		box.innerHTML = '<p class="ibx-section__help">' + th('InboxJournalHelp') + '</p>'
+			+ '<div class="ibx-journal__filters" role="search">'
+			+ '<label class="ibx-sr-only" for="j-q">' + th('InboxJournalSearch') + '</label><input type="search" class="ibx-field ibx-field--medium" id="j-q" autocomplete="off" placeholder="' + th('InboxJournalSearch') + '">'
+			+ '<label class="ibx-sr-only" for="j-user">' + th('InboxJournalWho') + '</label><select class="ibx-field ibx-field--medium" id="j-user"><option value="0">' + th('InboxJournalEveryone') + '</option></select>'
+			+ '<label class="ibx-sr-only" for="j-what">' + th('InboxJournalAction') + '</label><select class="ibx-field ibx-field--medium" id="j-what"><option value="">' + th('InboxJournalAllActions') + '</option>'
+			+ JOURNAL_ACTIONS.map(a => '<option value="' + a + '">' + th('InboxJournal_' + a) + '</option>').join('') + '</select>'
+			+ '<span class="ibx-inline"><label for="j-from">' + th('InboxJournalFrom') + '</label><input type="date" class="ibx-field" id="j-from"><label for="j-to">' + th('InboxJournalTo') + '</label><input type="date" class="ibx-field" id="j-to"></span>'
+			+ '</div><div class="ibx-js-jlist" aria-live="polite"></div>';
+		const list = $('.ibx-js-jlist', box);
+		const day = v => v ? Math.floor(new Date(v + 'T00:00:00').getTime() / 1000) : 0;
+		const paint = more => {
+			if (!lines.length) {
+				list.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div>' + th(f.user || f.what || f.from || f.to || f.q ? 'InboxJournalNoMatch' : 'InboxActionsJournalEmpty') + '</div></div>';
+				return;
+			}
+			const where = l => {
+				if (l.action === 'tag') {
+					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
+				}
+				if (l.action === 'destroy') {
+					return esc(l.from);
+				}
+				return esc(l.from) + ' → ' + (l.account_to ? '<b>' + esc(l.account_to) + '</b> / ' : '') + esc(l.to);
+			};
+			list.innerHTML = '<table class="ibx-table ibx-journal"><thead><tr><th>' + th('InboxJournalDate') + '</th><th>' + th('InboxJournalWho') + '</th><th>' + th('InboxJournalAction') + '</th><th>' + th('InboxJournalMails') + '</th><th>' + th('InboxJournalWhere') + '</th></tr></thead><tbody>'
+				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString()) + '</td><td>' + esc(l.user) + '</td>'
+					+ '<td>' + th('InboxJournal_' + l.action) + (l.undone ? ' <span class="ibx-badge">' + th('InboxJournalUndone') + '</span>' : '') + (l.incoming ? ' <span class="ibx-badge">' + th('InboxJournalIncoming') + '</span>' : '') + '</td>'
+					+ '<td>' + (l.nb > 1 ? '<b>' + th('InboxJournalNbMails', l.nb) + '</b>' + (l.subject ? '<div class="ibx-muted ibx-ellipsis">' + th('InboxJournalFirst', l.subject) + '</div>' : '')
+						: '<span class="ibx-ellipsis" title="' + esc(l.message_id) + '">' + esc(l.subject || l.message_id || '') + '</span>') + '</td>'
+					+ '<td>' + where(l) + '</td></tr>').join('')
+				+ '</tbody></table>' + (more ? '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-jmore">' + th('InboxJournalMore') + '</button></div>' : '');
+			const btn = $('.ibx-js-jmore', list);
+			if (btn) {
+				btn.addEventListener('click', () => load(true));
+			}
+		};
+		let seq = 0;
+		const load = async append => {
+			const mine = ++seq;
+			offset = append ? offset + 50 : 0;
+			if (!append) {
+				list.innerHTML = skeleton(4);
+			}
+			let res;
+			try {
+				res = await api('action', 'journal', { id: account.id, user: f.user, what: f.what, from: day(f.from), to: f.to ? day(f.to) + 86400 : 0, q: f.q, offset }, { method: 'POST' });
+			} catch (err) {
+				if (mine === seq) {
+					list.replaceChildren(errorBox(err, () => load(false)));
+				}
+				return;
+			}
+			if (mine !== seq) {
+				return;
+			}
+			lines = append ? lines.concat(res.lines) : res.lines;
+			const who = $('#j-user', box);
+			if (who.options.length === 1) {
+				res.authors.forEach(a => who.insertAdjacentHTML('beforeend', '<option value="' + a.id + '">' + esc(a.name) + '</option>'));
+			}
+			paint(res.more);
+		};
+		let timer = 0;
+		$('#j-q', box).addEventListener('input', e => {
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				f.q = e.target.value.trim();
+				load(false);
+			}, 300);
+		});
+		[['#j-user', 'user'], ['#j-what', 'what'], ['#j-from', 'from'], ['#j-to', 'to']].forEach(([sel, k]) => $(sel, box).addEventListener('change', e => {
+			f[k] = k === 'user' ? +e.target.value : e.target.value;
+			load(false);
+		}));
+		load(false);
 	}
 
 	// ----- Tab Server -----
@@ -1161,6 +1245,7 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" id="g-delay" data-name="INBOX_DEFAULT_READ_DELAY" value="' + esc(s.INBOX_DEFAULT_READ_DELAY) + '"> ' + th('InboxSeconds') + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-send">' + th('InboxSendDelay') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-send" data-name="INBOX_SEND_DELAY" value="' + esc(s.INBOX_SEND_DELAY) + '"> ' + th('InboxSeconds') + '</div><div class="ibx-formrow__help">' + th('InboxSendDelayHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-journal">' + th('InboxJournalKeep') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-journal" data-name="INBOX_ACTION_LOG_MONTHS" value="' + esc(s.INBOX_ACTION_LOG_MONTHS) + '"> ' + th('InboxMonths') + '</div><div class="ibx-formrow__help">' + th('InboxJournalKeepHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAvatars') + '</h2><p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
@@ -1225,6 +1310,12 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-theme">' + th('InboxTheme') + '</label><div>' + opt('theme', ['auto', 'light', 'dark', 'contrast'], p.theme) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-density">' + th('InboxDensity') + '</label><div>' + opt('density', ['compact', 'normal', 'comfortable'], p.density) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-text_size">' + th('InboxTextSize') + '</label><div class="ibx-inline"><input type="range" min="90" max="150" step="10" data-param="text_size" id="me-text_size" value="' + esc(p.text_size) + '" aria-valuetext="' + esc(p.text_size) + ' %"><output class="ibx-js-ts">' + esc(p.text_size) + ' %</output></div></div>'
+			+ '</div></section>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'
+			+ ['swipe_left', 'swipe_right'].map(k => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-' + k + '">' + th(k === 'swipe_left' ? 'InboxSwipeLeft' : 'InboxSwipeRight') + '</label><div>'
+				+ '<select class="ibx-field ibx-field--medium" data-param="' + k + '" id="me-' + k + '">' + ['none', 'archive', 'delete', 'read', 'flag', 'tag', 'move'].map(v => '<option value="' + v + '"' + (v === p[k] ? ' selected' : '') + '>' + th('InboxSwipe_' + v) + '</option>').join('') + '</select>'
+				+ (k === 'swipe_right' ? '<div class="ibx-formrow__help">' + th('InboxSwipeHelp') + '</div>' : '') + '</div></div>').join('')
 			+ '</div></section></div>';
 		main.innerHTML = html;
 		$$('[data-param]', main).forEach(f => {

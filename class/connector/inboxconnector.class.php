@@ -211,6 +211,27 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
+	 * @param string   $folder    Folder
+	 * @param string[] $remoteIds Identifiers
+	 * @return bool
+	 */
+	public function deleteMails($folder, array $remoteIds)
+	{
+		$this->unsupported('deleteMails');
+		return false;
+	}
+
+	/**
+	 * @param string $path Folder
+	 * @return bool
+	 */
+	public function createFolder($path)
+	{
+		$this->unsupported('createFolder');
+		return false;
+	}
+
+	/**
 	 * @param string $raw Source
 	 * @return bool
 	 */

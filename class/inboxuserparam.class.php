@@ -80,6 +80,10 @@ class InboxUserParam
 			'presence' => array('', 'json'),
 			// New mails (1.5.0): per mailbox, folder => last row seen by the user (InboxNewMarks)
 			'seen_marks' => array('', 'json'),
+			// Actions (1.6.0): mail selected after one leaves the list, gestures of the phone on the cards
+			'after_move' => array('next', array('next', 'previous')),
+			'swipe_left' => array('archive', array('none', 'archive', 'delete', 'read', 'flag', 'tag', 'move')),
+			'swipe_right' => array('read', array('none', 'archive', 'delete', 'read', 'flag', 'tag', 'move')),
 		);
 	}
 

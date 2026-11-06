@@ -214,5 +214,23 @@ class InboxAjaxSecurityTest extends InboxTestCase
 
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/mail.php', array('action' => 'seen', 'id' => (int) $row->rowid, 'seen' => 1))['code'], 'read without token refused');
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/mail.php?action=seen&seen=1&id='.$row->rowid.'&token='.urlencode($token))['code'], 'write by GET refused');
+
+		// Actions of lot W4 (CA-04): token and POST, level « manage » checked by the server whatever the page says
+		$act = array('action' => 'run', 'what' => 'move', 'ids' => array((int) $row->rowid), 'folder' => (int) $row->fk_folder);
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/action.php', $act)['code'], 'action without token refused');
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/action.php?action=run&what=flag&on=1&ids='.$row->rowid.'&token='.urlencode($token))['code'], 'action by GET refused');
+		$forged = $this->call('/custom/inbox/ajax/action.php', array('action' => 'run', 'what' => 'flag', 'on' => 1, 'ids' => array(99999999), 'token' => $token));
+		$this->assertSame(404, $forged['code'], 'forged mail');
+		$readOnly = $this->call('/custom/inbox/ajax/action.php', array('action' => 'run', 'what' => 'archive', 'ids' => array((int) $row->rowid), 'token' => $token));
+		$this->assertSame(403, $readOnly['code'], 'level read: no archive');
+		$this->assertSame('InboxErrorNeedManage', $readOnly['json']['code']);
+		// Journal: managers of the mailbox and admins of the mailboxes (the user of the HTTP tests is one), a forged one not found
+		$journal = $this->call('/custom/inbox/ajax/action.php?action=journal&id='.$a->id);
+		$this->assertSame(200, $journal['code'], $journal['body']);
+		$this->assertArrayHasKey('lines', $journal['json']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/action.php?action=journal&id=99999999')['code']);
+		$flag = $this->call('/custom/inbox/ajax/action.php', array('action' => 'run', 'what' => 'flag', 'on' => 1, 'ids' => array((int) $row->rowid), 'token' => $token));
+		$this->assertSame(200, $flag['code'], 'level read: starred allowed '.$flag['body']);
+		$this->assertSame(1, $flag['json']['count']);
 	}
 }

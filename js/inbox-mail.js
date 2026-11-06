@@ -887,7 +887,7 @@
 				+ '<th class="ibx-colpicker"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-colpicker" aria-haspopup="menu" title="' + th('InboxChooseColumns') + '" aria-label="' + th('InboxChooseColumns') + '">' + ic('view-table') + '</button></th></tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
-				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
+				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '" draggable="true">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
 					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '<td></td></tr>'
 					+ threadChildren(r, 'table', cols);
@@ -906,7 +906,7 @@
 					}
 				}
 				const sel = S.selected.has(r.id);
-				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
+				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
@@ -1095,6 +1095,7 @@
 				cb.checked = sel;
 			}
 		});
+		renderBulkBar();
 	}
 	/** Click on a mail: alone (open it), Ctrl (add / remove), Shift (range from the anchor) */
 	function select(id, mode) {
@@ -1183,14 +1184,16 @@
 		const n = S.selected.size;
 		readPane().innerHTML = '<div class="ibx-empty">' + ic('multi', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSelectedCount', n) + '</div>'
 			+ (S.next && n >= S.rows.length ? '<button type="button" class="ibx-btn ibx-js-allfolder">' + th('InboxSelectWholeFolder', (S.total || 0).toLocaleString(locale())) + '</button>' : '')
-			+ '<div class="ibx-inline"><button type="button" class="ibx-btn ibx-js-markread" data-seen="1">' + ic('mark-read') + ' ' + th('InboxMarkRead') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-js-markread" data-seen="0">' + ic('unread') + ' ' + th('InboxMarkUnread') + '</button></div></div>';
-		$$('.ibx-js-markread', readPane()).forEach(b => b.addEventListener('click', () => setSeenMany(Array.from(S.selected), b.dataset.seen === '1')));
+			+ '<div class="ibx-muted">' + th('InboxBulkHint') + '</div></div>';
 		const all = $('.ibx-js-allfolder', readPane());
 		if (all) {
 			all.addEventListener('click', () => {
 				S.allInFolder = true;
 				all.outerHTML = '<p>' + th('InboxWholeFolderSelected', (S.total || 0).toLocaleString(locale())) + '</p>';
+				const count = $('.ibx-bulkbar__count', S.el);
+				if (count) {
+					count.textContent = t('InboxSelectedCount', (S.total || 0).toLocaleString(locale()));
+				}
 			});
 		}
 	}
@@ -1334,17 +1337,857 @@
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + tagsHtml({ folder: m.folder, tags: m.tags }) + '</h2>';
 	}
 
+	// ---------- Actions on mails (lot W4: write on the server, checked, undo 8 s) ----------
+	/** Actions after which the mail leaves the folder */
+	const LEAVING = new Set(['move', 'archive', 'delete', 'junk', 'notjunk']);
+	/** Actions of the level « manage » (read / unread and starred: « read », lot W4 §10 point 2) */
+	const MANAGING = new Set(['tag', 'move', 'archive', 'delete', 'junk', 'notjunk']);
+	/** Mails per call (a larger selection goes by batches, decision W4 point 3) */
+	const BATCH = 200;
+
+	/** A mail known on screen: row of the list, mail of an unfolded conversation, of the conversation read, or the mail read */
+	function rowOf(id) {
+		let r = S.rows.find(x => x.id === id);
+		if (r) {
+			return r;
+		}
+		for (const k in S.threadCache) {
+			r = (S.threadCache[k] || []).find(x => x.id === id);
+			if (r) {
+				return r;
+			}
+		}
+		r = (S.thread || []).find(x => x.id === id);
+		if (r) {
+			return r;
+		}
+		return S.mail && S.mail.id === id ? S.mail : null;
+	}
+	function accountOfRow(r) {
+		const e = r ? S.folders.get(r.folder) : null;
+		return e ? e.account : null;
+	}
+	/** Why an action is refused on these mails ('' = allowed); the server checks it again */
+	function refusal(what, ids) {
+		if (!MANAGING.has(what)) {
+			return '';
+		}
+		for (const id of ids) {
+			const a = accountOfRow(rowOf(id));
+			if (a && a.level !== 'manage') {
+				return t('InboxReadOnlyOn', a.email);
+			}
+		}
+		return '';
+	}
+	/** Folder of a role in the mailbox of a mail */
+	function roleFolderOf(r, role) {
+		const a = accountOfRow(r);
+		if (!a) {
+			return null;
+		}
+		return a.folders.find(f => f.role === role && f.primary !== false && f.selectable) || a.folders.find(f => f.role === role && f.selectable) || null;
+	}
+	/** A collapsed conversation of the list: the action takes all its mails of the folder */
+	function foldedThreads(ids) {
+		return ids.filter(id => {
+			const r = S.rows.find(x => x.id === id);
+			return r && r.thread && r.thread.count > 1 && !S.expanded.has(r.thread.key);
+		});
+	}
+
+	/**
+	 * Run an action: at once on the screen, then on the server by batches; refused = back as before with the reason
+	 * and « Retry »; done = toast « Undo » 8 s
+	 * @param {string} what seen, flag, tag, move, archive, delete, junk, notjunk
+	 * @param {number[]} ids Mails
+	 * @param {object} p on, add, remove, folder, confirm
+	 * @param {object} o quiet (no toast), stay (no move of the selection), label (text of the toast)
+	 */
+	async function runAction(what, ids, p, o) {
+		p = Object.assign({}, p || {});
+		o = o || {};
+		ids = Array.from(new Set(ids || [])).filter(Boolean);
+		if (!ids.length) {
+			return null;
+		}
+		const why = refusal(what, ids);
+		if (why) {
+			toast(why, { error: true });
+			return null;
+		}
+		const rows = ids.map(rowOf).filter(Boolean);
+		if (what === 'delete' && !p.confirm && rows.some(r => (S.folders.get(r.folder) || { folder: {} }).folder.role === 'trash')) {
+			// In the trash: removed for good, the number named, no undo
+			const ok = await confirmBox(t('InboxDestroyTitle'), th('InboxDestroyText', ids.length), t('InboxDestroyConfirm', ids.length));
+			if (!ok) {
+				return null;
+			}
+			p.confirm = 1;
+		}
+		const leaving = LEAVING.has(what) && !(what === 'move' && rows.every(r => r.folder === p.folder));
+		const restore = leaving ? leaveRows(ids, o) : applyLocal(what, rows, p);
+		const expand = foldedThreads(ids);
+		if (expand.length) {
+			p.expand = expand;
+		}
+		const res = await sendAction(what, ids, p);
+		if (!res.count) {
+			restore();
+			toast(res.error || t('InboxErrorServer', ''), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
+			return null;
+		}
+		if (res.error) {
+			// Done in part: the list read again shows the truth, the part done can be undone
+			loadList(true);
+			toast(res.error, { error: true });
+		}
+		if (leaving) {
+			refreshTree();
+		}
+		Dolibarr.executeHook(leaving ? 'inbox:mail:moved' : 'inbox:mail:flagged', { action: what, ids, folder: p.folder || 0, count: res.count });
+		if (!o.quiet) {
+			const text = o.label || actionLabel(what, res.count, p);
+			if (res.undo.length) {
+				toast(text, { action: t('InboxUndo'), onAction: () => undoAction(res) });
+			} else {
+				toast(text);
+			}
+		}
+		return res;
+	}
+
+	/** Calls by batches; a move to another mailbox gives back what it had no time for: sent again */
+	async function sendAction(what, ids, p, undoOf) {
+		const out = { count: 0, undo: [], log: [], ids: {}, error: '' };
+		let todo = ids.slice();
+		let turns = 0;
+		while (todo.length && turns++ < 500) {
+			const chunk = todo.slice(0, BATCH);
+			todo = todo.slice(BATCH);
+			const body = Object.assign({ what, ids: chunk }, p);
+			if (p.expand) {
+				body.expand = p.expand.filter(x => chunk.includes(x));
+			}
+			if (undoOf) {
+				body.undo_of = undoOf;
+			}
+			let res;
+			try {
+				res = await post('action', 'run', body);
+			} catch (err) {
+				out.error = err.message;
+				break;
+			}
+			out.count += res.count || 0;
+			out.undo = out.undo.concat(res.undo || []);
+			out.log = out.log.concat(res.log || []);
+			Object.assign(out.ids, res.ids || {});
+			if (res.warning) {
+				out.error = res.warning;
+			}
+			if (res.rest && res.rest.length) {
+				if (!res.count) {
+					out.error = out.error || res.warning;
+					break;
+				}
+				todo = res.rest.concat(todo);
+			}
+		}
+		return out;
+	}
+
+	async function undoAction(res) {
+		let failed = '';
+		for (const u of res.undo) {
+			const r = await sendAction(u.action, u.ids, { on: u.on, add: u.add || [], remove: u.remove || [], folder: u.folder || 0 }, res.log);
+			if (r.error && !r.count) {
+				failed = r.error;
+			}
+		}
+		await loadList(true);
+		refreshTree();
+		toast(failed ? failed : t('InboxUndone'), { error: !!failed });
+	}
+
+	/** The mails leave the list at once; the selection goes to the next one (or the previous one, setting) */
+	function leaveRows(ids, o) {
+		const set = new Set(ids);
+		const before = { rows: S.rows.slice(), selected: new Set(S.selected), anchor: S.anchor, open: S.openId, total: S.total, cache: Object.assign({}, S.threadCache) };
+		const touched = S.openId && set.has(S.openId);
+		let next = 0;
+		if (touched && !o.stay) {
+			const idx = S.rows.map((r, i) => set.has(r.id) ? i : -1).filter(i => i >= 0);
+			if (idx.length) {
+				const prev = params.after_move === 'previous';
+				const after = S.rows.slice(Math.max(...idx) + 1).find(r => !set.has(r.id));
+				const above = S.rows.slice(0, Math.min(...idx)).reverse().find(r => !set.has(r.id));
+				const pick = prev ? (above || after) : (after || above);
+				next = pick ? pick.id : 0;
+			}
+		}
+		S.rows.filter(r => set.has(r.id)).forEach(r => {
+			const e = S.folders.get(r.folder);
+			if (e) {
+				e.folder.total = Math.max(0, (e.folder.total || 0) - 1);
+				if (!seenOf(r)) {
+					e.folder.unread = Math.max(0, (e.folder.unread || 0) - 1);
+				}
+			}
+		});
+		S.rows = S.rows.filter(r => !set.has(r.id));
+		for (const k in S.threadCache) {
+			S.threadCache[k] = (S.threadCache[k] || []).filter(m => !set.has(m.id));
+		}
+		S.total = Math.max(0, S.total - (before.rows.length - S.rows.length));
+		ids.forEach(id => S.selected.delete(id));
+		renderList();
+		renderListHead();
+		renderTree();
+		if (next) {
+			select(next);
+		} else if (touched || !S.selected.size) {
+			showNothing();
+		} else {
+			paintSelection();
+			showMulti();
+		}
+		renderBulkBar();
+		return () => {
+			S.rows = before.rows;
+			S.selected = before.selected;
+			S.anchor = before.anchor;
+			S.total = before.total;
+			S.threadCache = before.cache;
+			renderList();
+			renderListHead();
+			refreshTree();
+			if (before.open && S.selected.size <= 1) {
+				openMail(before.open);
+			}
+			renderBulkBar();
+		};
+	}
+
+	/** Flags and tags changed on the screen at once; the function given back puts them back */
+	function applyLocal(what, rows, p) {
+		const saved = rows.map(r => ({ r, seen: r.seen, flagged: r.flagged, tags: (r.tags || []).slice() }));
+		const lower = x => String(x).toLowerCase();
+		rows.forEach(r => {
+			if (what === 'seen') {
+				if (!!r.seen !== !!p.on) {
+					const e = S.folders.get(r.folder);
+					if (e) {
+						e.folder.unread = Math.max(0, (e.folder.unread || 0) + (p.on ? -1 : 1));
+					}
+				}
+				r.seen = p.on ? 1 : 0;
+			} else if (what === 'flag') {
+				r.flagged = p.on ? 1 : 0;
+			} else if (what === 'tag') {
+				const rm = (p.remove || []).map(lower);
+				r.tags = (r.tags || []).filter(k => !rm.includes(lower(k)));
+				(p.add || []).forEach(k => {
+					if (!r.tags.some(x => lower(x) === lower(k))) {
+						r.tags.push(k);
+					}
+				});
+			}
+		});
+		const paint = () => {
+			if (what === 'seen') {
+				repaintRows(rows);
+				renderTree();
+			} else {
+				renderList();
+			}
+			if (S.mail && rows.some(r => r.id === S.mail.id || r === S.mail)) {
+				const r = rows.find(x => x.id === S.mail.id) || S.mail;
+				S.mail.seen = r.seen;
+				S.mail.flagged = r.flagged;
+				S.mail.tags = r.tags;
+				repaintReadHead();
+			}
+		};
+		paint();
+		return () => {
+			saved.forEach(s => {
+				s.r.seen = s.seen;
+				s.r.flagged = s.flagged;
+				s.r.tags = s.tags;
+			});
+			paint();
+			refreshTree();
+		};
+	}
+
+	/** Head of the mail read after a change of its flags or tags (the body stays) */
+	function repaintReadHead() {
+		if (!S.mail) {
+			return;
+		}
+		const root = mailRoot(S.mail);
+		const acts = $('.ibx-readhead__actions', root);
+		if (acts && !acts.classList.contains('ibx-js-convoactions')) {
+			acts.innerHTML = actionButtons(S.mail);
+			bindActions(acts);
+		}
+		const subject = $('.ibx-readhead__subject', root);
+		if (subject) {
+			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + tagsHtml({ folder: S.mail.folder, tags: S.mail.tags });
+		}
+	}
+
+	function actionLabel(what, n, p) {
+		if (what === 'move') {
+			const e = S.folders.get(p.folder);
+			return t('InboxActMoved', n, e ? folderName(e.folder) : '');
+		}
+		const keys = { seen: p.on ? 'InboxActSeen' : 'InboxActUnseen', flag: p.on ? 'InboxActFlagged' : 'InboxActUnflagged', tag: 'InboxActTagged', archive: 'InboxActArchived',
+			delete: p.confirm ? 'InboxActDestroyed' : 'InboxActDeleted', junk: 'InboxActJunk', notjunk: 'InboxActNotJunk' };
+		return t(keys[what] || 'InboxActDone', n);
+	}
+
+	function confirmBox(title, html, label) {
+		return new Promise(resolve => {
+			let done = false;
+			const dlg = dialog({
+				title,
+				body: '<p>' + html + '</p>',
+				actions: [{ label, danger: true, run: () => {
+					done = true;
+					resolve(true);
+					return true;
+				} }],
+			});
+			dlg.addEventListener('close', () => {
+				if (!done) {
+					resolve(false);
+				}
+			});
+		});
+	}
+
+	/** Mails an action of the keyboard or of the bulk bar acts on: the selection, else the mail read */
+	function targetIds() {
+		if (S.selected.size) {
+			return Array.from(S.selected);
+		}
+		return S.mail ? [S.mail.id] : [];
+	}
+
+	// Short forms used by the buttons, the menus, the keyboard, the gestures
+	function doFlag(ids) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const on = rows.some(r => !r.flagged);
+		return runAction('flag', ids, { on: on ? 1 : 0 }, { quiet: ids.length < 2 });
+	}
+	function doSeen(ids, seen) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const on = seen === undefined ? rows.some(r => !seenOf(r)) : seen;
+		return runAction('seen', ids, { on: on ? 1 : 0 }, { quiet: ids.length < 2 });
+	}
+	function doArchive(ids, o) {
+		return runAction('archive', ids, {}, o);
+	}
+	function doDelete(ids, o) {
+		return runAction('delete', ids, {}, o);
+	}
+	function doJunk(ids, junk, o) {
+		return runAction(junk ? 'junk' : 'notjunk', ids, {}, o);
+	}
+	/** Tag of the place n (keys 1 to 9) set or removed on the mails; 0 = all removed */
+	function doTagIndex(ids, n) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const a = accountOfRow(rows[0]);
+		if (!a) {
+			return null;
+		}
+		if (n === 0) {
+			const all = Array.from(new Set(rows.flatMap(r => r.tags || []))).filter(k => k.charAt(0) !== '$' || /^\$label\d$/i.test(k));
+			return all.length ? runAction('tag', ids, { remove: all }, { quiet: ids.length < 2 }) : null;
+		}
+		const def = (a.tags || [])[n - 1];
+		return def ? toggleTag(ids, def.keyword) : null;
+	}
+	function toggleTag(ids, keyword) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const has = r => (r.tags || []).some(k => k.toLowerCase() === keyword.toLowerCase());
+		const all = rows.every(has);
+		// One mail: the tag is seen on it and undone by the same key, no toast (several mails: « Undo »)
+		return runAction('tag', ids, all ? { remove: [keyword] } : { add: [keyword] }, { quiet: ids.length < 2 });
+	}
+
+	/** Menu of the tags of the mailbox, checked when every mail has it */
+	function tagMenu(anchor, ids, at) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const a = accountOfRow(rows[0]);
+		const defs = a ? (a.tags || []) : [];
+		const why = refusal('tag', ids);
+		const items = defs.map((d, i) => ({ icon: 'tag', label: d.label, key: i < 9 ? String(i + 1) : '', checked: rows.every(r => (r.tags || []).some(k => k.toLowerCase() === d.keyword.toLowerCase())),
+			disabled: !!why, run: () => toggleTag(ids, d.keyword) }));
+		if (!items.length) {
+			items.push({ note: t('InboxNoTags') });
+		}
+		items.push({ sep: true });
+		items.push({ icon: 'tag-off', label: t('InboxRemoveAllTags'), key: '0', disabled: !!why, run: () => doTagIndex(ids, 0) });
+		if (why) {
+			items.push({ note: why });
+		}
+		menu(anchor, items, at);
+	}
+
+	/** Target folder picked in a list searched as you type; folders of the mailboxes without « manage » shown greyed */
+	function moveDialog(ids) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const why = refusal('move', ids);
+		if (why) {
+			toast(why, { error: true });
+			return;
+		}
+		const here = new Set(rows.map(r => r.folder));
+		const options = [];
+		S.accounts.forEach(a => a.folders.filter(f => f.selectable).forEach(f => options.push({ id: f.id, account: a, folder: f,
+			path: (a.label || a.email) + ' / ' + folderPath(f), ok: a.level === 'manage' && !(here.size === 1 && here.has(f.id)) })));
+		const dlg = dialog({
+			title: t('InboxMoveTo', ids.length),
+			body: '<input type="search" class="ibx-field ibx-js-movesearch" autocomplete="off" placeholder="' + th('InboxSearchFolder') + '" aria-label="' + th('InboxSearchFolder') + '">'
+				+ '<div class="ibx-picklist ibx-js-movelist" role="listbox" aria-label="' + th('InboxFolders') + '"></div>',
+			actions: [{ label: t('InboxMove'), primary: true, run: d => {
+				const cur = $('[aria-selected="true"]', d);
+				if (!cur) {
+					return false;
+				}
+				runAction('move', ids, { folder: +cur.dataset.id });
+				return true;
+			} }],
+		});
+		const input = $('.ibx-js-movesearch', dlg);
+		const list = $('.ibx-js-movelist', dlg);
+		const paint = () => {
+			const q = input.value.trim().toLowerCase();
+			const shown = options.filter(o => !q || o.path.toLowerCase().includes(q) || folderName(o.folder).toLowerCase().includes(q));
+			let html = '';
+			let lastAcc = 0;
+			let first = true;
+			shown.forEach(o => {
+				if (o.account.id !== lastAcc && S.accounts.length > 1) {
+					html += '<div class="ibx-picklist__group" role="presentation">' + esc(accountName(o.account)) + (o.account.level !== 'manage' ? ' · ' + th('InboxReadOnly') : '') + '</div>';
+					lastAcc = o.account.id;
+				}
+				html += '<div class="ibx-picklist__item" role="option" data-id="' + o.id + '"' + (o.ok ? '' : ' aria-disabled="true"') + ' aria-selected="' + (o.ok && first) + '" style="--ibx-depth:' + (o.folder.depth || 0) + '">'
+					+ ic(ROLE_ICON[o.folder.role] || 'folder') + ' <span class="ibx-ellipsis">' + esc(folderName(o.folder)) + '</span></div>';
+				if (o.ok && first) {
+					first = false;
+				}
+			});
+			list.innerHTML = html || '<div class="ibx-muted ibx-picklist__empty">' + th('InboxNoFolderFound') + '</div>';
+		};
+		const choose = el => {
+			$$('[aria-selected="true"]', list).forEach(x => x.setAttribute('aria-selected', 'false'));
+			el.setAttribute('aria-selected', 'true');
+			scrollWithin(list, el, 'nearest');
+		};
+		input.addEventListener('input', paint);
+		input.addEventListener('keydown', e => {
+			const items = $$('.ibx-picklist__item:not([aria-disabled])', list);
+			const i = items.findIndex(x => x.getAttribute('aria-selected') === 'true');
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				e.preventDefault();
+				if (items.length) {
+					choose(items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1) + items.length) % items.length]);
+				}
+			} else if (e.key === 'Enter') {
+				e.preventDefault();
+				if (i >= 0) {
+					$('.ibx-dialog__foot .ibx-btn--primary', dlg).click();
+				}
+			}
+		});
+		list.addEventListener('click', e => {
+			const it = e.target.closest('.ibx-picklist__item');
+			if (it && !it.hasAttribute('aria-disabled')) {
+				choose(it);
+			}
+		});
+		list.addEventListener('dblclick', e => {
+			const it = e.target.closest('.ibx-picklist__item');
+			if (it && !it.hasAttribute('aria-disabled')) {
+				choose(it);
+				$('.ibx-dialog__foot .ibx-btn--primary', dlg).click();
+			}
+		});
+		paint();
+		input.focus();
+	}
+	function folderDepth(f) {
+		let d = 0;
+		for (let p = f.parent; p && d < 20; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
+			d++;
+		}
+		return d;
+	}
+	/** « Clients / 2026 »: path of a folder by its parents in the tree */
+	function folderPath(f) {
+		const names = [folderName(f)];
+		for (let p = f.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
+			const e = S.folders.get(p);
+			if (!e) {
+				break;
+			}
+			names.unshift(folderName(e.folder));
+		}
+		return names.join(' / ');
+	}
+
+	/** Actions on a list of mails, shared by the menu of a row, the bulk bar and the reading pane */
+	function mailActionItems(ids, anchor) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const first = rows[0];
+		const manage = refusal('move', ids);
+		const role = first ? (S.folders.get(first.folder) || { folder: {} }).folder.role : '';
+		const inTrash = role === 'trash';
+		const inJunk = role === 'junk';
+		const anyUnflagged = rows.some(r => !r.flagged);
+		const items = [
+			{ id: 'flag', icon: anyUnflagged ? 'star' : 'star-on', label: t(anyUnflagged ? 'InboxFlag' : 'InboxUnflag'), key: 'S', run: () => doFlag(ids) },
+			{ id: 'tag', icon: 'tag', label: t('InboxTagMenu'), key: '1…9', disabled: !!manage, reason: manage, run: () => tagMenu(anchor || S.el, ids) },
+			{ sep: true },
+			{ id: 'archive', icon: 'archive', label: t('InboxArchive'), key: 'A', disabled: !!manage || role === 'archive', reason: manage, run: () => doArchive(ids) },
+			{ id: 'move', icon: 'folder-move', label: t('InboxMoveToMenu'), key: 'Maj+M', disabled: !!manage, reason: manage, run: () => moveDialog(ids) },
+			inJunk ? { id: 'notjunk', icon: 'inbox', label: t('InboxNotJunk'), key: 'Maj+J', disabled: !!manage, reason: manage, run: () => doJunk(ids, false) }
+				: { id: 'junk', icon: 'junk', label: t('InboxJunk'), key: 'J', disabled: !!manage, reason: manage, run: () => doJunk(ids, true) },
+			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, run: () => doDelete(ids) },
+		];
+		return items;
+	}
+
+	// ---------- Bulk bar (from 2 mails) ----------
+	function renderBulkBar() {
+		const bar = $('.ibx-js-bulkbar', S.el);
+		if (!bar) {
+			return;
+		}
+		const ids = Array.from(S.selected);
+		if (ids.length < 2) {
+			bar.hidden = true;
+			bar.innerHTML = '';
+			bar.parentNode.classList.remove('has-bulk');
+			return;
+		}
+		const rows = ids.map(rowOf).filter(Boolean);
+		const anyUnread = rows.some(r => !seenOf(r));
+		const why = refusal('move', ids);
+		// The key of the action in its bubble: learnt where it is used
+		const btn = (cls, icon, label, disabled, extra, key) => '<button type="button" class="ibx-btn ibx-btn--sm ' + cls + '"' + (disabled ? ' aria-disabled="true" title="' + esc(why) + '"' : ' title="' + esc(label + (key ? ' (' + key + ')' : '')) + '"') + (extra || '') + (key && key.indexOf('…') < 0 ? ' aria-keyshortcuts="' + esc(key.replace('Maj', 'Shift').replace('Suppr', 'Delete')) + '"' : '') + '>'
+			+ ic(icon) + '<span class="ibx-bulkbar__label">' + esc(label) + '</span></button>';
+		const role = rows[0] ? (S.folders.get(rows[0].folder) || { folder: {} }).folder.role : '';
+		bar.hidden = false;
+		// Floating over the list: showing it never moves the mails
+		bar.parentNode.classList.add('has-bulk');
+		bar.innerHTML = '<span class="ibx-bulkbar__count" role="status">' + th('InboxSelectedCount', ids.length) + '</span>'
+			+ btn('ibx-js-bulk', 'archive', t('InboxArchive'), !!why, ' data-act="archive"', 'A')
+			+ btn('ibx-js-bulk', anyUnread ? 'mark-read' : 'unread', t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), false, ' data-act="seen"', 'M')
+			+ btn('ibx-js-bulk', 'tag', t('InboxTagMenu'), !!why, ' data-act="tag" aria-haspopup="menu"', '1…9')
+			+ btn('ibx-js-bulk', 'folder-move', t('InboxMoveToMenu'), !!why, ' data-act="move"', 'Maj+M')
+			+ btn('ibx-js-bulk', role === 'junk' ? 'inbox' : 'junk', t(role === 'junk' ? 'InboxNotJunk' : 'InboxJunk'), !!why, ' data-act="' + (role === 'junk' ? 'notjunk' : 'junk') + '"', role === 'junk' ? 'Maj+J' : 'J')
+			+ '<span class="ibx-spacer"></span>'
+			+ btn('ibx-js-bulk ibx-btn--danger-quiet', 'delete', t(role === 'trash' ? 'InboxDestroy' : 'InboxDelete'), !!why, ' data-act="delete"', 'Suppr')
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-bulkclose" title="' + th('InboxClearSelection') + ' (Échap)" aria-label="' + th('InboxClearSelection') + '">' + ic('close') + '</button>';
+	}
+	function bindBulkBar() {
+		const bar = $('.ibx-js-bulkbar', S.el);
+		bar.addEventListener('click', async e => {
+			if (e.target.closest('.ibx-js-bulkclose')) {
+				S.selected.clear();
+				S.allInFolder = false;
+				paintSelection();
+				renderBulkBar();
+				showNothing();
+				return;
+			}
+			const b = e.target.closest('.ibx-js-bulk');
+			if (!b) {
+				return;
+			}
+			const act = b.dataset.act;
+			if (b.getAttribute('aria-disabled') === 'true') {
+				toast(b.getAttribute('data-title') || b.title, { error: true });
+				return;
+			}
+			const ids = S.allInFolder ? await wholeFolderIds() : Array.from(S.selected);
+			if (!ids) {
+				return;
+			}
+			if (act === 'seen') {
+				doSeen(ids);
+			} else if (act === 'tag') {
+				tagMenu(b, ids);
+			} else if (act === 'move') {
+				moveDialog(ids);
+			} else if (act === 'archive') {
+				doArchive(ids);
+			} else if (act === 'junk' || act === 'notjunk') {
+				doJunk(ids, act === 'junk');
+			} else if (act === 'delete') {
+				doDelete(ids);
+			}
+		});
+	}
+	/** « Select the 3 245 mails of the folder »: their ids asked to the server (sent after by batches of 200) */
+	async function wholeFolderIds() {
+		try {
+			const res = await api('list', 'ids', listQuery(''), { method: 'POST' });
+			return res.ids || [];
+		} catch (err) {
+			toast(err.message, { error: true });
+			return null;
+		}
+	}
+
+	// ---------- Drag and drop of mails on the folders ----------
+	function dragIdsOf(row) {
+		const id = +row.dataset.mail;
+		return S.selected.has(id) ? Array.from(S.selected) : [id];
+	}
+	/** Why the mails dragged cannot go into this folder ('' = they can) */
+	function dropRefusal(folderId) {
+		const e = S.folders.get(folderId);
+		if (!e || !e.folder.selectable) {
+			return t('InboxDropNotHere');
+		}
+		if (e.account.level !== 'manage') {
+			return t('InboxReadOnlyOn', e.account.email);
+		}
+		const why = refusal('move', S.drag || []);
+		if (why) {
+			return why;
+		}
+		const rows = (S.drag || []).map(rowOf).filter(Boolean);
+		if (rows.length && rows.every(r => r.folder === folderId)) {
+			return t('InboxDropSameFolder');
+		}
+		return '';
+	}
+	function dragTip(text, x, y) {
+		let tip = $('.ibx-dragtip');
+		if (!text) {
+			if (tip) {
+				tip.remove();
+			}
+			return;
+		}
+		if (!tip) {
+			tip = document.createElement('div');
+			tip.className = 'ibx-dragtip';
+			tip.setAttribute('role', 'status');
+			document.body.appendChild(tip);
+		}
+		tip.textContent = text;
+		tip.style.left = (x + 14) + 'px';
+		tip.style.top = (y + 14) + 'px';
+	}
+	function bindDragDrop() {
+		const list = $('.ibx-pane--list .ibx-pane__body', S.el);
+		const tree = $('.ibx-pane--folders', S.el);
+		list.addEventListener('dragstart', e => {
+			const row = e.target.closest && e.target.closest('[data-mail]');
+			if (!row || e.target.closest('th')) {
+				return;
+			}
+			const ids = dragIdsOf(row);
+			S.drag = ids;
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', ids.length === 1 ? ((rowOf(ids[0]) || {}).subject || '') : t('InboxSelectedCount', ids.length));
+			const ghost = document.createElement('div');
+			ghost.className = 'ibx-dragghost';
+			ghost.textContent = ids.length === 1 ? ((rowOf(ids[0]) || {}).subject || t('InboxNoSubject')) : t('InboxSelectedCount', ids.length);
+			document.body.appendChild(ghost);
+			e.dataTransfer.setDragImage(ghost, 10, 10);
+			setTimeout(() => ghost.remove(), 0);
+		});
+		list.addEventListener('dragend', () => {
+			S.drag = null;
+			dragTip('');
+			$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
+		});
+		let hover = { id: 0, timer: 0 };
+		tree.addEventListener('dragover', e => {
+			if (!S.drag) {
+				return;
+			}
+			const row = e.target.closest('[data-folder], [data-account]');
+			$$('.is-droptarget', tree).forEach(x => x !== row && x.classList.remove('is-droptarget'));
+			if (!row) {
+				dragTip('');
+				return;
+			}
+			// A folder (or a mailbox) folded and hovered 600 ms opens
+			const key = row.dataset.folder ? 'f' + row.dataset.folder : 'a' + row.dataset.account;
+			if (hover.id !== key) {
+				clearTimeout(hover.timer);
+				hover = { id: key, timer: setTimeout(() => {
+					if (S.collapsed.has(key)) {
+						S.collapsed.delete(key);
+						renderTree();
+					}
+				}, 600) };
+			}
+			if (!row.dataset.folder) {
+				dragTip('');
+				return;
+			}
+			const why = dropRefusal(+row.dataset.folder);
+			if (why) {
+				e.dataTransfer.dropEffect = 'none';
+				row.classList.remove('is-droptarget');
+				dragTip(why, e.clientX, e.clientY);
+				return;
+			}
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+			row.classList.add('is-droptarget');
+			dragTip('');
+		});
+		tree.addEventListener('dragleave', e => {
+			if (!tree.contains(e.relatedTarget)) {
+				$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
+				dragTip('');
+				clearTimeout(hover.timer);
+				hover = { id: 0, timer: 0 };
+			}
+		});
+		tree.addEventListener('drop', e => {
+			const row = e.target.closest('[data-folder]');
+			const ids = S.drag;
+			S.drag = null;
+			dragTip('');
+			clearTimeout(hover.timer);
+			$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
+			if (!row || !ids) {
+				return;
+			}
+			e.preventDefault();
+			runAction('move', ids, { folder: +row.dataset.folder });
+		});
+	}
+
+	// ---------- Gestures of the phone: a card slid left or right ----------
+	const SWIPES = { archive: ['archive', 'InboxArchive'], delete: ['delete', 'InboxDelete'], read: ['mark-read', 'InboxKeyRead'], flag: ['star', 'InboxFlag'],
+		tag: ['tag', 'InboxTagMenu'], move: ['folder-move', 'InboxMoveToMenu'] };
+	function swipeAction(side) {
+		const v = params[side === 'left' ? 'swipe_left' : 'swipe_right'];
+		const def = side === 'left' ? 'archive' : 'read';
+		return v === 'none' ? '' : (SWIPES[v] ? v : def);
+	}
+	function runSwipe(act, id, card) {
+		const ids = [id];
+		if (act === 'archive') {
+			doArchive(ids, { stay: true });
+		} else if (act === 'delete') {
+			doDelete(ids, { stay: true });
+		} else if (act === 'read') {
+			const r = rowOf(id);
+			runAction('seen', ids, { on: r && seenOf(r) ? 0 : 1 });
+		} else if (act === 'flag') {
+			const r = rowOf(id);
+			runAction('flag', ids, { on: r && r.flagged ? 0 : 1 });
+		} else if (act === 'tag') {
+			tagMenu(card, ids);
+		} else if (act === 'move') {
+			moveDialog(ids);
+		}
+	}
+	function bindSwipes() {
+		const list = $('.ibx-pane--list .ibx-pane__body', S.el);
+		let g = null;
+		list.addEventListener('pointerdown', e => {
+			if (e.pointerType !== 'touch') {
+				return;
+			}
+			const card = e.target.closest('.ibx-mailcard[data-mail]');
+			if (!card || card.dataset.child) {
+				return;
+			}
+			g = { card, x: e.clientX, y: e.clientY, dx: 0, on: false };
+		}, { passive: true });
+		list.addEventListener('pointermove', e => {
+			if (!g) {
+				return;
+			}
+			const dx = e.clientX - g.x;
+			const dy = e.clientY - g.y;
+			if (!g.on) {
+				if (Math.abs(dy) > 12) {
+					g = null;
+					return;
+				}
+				if (Math.abs(dx) < 12) {
+					return;
+				}
+				const act = swipeAction(dx < 0 ? 'left' : 'right');
+				if (!act) {
+					g = null;
+					return;
+				}
+				g.on = true;
+				g.card.classList.add('is-swiping');
+			}
+			g.dx = dx;
+			const act = swipeAction(dx < 0 ? 'left' : 'right');
+			const s = SWIPES[act] || ['', ''];
+			g.card.style.transform = 'translateX(' + dx + 'px)';
+			g.card.dataset.swipe = dx < 0 ? 'left' : 'right';
+			g.card.style.setProperty('--ibx-swipe-label', '"' + t(s[1]).replace(/"/g, '') + '"');
+			g.card.classList.toggle('is-swipe-armed', Math.abs(dx) > 80);
+		}, { passive: true });
+		const end = () => {
+			if (!g) {
+				return;
+			}
+			const { card, dx, on } = g;
+			g = null;
+			if (!on) {
+				return;
+			}
+			card.classList.remove('is-swiping', 'is-swipe-armed');
+			card.style.transform = '';
+			delete card.dataset.swipe;
+			// The click that may follow the gesture does not open the mail
+			S.swipedAt = Date.now();
+			if (Math.abs(dx) > 80) {
+				runSwipe(swipeAction(dx < 0 ? 'left' : 'right'), +card.dataset.mail, card);
+			}
+		};
+		list.addEventListener('pointerup', end);
+		list.addEventListener('pointercancel', () => {
+			if (g && g.card) {
+				g.card.classList.remove('is-swiping', 'is-swipe-armed');
+				g.card.style.transform = '';
+			}
+			g = null;
+		});
+	}
+
 	// ---------- Registry of actions (one definition: buttons, menu, keyboard; hook inbox:mail:actions) ----------
 	function actions(m) {
 		const list = [
 			{ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) },
+		];
+		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
+		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
+		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
+			list.push(Object.assign({}, a, { button: ['flag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(anchor(), [m.id]) : a.run }));
+		});
+		list.push(
+			{ sep: true },
 			{ id: 'headers', icon: 'info', label: t('InboxAllHeaders'), run: () => headersDialog(m) },
 			{ id: 'source', icon: 'source', label: t('InboxViewSource'), key: 'Ctrl+U', run: () => openViewer({ mail: m, source: true }) },
 			{ id: 'eml', icon: 'download', label: t('InboxSaveEml'), run: () => download(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=source&download=1') },
 			{ id: 'print', icon: 'print', label: t('InboxPrint'), key: 'Ctrl+P', run: () => printMail(m) },
 			{ id: 'zoomin', icon: 'text-size', label: t('InboxZoomMailIn'), run: () => zoomMail(10) },
 			{ id: 'zoomout', icon: 'text-size', label: t('InboxZoomMailOut'), run: () => zoomMail(-10) },
-		];
+		);
 		list.forEach(a => {
 			a.own = true;
 		});
@@ -1355,8 +2198,9 @@
 		return list;
 	}
 	function actionButtons(m) {
-		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '') + '" data-action="' + esc(a.id) + '" title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '" aria-label="' + esc(a.label) + '">' + ic(a.icon) + '</button>').join('')
-			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-more" aria-haspopup="menu" title="' + th('InboxMoreActions') + '" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>';
+		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '') + '" data-action="' + esc(a.id) + '"'
+			+ (a.disabled ? ' aria-disabled="true" title="' + esc(a.reason || a.label) + '"' : ' title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '"') + ' aria-label="' + esc(a.label) + '">' + ic(a.icon) + '</button>').join('')
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-more" aria-haspopup="menu" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>';
 	}
 
 	/** Small menu under a button; closes on Escape, outside click; arrows move */
@@ -1373,7 +2217,7 @@
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
 			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
 			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
-			: '<button type="button" class="ibx-menu__item" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
+			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		document.body.appendChild(box);
 		const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor.getBoundingClientRect();
@@ -1658,13 +2502,16 @@
 	function bindActions(root) {
 		$$('.ibx-js-action', root).forEach(b => b.addEventListener('click', () => {
 			const a = actions(S.mail).find(x => x.id === b.dataset.action);
-			if (a) {
+			if (a && a.disabled) {
+				toast(a.reason || a.label, { error: true });
+			} else if (a) {
 				a.run();
 			}
 		}));
 		const more = $('.ibx-js-more', root);
 		if (more) {
-			more.addEventListener('click', () => menu(more, actions(S.mail).filter(a => !a.button).map(a => ({ icon: a.icon, label: a.label, key: a.key, run: a.run }))));
+			more.addEventListener('click', () => menu(more, actions(S.mail).filter(a => !a.button).map(a => a.sep ? a : ({ icon: a.icon, label: a.label, key: a.key, run: a.run, disabled: a.disabled, reason: a.reason }))
+				.filter((a, i, all) => !(a.sep && (i === 0 || all[i - 1].sep)))));
 		}
 	}
 
@@ -2280,7 +3127,9 @@
 			items.push({ icon: 'mail-opened', label: t('InboxOpen'), key: 'Entrée', run: () => openMail(row.id) });
 			items.push({ sep: true });
 		}
-		items.push({ icon: anyUnread ? 'mark-read' : 'unread', label: t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), key: 'M', run: () => setSeenMany(ids, anyUnread) });
+		items.push({ icon: anyUnread ? 'mark-read' : 'unread', label: t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), key: 'M', run: () => doSeen(ids, anyUnread) });
+		const rowEl = $('[data-mail="' + row.id + '"]', S.el);
+		mailActionItems(ids, rowEl).forEach(a => items.push(a.id === 'tag' ? Object.assign({}, a, { run: () => tagMenu(rowEl || S.el, ids, at || rectPoint(rowEl)) }) : a));
 		if (one) {
 			items.push({ sep: true });
 			items.push({ icon: 'download', label: t('InboxSaveEml'), run: () => download(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + row.id + '&part=source&download=1') });
@@ -2787,12 +3636,38 @@
 		} else if (key === 'n' || key === 'N') {
 			e.preventDefault();
 			nextUnread();
+		} else if (key === 'M' && e.shiftKey) {
+			e.preventDefault();
+			moveDialog(targetIds());
+		} else if (key === 's' || key === 'S') {
+			e.preventDefault();
+			doFlag(targetIds());
+		} else if (key === 'a' || key === 'A') {
+			e.preventDefault();
+			doArchive(targetIds());
+		} else if (key === 'j' || key === 'J') {
+			e.preventDefault();
+			doJunk(targetIds(), !e.shiftKey);
+		} else if (key === 'Delete') {
+			e.preventDefault();
+			doDelete(targetIds());
+		} else if (/^[0-9]$/.test(key) && !e.shiftKey) {
+			e.preventDefault();
+			const ids = targetIds();
+			if (ids.length) {
+				const why = refusal('tag', ids);
+				if (why) {
+					toast(why, { error: true });
+				} else {
+					doTagIndex(ids, +key);
+				}
+			}
 		} else if (key === 'm' || key === 'M') {
 			e.preventDefault();
 			const ids = S.selected.size ? Array.from(S.selected) : (S.mail ? [S.mail.id] : []);
 			if (ids.length) {
 				const anyUnread = S.rows.some(r => ids.includes(r.id) && !r.seen) || (S.mail && ids.includes(S.mail.id) && !S.mail.seen);
-				setSeenMany(ids, anyUnread);
+				doSeen(ids, anyUnread);
 			}
 		} else if (key === 'PageDown' || key === 'PageUp') {
 			e.preventDefault();
@@ -2811,6 +3686,7 @@
 				if (keep) {
 					S.selected.add(keep);
 				}
+				S.allInFolder = false;
 				paintSelection();
 			}
 		}
@@ -2818,7 +3694,8 @@
 
 	function keysHelp() {
 		const rows = [
-			['↑ ↓', 'InboxKeyNav'], ['N', 'InboxKeyNextUnread'], ['M', 'InboxKeyRead'], ['Ctrl+Maj+K', 'InboxKeySearch'], ['F9', 'InboxKeyFolders'],
+			['↑ ↓', 'InboxKeyNav'], ['N', 'InboxKeyNextUnread'], ['M', 'InboxKeyRead'], ['S', 'InboxFlag'], ['A', 'InboxArchive'], ['Maj+M', 'InboxMoveToMenu'], ['J / Maj+J', 'InboxKeyJunk'],
+			['Suppr', 'InboxDelete'], ['1 … 9', 'InboxKeyTags'], ['0', 'InboxRemoveAllTags'], ['Ctrl+Maj+K', 'InboxKeySearch'], ['F9', 'InboxKeyFolders'],
 			['Pg. suiv. / Pg. préc.', 'InboxKeyScroll'], ['Ctrl + / - / 0', 'InboxKeyTextSize'], ['Ctrl+U', 'InboxViewSource'], ['Ctrl+A', 'InboxKeySelectAll'], ['?', 'InboxKeyHelp'], ['Échap', 'InboxKeyEscape'],
 		];
 		dialog({
@@ -2934,7 +3811,7 @@
 			+ '<span class="ibx-pane__title ibx-ellipsis ibx-js-listtitle" role="heading" aria-level="1"></span><span class="ibx-spacer"></span>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--toggle ibx-js-quickfilter" aria-pressed="false" title="' + th('InboxQuickFilter') + '" aria-label="' + th('InboxQuickFilter') + '">' + ic('quickfilter') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" title="' + th('InboxListOptions') + '" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
 			+ '<div class="ibx-toolbar"><label class="ibx-search">' + ic('search') + '<input type="search" class="ibx-field ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false"'
 			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd">Ctrl+Maj+K</kbd></label></div>'
 			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span> <span class="ibx-js-pills" hidden></span></div>'
@@ -2946,6 +3823,7 @@
 			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm">' + th('InboxSyncResume') + '</button></div>'
 			+ '<button type="button" class="ibx-newpill ibx-js-newpill" hidden></button>'
+			+ '<div class="ibx-bulkbar ibx-js-bulkbar" role="toolbar" aria-label="' + th('InboxBulkActions') + '" hidden></div>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
 			+ '<div class="ibx-splitter" data-split="2" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '"></div>'
 			+ '<section class="ibx-pane ibx-pane--read" aria-label="' + th('InboxReadingPane') + '">'
@@ -2959,6 +3837,9 @@
 		bindTree();
 		bindSplitters();
 		bindContextMenus();
+		bindBulkBar();
+		bindDragDrop();
+		bindSwipes();
 		S.mobile = to => {
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
@@ -3054,7 +3935,7 @@
 				return;
 			}
 			const item = e.target.closest('[data-mail]');
-			if (!item) {
+			if (!item || Date.now() - (S.swipedAt || 0) < 400) {
 				return;
 			}
 			const id = +item.dataset.mail;

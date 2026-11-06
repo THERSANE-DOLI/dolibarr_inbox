@@ -430,6 +430,74 @@
 	// setEventMessage of the context shown as an inbox toast (no jnotify on this page)
 	Dolibarr.defineTool('setEventMessage', (msg, type) => toast(String(msg), { error: type === 'errors' || type === 'error' }), true);
 
+	// ---------- Tooltips ----------
+	/**
+	 * Tooltips of inbox (css/inbox.css, .ibx-tooltip: the look of the dark tooltips of Dolibarr 24, kept in inbox so
+	 * that a change of the theme of Dolibarr never changes them), in measured places only:
+	 * - bars of icons (bulk bar, actions of the mail read, heads of the panes) and the context menus: the bubble
+	 *   comes at once, the icon alone does not say enough;
+	 * - everywhere else (folders, rows of the list, rail) the native title stays: it comes with a delay and does not
+	 *   hide what the pointer crosses;
+	 * - a button that opens a menu: no bubble while its menu is open (aria-expanded), and none at all on the « ⋯ »
+	 *   buttons (no title: their dots say it).
+	 * The title moves to data-title at the first hover or focus, with the side that keeps the bubble inside the
+	 * window. An element drawing its own ::before or ::after keeps the native title.
+	 */
+	function tooltips() {
+		const SIDES = ['ibx-tooltip--top', 'ibx-tooltip--bottom', 'ibx-tooltip--left', 'ibx-tooltip--right'];
+		const drawsItself = el => {
+			if (el.classList.contains('ibx-tooltip')) {
+				return false;
+			}
+			const b = getComputedStyle(el, '::before').content;
+			const a = getComputedStyle(el, '::after').content;
+			return (b && b !== 'none' && b !== 'normal') || (a && a !== 'none' && a !== 'normal');
+		};
+		const init = el => {
+			const title = el.getAttribute('title');
+			if (title) {
+				if (drawsItself(el)) {
+					return;
+				}
+				el.setAttribute('data-title', title);
+				if (!el.hasAttribute('aria-label')) {
+					el.setAttribute('aria-label', title);
+				}
+				el.removeAttribute('title');
+			}
+			if (!el.hasAttribute('data-title')) {
+				return;
+			}
+			// Side of the bubble: above by default, below at the top of the window, aside near the edges
+			const r = el.getBoundingClientRect();
+			// Actions of the mail read: always below, a bubble beside would cover the next icons; near the right
+			// edge it is aligned on the right of the button (never out of the window)
+			const below = !!el.closest('.ibx-readhead__actions');
+			let side = below || r.top < 56 ? 'ibx-tooltip--bottom' : 'ibx-tooltip--top';
+			if (!below && r.right > window.innerWidth - 110) {
+				side = 'ibx-tooltip--left';
+			} else if (!below && r.left < 110) {
+				side = 'ibx-tooltip--right';
+			}
+			el.classList.remove(...SIDES);
+			el.classList.toggle('ibx-tooltip--end', below && r.right > window.innerWidth - 110);
+			el.classList.add('ibx-tooltip', side);
+		};
+		const target = e => {
+			const el = e.target && e.target.closest ? e.target.closest('button[title], a[title], [role="button"][title], button[data-title], a[data-title]') : null;
+			return el && el.closest('.ibx-bulkbar, .ibx-readhead__actions, .ibx-pane__head, .ibx-menu') ? el : null;
+		};
+		['pointerover', 'focusin'].forEach(ev => document.addEventListener(ev, e => {
+			if (e.pointerType === 'touch') {
+				return;
+			}
+			const el = target(e);
+			if (el) {
+				init(el);
+			}
+		}, true));
+	}
+
 	async function start() {
 		try {
 			// The langs tool reads the language when its file loads, before the values of the page: set it here
@@ -456,6 +524,7 @@
 			// Keys shown as they are: the application still works
 		}
 		applyDisplay(ctxJson('INBOX_PARAMS_JSON', {}));
+		tooltips();
 		Dolibarr.executeHook('inbox:app:init', { inbox });
 		renderRail();
 		$('#ibx-app').removeAttribute('data-loading');

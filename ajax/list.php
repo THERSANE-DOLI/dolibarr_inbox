@@ -73,7 +73,51 @@ function inboxListStamp($folderId)
 	return (int) $row->n.':'.(int) $row->m.':'.($row->t ? (int) $db->jdate($row->t) : 0).':'.(int) $row->u;
 }
 
+/**
+ * Search of the input: words and operators, sort, quick filters
+ *
+ * @return array<string,mixed>
+ */
+function inboxListQuery()
+{
+	global $langs;
+
+	$query = InboxSearchQuery::parse((string) inboxAjaxParam('q', 'alphanohtml'), $langs);
+	$sort = explode(':', (string) inboxAjaxParam('sort', 'alphanohtml'));
+	$query['sort'] = $sort[0] ?? 'date';
+	$query['dir'] = ($sort[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+	foreach (array('unread', 'flagged', 'attachment') as $f) {
+		if ((int) inboxAjaxParam($f, 'int') === 1) {
+			$query[$f] = true;
+		}
+	}
+	$tag = (string) inboxAjaxParam('tag', 'alphanohtml');
+	if ($tag !== '') {
+		$query['tag'][] = $tag;
+	}
+	$query['soc'] = (int) inboxAjaxParam('soc', 'int');
+
+	return $query;
+}
+
 switch ($action) {
+	case 'ids':
+		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
+		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
+		$query = inboxListQuery();
+		$engine = new InboxSearchSql($db);
+		$ids = array();
+		$cursor = '';
+		do {
+			$page = $engine->search(array((int) $folder->fk_account), (int) $folder->rowid, $query, $cursor, 500);
+			foreach ($page['rows'] as $r) {
+				$ids[] = (int) $r['id'];
+			}
+			$cursor = (string) $page['next'];
+		} while ($cursor !== '' && count($ids) < 20000);
+		inboxAjaxReply(array('ids' => $ids, 'more' => $cursor !== ''));
+		// no break
+
 	case 'page':
 		// scope: folder (default), account (every folder of the mailbox of the folder), all (every mailbox)
 		$scope = (string) inboxAjaxParam('scope', 'aZ09');
@@ -88,20 +132,7 @@ switch ($action) {
 		} else {
 			$folderId = 0;
 		}
-		$query = InboxSearchQuery::parse((string) inboxAjaxParam('q', 'alphanohtml'), $langs);
-		$sort = explode(':', (string) inboxAjaxParam('sort', 'alphanohtml'));
-		$query['sort'] = $sort[0] ?? 'date';
-		$query['dir'] = ($sort[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-		foreach (array('unread', 'flagged', 'attachment') as $f) {
-			if ((int) inboxAjaxParam($f, 'int') === 1) {
-				$query[$f] = true;
-			}
-		}
-		$tag = (string) inboxAjaxParam('tag', 'alphanohtml');
-		if ($tag !== '') {
-			$query['tag'][] = $tag;
-		}
-		$query['soc'] = (int) inboxAjaxParam('soc', 'int');
+		$query = inboxListQuery();
 		$engine = new InboxSearchSql($db);
 		$start = microtime(true);
 		// Conversations: one line per thread, when the list is sorted by date (a search lists the mails one by one)

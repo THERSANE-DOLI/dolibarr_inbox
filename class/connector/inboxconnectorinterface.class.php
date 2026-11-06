@@ -198,6 +198,23 @@ interface InboxConnectorInterface
 	public function importRaw($folder, $raw, array $flags = array(), $date = null);
 
 	/**
+	 * Remove mails for good, only these ones (lot W4)
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Identifiers
+	 * @return bool
+	 */
+	public function deleteMails($folder, array $remoteIds);
+
+	/**
+	 * Create a folder; an existing one is not an error (lot W4)
+	 *
+	 * @param string $path Full path
+	 * @return bool
+	 */
+	public function createFolder($path);
+
+	/**
 	 * Send a mail and keep its copy in the sent folder (lot W6)
 	 *
 	 * @param string $raw RFC 822 source

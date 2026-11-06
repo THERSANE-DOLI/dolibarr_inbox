@@ -830,3 +830,129 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-convo__item { margin-right: 2.5rem; }
 .ibx-convo__item.is-mine { margin-left: 2.5rem; margin-right: var(--ibx-s3); }
 .ibx-avatar--me .ibx-icon { width: 0.875rem; height: 0.875rem; }
+
+/* ---------- Actions on mails (1.6.0) ---------- */
+/* Bulk bar: above the list from 2 mails; labels hidden when the pane is narrow (titles stay) */
+.ibx-bulkbar { flex-wrap: wrap; container-type: inline-size; }
+.ibx-bulkbar[hidden] { display: none; }
+.ibx-bulkbar__count { margin-right: var(--ibx-s2); }
+.ibx-bulkbar .ibx-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+@container (max-width: 46rem) {
+	.ibx-bulkbar__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+.ibx-btn--danger-quiet { color: var(--ibx-danger); }
+.ibx-btn--danger-quiet:hover { background: var(--ibx-danger-soft); }
+.ibx-readhead__actions .ibx-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.ibx-menu__item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+
+/* Folder picker of « Move to »: searched as you type, folders indented, mailboxes as groups */
+.ibx-picklist { max-height: min(55vh, 26rem); overflow: auto; margin-top: var(--ibx-s2); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-picklist__group { padding: var(--ibx-s2) var(--ibx-s3) var(--ibx-s1); font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text-muted); position: sticky; top: 0; background: var(--ibx-bg-pane); }
+.ibx-picklist__item { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; padding: 0 var(--ibx-s3) 0 calc(var(--ibx-s3) + var(--ibx-depth, 0) * 1rem); cursor: pointer; }
+.ibx-picklist__item:hover { background: var(--ibx-bg-hover); }
+.ibx-picklist__item[aria-selected="true"] { background: var(--ibx-accent-soft); box-shadow: inset 3px 0 0 var(--ibx-accent); }
+.ibx-picklist__item[aria-disabled="true"] { color: var(--ibx-text-faint); cursor: not-allowed; }
+.ibx-picklist__empty { padding: var(--ibx-s3); }
+.ibx-js-movesearch { width: 100%; }
+
+/* Drag and drop: the label under the pointer, the reason of a refused drop */
+.ibx-dragghost { position: fixed; top: -100px; left: 0; max-width: 18rem; padding: var(--ibx-s1) var(--ibx-s2); overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+	font: var(--ibx-fs-md) var(--ibx-font); color: var(--ibx-on-accent); background: var(--ibx-accent); border-radius: var(--ibx-radius); }
+.ibx-dragtip { position: fixed; z-index: 100; max-width: 18rem; padding: var(--ibx-s1) var(--ibx-s2); pointer-events: none;
+	font: var(--ibx-fs-sm) var(--ibx-font); color: var(--ibx-text); background: var(--ibx-warning-soft); border: 1px solid var(--ibx-warning); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-mailrow[draggable="true"], .ibx-mailcard[draggable="true"] { -webkit-user-drag: element; }
+
+/* Phone: a card slid left or right, the action named behind it */
+.ibx-mailcard { touch-action: pan-y; }
+.ibx-mailcard.is-swiping { transition: none; z-index: 1; box-shadow: var(--ibx-shadow-float); }
+.ibx-mailcard:not(.is-swiping) { transition: transform var(--ibx-dur) ease-out; }
+.ibx-mailcard[data-swipe]::after { content: var(--ibx-swipe-label); position: absolute; top: 50%; transform: translateY(-50%); font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text-muted); }
+.ibx-mailcard[data-swipe="left"]::after { left: 100%; margin-left: var(--ibx-s3); }
+.ibx-mailcard[data-swipe="right"]::after { right: 100%; margin-right: var(--ibx-s3); }
+.ibx-mailcard.is-swipe-armed { border-color: var(--ibx-accent); }
+.ibx-mailcard.is-swipe-armed::after { color: var(--ibx-accent); }
+
+/* Journal of the actions (card of the mailbox) */
+.ibx-journal__filters { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); align-items: center; margin-bottom: var(--ibx-s3); }
+.ibx-journal td { vertical-align: top; }
+.ibx-journal td .ibx-ellipsis { display: block; max-width: 22rem; }
+.ibx-journal tr.is-undone td { color: var(--ibx-text-faint); }
+.ibx-mono { font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-sm); }
+.ibx-nowrap { white-space: nowrap; }
+@media (max-width: 63.9375rem) {
+	/* The cards slide sideways: no horizontal scroll of the list (phone: cards only) */
+	.ibx-pane--list .ibx-pane__body { overflow-x: hidden; }
+}
+.ibx-journal__filters > .ibx-field { width: auto; flex: 0 1 14rem; }
+.ibx-journal__filters .ibx-inline { flex-wrap: nowrap; }
+.ibx-journal__filters input[type="date"] { width: auto; }
+/* Bulk bar floating at the bottom of the list (absolute: the mails do not move when it shows) */
+.ibx-pane--list { position: relative; }
+.ibx-pane--list > .ibx-bulkbar {
+	position: absolute; left: var(--ibx-s2); right: var(--ibx-s2); bottom: var(--ibx-s2); z-index: 5;
+	flex-wrap: nowrap; border: 1px solid color-mix(in srgb, var(--ibx-accent) 35%, var(--ibx-border)); border-radius: var(--ibx-radius-lg);
+	background: var(--ibx-bg); box-shadow: var(--ibx-shadow-float);
+}
+.ibx-pane--list.has-bulk > .ibx-pane__body { padding-bottom: 4rem; }
+/* Bulk bar on the accent: seen at once over the cards */
+.ibx-pane--list > .ibx-bulkbar { background: var(--ibx-accent); color: var(--ibx-on-accent); border-color: var(--ibx-accent); }
+.ibx-bulkbar .ibx-btn { color: var(--ibx-on-accent); background: transparent; border-color: color-mix(in srgb, var(--ibx-on-accent) 45%, transparent); }
+.ibx-bulkbar .ibx-btn .ibx-icon { color: inherit; }
+/* Hover colors through the variables of .ibx-btn (its rule :hover:not(...) is stronger than a class here) */
+.ibx-bulkbar .ibx-btn { --_fg-h: var(--ibx-on-accent); --_bg-h: color-mix(in srgb, var(--ibx-on-accent) 16%, transparent); --_bd-h: var(--ibx-on-accent); }
+.ibx-bulkbar .ibx-btn:focus-visible { outline: 2px solid var(--ibx-on-accent); outline-offset: 1px; box-shadow: none; }
+.ibx-bulkbar .ibx-btn--danger-quiet { --_fg-h: #ffffff; --_bg-h: var(--ibx-danger); --_bd-h: var(--ibx-danger); }
+.ibx-bulkbar .ibx-btn[aria-disabled="true"]:hover { background: transparent; }
+
+
+/* ---------- Tooltips (js/inbox.js tooltips()) ----------
+   Look of the dark tooltips of Dolibarr 24, owned by inbox: a change of the theme of Dolibarr never changes them.
+   The bubble is the ::after of the element (text of data-title), its arrow the ::before. */
+:root { --ibx-tip-fg: #f9fafb; --ibx-tip-bg: #1f2937; --ibx-tip-border: #374151; --ibx-tip-arrow: 6px; }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-ibx-theme="light"]) { --ibx-tip-bg: #0d1418; --ibx-tip-border: #4b5b62; }
+}
+:root[data-ibx-theme="dark"] { --ibx-tip-bg: #0d1418; --ibx-tip-border: #4b5b62; }
+:root[data-ibx-theme="contrast"] { --ibx-tip-fg: #ffffff; --ibx-tip-bg: #000000; --ibx-tip-border: #ffffff; }
+
+.ibx-tooltip { position: relative; }
+.ibx-tooltip::after, .ibx-tooltip::before { position: absolute; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 120ms ease, transform 120ms ease; }
+.ibx-tooltip::after {
+	content: attr(data-title); z-index: 1000; white-space: nowrap; padding: 0.375rem 0.625rem;
+	font: 500 var(--ibx-fs-md) / 1.45 var(--ibx-font); letter-spacing: normal; text-transform: none; text-align: left;
+	color: var(--ibx-tip-fg); background: var(--ibx-tip-bg); border: 1px solid var(--ibx-tip-border); border-radius: 0.375rem;
+	box-shadow: 0 1px 20px rgba(0, 0, 0, .12);
+}
+.ibx-tooltip::before { content: ""; z-index: 1001; border: var(--ibx-tip-arrow) solid transparent; }
+/* Shown after 120 ms (the pointer only crossing does not show it), hidden at once */
+.ibx-tooltip:hover::after, .ibx-tooltip:hover::before, .ibx-tooltip:focus-visible::after, .ibx-tooltip:focus-visible::before {
+	opacity: 1; visibility: visible; transition: opacity 120ms ease 120ms, transform 120ms ease 120ms, visibility 0s linear 120ms;
+}
+/* A button whose menu is open: no bubble over the menu */
+.ibx-tooltip[aria-expanded="true"]::after, .ibx-tooltip[aria-expanded="true"]::before { display: none; }
+
+/* Above */
+.ibx-tooltip--top::after { bottom: calc(100% + var(--ibx-tip-arrow) + 2px); left: 50%; transform: translate(-50%, 4px); }
+.ibx-tooltip--top::before { bottom: calc(100% - var(--ibx-tip-arrow) + 2px); left: 50%; transform: translateX(-50%); border-top-color: var(--ibx-tip-bg); }
+.ibx-tooltip--top:hover::after, .ibx-tooltip--top:focus-visible::after { transform: translate(-50%, 0); }
+/* Below */
+.ibx-tooltip--bottom::after { top: calc(100% + var(--ibx-tip-arrow) + 2px); left: 50%; transform: translate(-50%, -4px); }
+.ibx-tooltip--bottom::before { top: calc(100% - var(--ibx-tip-arrow) + 2px); left: 50%; transform: translateX(-50%); border-bottom-color: var(--ibx-tip-bg); }
+.ibx-tooltip--bottom:hover::after, .ibx-tooltip--bottom:focus-visible::after { transform: translate(-50%, 0); }
+/* Below, near the right edge of the window: aligned on the right of the button (the arrow stays on it) */
+.ibx-tooltip--bottom.ibx-tooltip--end::after { left: auto; right: 0; transform: translateY(-4px); }
+.ibx-tooltip--bottom.ibx-tooltip--end:hover::after, .ibx-tooltip--bottom.ibx-tooltip--end:focus-visible::after { transform: none; }
+/* On the left */
+.ibx-tooltip--left::after { right: calc(100% + var(--ibx-tip-arrow) + 2px); top: 50%; transform: translate(4px, -50%); }
+.ibx-tooltip--left::before { right: calc(100% - var(--ibx-tip-arrow) + 2px); top: 50%; transform: translateY(-50%); border-left-color: var(--ibx-tip-bg); }
+.ibx-tooltip--left:hover::after, .ibx-tooltip--left:focus-visible::after { transform: translate(0, -50%); }
+/* On the right */
+.ibx-tooltip--right::after { left: calc(100% + var(--ibx-tip-arrow) + 2px); top: 50%; transform: translate(-4px, -50%); }
+.ibx-tooltip--right::before { left: calc(100% - var(--ibx-tip-arrow) + 2px); top: 50%; transform: translateY(-50%); border-right-color: var(--ibx-tip-bg); }
+.ibx-tooltip--right:hover::after, .ibx-tooltip--right:focus-visible::after { transform: translate(0, -50%); }
+@media (prefers-reduced-motion: reduce) {
+	.ibx-tooltip::after, .ibx-tooltip::before { transition: none !important; }
+}
+@media (forced-colors: active) {
+	.ibx-tooltip::after { border-color: CanvasText; }
+}

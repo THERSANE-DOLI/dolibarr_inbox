@@ -511,6 +511,9 @@ class Inbox
 		require_once __DIR__.'/inboxaccountlog.class.php';
 		$accountLog = new InboxAccountLog($this->db);
 		$accountLog->purge();
+		// Journal of the actions on the mails (INBOX_ACTION_LOG_MONTHS)
+		require_once __DIR__.'/inboxactionlog.class.php';
+		InboxActionLog::purge($this->db);
 
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)

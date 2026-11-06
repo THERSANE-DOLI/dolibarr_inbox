@@ -64,8 +64,8 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Reading, and the flags since lot W3 (read / unread). The other write capabilities come with the lots that write
-	 * (W4, W6, W8), each one checked against the capabilities of the server.
+	 * Reading, flags (lot W3), tags, move, import, folders (lot W4); sending and drafts come with lot W6, each one checked
+	 * against the capabilities of the server.
 	 *
 	 * @return string[]
 	 */
@@ -82,6 +82,13 @@ class InboxImapConnector extends InboxConnector
 		}
 		if (in_array('QUOTA', $server, true)) {
 			$caps[] = self::CAP_QUOTA;
+		}
+		// Writes of lot W4: tags, move (MOVE, or COPY + UID EXPUNGE with UIDPLUS), import (APPEND), folders
+		$caps[] = self::CAP_TAGS;
+		$caps[] = self::CAP_IMPORT;
+		$caps[] = self::CAP_FOLDERS_MANAGE;
+		if (in_array('MOVE', $server, true) || in_array('UIDPLUS', $server, true)) {
+			$caps[] = self::CAP_MOVE;
 		}
 
 		return $caps;
@@ -525,6 +532,396 @@ class InboxImapConnector extends InboxConnector
 		}
 
 		return null;
+	}
+
+	/**
+	 * UIDs of identifiers "uidvalidity:uid" of one folder (all the same uidvalidity)
+	 *
+	 * @param string[] $remoteIds Identifiers
+	 * @param int      $validity  Set to their uidvalidity
+	 * @return int[]|null Null if one is not valid
+	 */
+	protected function uidsOf(array $remoteIds, &$validity)
+	{
+		$validity = 0;
+		$uids = array();
+		foreach ($remoteIds as $id) {
+			if (!preg_match('/^(\d+):(\d+)$/', (string) $id, $m) || ($validity && $validity !== (int) $m[1])) {
+				return null;
+			}
+			$validity = (int) $m[1];
+			$uids[] = (int) $m[2];
+		}
+
+		return $uids ?: null;
+	}
+
+	/**
+	 * Select a folder read-write for one write, after checking its uidvalidity; back to read only by readOnly()
+	 *
+	 * @param string $folder   Folder path
+	 * @param int    $validity Uidvalidity expected (0 = any)
+	 * @return bool
+	 */
+	protected function selectForWrite($folder, $validity)
+	{
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			$this->error = $this->error ?: 'Invalid folder';
+			return false;
+		}
+		$status = $this->client->getConnection()->selectFolder($folder);
+		$this->examined = '';
+		if (!is_array($status)) {
+			$this->error = 'Folder not found';
+			return false;
+		}
+		if ($validity && (int) ($status['uidvalidity'] ?? 0) !== $validity) {
+			$this->error = 'UIDVALIDITY changed';
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Back to read only after a write. Never CLOSE: on a folder selected read-write it expunges the mails marked
+	 * \Deleted by another client. Without UNSELECT, EXAMINE of the same folder.
+	 *
+	 * @param string $folder Folder path
+	 * @return void
+	 */
+	protected function readOnly($folder)
+	{
+		try {
+			if (in_array('UNSELECT', $this->serverCapabilities, true)) {
+				$this->client->getConnection()->requestAndResponse('UNSELECT');
+			} else {
+				$this->examine($folder);
+			}
+		} catch (Exception $e) {
+			// Next reading examines again
+			$this->examined = '';
+		}
+	}
+
+	/**
+	 * UIDs of a folder among a set (to check a write), folder selected
+	 *
+	 * @param int[] $uids UIDs
+	 * @return int[]
+	 */
+	protected function presentUids(array $uids)
+	{
+		$found = array();
+		foreach (array_chunk($uids, 500) as $chunk) {
+			$found = array_merge($found, $this->searchUids(array('UID', implode(',', $chunk))));
+		}
+
+		return array_map('intval', $found);
+	}
+
+	/**
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Identifiers
+	 * @param string[] $add       Keywords to add
+	 * @param string[] $remove    Keywords to remove
+	 * @return bool
+	 */
+	public function setTags($folder, array $remoteIds, array $add, array $remove)
+	{
+		$this->error = '';
+		$valid = function ($k) {
+			return is_string($k) && preg_match('/^[A-Za-z0-9$_.\-]{1,64}$/', $k) && $k[0] !== '\\';
+		};
+		$add = array_values(array_filter($add, $valid));
+		$remove = array_values(array_filter($remove, $valid));
+		$uids = $this->uidsOf($remoteIds, $validity);
+		if ($uids === null || (!$add && !$remove)) {
+			$this->error = 'Invalid tags';
+			return false;
+		}
+		if (!$this->selectForWrite($folder, $validity)) {
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			foreach (array_chunk($uids, 500) as $chunk) {
+				foreach (array('+' => $add, '-' => $remove) as $sign => $keys) {
+					if ($keys && $conn->requestAndResponse('UID STORE', array(implode(',', $chunk), $sign.'FLAGS.SILENT', '('.implode(' ', $keys).')')) === false) {
+						$this->error = 'The server refused the tags (PERMANENTFLAGS)';
+						return false;
+					}
+				}
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Move mails inside the mailbox: UID MOVE (RFC 6851), else UID COPY + \Deleted + UID EXPUNGE of these UIDs only
+	 * (UIDPLUS; without it, nothing is removed: the copy is undone). Checked after: the mails are gone from the source.
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Identifiers
+	 * @param string   $target    Target folder path
+	 * @return array<string,string>|null Old identifier => new identifier ('' when the server did not tell it), null on error
+	 */
+	public function move($folder, array $remoteIds, $target)
+	{
+		$this->error = '';
+		$uids = $this->uidsOf($remoteIds, $validity);
+		if ($uids === null || !self::isSafeFolderPath($target) || $target === $folder) {
+			$this->error = 'Invalid move';
+			return null;
+		}
+		if (!$this->selectForWrite($folder, $validity)) {
+			return null;
+		}
+		$map = array();
+		try {
+			$conn = $this->client->getConnection();
+			$caps = $this->serverCapabilities;
+			foreach (array_chunk($uids, 500) as $chunk) {
+				$set = implode(',', $chunk);
+				if (in_array('MOVE', $caps, true)) {
+					$res = $conn->requestAndResponse('UID MOVE', array($set, $conn->escapeString($target)));
+				} else {
+					if (!in_array('UIDPLUS', $caps, true)) {
+						// Without UID EXPUNGE, EXPUNGE would remove every mail marked \Deleted by another client
+						$this->error = 'The server knows neither MOVE nor UIDPLUS: mails not moved';
+						return null;
+					}
+					$res = $conn->requestAndResponse('UID COPY', array($set, $conn->escapeString($target)));
+					if (is_array($res)) {
+						$conn->requestAndResponse('UID STORE', array($set, '+FLAGS.SILENT', '(\\Deleted)'));
+						$conn->requestAndResponse('UID EXPUNGE', array($set));
+					}
+				}
+				if (!is_array($res)) {
+					$this->error = 'The server refused the move';
+					return null;
+				}
+				$map += self::copyUidMap($res, $chunk, $validity);
+			}
+			// Checked: no mail left in the source
+			$left = $this->presentUids($uids);
+			if ($left) {
+				$this->error = count($left).' mail(s) still in the source folder after the move';
+				return null;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Mapping of the COPYUID answer (UIDPLUS): [COPYUID <validity> <source set> <target set>]
+	 *
+	 * @param mixed $response Answer
+	 * @param int[] $uids     UIDs asked
+	 * @param int   $validity Uidvalidity of the source
+	 * @return array<string,string> Old identifier => new identifier ('' when unknown)
+	 */
+	protected static function copyUidMap($response, array $uids, $validity)
+	{
+		$map = array();
+		foreach ($uids as $u) {
+			$map[$validity.':'.$u] = '';
+		}
+		if (!preg_match('/\[COPYUID (\d+) ([\d,:]+) ([\d,:]+)\]/i', self::responseText($response), $m)) {
+			return $map;
+		}
+		$src = self::expandSet($m[2]);
+		$dst = self::expandSet($m[3]);
+		if (count($src) === count($dst)) {
+			foreach ($src as $i => $u) {
+				$map[$validity.':'.$u] = $m[1].':'.$dst[$i];
+			}
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Response of Webklex (lines cut in words, nested lists) as text: « OK [COPYUID 17 3:4 9:10] Moved »
+	 *
+	 * @param mixed $response Response
+	 * @return string
+	 */
+	protected static function responseText($response)
+	{
+		if (!is_array($response)) {
+			return is_scalar($response) ? (string) $response : '';
+		}
+		$parts = array();
+		foreach ($response as $item) {
+			$parts[] = is_array($item) ? self::responseText($item) : (is_scalar($item) ? (string) $item : '');
+		}
+
+		return implode(' ', $parts);
+	}
+
+	/**
+	 * @param string $set « 3,5:7 »
+	 * @return int[]
+	 */
+	protected static function expandSet($set)
+	{
+		$out = array();
+		foreach (explode(',', $set) as $part) {
+			if (strpos($part, ':') !== false) {
+				list($a, $b) = array_map('intval', explode(':', $part));
+				for ($i = min($a, $b); $i <= max($a, $b) && count($out) < 10000; $i++) {
+					$out[] = $i;
+				}
+			} else {
+				$out[] = (int) $part;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Put a mail in a folder from its source (another mailbox), with its flags and its date of reception; checked by
+	 * APPENDUID (UIDPLUS) or by its Message-ID
+	 *
+	 * @param string   $folder Folder path
+	 * @param string   $raw    RFC 822 source
+	 * @param string[] $flags  Flags (\Seen, \Answered, \Flagged) and keywords
+	 * @param int|null $date   Internal date
+	 * @return string|null New identifier ('' when the server did not tell it but the mail is there), null on error
+	 */
+	public function importRaw($folder, $raw, array $flags = array(), $date = null)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !$this->connect() || (string) $raw === '') {
+			$this->error = $this->error ?: 'Invalid import';
+			return null;
+		}
+		$flags = array_values(array_filter($flags, function ($f) {
+			return is_string($f) && (in_array($f, array('\\Seen', '\\Answered', '\\Flagged', '\\Draft'), true) || preg_match('/^[A-Za-z0-9$_.\-]{1,64}$/', $f));
+		}));
+		try {
+			$conn = $this->client->getConnection();
+			$res = $conn->appendMessage($folder, (string) $raw, $flags ?: null, $date ? date('d-M-Y H:i:s O', (int) $date) : null);
+			if ($res === false || $res === null) {
+				$this->error = 'The server refused the mail';
+				return null;
+			}
+			if (preg_match('/APPENDUID (\d+) (\d+)/i', self::responseText($res), $m)) {
+				return $m[1].':'.$m[2];
+			}
+			// No UIDPLUS: found again by its Message-ID
+			if (preg_match('/^Message-ID:\s*<?([^<>\s]+)>?/mi', substr((string) $raw, 0, 65536), $mid)) {
+				$this->examined = '';
+				if ($this->examine($folder)) {
+					$found = $this->searchUids(array('HEADER', 'Message-ID', '"'.str_replace('"', '', $mid[1]).'"'));
+					if ($found) {
+						return $this->examinedValidity.':'.max(array_map('intval', $found));
+					}
+				}
+				$this->error = 'The mail was not found after the copy';
+				return null;
+			}
+
+			return '';
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		}
+	}
+
+	/**
+	 * Remove mails for good: \Deleted then UID EXPUNGE of these UIDs only (UIDPLUS). Without UIDPLUS: refused, as an
+	 * EXPUNGE would also remove the mails marked \Deleted by another client.
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Identifiers
+	 * @return bool
+	 */
+	public function deleteMails($folder, array $remoteIds)
+	{
+		$this->error = '';
+		$uids = $this->uidsOf($remoteIds, $validity);
+		if ($uids === null) {
+			$this->error = 'Invalid identifier';
+			return false;
+		}
+		if (!$this->connect()) {
+			return false;
+		}
+		if (!in_array('UIDPLUS', $this->serverCapabilities, true)) {
+			$this->error = 'The server does not know UIDPLUS: mails not removed';
+			return false;
+		}
+		if (!$this->selectForWrite($folder, $validity)) {
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			foreach (array_chunk($uids, 500) as $chunk) {
+				$set = implode(',', $chunk);
+				$conn->requestAndResponse('UID STORE', array($set, '+FLAGS.SILENT', '(\\Deleted)'));
+				$conn->requestAndResponse('UID EXPUNGE', array($set));
+			}
+			$left = $this->presentUids($uids);
+			if ($left) {
+				$this->error = count($left).' mail(s) still there after the removal';
+				return false;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Create a folder (and subscribe to it); an existing folder is not an error
+	 *
+	 * @param string $path Full path (with the delimiter of the server)
+	 * @return bool
+	 */
+	public function createFolder($path)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($path) || !$this->connect()) {
+			$this->error = $this->error ?: 'Invalid folder';
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			$res = $conn->requestAndResponse('CREATE', array($conn->escapeString($path)));
+			if ($res === false) {
+				// Already there? It answers to STATUS
+				$this->examined = '';
+				if (!is_array($conn->examineFolder($path))) {
+					$this->error = 'The server refused to create the folder';
+					return false;
+				}
+			}
+			$conn->requestAndResponse('SUBSCRIBE', array($conn->escapeString($path)));
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

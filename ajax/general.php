@@ -41,6 +41,8 @@ function inboxGeneralSettings()
 		'INBOX_DEFAULT_READ_DELAY' => array('default' => '3', 'check' => 'int:0:600'),
 		'INBOX_SEND_DELAY' => array('default' => '10', 'check' => 'int:0:120'),
 		'INBOX_ANTIVIRUS_MAX_MB' => array('default' => '25', 'check' => 'int:1:200'),
+		// Journal of the actions on the mails (lot W4): months kept, 0 = kept without limit
+		'INBOX_ACTION_LOG_MONTHS' => array('default' => '12', 'check' => 'int:0:120'),
 		// Pictures of the correspondents (1.5.0): sources looked for by the server
 		'INBOX_AVATAR_DOLIBARR' => array('default' => '1', 'check' => 'int:0:1'),
 		'INBOX_AVATAR_BIMI' => array('default' => '1', 'check' => 'int:0:1'),
