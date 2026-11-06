@@ -135,6 +135,65 @@ switch ($action) {
 		inboxAjaxReply($out);
 		// no break
 
+	case 'pump':
+		// Synchronisation driven by the browser, called by ONE tab only (the leader tab of the browser):
+		// 1. the folder asked (open in a tab), unless synchronised less than 15 s ago;
+		// 2. when the scheduled job does not run (no run for 3 min), a pass on the mailboxes of the user, the least
+		//    recent first (inbox and sent, folders due, first indexing), within 10 s per call; « more » tells the tab
+		//    to call again soon while a first indexing is left.
+		// The session is released first: a slow mail server never blocks the other calls of the user. The lock per
+		// mailbox makes several users (or browsers) never work twice on the same mailbox.
+		dol_include_once('/inbox/class/inboxsync.class.php');
+		$folderId = (int) inboxAjaxParam('folder', 'int');
+		$folder = $folderId > 0 ? inboxListFolder($folderId, $readable) : null;
+		$cron = $db->getRow("SELECT datelastrun, status FROM ".$db->prefix()."cronjob WHERE classesname = '/inbox/class/inboxsync.class.php' AND methodename = 'cronRun'");
+		$cronAlive = is_object($cron) && (int) $cron->status === 1 && $cron->datelastrun && (int) $db->jdate($cron->datelastrun) > dol_now() - 180;
+		session_write_close();
+		$deadline = microtime(true) + 10;
+		$sync = new InboxSync($db);
+		$stats = array('new' => 0, 'changed' => 0, 'deleted' => 0, 'folders' => 0);
+		$add = function () use ($sync, &$stats) {
+			foreach ($stats as $k => $v) {
+				$stats[$k] = $v + (int) ($sync->stats[$k] ?? 0);
+			}
+		};
+		$done = array();
+		if ($folder) {
+			$row = $db->getRow("SELECT date_sync FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folder->rowid));
+			if (!is_object($row) || !$row->date_sync || (int) $db->jdate($row->date_sync) <= dol_now() - 15) {
+				$account = new InboxAccount($db);
+				if ($account->fetch((int) $folder->fk_account) > 0 && $sync->run($account, microtime(true) + 8, array('folder_id' => (int) $folder->rowid)) === 1) {
+					$add();
+					$done[] = 'folder';
+				}
+			}
+		}
+		$more = false;
+		if (!$cronAlive && $readable) {
+			// A first indexing is left: state « first_sync », or a folder not indexed yet (index rebuilt, folder followed
+			// again, mailbox just enabled)
+			$firstLeft = "(sync_state = 'first_sync' OR EXISTS (SELECT f.rowid FROM ".$db->prefix()."inbox_folder as f WHERE f.fk_account = ".$db->prefix()."inbox_account.rowid"
+				." AND f.status = 1 AND f.selectable = 1 AND f.sync_enabled = 1 AND f.first_sync_done = 0))";
+			$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', $readable).") AND status = ".InboxAccount::STATUS_ACTIVE
+				." AND (date_sync IS NULL OR date_sync < '".$db->idate(dol_now() - 60)."' OR ".$firstLeft.") ORDER BY date_sync ASC LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if (microtime(true) > $deadline - 2) {
+					$more = true;
+					break;
+				}
+				$account = new InboxAccount($db);
+				if ($account->fetch((int) $r->rowid) > 0 && $sync->run($account, $deadline, array()) === 1) {
+					$add();
+					$done[] = (int) $r->rowid;
+				}
+			}
+			$left = $db->getRow("SELECT COUNT(rowid) AS n FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', $readable).") AND status = ".InboxAccount::STATUS_ACTIVE
+				." AND ".$firstLeft." AND (sync_retry_at IS NULL OR sync_retry_at < '".$db->idate(dol_now())."')");
+			$more = $more || (is_object($left) && (int) $left->n > 0);
+		}
+		inboxAjaxReply(array('cron' => $cronAlive, 'done' => $done, 'stats' => $stats, 'more' => $more));
+		// no break
+
 	case 'refresh':
 		// Folder open in the application: synchronised now (lot W2 §8.3), unless done less than 15 s ago (several users on the same folder: one pass) or a pass
 		// runs on the mailbox. Also the « Try again » of a mailbox in error (retry=1: even during the wait).

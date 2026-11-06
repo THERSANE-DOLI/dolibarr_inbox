@@ -280,11 +280,17 @@
 	}
 
 	// ---------- Tabs of the browser: coordination ----------
+	/**
+	 * Names shared by the tabs (channel, leader lock, keys of the local storage) are scoped to this instance of
+	 * Dolibarr: the browser shares them by origin, and two Dolibarr on the same domain (prod and test, several
+	 * entities on one host) would otherwise elect one leader for both and mix their messages
+	 */
+	const scope = name => name + ':' + ctx('INBOX_URL', location.pathname);
 	const channel = (() => {
 		const listeners = [];
 		let bc = null;
 		try {
-			bc = new BroadcastChannel('inbox');
+			bc = new BroadcastChannel(scope('inbox'));
 			bc.onmessage = e => listeners.forEach(fn => fn(e.data || {}));
 		} catch (e) {
 			bc = null;
@@ -303,7 +309,7 @@
 	// Leader tab (the only one that will poll the server from lot W2): Web Locks, else every tab is its own leader
 	let isLeader = false;
 	if (navigator.locks && navigator.locks.request) {
-		navigator.locks.request('inbox-leader', () => {
+		navigator.locks.request(scope('inbox-leader'), () => {
 			isLeader = true;
 			Dolibarr.executeHook('inbox:app:leader', {});
 			return new Promise(() => {});
@@ -414,7 +420,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,
@@ -433,14 +439,14 @@
 			const stamp = ctx('INBOX_LANG_STAMP', '') + '|' + ctx('DOL_LANG_INTERFACE_URL', '');
 			let known = '';
 			try {
-				known = localStorage.getItem('inbox-lang-stamp') || '';
+				known = localStorage.getItem(scope('inbox-lang-stamp')) || '';
 			} catch (e) {
 				known = '';
 			}
 			if (stamp && stamp !== known && Dolibarr.tools.langs.clearCache) {
 				await Dolibarr.tools.langs.clearCache(true);
 				try {
-					localStorage.setItem('inbox-lang-stamp', stamp);
+					localStorage.setItem(scope('inbox-lang-stamp'), stamp);
 				} catch (e) {
 					// private window: cleared again next time, harmless
 				}

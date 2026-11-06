@@ -178,6 +178,10 @@ class InboxAjaxSecurityTest extends InboxTestCase
 			$this->assertSame(404, $this->call($path)['code'], 'forged identifier: '.$path);
 		}
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id=99999999')['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=pump&folder=99999999')['code'], 'relay: forged folder');
+		$pump = $this->call('/custom/inbox/ajax/list.php?action=pump');
+		$this->assertSame(200, $pump['code'], $pump['body']);
+		$this->assertArrayHasKey('cron', $pump['json'], 'relay: says whether the scheduled job runs');
 
 		// A mailbox open to the user of the HTTP tests
 		$login = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."user WHERE login = '".$this->db->escape((string) getenv('INBOX_TEST_LOGIN'))."'");

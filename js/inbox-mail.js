@@ -1369,7 +1369,12 @@
 				zoomMail(e.deltaY < 0 ? 10 : -10);
 			}
 		}, { passive: false });
-		doc.addEventListener('keydown', e => onKey(e, true));
+		doc.addEventListener('keydown', e => {
+			activity();
+			onKey(e, true);
+		});
+		doc.addEventListener('pointerdown', activity);
+		doc.addEventListener('wheel', activity, { passive: true });
 		// Real address of a link at hover and focus (title), also read by the screen readers
 		Array.from(doc.querySelectorAll('a[href]')).forEach(a => {
 			if (!a.title) {
@@ -1845,26 +1850,159 @@
 		renderListHead();
 		await loadList();
 		Dolibarr.executeHook('inbox:folder:open', { account: entry.account.id, folder: id });
-		// Synchronised now in the background (unless done less than 15 s ago), then merged
-		api('list', 'refresh', { folder: id }).then(r => {
-			if (r.done && r.stats && (r.stats.new || r.stats.changed || r.stats.deleted) && S.folderId === id) {
-				loadList(true);
-				refreshTree();
-			}
-		}).catch(() => {});
+		// Synchronised now by the leader tab (unless done less than 15 s ago); its « synced » merges the changes
+		requestSync(id, true);
 	}
+
+	// ---------- Synchronisation by the browser: one tab only, paused after 30 min without activity ----------
+	/*
+	 * - Only the leader tab of the browser (Web Locks, js/inbox.js) calls list.php?action=pump: the folder opened (in
+	 *   any tab), and the whole mailboxes when the scheduled job does not run. The other tabs pass their requests to
+	 *   it on the channel of the tabs and refresh when it says « synced ».
+	 * - After 30 min without a click, a key or the wheel in any tab, every automatic call stops (synchronisation and
+	 *   state): the session of Dolibarr can expire as on its other pages. Any activity starts them again.
+	 */
+	const IDLE_MS = 30 * 60 * 1000;
+	const relay = { busy: false, queue: [], timer: 0, cron: true, paused: false, lastActive: Date.now(), lastShared: 0 };
+
+	function lastSeen() {
+		let shared = 0;
+		try {
+			shared = parseInt(localStorage.getItem(I.scope('inbox-activity')) || '0', 10) || 0;
+		} catch (e) {
+			shared = 0;
+		}
+		return Math.max(relay.lastActive, shared);
+	}
+	function isIdle() {
+		return Date.now() - lastSeen() > IDLE_MS;
+	}
+	/** Click, key, wheel, back on the tab: activity (kept for the other tabs, at most every 10 s) */
+	function activity() {
+		const now = Date.now();
+		relay.lastActive = now;
+		if (now - relay.lastShared > 10000) {
+			relay.lastShared = now;
+			try {
+				localStorage.setItem(I.scope('inbox-activity'), String(now));
+			} catch (e) {
+				// private window: this tab only
+			}
+		}
+		if (relay.paused) {
+			resume(true);
+		}
+	}
+	function pauseIfIdle() {
+		if (!isIdle()) {
+			return false;
+		}
+		if (!relay.paused) {
+			relay.paused = true;
+			const bar = S.el && $('.ibx-js-paused', S.el);
+			if (bar) {
+				bar.hidden = false;
+			}
+		}
+		return true;
+	}
+	function resume(tellOthers) {
+		relay.paused = false;
+		const bar = S.el && $('.ibx-js-paused', S.el);
+		if (bar) {
+			bar.hidden = true;
+		}
+		if (tellOthers) {
+			I.channel.post({ type: 'active' });
+		}
+		poll();
+		if (I.isLeader()) {
+			pumpSoon(0);
+		}
+	}
+
+	/**
+	 * A tab asks a synchronisation of a folder: the leader does it now (opened by a click) or at its next pass, the
+	 * other tabs pass the request
+	 */
+	function requestSync(folderId, now) {
+		if (I.isLeader()) {
+			if (folderId && !relay.queue.includes(folderId)) {
+				relay.queue.push(folderId);
+			}
+			if (now) {
+				pumpSoon(0);
+			}
+		} else {
+			I.channel.post({ type: 'sync-request', folder: folderId || 0, now: !!now });
+		}
+	}
+	function pumpSoon(ms) {
+		clearTimeout(relay.timer);
+		relay.timer = setTimeout(pump, ms);
+	}
+	async function pump() {
+		clearTimeout(relay.timer);
+		if (!I.isLeader() || relay.busy) {
+			return;
+		}
+		if (pauseIfIdle()) {
+			return;
+		}
+		relay.busy = true;
+		let next = 20000;
+		const folder = relay.queue.length ? relay.queue.shift() : (S.folderId || 0);
+		try {
+			const r = await api('list', 'pump', { folder });
+			relay.cron = !!r.cron;
+			const changed = r.stats && (r.stats.new || r.stats.changed || r.stats.deleted);
+			if (changed || (r.done || []).some(x => x !== 'folder')) {
+				I.channel.post({ type: 'synced' });
+				poll();
+			}
+			if (r.more || relay.queue.length) {
+				next = 2000;
+			}
+		} catch (err) {
+			// Server or network down: try again later, never in a loop
+			next = 30000;
+		} finally {
+			relay.busy = false;
+		}
+		pumpSoon(next);
+	}
+	I.channel.on(msg => {
+		if (msg.type === 'sync-request' && I.isLeader()) {
+			requestSync(msg.folder, msg.now);
+		} else if (msg.type === 'synced') {
+			poll();
+		} else if (msg.type === 'active' && relay.paused) {
+			resume(false);
+		}
+	});
+	Dolibarr.on('inbox:app:leader', () => {
+		// This tab is the leader now (the previous one was closed): it takes the synchronisation over
+		if (S.el) {
+			pumpSoon(1000);
+		}
+	});
+	['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, activity, { passive: true, capture: true }));
 
 	async function poll() {
 		clearTimeout(S.pollTimer);
+		if (pauseIfIdle()) {
+			// Started again by the next activity (resume)
+			return;
+		}
 		if (document.hidden || !S.el || S.el.closest('[hidden]')) {
 			S.pollTimer = setTimeout(poll, 20000);
 			return;
 		}
 		try {
-			// The open folder is synchronised (skipped by the server if done less than 15 s ago, a STATUS only when
-			// nothing changed), then the state tells the list whether to merge the changes
-			if (S.folderId) {
-				await api('list', 'refresh', { folder: S.folderId }).catch(() => {});
+			// The folder open here is synchronised by the leader tab (this one or another); the state (database only)
+			// tells the list whether to merge the changes
+			if (S.folderId && !I.isLeader()) {
+				requestSync(S.folderId, false);
 			}
 			const st = await api('list', 'state', { folder: S.folderId || 0 });
 			let treeChanged = false;
@@ -2106,6 +2244,8 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="flagged" aria-pressed="false">' + ic('star') + ' ' + th('InboxFilterFlagged') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="attachment" aria-pressed="false">' + ic('attachment') + ' ' + th('InboxFilterAttachment') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-clearfilters" hidden>' + th('InboxClearFilter') + '</button></div>'
+			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm">' + th('InboxSyncResume') + '</button></div>'
 			+ '<button type="button" class="ibx-newpill ibx-js-newpill" hidden></button>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
 			+ '<div class="ibx-splitter" data-split="2" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '"></div>'
@@ -2289,6 +2429,9 @@
 				}
 			});
 			S.pollTimer = setTimeout(poll, 20000);
+			if (I.isLeader()) {
+				pumpSoon(1500);
+			}
 		},
 		refresh(msg) {
 			if (msg && msg.entity === 'account') {

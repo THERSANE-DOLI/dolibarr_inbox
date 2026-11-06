@@ -630,3 +630,5 @@ InboxColumnsDefault = Colonnes par défaut
 InboxQuota = Espace de la boîte
 InboxQuotaUsed = %s Mo utilisés sur %s Mo (%s %%)
 InboxQuotaAlmostFull = Boîte presque pleine : %s %%
+InboxSyncPaused = Mise à jour en pause : aucune activité depuis 30 min.
+InboxSyncResume = Reprendre

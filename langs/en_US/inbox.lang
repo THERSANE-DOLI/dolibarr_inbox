@@ -630,3 +630,5 @@ InboxColumnsDefault = Columns by default
 InboxQuota = Space of the mailbox
 InboxQuotaUsed = %s MB used of %s MB (%s %%)
 InboxQuotaAlmostFull = Mailbox almost full: %s %%
+InboxSyncPaused = Updates paused: no activity for 30 min.
+InboxSyncResume = Resume

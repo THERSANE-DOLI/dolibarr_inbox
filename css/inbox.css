@@ -777,3 +777,4 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-menu__item[aria-disabled="true"] { color: var(--ibx-text-muted); cursor: default; }
 .ibx-tree__note--warning { color: var(--ibx-warning); font-weight: 600; }
 .ibx-tree__note--warning .ibx-icon { width: 0.875rem; height: 0.875rem; vertical-align: -2px; }
+.ibx-paused { margin: 0 var(--ibx-s3) var(--ibx-s2); }

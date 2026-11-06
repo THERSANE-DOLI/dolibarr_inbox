@@ -16,6 +16,9 @@
   - texts of the index in composed form (accents sent decomposed found by the search).
   - columns of the table chosen, sized and ordered by each user; the subject always keeps its room.
   - space of the mailbox (quota) in the tab Synchronisation, warning in the folders from 90 %.
+  - synchronisation by the browser when the scheduled job does not run (no run for 3 min): one tab only does it
+    for every tab of the browser, in calls of 10 s at most that never block the session; every automatic call
+    stops after 30 min without activity, so that the session of Dolibarr can expire as on its other pages.
 - NEW: synchronisation of the index of the mailboxes :   1.3.0
   - index in the database of the folders and of the headers of the mails (sender, recipients, subject, dates,
     size, attachments, flags, tags), never their body; the mail server stays the reference, read only.
