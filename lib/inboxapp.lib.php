@@ -78,6 +78,12 @@ function inboxAppContextVars(User $user)
 		$moduleVersion = $mod->version;
 	}
 
+	$colorblind = getDolUserString('MAIN_OPTIMIZEFORCOLORBLIND');
+	$colorblind = in_array($colorblind, array('flashy', 'protanopia', 'deuteranopes', 'tritanopes'), true) ? $colorblind : '';
+	if ($colorblind) {
+		$GLOBALS['langs']->load('admin');
+	}
+
 	return array(
 		'INBOX_VERSION' => $moduleVersion,
 		'INBOX_URL' => dol_buildpath('/inbox/index.php', 1),
@@ -91,6 +97,11 @@ function inboxAppContextVars(User $user)
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
 		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#1d6a8a'),
+		// Colour blindness declared in the card of the user (tab Interface): flashy, protanopia, deuteranopes, tritanopes
+		'INBOX_COLORBLIND' => $colorblind,
+		// Labels of Dolibarr for this option and its value (My account cites them)
+		'INBOX_COLORBLIND_OPTION' => $colorblind ? $GLOBALS['langs']->transnoentitiesnoconv('MAIN_OPTIMIZEFORCOLORBLIND') : '',
+		'INBOX_COLORBLIND_VALUE' => $colorblind ? $GLOBALS['langs']->transnoentitiesnoconv(array('flashy' => 'Flashy', 'protanopia' => 'Protanopia', 'deuteranopes' => 'Deuteranopes', 'tritanopes' => 'Tritanopes')[$colorblind]) : '',
 		'INBOX_DOLIBARR_URL' => DOL_URL_ROOT.'/',
 		'INBOX_COMPANY' => getDolGlobalString('MAIN_INFO_SOCIETE_NOM'),
 		// Changes with the language file: the page clears the translations cached by the browser when it changed

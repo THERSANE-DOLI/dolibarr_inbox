@@ -226,6 +226,15 @@
 	display: inline-flex; align-items: center; height: 1.125rem; padding: 0 0.375rem;
 	font-size: var(--ibx-fs-xs); font-weight: 600; color: #fff; background: var(--ibx-tag-color, var(--ibx-tag-4)); border-radius: var(--ibx-radius-sm);
 }
+/* Dark text on a light colour (js/inbox-colors.js darkText) */
+.ibx-tag--dark { color: #111111; }
+/* Border chosen per tag: around the badge, in the colour of the text of the theme, a mark that does not rely on the
+   colour (the background and the label stay as they are) */
+.ibx-tag--b-solid, .ibx-tag--b-dashed, .ibx-tag--b-dotted, .ibx-tag--b-double { outline-offset: 1px; margin-inline: 0.25rem; }
+.ibx-tag--b-solid { outline: 1.5px solid var(--ibx-text); }
+.ibx-tag--b-dashed { outline: 2px dashed var(--ibx-text); }
+.ibx-tag--b-dotted { outline: 2px dotted var(--ibx-text); }
+.ibx-tag--b-double { outline: 4px double var(--ibx-text); }
 .ibx-tag--1 { --ibx-tag-color: var(--ibx-tag-1); }
 .ibx-tag--2 { --ibx-tag-color: var(--ibx-tag-2); }
 .ibx-tag--3 { --ibx-tag-color: var(--ibx-tag-3); }
@@ -991,3 +1000,18 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
    densities; comfortable keeps it, even empty. Compact also drops the snippet. */
 :root[data-ibx-density="compact"] .ibx-mailcard__snippet { display: none; }
 :root:not([data-ibx-density="comfortable"]) .ibx-mailcard__foot:not(:has(> :not(.ibx-spacer))) { display: none; }
+
+/* ---------- Tags and colour blindness (settings, tab Tags) ---------- */
+.ibx-tagrisk { display: inline-flex; vertical-align: middle; margin-left: var(--ibx-s2); color: var(--ibx-warning); }
+.ibx-tagrisk[hidden] { display: none; }
+.ibx-notice__list { margin: var(--ibx-s1) 0 var(--ibx-s2); padding-left: 1.25rem; }
+.ibx-palettes { display: grid; gap: var(--ibx-s3); }
+.ibx-palette {
+	display: grid; grid-template-columns: auto 1fr; gap: var(--ibx-s1) var(--ibx-s3); align-items: center; cursor: pointer;
+	padding: var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius);
+}
+.ibx-palette:has(input:checked) { border-color: var(--ibx-accent); box-shadow: 0 0 0 1px var(--ibx-accent); }
+.ibx-palette > input { grid-row: span 4; margin: 0; }
+.ibx-palette__swatches { display: flex; gap: 3px; }
+.ibx-palette__swatches span { width: 1.125rem; height: 1.125rem; border-radius: 2px; }
+.ibx-palette__tags { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); }

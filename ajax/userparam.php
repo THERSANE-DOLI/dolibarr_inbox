@@ -37,10 +37,16 @@ if ($accountId > 0) {
 
 switch ($action) {
 	case 'get':
+		dol_include_once('/inbox/class/inboxtag.class.php');
 		$mailboxes = array();
 		$access = new InboxAccess($db);
+		$tagHelper = new InboxTag($db);
 		foreach ($access->getAccounts($user) as $account) {
-			$mailboxes[] = array('id' => (int) $account->id, 'email' => $account->email, 'label' => $account->label, 'params' => $params->getAll($user, (int) $account->id));
+			$mailboxes[] = array('id' => (int) $account->id, 'email' => $account->email, 'label' => $account->label, 'params' => $params->getAll($user, (int) $account->id),
+				// Active tags, to tell the user which ones show another colour for his vision
+				'tags' => array_map(function ($t) {
+					return array('label' => $t['label'], 'color' => $t['color']);
+				}, $tagHelper->listForAccount($account, true)));
 		}
 		inboxAjaxReply(array('params' => $params->getAll($user), 'mailboxes' => $mailboxes));
 		// no break

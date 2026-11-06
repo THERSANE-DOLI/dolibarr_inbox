@@ -126,9 +126,9 @@ switch ($action) {
 				'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null,
 				'folders' => $folderTree,
 				'marks' => (object) $marks,
-				// Tags of the mailbox (its own list or the global one): keyword => label and color
+				// Tags of the mailbox (its own list or the global one): keyword => label, color and border
 				'tags' => array_values(array_map(function ($t) {
-					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color']);
+					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border']);
 				}, array_filter($tagHelper->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), function ($t) {
 					return (int) $t['status'] === 1;
 				}))),

@@ -198,6 +198,23 @@
 		});
 		S.folders.clear();
 		S.accounts.forEach(a => a.folders.forEach(f => S.folders.set(f.id, { folder: f, account: a })));
+		adaptTags();
+	}
+
+	/**
+	 * Colour shown for each tag (d.view): the colours configured, or for a user who declared a colour blindness in his
+	 * card (and kept « adapted » in My account), another colour for the tags that collide for his vision. Display only
+	 */
+	function adaptTags() {
+		const C = Dolibarr.tools.inboxColors;
+		const visions = String(params.tag_colors_adapt) === '0' ? [] : C.userVisions();
+		S.accounts.forEach(a => {
+			const defs = a.tags || [];
+			const colors = C.adapt(defs, visions);
+			defs.forEach((d, i) => {
+				d.view = colors[i];
+			});
+		});
 	}
 
 	function renderTree() {
@@ -508,7 +525,7 @@
 			if (!d) {
 				return '';
 			}
-			return '<span class="ibx-tag" style="--ibx-tag-color:' + esc(d.color) + '">' + esc(d.label) + '</span>';
+			return Dolibarr.tools.inboxColors.badge(d, d.view);
 		}).join(' ');
 	}
 
@@ -3513,6 +3530,7 @@
 	}
 	Dolibarr.on('inbox:params:changed', p => {
 		Object.assign(params, p || {});
+		adaptTags();
 		if (S.el) {
 			loadList(true);
 		}

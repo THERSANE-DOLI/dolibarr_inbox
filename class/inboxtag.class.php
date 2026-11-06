@@ -31,6 +31,11 @@ require_once __DIR__.'/inboxaccount.class.php';
  */
 class InboxTag
 {
+	/**
+	 * @var string[] Borders of a tag (none = no border)
+	 */
+	const BORDERS = array('none', 'solid', 'dashed', 'dotted', 'double');
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -50,14 +55,14 @@ class InboxTag
 	 *
 	 * @param int  $accountId  0 = global list
 	 * @param bool $activeOnly Only the active tags
-	 * @return array<int,array{id:int,fk_account:int,keyword:string,label:string,color:string,position:int,status:int,key:string}>
+	 * @return array<int,array{id:int,fk_account:int,keyword:string,label:string,color:string,border:string,position:int,status:int,key:string}>
 	 */
 	public function listTags($accountId = 0, $activeOnly = false)
 	{
 		global $conf;
 
 		$out = array();
-		$sql = "SELECT rowid, fk_account, keyword, label, color, position, status FROM ".$this->db->prefix()."inbox_tag";
+		$sql = "SELECT rowid, fk_account, keyword, label, color, border, position, status FROM ".$this->db->prefix()."inbox_tag";
 		$sql .= " WHERE entity = ".((int) $conf->entity)." AND fk_account = ".((int) $accountId);
 		$sql .= $activeOnly ? " AND status = 1" : '';
 		$sql .= " ORDER BY position, rowid LIMIT 500";
@@ -73,6 +78,7 @@ class InboxTag
 				'keyword' => (string) $row->keyword,
 				'label' => (string) $row->label,
 				'color' => (string) $row->color,
+				'border' => self::isBorder((string) $row->border) ? (string) $row->border : 'none',
 				'position' => (int) $row->position,
 				'status' => (int) $row->status,
 				// Key of the keyboard: the 9 first active tags
@@ -102,6 +108,17 @@ class InboxTag
 	public static function isColor($color)
 	{
 		return (bool) preg_match('/^#[0-9a-f]{6}$/i', (string) $color);
+	}
+
+	/**
+	 * Border of a tag: drawn around the badge in the colour of the text, a mark that does not rely on the colour
+	 *
+	 * @param string $border Border
+	 * @return bool          none, solid, dashed, dotted or double
+	 */
+	public static function isBorder($border)
+	{
+		return in_array((string) $border, self::BORDERS, true);
 	}
 
 	/**
@@ -139,9 +156,10 @@ class InboxTag
 	 * @param string $label     Label
 	 * @param string $color     #RRGGBB
 	 * @param int    $accountId 0 = global list
+	 * @param string $border    none, solid, dashed, dotted or double
 	 * @return int               Id, < 0 if KO
 	 */
-	public function create(User $user, $label, $color, $accountId = 0)
+	public function create(User $user, $label, $color, $accountId = 0, $border = 'none')
 	{
 		global $conf;
 
@@ -154,11 +172,15 @@ class InboxTag
 			$this->error = 'InboxErrorTagColor';
 			return -1;
 		}
+		if (!self::isBorder($border)) {
+			$this->error = 'InboxErrorTagBorder';
+			return -1;
+		}
 		$prefix = $this->db->prefix();
 		$max = $this->db->getRow("SELECT MAX(position) AS p FROM ".$prefix."inbox_tag WHERE entity = ".((int) $conf->entity)." AND fk_account = ".((int) $accountId));
-		$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, position, status, date_creation, fk_user_creat)";
+		$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, position, status, date_creation, fk_user_creat)";
 		$sql .= " VALUES (".((int) $conf->entity).", ".((int) $accountId).", '".$this->db->escape($this->makeKeyword($label, $accountId))."',";
-		$sql .= " '".$this->db->escape($label)."', '".$this->db->escape(strtoupper($color))."', ".((is_object($max) ? (int) $max->p : 0) + 1).", 1,";
+		$sql .= " '".$this->db->escape($label)."', '".$this->db->escape(strtoupper($color))."', ".($border === 'none' ? 'NULL' : "'".$this->db->escape($border)."'").", ".((is_object($max) ? (int) $max->p : 0) + 1).", 1,";
 		$sql .= " '".$this->db->idate(dol_now())."', ".((int) $user->id).")";
 		if (!$this->db->query($sql)) {
 			$this->error = $this->db->lasterror();
@@ -176,9 +198,10 @@ class InboxTag
 	 * @param string $label  Label
 	 * @param string $color  #RRGGBB
 	 * @param int    $status 1 active, 0 not
+	 * @param string $border none, solid, dashed, dotted or double
 	 * @return int            > 0 if OK, < 0 if KO
 	 */
-	public function update(User $user, $id, $label, $color, $status = 1)
+	public function update(User $user, $id, $label, $color, $status = 1, $border = 'none')
 	{
 		global $conf;
 
@@ -191,7 +214,12 @@ class InboxTag
 			$this->error = 'InboxErrorTagColor';
 			return -1;
 		}
+		if (!self::isBorder($border)) {
+			$this->error = 'InboxErrorTagBorder';
+			return -1;
+		}
 		$sql = "UPDATE ".$this->db->prefix()."inbox_tag SET label = '".$this->db->escape($label)."', color = '".$this->db->escape(strtoupper($color))."',";
+		$sql .= " border = ".($border === 'none' ? 'NULL' : "'".$this->db->escape($border)."'").",";
 		$sql .= " status = ".($status ? 1 : 0).", fk_user_modif = ".((int) $user->id);
 		$sql .= " WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity);
 
@@ -258,8 +286,8 @@ class InboxTag
 		$prefix = $this->db->prefix();
 		$this->db->begin();
 		if ($mode === 'own' && !$this->listTags((int) $account->id)) {
-			$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, position, status, date_creation, fk_user_creat)";
-			$sql .= " SELECT entity, ".((int) $account->id).", keyword, label, color, position, status, '".$this->db->idate(dol_now())."', ".((int) $user->id);
+			$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, position, status, date_creation, fk_user_creat)";
+			$sql .= " SELECT entity, ".((int) $account->id).", keyword, label, color, border, position, status, '".$this->db->idate(dol_now())."', ".((int) $user->id);
 			$sql .= " FROM ".$prefix."inbox_tag WHERE entity = ".((int) $conf->entity)." AND fk_account = 0";
 			if (!$this->db->query($sql)) {
 				$this->error = $this->db->lasterror();

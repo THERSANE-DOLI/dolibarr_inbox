@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: tags readable by the colour blind people :   1.7.0
+  - border per tag (none, solid, dashes, dots, double), drawn around the badge in the colour of the text: a mark
+    that does not rely on the colour; none by default.
+  - warning in the tab Tags when two active tags may be mixed up (protanopia, deuteranopia, tritanopia, or too close
+    for everyone), with the pairs named and a mark on their rows; computed while the colour is picked.
+  - palettes made for the colour blind people (Okabe-Ito, Tol bright, Tol muted) previewed on the tags, then applied.
+  - a user who declared a colour blindness in his card (option of Dolibarr) sees another colour only for the tags
+    that collide for his vision, the others keep theirs; « My account » says which ones and can turn it off.
+  - dark text on the light colours of tags.
 - NEW: actions on the mails, written on the mail server and checked :   1.6.0
   - starred, tags (the same keywords as the other mail clients), archive into Archives / year of the mail (created when
     missing), move, junk / not junk, delete to the trash then for good with a confirmation naming the number.

@@ -102,6 +102,7 @@ if (!inboxPrintJsContext($vars)) {
 	exit;
 }
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-colors.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-mail.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" defer></script>'."\n";
 print '</head>'."\n";

@@ -84,6 +84,9 @@ class InboxUserParam
 			'after_move' => array('next', array('next', 'previous')),
 			'swipe_left' => array('archive', array('none', 'archive', 'delete', 'read', 'flag', 'tag', 'move')),
 			'swipe_right' => array('read', array('none', 'archive', 'delete', 'read', 'flag', 'tag', 'move')),
+			// Colour blindness (1.7.0): colours of the tags adapted to the vision declared in the card of the user
+			// (Dolibarr option MAIN_OPTIMIZEFORCOLORBLIND), 0 = the colours configured
+			'tag_colors_adapt' => array('1', 'int:0:1'),
 		);
 	}
 

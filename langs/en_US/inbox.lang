@@ -766,3 +766,36 @@ InboxJournalKeepHelp = Older lines are erased by the scheduled cleaning job. 0 =
 InboxMonths = months
 InboxSwipeSeen = Read
 InboxSwipeUnseen = Unread
+
+# Tags and colour blindness (1.7.0)
+InboxTagBorder = Border
+InboxTagBorder_none = None
+InboxTagBorder_solid = Solid
+InboxTagBorder_dashed = Dashes
+InboxTagBorder_dotted = Dots
+InboxTagBorder_double = Double
+InboxTagBorderHelp = A border tells two tags apart without relying on their colour.
+InboxErrorTagBorder = Unknown border.
+InboxTagsCvdRow = May be mixed up with another tag by a colour blind person
+InboxTagsCvdWarn = Some tags may be mixed up by a colour blind person:
+InboxTagsCvdPair = « %s » and « %s » (%s)
+InboxTagsCvdHint = Choose colours further apart, a palette made for colour blind people, or a different border for one of the two.
+InboxTagsCvdTooMany = %s active tags: too many for colours that all stay distinct. The label and the border remain the marks.
+InboxVision_normal = normal vision
+InboxVision_protanopia = protanopia
+InboxVision_deuteranopia = deuteranopia
+InboxVision_tritanopia = tritanopia
+InboxTagsPalettes = Palettes for colour blind people
+InboxTagsPalettesHelp = Preview of your tags with each palette, in their order. The borders do not change.
+InboxPalette_okabe = 8 colours, the reference
+InboxPalette_tolbright = 7 bright colours
+InboxPalette_tolmuted = 9 soft colours, one per key
+InboxTagsPaletteRisks = %s pair(s) at risk
+InboxTagsPaletteNoRisk = No pair at risk
+InboxTagsPaletteApply = Apply the palette
+InboxTagsPaletteApplied = Palette applied
+InboxTagColorsAdapt = Tag colours suited to my vision
+Inbox_tag_colors_adapt_1 = Yes
+Inbox_tag_colors_adapt_0 = No, the colours configured
+InboxTagColorsAdaptSome = According to the option « %s » of your user card (%s), these tags show another colour for you only: %s.
+InboxTagColorsAdaptNone = According to the option « %s » of your user card (%s), no tag needs another colour.

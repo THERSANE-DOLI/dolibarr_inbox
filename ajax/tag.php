@@ -62,7 +62,7 @@ switch ($action) {
 			// The global list is changed in Settings > General, not from a mailbox
 			inboxAjaxNeedAdmin();
 		}
-		$result = $tags->create($user, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), $listId);
+		$result = $tags->create($user, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), $listId, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'));
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($tags->error), 422);
 		}
@@ -80,7 +80,7 @@ switch ($action) {
 			inboxAjaxNeedAdmin();
 		}
 		$result = $action === 'update'
-			? $tags->update($user, $tagId, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), inboxAjaxParam('status', 'int') ? 1 : 0)
+			? $tags->update($user, $tagId, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), inboxAjaxParam('status', 'int') ? 1 : 0, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'))
 			: $tags->delete($tagId);
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($tags->error), 422);

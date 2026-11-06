@@ -895,7 +895,96 @@
 			+ lines.map(l => '<tr><td class="ibx-muted">' + esc(fmt(l.date)) + '</td><td>' + esc(l.user || '-') + '</td><td>' + esc(describe(l)) + (l.target ? ' : <b>' + esc(l.target) + '</b>' : '') + '</td></tr>').join('') + '</tbody></table>';
 	}
 
+	/**
+	 * My account: colours of the tags adapted to the colour blindness declared in the card of the user (Dolibarr), only
+	 * when one is declared; says which tags show another colour
+	 */
+	function tagColorsRow(data, opt) {
+		const setting = I.ctx('INBOX_COLORBLIND', '');
+		if (!setting) {
+			return '';
+		}
+		const visions = Dolibarr.tools.inboxColors.SETTING_VISIONS[setting] || [];
+		const changed = new Set();
+		data.mailboxes.forEach(m => {
+			const tags = m.tags || [];
+			Dolibarr.tools.inboxColors.adapt(tags, visions).forEach((c, i) => {
+				if (c !== tags[i].color) {
+					changed.add(tags[i].label);
+				}
+			});
+		});
+		const option = I.ctx('INBOX_COLORBLIND_OPTION', '');
+		const value = I.ctx('INBOX_COLORBLIND_VALUE', setting);
+		const help = changed.size ? t('InboxTagColorsAdaptSome', option, value, [...changed].join(', ')) : t('InboxTagColorsAdaptNone', option, value);
+		return '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-tag_colors_adapt">' + th('InboxTagColorsAdapt') + '</label><div>' + opt('tag_colors_adapt', ['1', '0'], String(data.params.tag_colors_adapt))
+			+ '<div class="ibx-formrow__help">' + esc(help) + '</div></div></div>';
+	}
+
 	// ----- Tab Tags (and the global list of Settings > General) -----
+	const C = Dolibarr.tools.inboxColors;
+
+	function borderSelect(current, attr) {
+		return '<select class="ibx-field ibx-field--narrow" ' + attr + ' aria-label="' + th('InboxTagBorder') + '">'
+			+ C.BORDERS.map(b => '<option value="' + b + '"' + (b === (current || 'none') ? ' selected' : '') + '>' + th('InboxTagBorder_' + b) + '</option>').join('') + '</select>';
+	}
+
+	/**
+	 * Warning of the tags a colour blind person may mix up (computed for the three colour blindnesses, whoever looks:
+	 * the person who sets the colours is seldom the one who needs it), with the palettes made for them
+	 */
+	function cvdWarning(box, tags, editable, applyPalette) {
+		const zone = $('.ibx-js-cvd', box);
+		const risks = C.risks(tags);
+		const active = tags.filter(tg => +tg.status === 1);
+		const risky = new Set(risks.flatMap(p => [tags[p.a].id, tags[p.b].id]));
+		$$('[data-tag]', box).forEach(row => {
+			$('[data-risk]', row).hidden = !risky.has(+row.dataset.tag);
+		});
+		let html = '';
+		if (active.length > 8) {
+			html = '<div class="ibx-notice ibx-notice--warning" style="margin-top:1rem">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxTagsCvdTooMany', active.length) + '</div></div>';
+		} else if (risks.length) {
+			html = '<div class="ibx-notice ibx-notice--warning" style="margin-top:1rem">' + ic('warning') + '<div class="ibx-notice__text"><b>' + th('InboxTagsCvdWarn') + '</b><ul class="ibx-notice__list">'
+				+ risks.map(p => '<li>' + th('InboxTagsCvdPair', tags[p.a].label, tags[p.b].label, p.visions.map(v => t('InboxVision_' + v)).join(', ')) + '</li>').join('')
+				+ '</ul>' + th('InboxTagsCvdHint') + '</div></div>';
+		}
+		if (editable && tags.length) {
+			html += '<p style="margin-top:0.75rem"><button type="button" class="ibx-btn ibx-js-palettes">' + ic('theme') + ' ' + th('InboxTagsPalettes') + '</button></p>';
+		}
+		zone.innerHTML = html;
+		const btn = $('.ibx-js-palettes', zone);
+		if (btn) {
+			btn.addEventListener('click', () => paletteDialog(tags, applyPalette));
+		}
+	}
+
+	/** Palettes made for the colour blind people, previewed on the tags (propose, then apply what was chosen) */
+	function paletteDialog(tags, applyPalette) {
+		const options = C.PALETTES.map(p => {
+			const list = tags.map((tg, i) => Object.assign({}, tg, { color: p.colors[i % p.colors.length] }));
+			return { p, list, risks: C.risks(list).length };
+		});
+		const first = Math.max(0, options.findIndex(o => !o.risks));
+		const dlg = I.dialog({
+			title: t('InboxTagsPalettes'),
+			wide: true,
+			body: '<p class="ibx-section__help">' + th('InboxTagsPalettesHelp') + '</p><div class="ibx-palettes" role="radiogroup" aria-label="' + th('InboxTagsPalettes') + '">'
+				+ options.map((o, k) => '<label class="ibx-palette"><input type="radio" name="palette" value="' + k + '"' + (k === first ? ' checked' : '') + '>'
+					+ '<span class="ibx-palette__head"><b>' + esc(o.p.name) + '</b> <span class="ibx-muted">' + th('InboxPalette_' + o.p.id) + '</span></span>'
+					+ '<span class="ibx-palette__swatches" aria-hidden="true">' + o.p.colors.map(c => '<span style="background:' + c + '"></span>').join('') + '</span>'
+					+ '<span class="ibx-palette__tags">' + o.list.filter(tg => +tg.status === 1).map(tg => C.badge(tg)).join(' ') + '</span>'
+					+ '<span class="ibx-muted">' + (o.risks ? th('InboxTagsPaletteRisks', o.risks) : th('InboxTagsPaletteNoRisk')) + '</span></label>').join('')
+				+ '</div>',
+			actions: [{ label: t('InboxTagsPaletteApply'), primary: true, run: async d => {
+				const k = +($('[name="palette"]:checked', d) || { value: first }).value;
+				await applyPalette(options[k].p.colors);
+				return true;
+			} }],
+		});
+		return dlg;
+	}
+
 	async function tabTags(box, account) {
 		box.innerHTML = skeleton(5);
 		let data;
@@ -916,27 +1005,59 @@
 				html += '<div class="ibx-notice ibx-notice--info" style="margin-top:1rem">' + ic('info') + '<div class="ibx-notice__text">' + th(isAdmin() ? 'InboxTagsGlobalHereAdmin' : 'InboxTagsGlobalHere') + '</div></div>';
 			}
 		}
-		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
+		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" draggable="' + editable + '" data-tag="' + tg.id + '">'
 				+ '<td>' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
 				+ '<td>' + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
-				+ '<td>' + (editable ? '<input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '">' : '<span class="ibx-tag" style="--ibx-tag-color:' + esc(tg.color) + '">' + esc(tg.label) + '</span>') + '</td>'
-				+ '<td>' + (editable ? '<input type="color" class="ibx-color" data-f="color" value="' + esc(tg.color || '#888888') + '" aria-label="' + th('InboxTagColor') + '">' : '') + '</td>'
+				+ '<td>' + (editable ? '<input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '">' : C.badge(tg)) + '</td>'
+				+ '<td>' + (editable ? '<input type="color" class="ibx-color" data-f="color" value="' + esc(tg.color || '#888888') + '" aria-label="' + th('InboxTagColor') + '">' : '') + '<span class="ibx-tagrisk" data-risk hidden title="' + th('InboxTagsCvdRow') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxTagsCvdRow') + '</span></span></td>'
+				+ '<td>' + (editable ? borderSelect(tg.border, 'data-f="border"') : th('InboxTagBorder_' + (tg.border || 'none'))) + '</td>'
 				+ '<td>' + (editable ? '<button type="button" class="ibx-switch" role="switch" data-f="status" aria-checked="' + (tg.status ? 'true' : 'false') + '" aria-label="' + th('InboxTagActive') + '"></button>' : (tg.status ? th('InboxAccountStatusActive') : th('InboxInactive'))) + '</td>'
 				+ '<td class="ibx-table__actions">' + (editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="1" title="' + th('InboxMoveDown') + '" aria-label="' + th('InboxMoveDown') + '"' + (n === data.tags.length - 1 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-down') + '</button>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-deltag="1" title="' + th('InboxDelete') + '" aria-label="' + th('InboxDelete') + '">' + ic('delete') + '</button>' : '') + '</td></tr>').join('')
 			+ '</tbody></table>';
 		if (editable) {
-			html += '<form class="ibx-inline ibx-js-addtag" style="margin-top:1rem"><input class="ibx-field ibx-field--medium" name="label" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"><input type="color" class="ibx-color" name="color" value="#2a6fd6" aria-label="' + th('InboxTagColor') + '"><button type="submit" class="ibx-btn ibx-btn--primary">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></form>';
-			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + '</p>';
+			html += '<form class="ibx-inline ibx-js-addtag" style="margin-top:1rem"><input class="ibx-field ibx-field--medium" name="label" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"><input type="color" class="ibx-color" name="color" value="#0072b2" aria-label="' + th('InboxTagColor') + '">'
+				+ borderSelect('none', 'name="border"') + '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></form>';
+			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + '</p>';
 		}
+		html += '<div class="ibx-js-cvd" aria-live="polite"></div>';
 		box.innerHTML = html;
 		const params = account ? { id: account.id } : {};
 		const reload = () => {
 			I.changed('tag', account ? account.id : 0);
 			tabTags(box, account);
 		};
+		// Tags as shown now (the colour being picked included), in their order
+		const current = () => $$('[data-tag]', box).map(row => {
+			const tg = data.tags.find(x => x.id === +row.dataset.tag);
+			const sw = $('[data-f="status"]', row);
+			const col = $('[data-f="color"]', row);
+			const lab = $('[data-f="label"]', row);
+			const bor = $('[data-f="border"]', row);
+			return Object.assign({}, tg, {
+				label: lab ? lab.value : tg.label,
+				color: col ? col.value.toUpperCase() : tg.color,
+				border: bor ? bor.value : tg.border,
+				status: sw ? (sw.getAttribute('aria-checked') === 'true' ? 1 : 0) : tg.status,
+			});
+		});
+		const paintRisks = () => cvdWarning(box, current(), editable, applyPalette);
+		const applyPalette = async colors => {
+			const list = current();
+			try {
+				for (let i = 0; i < list.length; i++) {
+					const tg = list[i];
+					await post('tag', 'update', Object.assign({ tag_id: tg.id, label: tg.label, color: colors[i % colors.length], status: tg.status, border: tg.border || 'none' }, params));
+				}
+				toast(t('InboxTagsPaletteApplied'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			reload();
+		};
+		paintRisks();
 		$$('[name="tags_mode"]', box).forEach(r => r.addEventListener('change', async () => {
 			try {
 				await post('tag', 'mode', Object.assign({ mode: r.value }, params));
@@ -948,9 +1069,10 @@
 		const saveRow = async row => {
 			const label = $('[data-f="label"]', row).value;
 			const color = $('[data-f="color"]', row).value;
+			const border = $('[data-f="border"]', row).value;
 			const status = $('[data-f="status"]', row).getAttribute('aria-checked') === 'true' ? 1 : 0;
 			try {
-				await post('tag', 'update', Object.assign({ tag_id: row.dataset.tag, label, color, status }, params));
+				await post('tag', 'update', Object.assign({ tag_id: row.dataset.tag, label, color, status, border }, params));
 				I.changed('tag', account ? account.id : 0);
 			} catch (err) {
 				toast(err.message, { error: true });
@@ -960,8 +1082,17 @@
 			if (!editable) {
 				return;
 			}
-			$('[data-f="label"]', row).addEventListener('change', () => saveRow(row));
+			$('[data-f="label"]', row).addEventListener('change', () => {
+				saveRow(row);
+				paintRisks();
+			});
 			$('[data-f="color"]', row).addEventListener('change', () => saveRow(row));
+			// The warning follows the colour while it is being picked
+			$('[data-f="color"]', row).addEventListener('input', paintRisks);
+			$('[data-f="border"]', row).addEventListener('change', () => {
+				saveRow(row);
+				paintRisks();
+			});
 			$('[data-f="status"]', row).addEventListener('click', e => {
 				const sw = e.currentTarget;
 				sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
@@ -1032,7 +1163,7 @@
 			add.addEventListener('submit', async e => {
 				e.preventDefault();
 				try {
-					await post('tag', 'create', Object.assign({ label: add.label.value, color: add.color.value }, params));
+					await post('tag', 'create', Object.assign({ label: add.label.value, color: add.color.value, border: add.border.value }, params));
 					reload();
 				} catch (err) {
 					toast(err.message, { error: true });
@@ -1310,6 +1441,7 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-theme">' + th('InboxTheme') + '</label><div>' + opt('theme', ['auto', 'light', 'dark', 'contrast'], p.theme) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-density">' + th('InboxDensity') + '</label><div>' + opt('density', ['compact', 'normal', 'comfortable'], p.density) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-text_size">' + th('InboxTextSize') + '</label><div class="ibx-inline"><input type="range" min="90" max="150" step="10" data-param="text_size" id="me-text_size" value="' + esc(p.text_size) + '" aria-valuetext="' + esc(p.text_size) + ' %"><output class="ibx-js-ts">' + esc(p.text_size) + ' %</output></div></div>'
+			+ tagColorsRow(data, opt)
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'
