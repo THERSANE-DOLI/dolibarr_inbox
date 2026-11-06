@@ -54,6 +54,9 @@
 		readTimer: 0,
 		pollTimer: 0,
 		collapsed: new Set(),
+		// Conversations unfolded in the list (key of the thread) and their mails
+		expanded: new Set(),
+		threadCache: {},
 	};
 	try {
 		(JSON.parse(params.tree_collapsed || '[]') || []).forEach(k => S.collapsed.add(String(k)));
@@ -252,13 +255,13 @@
 			const icon = ROLE_ICON[f.role] || 'folder';
 			const selected = f.id === S.folderId && S.scope === 'folder';
 			html += '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
-				+ '<div class="ibx-tree__row' + (f.unread ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
+				+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
 				+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '">'
 				+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
 				+ ic(icon, 'ibx-tree__icon')
 				+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
 				+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
-				+ (f.unread ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
+				+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
 				+ '</li>';
@@ -408,7 +411,16 @@
 			S.pills = res.query;
 			if (keep) {
 				mergeRows(res.rows, res.next);
+				if (S.expanded.size) {
+					S.threadCache = {};
+					const again = S.rows.filter(r => r.thread && S.expanded.has(r.thread.key));
+					Promise.all(again.map(r => api('mail', 'thread', { id: r.id }).then(x => {
+						S.threadCache[r.thread.key] = x.mails || [];
+					}).catch(() => {}))).then(() => renderList());
+				}
 			} else {
+				S.expanded.clear();
+				S.threadCache = {};
 				S.rows = res.rows;
 				S.next = res.next;
 			}
@@ -501,15 +513,38 @@
 	}
 
 	/** Correspondent of a row: the recipient in Sent and Drafts */
+	/**
+	 * Mail sent by the mailbox (in Sent or Drafts, or its sender is the address of the mailbox): never shown unread,
+	 * even when the server has no \\Seen on it (copy made by the server, another tool, an import). Display only: nothing
+	 * is written on the server
+	 */
+	function isMine(m) {
+		const e = S.folders.get(m.folder);
+		if (!e) {
+			return false;
+		}
+		const role = m.role !== undefined ? m.role : e.folder.role;
+		return role === 'sent' || role === 'drafts' || (m.from_email || (m.from && m.from.email) || '').toLowerCase() === e.account.email.toLowerCase();
+	}
+	function seenOf(m) {
+		return !!m.seen || isMine(m);
+	}
+	/** « Me → Client Bride »: the first recipient of a mail sent */
+	function mineLabel(m) {
+		const first = String(m.to || '').split(',')[0].trim();
+		const name = first.replace(/\s*<[^>]*>\s*$/, '').replace(/^"|"$/g, '').trim() || first.replace(/[<>]/g, '');
+		return t('InboxMe') + (name ? ' → ' + name : '');
+	}
+
 	/** New mail: arrived after the mark of the user in its folder (when he opened it) and still unread */
 	function isNew(r) {
-		if (r.seen) {
+		if (seenOf(r)) {
 			return false;
 		}
 		const e = S.folders.get(r.folder);
 		const marks = e && S.shownMarks ? S.shownMarks : null;
 		const mark = marks && marks[r.folder] !== undefined ? marks[r.folder] : null;
-		return mark !== null && r.id > mark;
+		return mark !== null && (r.arrival || 0) > mark;
 	}
 
 	/**
@@ -538,7 +573,78 @@
 
 	/** Number of mails of the conversation of a line (none for a mail alone) */
 	function threadBadge(r) {
-		return r.thread && r.thread.count > 1 ? '<span class="ibx-threadcount" title="' + th('InboxThreadCount', r.thread.count) + '">' + ic('thread') + ' ' + r.thread.count + '</span> ' : '';
+		if (!r.thread || r.thread.count < 2) {
+			return '';
+		}
+		const open = S.expanded.has(r.thread.key);
+		return '<button type="button" class="ibx-threadtoggle ibx-js-threadtoggle" data-row="' + r.id + '" aria-expanded="' + open + '" tabindex="-1" title="' + th('InboxThreadCount', r.thread.count) + '">'
+			+ ic('thread') + ' ' + th('InboxThreadReplies', r.thread.count - 1) + ' ' + ic(open ? 'chevron-up' : 'chevron-down') + '</button> ';
+	}
+
+	/** Other mails of the conversation of a line, unfolded under it (cards or table rows) */
+	function threadChildren(r, view, cols) {
+		if (!r.thread || !S.expanded.has(r.thread.key)) {
+			return '';
+		}
+		const list = S.threadCache[r.thread.key];
+		if (!list) {
+			return view === 'table' ? '<tr class="ibx-mailrow ibx-mailrow--child"><td></td><td colspan="' + (cols.length + 1) + '"><span class="ibx-skeleton" style="width:40%"></span></td></tr>'
+				: '<div class="ibx-thread"><span class="ibx-skeleton" style="width:50%"></span></div>';
+		}
+		const kids = list.filter(m => m.id !== r.id).slice().reverse();
+		if (view === 'table') {
+			return kids.map(m => '<tr class="ibx-mailrow ibx-mailrow--child' + (seenOf(m) ? '' : ' is-unread') + (isMine(m) ? ' is-mine' : '') + '" data-mail="' + m.id + '" data-child="1" aria-selected="' + S.selected.has(m.id) + '" tabindex="-1">'
+				+ '<td></td>' + cols.map(c => {
+					if (c.id === 'from') {
+						return '<td title="' + esc(m.from_email) + '">' + (isMine(m) ? ic('sent', 'ibx-faint') + ' <span class="ibx-sr-only">' + th('InboxSent') + ' </span>' + esc(mineLabel(m)) : '<span class="ibx-sr-only">' + th('InboxReceived') + ' </span>' + esc(m.from_name || m.from_email || t('InboxNoSender'))) + '</td>';
+					}
+					if (c.id === 'subject') {
+						return '<td class="ibx-mailrow__subject ibx-muted">' + esc(m.subject || t('InboxNoSubject')) + '</td>';
+					}
+					if (c.id === 'date') {
+						return '<td class="ibx-mailrow__date" title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</td>';
+					}
+					if (c.id === 'att') {
+						return '<td>' + (m.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>';
+					}
+					return '<td></td>';
+				}).join('') + '<td></td></tr>').join('');
+		}
+		return '<div class="ibx-thread" role="group" aria-label="' + th('InboxThreadCount', list.length) + '">' + kids.map(m => '<div class="ibx-mailcard ibx-mailcard--child' + (seenOf(m) ? '' : ' is-unread') + (isMine(m) ? ' is-mine' : '') + '" role="option" data-mail="' + m.id + '" data-child="1" aria-selected="' + S.selected.has(m.id) + '" tabindex="-1">'
+			+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
+			+ '<span class="ibx-mailcard__from"><span class="ibx-ellipsis">' + (isMine(m) ? ic('sent', 'ibx-faint') + ' <span class="ibx-sr-only">' + th('InboxSent') + ' </span>' + esc(mineLabel(m))
+				: '<span class="ibx-sr-only">' + th('InboxReceived') + ' </span>' + esc(m.from_name || m.from_email || t('InboxNoSender'))) + '</span></span>'
+			+ '<span class="ibx-mailcard__meta">' + (m.attachments ? ic('attachment') : '') + '<span title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></span>'
+			+ '<span class="ibx-mailcard__subject ibx-ellipsis ibx-muted">' + esc(m.snippet || m.subject || '') + '</span></div>').join('') + '</div>';
+	}
+
+	/** Unfold or fold the conversation of a line in the list (its mails read once) */
+	async function toggleThread(rowId, open) {
+		const r = S.rows.find(x => x.id === rowId);
+		if (!r || !r.thread || r.thread.count < 2) {
+			return;
+		}
+		const key = r.thread.key;
+		const want = open === undefined ? !S.expanded.has(key) : open;
+		if (want === S.expanded.has(key)) {
+			return;
+		}
+		if (want) {
+			S.expanded.add(key);
+		} else {
+			S.expanded.delete(key);
+		}
+		renderList();
+		if (want && !S.threadCache[key]) {
+			try {
+				const res = await api('mail', 'thread', { id: rowId });
+				S.threadCache[key] = res.mails || [];
+			} catch (err) {
+				S.expanded.delete(key);
+				toast(err.message, { error: true });
+			}
+			renderList();
+		}
 	}
 
 	/** Row of Sent or Drafts: its correspondent is the recipient, no picture of the sender (that is us) */
@@ -563,7 +669,7 @@
 	const COLUMNS = {
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
-		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
+		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
@@ -781,9 +887,10 @@
 				+ '<th class="ibx-colpicker"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-colpicker" aria-haspopup="menu" title="' + th('InboxChooseColumns') + '" aria-label="' + th('InboxChooseColumns') + '">' + ic('view-table') + '</button></th></tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
-				html += '<tr class="ibx-mailrow' + (r.seen ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
+				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
-					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '<td></td></tr>';
+					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '<td></td></tr>'
+					+ threadChildren(r, 'table', cols);
 			});
 			html += '</tbody></table>';
 		} else {
@@ -799,17 +906,18 @@
 					}
 				}
 				const sel = S.selected.has(r.id);
-				html += '<div class="ibx-mailcard' + (r.seen ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
+				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
-					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
+					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
 					+ '<span class="ibx-mailcard__meta">' + (r.answered ? ic('reply') : '') + '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : '')
 					+ '<span class="ibx-mailcard__foot">' + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
 					+ (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '')
 					+ '<span class="ibx-spacer"></span>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</span>'
-					+ '</div>';
+					+ '</div>'
+					+ threadChildren(r, 'cards', null);
 			});
 			html += '</div>';
 		}
@@ -1037,7 +1145,7 @@
 	}
 	function nextUnread() {
 		const start = rowIndex(S.anchor);
-		const r = S.rows.find((x, i) => i > start && !x.seen) || S.rows.find(x => !x.seen);
+		const r = S.rows.find((x, i) => i > start && !seenOf(x)) || S.rows.find(x => !seenOf(x));
 		if (r) {
 			moveSelection(rowIndex(r.id) - rowIndex(S.anchor));
 		} else {
@@ -1134,7 +1242,7 @@
 
 	/** Mail marked read by the setting of the user and the mailbox (interface §5.3) */
 	function autoRead(mail) {
-		if (mail.seen || mail.read_mode === 'manual') {
+		if (mail.seen || mail.read_mode === 'manual' || isMine({ folder: mail.folder, role: mail.folder_role, from: mail.from })) {
 			return;
 		}
 		const delay = mail.read_mode === 'immediate' ? 0 : Math.max(0, mail.read_delay || 0) * 1000;
@@ -1191,7 +1299,7 @@
 		list.forEach(r => {
 			const el = $('[data-mail="' + r.id + '"]', S.el);
 			if (el) {
-				el.classList.toggle('is-unread', !r.seen);
+				el.classList.toggle('is-unread', !seenOf(r));
 				el.classList.toggle('is-new', isNew(r));
 				const dot = $('.ibx-newdot--row', el);
 				if (dot && !isNew(r)) {
@@ -1214,9 +1322,12 @@
 		const box = inThread ? '' : (e ? e.account.email : (m.mailbox || ''));
 		const recipients = (m.to || []).concat(m.cc || []);
 		const toLine = recipients.length ? th('InboxForShort') + ' ' + recipients.slice(0, 6).map(addressHtml).join(', ') + (recipients.length > 6 ? ' ' + th('InboxAndMore', recipients.length - 6) : '') : '';
-		return '<div class="ibx-readhead__top">' + avatar(m.from.name, m.from.email, '', m.id, !partial || inThread)
-			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr" data-email="' + esc(m.from.email) + '" data-name="' + esc(m.from.name || '') + '">' + esc(m.from.name || m.from.email || t('InboxNoSender'))
-			+ (m.from.name ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '') + '</div>'
+		// A mail sent by the mailbox: « Me » with the address of the mailbox in small
+		const mine = m.id && isMine({ folder: m.folder, role: m.folder_role, from: m.from });
+		return '<div class="ibx-readhead__top">' + (mine ? '<span class="ibx-avatar ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>' : avatar(m.from.name, m.from.email, '', m.id, !partial || inThread))
+			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr" data-email="' + esc(m.from.email) + '" data-name="' + esc(m.from.name || '') + '">'
+			+ (mine ? esc(t('InboxMe')) + ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>'
+				: esc(m.from.name || m.from.email || t('InboxNoSender')) + (m.from.name ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')) + '</div>'
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
@@ -1365,9 +1476,10 @@
 			+ '<header class="ibx-readhead ibx-convo__head"><div class="ibx-readhead__top"><div class="ibx-readhead__who"><h2 class="ibx-readhead__subject">' + esc(last.subject || row.subject || t('InboxNoSubject'))
 			+ ' ' + tagsHtml(row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div></div>'
 			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
-			+ mails.map(m => '<section class="ibx-convo__item' + ((m.from_email || '').toLowerCase() === box ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
-				+ '<button type="button" class="ibx-convo__line ibx-js-expand" aria-expanded="false">' + avatar(m.from_name, m.from_email, 'ibx-avatar--sm', m.id)
-				+ '<span class="ibx-convo__who ibx-ellipsis' + (m.seen ? '' : ' is-unread') + '">' + esc(m.from_name || m.from_email || t('InboxNoSender')) + '</span>'
+			+ mails.map(m => '<section class="ibx-convo__item' + (isMine(m) ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
+				+ '<button type="button" class="ibx-convo__line ibx-js-expand" aria-expanded="false">' + (isMine(m) ? '<span class="ibx-avatar ibx-avatar--sm ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>' : avatar(m.from_name, m.from_email, 'ibx-avatar--sm', m.id))
+				+ '<span class="ibx-sr-only">' + th(isMine(m) ? 'InboxSent' : 'InboxReceived') + ' </span>'
+				+ '<span class="ibx-convo__who ibx-ellipsis' + (seenOf(m) ? '' : ' is-unread') + '">' + esc(isMine(m) ? mineLabel(m) : (m.from_name || m.from_email || t('InboxNoSender'))) + '</span>'
 				+ '<span class="ibx-convo__snippet ibx-ellipsis ibx-muted">' + esc(m.snippet || m.subject || '') + '</span>'
 				+ (m.attachments ? ic('attachment', 'ibx-faint') : '') + '<span class="ibx-convo__date ibx-muted" title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></button>'
 				+ '<div class="ibx-convo__body" hidden></div></section>').join('')
@@ -1383,7 +1495,7 @@
 				expandItem(item, +item.dataset.mailblock, mails);
 			}
 		}));
-		const wanted = mails.filter((m, i) => m.id === id || i === mails.length - 1 || !m.seen).slice(-6);
+		const wanted = mails.filter((m, i) => m.id === id || i === mails.length - 1 || !seenOf(m)).slice(-6);
 		await Promise.all(wanted.map(m => expandItem($('[data-mailblock="' + m.id + '"]', pane), m.id, mails)));
 		const current = $('[data-mailblock="' + id + '"]', pane) || $('[data-mailblock="' + last.id + '"]', pane);
 		if (current) {
@@ -2666,6 +2778,12 @@
 			}
 			e.preventDefault();
 			moveSelection(key === 'ArrowDown' ? 1 : -1);
+		} else if ((key === 'ArrowRight' || key === 'ArrowLeft') && S.anchor && !(e.target.closest && e.target.closest('.ibx-pane--folders, .ibx-menu, dialog, .ibx-splitter'))) {
+			const r = S.rows.find(x => x.id === S.anchor);
+			if (r && r.thread && r.thread.count > 1) {
+				e.preventDefault();
+				toggleThread(r.id, key === 'ArrowRight');
+			}
 		} else if (key === 'n' || key === 'N') {
 			e.preventDefault();
 			nextUnread();
@@ -2929,11 +3047,26 @@
 				setSort(key + ':' + (k === key ? (dir === 'asc' ? 'desc' : 'asc') : (key === 'date' || key === 'size' ? 'desc' : 'asc')));
 				return;
 			}
+			const tg = e.target.closest('.ibx-js-threadtoggle');
+			if (tg) {
+				e.stopPropagation();
+				toggleThread(+tg.dataset.row);
+				return;
+			}
 			const item = e.target.closest('[data-mail]');
 			if (!item) {
 				return;
 			}
 			const id = +item.dataset.mail;
+			if (item.dataset.child) {
+				// A mail of an unfolded conversation: opened alone
+				S.selected.clear();
+				S.selected.add(id);
+				S.anchor = id;
+				paintSelection();
+				openMail(id, true);
+				return;
+			}
 			if (e.target.closest('.ibx-js-check')) {
 				select(id, 'toggle');
 			} else {

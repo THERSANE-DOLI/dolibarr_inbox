@@ -193,6 +193,12 @@ class InboxConversationTest extends InboxTestCase
 		$s->run($a, microtime(true) + 30, array('force' => true));
 		$counts = $nm->counts($nm->marks($this->admin, (int) $a->id));
 		$this->assertSame(array(1), array_values($counts), 'one new mail in the inbox');
+		// First indexing goes from the recent mails to the older ones: an old mail indexed after the mark (greater row,
+		// smaller UID) is not new
+		$p = $this->db->prefix();
+		$old = $this->db->getRow("SELECT * FROM ".$p."inbox_mail WHERE fk_account = ".((int) $a->id)." AND message_id = 'new-a@inbox-test.invalid'");
+		$this->db->query("INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, subject, seen, date_index) VALUES (".((int) $a->id).", ".((int) $old->fk_folder).", 'old:1', 0, 'old-backfill@inbox-test.invalid', 'Ancien', 0, '".$this->db->idate(dol_now())."')");
+		$this->assertSame(array(1), array_values($nm->counts($nm->marks($this->admin, (int) $a->id))), 'old mail indexed late: not new');
 		$other = $this->user('newmarks_other');
 		$this->assertSame(array(), $nm->counts($nm->marks($other, (int) $a->id)), 'another user starts at his first visit');
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET seen = 1 WHERE fk_account = ".((int) $a->id)." AND message_id = 'new-a@inbox-test.invalid'");

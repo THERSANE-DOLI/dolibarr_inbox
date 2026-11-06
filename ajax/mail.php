@@ -68,7 +68,8 @@ switch ($action) {
 			$rows = $db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.seen, m.answered,"
 				." m.flagged, m.has_attachments, f.role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
 				." WHERE m.fk_account = ".((int) $reader->row->fk_account)." AND m.thread_key = '".$db->escape($key)."'"
-				." ORDER BY COALESCE(m.date_received, m.date_mail) ASC, m.rowid ASC LIMIT 200");
+				// In the order the mails were written (Date header), the arrival when it is missing
+				." ORDER BY COALESCE(m.date_mail, m.date_received) ASC, m.rowid ASC LIMIT 200");
 			$byMsg = array();
 			foreach (is_array($rows) ? $rows : array() as $r) {
 				$id = $r->message_id ? (string) $r->message_id : 'row'.$r->rowid;
@@ -76,7 +77,7 @@ switch ($action) {
 				if (isset($byMsg[$id]) && !($byMsg[$id]['bad'] && !$bad) && (int) $r->rowid !== (int) $reader->row->rowid) {
 					continue;
 				}
-				$date = $r->date_received ? $r->date_received : $r->date_mail;
+				$date = $r->date_mail ? $r->date_mail : $r->date_received;
 				$byMsg[$id] = array('bad' => $bad, 'mail' => array(
 					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) $r->from_email, 'from_name' => (string) $r->from_name,
 					'to' => dol_trunc((string) $r->to_text, 300, 'right', 'UTF-8', 1), 'subject' => (string) $r->subject, 'snippet' => (string) $r->snippet,

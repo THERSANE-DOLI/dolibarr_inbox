@@ -26,8 +26,11 @@ require_once __DIR__.'/inboxuserparam.class.php';
 /**
  * Unread = no \Seen on the server, the same for everybody in a shared mailbox. New = arrived in the folder since
  * this user last left it, and still unread: the dot of the lists, as the usual mail clients. Kept per user and per
- * folder in the settings of the user (seen_marks of the mailbox: folder => last row seen), never on the mail server
+ * folder in the settings of the user (seen_marks of the mailbox: folder => last arrival seen), never on the mail server
  * (\Recent of IMAP is reset by any other client). A folder never opened starts at its last mail: nothing is new.
+ * The order of arrival is the key of sort of the connector (UID of IMAP), not the row of the index: the first indexing
+ * reads the recent mails first, the older ones get greater rows and would look new. A folder renumbered by the
+ * server (its last arrival below the mark) starts again at its last mail.
  */
 class InboxNewMarks
 {
@@ -54,13 +57,13 @@ class InboxNewMarks
 		$params = new InboxUserParam($this->db);
 		$marks = json_decode((string) $params->get($user, 'seen_marks', (int) $accountId), true);
 		$marks = is_array($marks) ? array_map('intval', $marks) : array();
-		$rows = $this->db->getRows("SELECT f.rowid, MAX(m.rowid) AS last FROM ".$this->db->prefix()."inbox_folder as f LEFT JOIN ".$this->db->prefix()."inbox_mail as m ON m.fk_folder = f.rowid"
+		$rows = $this->db->getRows("SELECT f.rowid, MAX(m.sort_key) AS last FROM ".$this->db->prefix()."inbox_folder as f LEFT JOIN ".$this->db->prefix()."inbox_mail as m ON m.fk_folder = f.rowid"
 			." WHERE f.fk_account = ".((int) $accountId)." AND f.status = 1 GROUP BY f.rowid LIMIT 5000");
 		$changed = false;
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$id = (int) $r->rowid;
-			if (!isset($marks[$id])) {
+			if (!isset($marks[$id]) || (int) $r->last < $marks[$id]) {
 				$marks[$id] = (int) $r->last;
 				$changed = true;
 			}
@@ -86,9 +89,13 @@ class InboxNewMarks
 		foreach (array_chunk($marks, 100, true) as $chunk) {
 			$or = array();
 			foreach ($chunk as $folderId => $mark) {
-				$or[] = "(fk_folder = ".((int) $folderId)." AND rowid > ".((int) $mark).")";
+				$or[] = "(fk_folder = ".((int) $folderId)." AND sort_key > ".((int) $mark).")";
 			}
-			$res = $this->db->query("SELECT fk_folder, COUNT(rowid) AS n FROM ".$this->db->prefix()."inbox_mail WHERE seen = 0 AND (".implode(' OR ', $or).") GROUP BY fk_folder");
+			// Mails sent by the mailbox are never new (Sent, Drafts, or the sender is the mailbox)
+			$p = $this->db->prefix();
+			$res = $this->db->query("SELECT m.fk_folder, COUNT(m.rowid) AS n FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
+				." INNER JOIN ".$p."inbox_account as a ON a.rowid = m.fk_account WHERE m.seen = 0 AND COALESCE(f.role, '') NOT IN ('sent', 'drafts')"
+				." AND LOWER(COALESCE(m.from_email, '')) <> LOWER(a.email) AND (".str_replace(array('fk_folder', 'sort_key'), array('m.fk_folder', 'm.sort_key'), implode(' OR ', $or)).") GROUP BY m.fk_folder");
 			while ($res && ($o = $this->db->fetch_object($res))) {
 				$out[(int) $o->fk_folder] = (int) $o->n;
 			}

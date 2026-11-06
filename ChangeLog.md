@@ -12,8 +12,12 @@
     that passed DMARC, Gravatar off by default, else the initials; a switch per source in the general settings.
   - presence in the shared mailboxes: « Marie reads this mail » in the head of the mail.
   - new mails apart from unread ones: the dot shows the mails arrived since the user last left the folder (per user, in
-    the list and in the folders), bold and the bar show the unread ones.
+    the list and in the folders, by order of arrival on the server), bold and the bar show the unread ones.
   - Shift + click in the list selects a range of mails, never the text of the rows.
+  - conversation unfolded in the list (« N others » on the cards, triangle in the table, keys right and left), its
+    mails opened alone.
+  - mails sent by the mailbox in the conversations: « Me → recipient », tinted, on the right of the reading pane,
+    never shown unread nor new (even without \Seen on the server); the conversation in the order the mails were written.
   - size of the antivirus taken from the general settings (it was read under another name).
 - NEW: reading of the mails in the application (space Mail) :   1.4.0
   - mailboxes and folders from the index, unread counters, mailbox in error with the reason and « Try again ».

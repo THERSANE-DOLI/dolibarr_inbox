@@ -664,3 +664,7 @@ InboxPresenceOne = %s reads this mail
 InboxPresenceMany = %s read this mail
 InboxNew = New
 InboxNewCount = %s new mail(s) since your last visit
+InboxThreadReplies = %s other(s)
+InboxMe = Me
+InboxSent = Sent
+InboxReceived = Received

@@ -67,7 +67,8 @@ function inboxListStamp($folderId)
 {
 	global $db;
 
-	$row = $db->getRow("SELECT COUNT(rowid) AS n, SUM(CASE WHEN seen = 0 THEN 1 ELSE 0 END) AS u, MAX(tms) AS t, MAX(rowid) AS m FROM ".$db->prefix()."inbox_mail WHERE fk_folder = ".((int) $folderId));
+	// Count, last arrival (sort key of the connector: also the mark of the new mails), last change, unread
+	$row = $db->getRow("SELECT COUNT(rowid) AS n, SUM(CASE WHEN seen = 0 THEN 1 ELSE 0 END) AS u, MAX(tms) AS t, MAX(sort_key) AS m FROM ".$db->prefix()."inbox_mail WHERE fk_folder = ".((int) $folderId));
 
 	return (int) $row->n.':'.(int) $row->m.':'.($row->t ? (int) $db->jdate($row->t) : 0).':'.(int) $row->u;
 }

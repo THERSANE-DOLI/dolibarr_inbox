@@ -84,7 +84,7 @@ class InboxSearchSql implements InboxSearchEngine
 			$op = $desc ? '<' : '>';
 			$where[] = "(".$expr." ".$op." ".$value." OR (".$expr." = ".$value." AND m.rowid ".$op." ".((int) $after[1])."))";
 		}
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet,";
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
 		$sql .= " m.date_received, m.date_mail, m.size, m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc,";
 		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value";
 		$sql .= $from." LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc";
@@ -144,7 +144,9 @@ class InboxSearchSql implements InboxSearchEngine
 			$k = "'".$this->db->escape($after[1])."'";
 			$having = " HAVING (last_date ".$op." ".$v." OR (last_date = ".$v." AND tkey ".$op." ".$k."))";
 		}
-		$sql = "SELECT ".$key." AS tkey, MAX(".$date.") AS last_date, COUNT(m.rowid) AS n_here, SUM(CASE WHEN m.seen = 0 THEN 1 ELSE 0 END) AS unread,"
+		// Unread mails of the thread here, the mails sent by the mailbox apart (never shown unread)
+		$mineSql = "(COALESCE(f.role, '') IN ('sent', 'drafts') OR LOWER(COALESCE(m.from_email, '')) = (SELECT LOWER(a.email) FROM ".$p."inbox_account as a WHERE a.rowid = m.fk_account))";
+		$sql = "SELECT ".$key." AS tkey, MAX(".$date.") AS last_date, COUNT(m.rowid) AS n_here, SUM(CASE WHEN m.seen = 0 AND NOT ".$mineSql." THEN 1 ELSE 0 END) AS unread,"
 			." MAX(m.has_attachments) AS att, MAX(m.flagged) AS flagged, MIN(m.fk_account) AS account".$from
 			." GROUP BY tkey".$having." ORDER BY last_date ".($desc ? 'DESC' : 'ASC').", tkey ".($desc ? 'DESC' : 'ASC')." LIMIT ".($limit + 1);
 		$groups = array();
@@ -165,7 +167,7 @@ class InboxSearchSql implements InboxSearchEngine
 		$keys = array_map(function ($g) {
 			return "'".$this->db->escape((string) $g->tkey)."'";
 		}, $groups);
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.size,"
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
 			." m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc, s.nom AS soc_name, ".$key." AS tkey, ".$date." AS sort_value"
 			." FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc"
 			." WHERE ".implode(' AND ', $where)." AND ".$key." IN (".implode(',', $keys).") ORDER BY sort_value DESC, m.rowid DESC";
@@ -294,6 +296,8 @@ class InboxSearchSql implements InboxSearchEngine
 
 		return array(
 			'id' => (int) $o->rowid,
+			// Order of arrival in the folder (UID of IMAP): mark of the new mails
+			'arrival' => (int) ($o->sort_key ?? 0),
 			'account' => (int) $o->fk_account,
 			'folder' => (int) $o->fk_folder,
 			'from_email' => (string) $o->from_email,

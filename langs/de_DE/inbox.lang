@@ -664,3 +664,7 @@ InboxPresenceOne = %s liest diese E-Mail
 InboxPresenceMany = %s lesen diese E-Mail
 InboxNew = Neu
 InboxNewCount = %s neue E-Mail(s) seit Ihrem letzten Besuch
+InboxThreadReplies = %s weitere
+InboxMe = Ich
+InboxSent = Gesendet
+InboxReceived = Empfangen

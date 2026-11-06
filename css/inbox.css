@@ -816,3 +816,15 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-pane--list .ibx-maillist, .ibx-pane--list .ibx-mailtable { user-select: none; -webkit-user-select: none; }
 .ibx-newdot { flex: none; display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ibx-accent); }
 .ibx-newdot--row { margin-right: 0.375rem; vertical-align: 0.0625rem; }
+/* Conversation unfolded in the list: the other mails under the line, indented, joined by a dotted line */
+.ibx-mailcard--child { margin-bottom: var(--ibx-s1); padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.ibx-mailcard--child .ibx-mailcard__from { font-weight: 400; }
+.ibx-mailcard--child.is-unread .ibx-mailcard__from { font-weight: 700; }
+.ibx-mailrow--child td { background: var(--ibx-bg-pane); font-size: var(--ibx-fs-sm); }
+.ibx-mailrow--child td.ibx-mailrow__subject { padding-left: 1.25rem; }
+.ibx-threadtoggle .ibx-icon { width: 0.75rem; height: 0.75rem; }
+/* Mails sent by the mailbox: tinted, on the right of the conversation (who wrote what, at a glance) */
+.ibx-mailcard--child.is-mine, .ibx-mailrow--child.is-mine td { background: var(--ibx-accent-softer); }
+.ibx-convo__item { margin-right: 2.5rem; }
+.ibx-convo__item.is-mine { margin-left: 2.5rem; margin-right: var(--ibx-s3); }
+.ibx-avatar--me .ibx-icon { width: 0.875rem; height: 0.875rem; }
