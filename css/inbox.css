@@ -139,7 +139,9 @@
 /* ===== 2 bis. Icon (Tabler sprite inbox-icons.svg, usage names in icons.json) ===== */
 /* Size follows the text (1em, so the text zoom), colour follows the text (currentColor: themes, high contrast,
    forced colors). Outline symbols carry stroke attributes, filled ones fill="currentColor". */
-.ibx-icon { display: inline-block; flex: none; width: 1em; height: 1em; vertical-align: -0.14em; overflow: visible; }
+.ibx-icon { display: inline-block; flex: none; width: 1em; height: 1em; vertical-align: -0.14em; overflow: visible; stroke-width: 2; }
+/* Large icons drawn thinner: the stroke grows with the size, 2 looked heavy at 2 rem and more */
+.ibx-attachment__icon, .ibx-empty__icon, .ibx-viewer .ibx-empty__icon { stroke-width: 1.25; }
 .ibx-icon--lg { width: 1.5em; height: 1.5em; }
 
 /* ===== 3. Button ===== */

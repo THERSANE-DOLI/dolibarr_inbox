@@ -53,9 +53,10 @@ foreach ($conf['icons'] as $usage => $def) {
 		$missing[] = $usage.' (not an svg)';
 		continue;
 	}
-	// Keep the drawing attributes of the root <svg> (stroke or fill) on the <symbol>
+	// Keep the drawing attributes of the root <svg> (stroke or fill) on the <symbol>. Not the width of the stroke: set
+	// by the CSS (.ibx-icon), so that the large icons (attachments, empty states) can be drawn thinner
 	$attrs = array();
-	foreach (array('viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin') as $a) {
+	foreach (array('viewBox', 'fill', 'stroke', 'stroke-linecap', 'stroke-linejoin') as $a) {
 		if (preg_match('/\b'.$a.'="([^"]*)"/', $m[1], $v)) {
 			$attrs[] = $a.'="'.$v[1].'"';
 		}
