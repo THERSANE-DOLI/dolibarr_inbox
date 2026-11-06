@@ -41,5 +41,6 @@ CREATE TABLE llx_inbox_mail(
 	keywords varchar(1024) DEFAULT NULL,
 	fk_soc integer DEFAULT NULL,
 	fk_socpeople integer DEFAULT NULL,
-	date_index datetime NOT NULL
+	date_index datetime NOT NULL,
+	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;

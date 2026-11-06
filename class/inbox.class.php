@@ -311,7 +311,8 @@ class Inbox
 		self::writeReadme($dir);
 		$sha1 = sha1($found['raw']);
 		$file = $sha1.'.eml';
-		if (file_put_contents($dir.'/'.$file, $found['raw']) === false) {
+		// Never a warning in the answer: a cache not written only means a reading on the server next time
+		if (@file_put_contents($dir.'/'.$file, $found['raw']) === false) {
 			dol_syslog(__METHOD__.' cannot write '.$dir.'/'.$file, LOG_WARNING);
 			return;
 		}
@@ -330,6 +331,56 @@ class Inbox
 		if (!$this->db->query($sql)) {
 			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_WARNING);
 		}
+	}
+
+	/**
+	 * Raw mail kept in the cache (reading in the application, lot W3: no journal, the rights per mailbox apply)
+	 *
+	 * @param string $mailbox   Email address of the mailbox
+	 * @param string $messageId Message-ID
+	 * @return string|null Raw mail, null if not in the cache
+	 */
+	public function cachedRaw($mailbox, $messageId)
+	{
+		global $conf;
+
+		$normalized = self::normalizeMessageId($messageId);
+		if ($normalized === '') {
+			return null;
+		}
+		$cached = $this->db->getRow("SELECT rowid, filepath FROM ".$this->db->prefix()."inbox_message"
+			." WHERE entity = ".((int) $conf->entity)." AND mailbox = '".$this->db->escape(strtolower(trim((string) $mailbox)))."'"
+			." AND message_id = '".$this->db->escape($normalized)."'");
+		if (!is_object($cached)) {
+			return null;
+		}
+		$path = self::storageDir().'/'.basename((string) $cached->filepath);
+		if (!is_readable($path)) {
+			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_message WHERE rowid = ".((int) $cached->rowid));
+			return null;
+		}
+
+		return (string) file_get_contents($path);
+	}
+
+	/**
+	 * Keep a raw mail read in the application in the cache (not above 25 MB: read again each time)
+	 *
+	 * @param string $mailbox   Email address of the mailbox
+	 * @param string $messageId Message-ID
+	 * @param string $raw       Raw mail
+	 * @param string $folder    Folder path
+	 * @param string $remoteId  Identifier of the connector
+	 * @param User   $user      User reading
+	 * @return void
+	 */
+	public function remember($mailbox, $messageId, $raw, $folder, $remoteId, $user)
+	{
+		$normalized = self::normalizeMessageId($messageId);
+		if ($normalized === '' || strlen((string) $raw) > 26214400) {
+			return;
+		}
+		$this->store(strtolower(trim((string) $mailbox)), $normalized, array('raw' => (string) $raw, 'folder' => (string) $folder, 'remote_id' => (string) $remoteId), $user);
 	}
 
 	/**

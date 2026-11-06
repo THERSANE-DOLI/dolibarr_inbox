@@ -410,22 +410,7 @@
 		app.prepend(rail);
 	}
 
-	// Mail space of lot W1: the reading of the mails comes with lot W3
-	registerSpace({
-		id: 'mail',
-		icon: 'mail',
-		label: () => t('InboxSpaceMail'),
-		render(el) {
-			if (el.dataset.done) {
-				return;
-			}
-			el.dataset.done = '1';
-			el.innerHTML = '<div class="ibx-empty">' + ic('mail-opened', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxMailComing') + '</div>'
-				+ '<div>' + th('InboxMailComingText') + '</div>'
-				+ (rights().account_admin ? '<a class="ibx-btn ibx-btn--primary" href="#/settings/accounts">' + ic('settings') + ' ' + th('InboxGoToAccounts') + '</a>' : '')
-				+ '</div>';
-		},
-	});
+	// Mail space: js/inbox-mail.js (lot W3), registered first so that it is the default space
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {

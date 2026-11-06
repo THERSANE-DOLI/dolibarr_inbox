@@ -119,7 +119,8 @@ class InboxSync
 	 * @param InboxAccount $account  Mailbox (active)
 	 * @param int          $deadline Timestamp (microtime) not to go beyond
 	 * @param array<string,mixed> $options force (bool: even during the wait after an error, every folder now),
-	 *                                      phase (1: inbox and sent only; 2: the others and the first indexing; 0: both)
+	 *                                      phase (1: inbox and sent only; 2: the others and the first indexing; 0: both),
+	 *                                      folder_id (int: this folder only, now: folder open in the application)
 	 * @return int 1 done, 0 skipped (lock, wait after an error), -1 error
 	 */
 	public function run(InboxAccount $account, $deadline, array $options = array())
@@ -139,7 +140,7 @@ class InboxSync
 			return 0;
 		}
 		try {
-			return $this->pass($account, $deadline, $force, $phase);
+			return $this->pass($account, $deadline, $force, $phase, (int) ($options['folder_id'] ?? 0));
 		} finally {
 			$this->unlock((int) $account->id);
 		}
@@ -150,9 +151,10 @@ class InboxSync
 	 * @param float        $deadline Microtime limit
 	 * @param bool         $force    Every folder now
 	 * @param int          $phase    0, 1, 2
+	 * @param int          $onlyFolder This folder only (0: all)
 	 * @return int
 	 */
-	protected function pass(InboxAccount $account, $deadline, $force, $phase)
+	protected function pass(InboxAccount $account, $deadline, $force, $phase, $onlyFolder = 0)
 	{
 		global $langs;
 
@@ -185,6 +187,12 @@ class InboxSync
 		$rows = array_filter($folders->listForAccount((int) $account->id), function ($f) {
 			return (int) $f->selectable === 1 && (int) $f->sync_enabled === 1;
 		});
+		if ($onlyFolder > 0) {
+			$rows = array_filter($rows, function ($f) use ($onlyFolder) {
+				return (int) $f->rowid === $onlyFolder;
+			});
+			$force = true;
+		}
 		// Order: inbox and sent first, then the others (due ones), then the first indexing
 		$first = array();
 		$others = array();
@@ -271,6 +279,10 @@ class InboxSync
 			}
 		}
 		$connector->disconnect();
+		if ($onlyFolder > 0) {
+			// One folder: the state of the mailbox is the business of the full passes
+			return 1;
+		}
 		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND status = 1 AND selectable = 1 AND sync_enabled = 1 AND first_sync_done = 0");
 		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
 

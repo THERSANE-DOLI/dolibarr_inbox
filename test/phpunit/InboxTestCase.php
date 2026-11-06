@@ -82,7 +82,8 @@ abstract class InboxTestCase extends TestCase
 		$p = $db->prefix();
 		$rows = $db->getRows("SELECT rowid FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid' LIMIT 10000");
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			foreach (array('inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam') as $t) {
+			$db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $r->rowid).")");
+			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam') as $t) {
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}

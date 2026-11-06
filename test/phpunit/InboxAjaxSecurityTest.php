@@ -162,4 +162,53 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$log = $this->call('/custom/inbox/ajax/account.php?action=log&id='.$id);
 		$this->assertStringNotContainsString('http-secret-pass', $log['body']);
 	}
+	/**
+	 * Lot W3: lists, reading, body and attachments refuse a forged identifier, a write without token or by GET; the
+	 * body answers with the headers that forbid any script (CA-01, CA-04)
+	 *
+	 * @return void
+	 */
+	public function testReadingEndpoints()
+	{
+		$this->needDovecot();
+		dol_include_once('/inbox/class/inboxsync.class.php');
+		$token = $this->login();
+		foreach (array('/custom/inbox/ajax/list.php?action=page&folder=99999999', '/custom/inbox/ajax/list.php?action=state&folder=99999999',
+			'/custom/inbox/ajax/mail.php?action=open&id=99999999', '/custom/inbox/ajax/attachment.php?mode=check&id=99999999&part=0') as $path) {
+			$this->assertSame(404, $this->call($path)['code'], 'forged identifier: '.$path);
+		}
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id=99999999')['code']);
+
+		// A mailbox open to the user of the HTTP tests
+		$login = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."user WHERE login = '".$this->db->escape((string) getenv('INBOX_TEST_LOGIN'))."'");
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$access = new InboxAccess($this->db);
+		$sync = new InboxSync($this->db);
+		$a->fetch($a->id);
+		$sync->run($a, microtime(true) + 30, array('force' => true));
+		$row = $this->db->getRow("SELECT rowid, fk_folder FROM ".$this->db->prefix()."inbox_mail WHERE fk_account = ".((int) $a->id)." AND message_id = 'seed-1@inbox-test.invalid'");
+		$this->assertIsObject($row);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/mail.php?action=open&id='.$row->rowid)['code'], 'IDOR: a mailbox without access is not found');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id='.$row->rowid)['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=page&folder='.$row->fk_folder)['code']);
+
+		$this->assertGreaterThan(0, $access->grant($this->admin, (int) $a->id, (int) $login->rowid, 0, InboxAccess::LEVEL_READ));
+		$open = $this->call('/custom/inbox/ajax/mail.php?action=open&id='.$row->rowid);
+		$this->assertSame(200, $open['code'], $open['body']);
+		$this->assertSame('Demande de prix raccords inox DN25', $open['json']['subject']);
+		$page = $this->call('/custom/inbox/ajax/list.php', array('action' => 'page', 'folder' => (int) $row->fk_folder, 'q' => '"raccords inox"'));
+		$this->assertSame(200, $page['code'], 'a phrase in quotes, sent in the body');
+		$this->assertSame(1, $page['json']['total']);
+
+		$ch = curl_init($this->base.'/custom/inbox/ajax/body.php?id='.$row->rowid);
+		curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_COOKIEFILE => $this->cookies));
+		$res = (string) curl_exec($ch);
+		curl_close($ch);
+		$this->assertMatchesRegularExpression("/Content-Security-Policy: default-src 'none';[^\r\n]*script-src 'none'/i", $res);
+		$this->assertStringNotContainsString(' https:', (string) preg_replace('/^.*Content-Security-Policy:([^\r\n]*).*$/s', '$1', $res), 'no remote picture by default');
+		$this->assertMatchesRegularExpression('/X-Content-Type-Options: nosniff/i', $res);
+
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/mail.php', array('action' => 'seen', 'id' => (int) $row->rowid, 'seen' => 1))['code'], 'read without token refused');
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/mail.php?action=seen&seen=1&id='.$row->rowid.'&token='.urlencode($token))['code'], 'write by GET refused');
+	}
 }

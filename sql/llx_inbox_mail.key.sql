@@ -20,3 +20,5 @@ ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_msgid (message_id);
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_account (fk_account);
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_from (from_email);
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_soc (fk_soc);
+-- Lot W3: the application asks every 20 s whether the open folder changed
+ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_tms (fk_folder, tms);

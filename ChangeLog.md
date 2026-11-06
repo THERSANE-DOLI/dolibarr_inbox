@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: reading of the mails in the application (space Mail) :   1.4.0
+  - mailboxes and folders from the index, unread counters, mailbox in error with the reason and « Try again ».
+  - list of a folder as a table or as cards, sort, quick filters (unread, starred, attachment), pages loaded while
+    scrolling; the open folder is synchronised every 20 s and the list follows without losing the selection.
+  - search on the index: words, phrases, from: to: subject: before: after: tag: has:attachment (also translated),
+    in the folder, the whole mailbox or every mailbox.
+  - reading isolated: HTML cleaned, frame without any script, remote pictures blocked (trackers counted, always for
+    a sender or a domain), misleading links and names imitating the company signalled, all the headers, source,
+    print, report of non delivery, signed or encrypted mail.
+  - attachments bar, preview windows (PDF, pictures, attached mails, text, CSV, zip listed) that move, minimise and
+    stack; antivirus first: infected file blocked, file not scanned shown only after a warning.
+  - read / unread on the server by the reading setting of the user and the mailbox, key M; keyboard, size of the
+    text, density, phone (one screen at a time).
+  - texts of the index in composed form (accents sent decomposed found by the search).
 - NEW: synchronisation of the index of the mailboxes :   1.3.0
   - index in the database of the folders and of the headers of the mails (sender, recipients, subject, dates,
     size, attachments, flags, tags), never their body; the mail server stays the reference, read only.

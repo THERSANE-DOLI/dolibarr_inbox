@@ -64,6 +64,14 @@ class InboxUserParam
 			'text_size' => array('100', 'int:90:150'),
 			'theme' => array('auto', array('auto', 'light', 'dark', 'contrast')),
 			'attachments_open' => array('0', 'int:0:1'),
+			// Mail space (lot W3): folders folded, sort of the lists, quick filter bar, preview windows, zoom of the
+			// text of the mails
+			'tree_collapsed' => array('', 'json'),
+			'list_sort' => array('date:desc', array('date:desc', 'date:asc', 'from:asc', 'from:desc', 'subject:asc', 'subject:desc', 'size:desc', 'size:asc')),
+			'quick_filter' => array('0', 'int:0:1'),
+			'folders_hidden' => array('0', 'int:0:1'),
+			'windows' => array('', 'json'),
+			'mail_zoom' => array('100', 'int:50:200'),
 		);
 	}
 

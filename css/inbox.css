@@ -690,3 +690,81 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 	.ibx-rail { padding-top: env(safe-area-inset-top); }
 }
 
+
+/* ===== 18. Mail space of the application (lot W3) ===== */
+/* The rail is outside the space here (shell .ibx-app): 3 panes and their 2 splitters */
+.ibx-mailapp { height: 100%; min-height: 0; display: grid; grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); overflow: hidden; }
+.ibx-mailapp[data-folders="collapsed"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); }
+.ibx-mailapp[data-folders="collapsed"] .ibx-pane--folders,
+.ibx-mailapp[data-folders="collapsed"] .ibx-splitter[data-split="1"] { display: none; }
+.ibx-mailapp .ibx-pane--list, .ibx-mailapp .ibx-pane--read { position: relative; }
+.ibx-mailapp .ibx-pane__body:focus { outline: none; }
+.ibx-splitter:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-spacer { flex: 1; }
+.ibx-mobileonly { display: none !important; }
+.ibx-breakall { word-break: break-all; }
+.ibx-tree__row.is-disabled { cursor: default; color: var(--ibx-text-muted); }
+.ibx-tree__row:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-tree__note { padding: 0 var(--ibx-s2) var(--ibx-s1) 2.25rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+.ibx-tree__row--account .ibx-btn--icon { margin-left: auto; color: var(--ibx-warning); }
+.ibx-searchinfo { padding: 0 var(--ibx-s3) var(--ibx-s1); font-size: var(--ibx-fs-xs); display: flex; flex-wrap: wrap; gap: var(--ibx-s1); align-items: center; }
+.ibx-sorthead { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 0.125rem; }
+.ibx-sorthead:focus-visible { outline: 2px solid var(--ibx-accent); }
+.ibx-mailrow:focus-visible, .ibx-mailcard:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-listmore { padding: var(--ibx-s3); }
+.ibx-newpill {
+	position: absolute; left: 50%; top: 8.5rem; z-index: 3; transform: translateX(-50%); padding: var(--ibx-s1) var(--ibx-s3);
+	font: inherit; font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-on-accent); background: var(--ibx-accent); border: 0; border-radius: 1rem; box-shadow: var(--ibx-shadow-float); cursor: pointer;
+}
+.ibx-shortcuts { display: flex; flex-wrap: wrap; gap: var(--ibx-s3); justify-content: center; margin-top: var(--ibx-s3); font-size: var(--ibx-fs-sm); }
+/* Avatar: color drawn from the address (initials) */
+.ibx-avatar[style*="--ibx-avatar-h"] { color: hsl(var(--ibx-avatar-h) 45% 30%); background: hsl(var(--ibx-avatar-h) 55% 90%); }
+:root[data-ibx-theme="dark"] .ibx-avatar[style*="--ibx-avatar-h"] { color: hsl(var(--ibx-avatar-h) 55% 85%); background: hsl(var(--ibx-avatar-h) 30% 28%); }
+.ibx-readhead__email { font-weight: 400; color: var(--ibx-text-muted); }
+.ibx-readhead__to { flex-wrap: wrap; }
+.ibx-readbanners { display: flex; flex-direction: column; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s4) 0; }
+.ibx-readbanners .ibx-banner { margin: 0; }
+.ibx-pane--read .ibx-mailframe { display: block; padding: 0; min-height: 7.5rem; border-radius: var(--ibx-radius); }
+.ibx-attachment { width: 15rem; padding: 0; gap: 0; }
+.ibx-attachment.is-warning { border-color: var(--ibx-warning); }
+.ibx-attachment__open { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2); font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
+.ibx-attachment > .ibx-btn { margin-right: var(--ibx-s1); }
+.ibx-attachment__warn { color: var(--ibx-warning); font-weight: 600; }
+.ibx-headers { max-height: 60vh; overflow: auto; }
+.ibx-headers th { text-align: left; vertical-align: top; white-space: nowrap; padding-right: var(--ibx-s3); }
+/* Preview windows */
+.ibx-viewer { display: flex; flex-direction: column; }
+.ibx-viewer__pad { padding: var(--ibx-s3); }
+.ibx-viewer__frame { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; }
+.ibx-viewer__text { flex: 1; margin: 0; padding: var(--ibx-s3); overflow: auto; white-space: pre-wrap; word-break: break-word; font: var(--ibx-fs-sm)/1.45 ui-monospace, Menlo, Consolas, monospace; }
+.ibx-viewer__canvas { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: var(--ibx-bg-sunken); }
+.ibx-viewer__img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; }
+.ibx-viewer__img.is-actual { max-width: none; max-height: none; }
+.ibx-table--csv td { white-space: nowrap; border: 1px solid var(--ibx-border); padding: 0.125rem var(--ibx-s2); font-size: var(--ibx-fs-sm); }
+.ibx-menu .ibx-menu__item > .ibx-icon:last-child:not(.ibx-menu__icon) { margin-left: auto; color: var(--ibx-accent); }
+
+@media (max-width: 79.9375rem) {
+	.ibx-mailapp, .ibx-mailapp[data-folders="collapsed"] { grid-template-columns: var(--ibx-w2, 23.75rem) 0.3125rem minmax(22.5rem, 1fr); }
+	.ibx-mailapp .ibx-pane--folders, .ibx-mailapp .ibx-splitter[data-split="1"] { display: none; }
+	.ibx-mailapp[data-folders="open"] .ibx-pane--folders { display: none; }
+	.ibx-mailapp[data-mobile="folders"] .ibx-pane--folders { display: flex; position: fixed; left: var(--ibx-rail-w); top: 0; bottom: 0; width: 17.5rem; z-index: 40; box-shadow: var(--ibx-shadow-float); }
+	.ibx-mailapp .ibx-js-back[data-to="folders"] { display: inline-flex !important; }
+	.ibx-desktoponly { display: none !important; }
+}
+/* Phone: one screen at a time (folders, list, mail), cards only */
+@media (max-width: 63.9375rem) {
+	.ibx-mailapp, .ibx-mailapp[data-folders="collapsed"] { display: block; }
+	.ibx-mailapp .ibx-pane { display: none; height: 100%; }
+	.ibx-mailapp[data-mobile="folders"] .ibx-pane--folders { display: flex; position: static; width: auto; box-shadow: none; }
+	.ibx-mailapp[data-mobile="list"] .ibx-pane--list, .ibx-mailapp[data-mobile="read"] .ibx-pane--read { display: flex; }
+	.ibx-mailapp .ibx-splitter { display: none; }
+	.ibx-mobileonly { display: inline-flex !important; }
+	.ibx-pane--read > .ibx-pane__head.ibx-mobileonly { display: flex !important; }
+	.ibx-search > .ibx-kbd, .ibx-desktoponly-phone { display: none !important; }
+	.ibx-attachment { width: 100%; }
+	.ibx-mailtable col.ibx-col--from { width: 40%; }
+}
+@media (pointer: coarse) {
+	.ibx-mailcard { min-height: 2.75rem; }
+	.ibx-attachment__open, .ibx-tree__row { min-height: 2.75rem; }
+}

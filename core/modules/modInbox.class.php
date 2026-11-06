@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.3.0';
+		$this->version = '1.4.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
@@ -264,6 +264,26 @@ class modInbox extends DolibarrModules
 				return -1;
 			}
 			$done = '1.3.0';
+		}
+		if (version_compare($done, '1.4.0', '<')) {
+			// 1.4.0: texts of the index in composed form (NFC), so that a search typed « été » finds the subjects and
+			// names sent with combining accents (bytes CC and CD in UTF-8: U+0300 to U+036F)
+			if (class_exists('Normalizer')) {
+				$sql = "SELECT rowid, subject, from_name FROM ".$prefix."inbox_mail WHERE INSTR(BINARY CONCAT(COALESCE(subject, ''), COALESCE(from_name, '')), UNHEX('CC')) > 0"
+					." OR INSTR(BINARY CONCAT(COALESCE(subject, ''), COALESCE(from_name, '')), UNHEX('CD')) > 0";
+				$res = $this->db->query($sql);
+				$rows = array();
+				while ($res && ($o = $this->db->fetch_object($res))) {
+					$rows[] = $o;
+				}
+				foreach ($rows as $o) {
+					$subject = Normalizer::normalize((string) $o->subject, Normalizer::FORM_C);
+					$name = Normalizer::normalize((string) $o->from_name, Normalizer::FORM_C);
+					$this->db->query("UPDATE ".$prefix."inbox_mail SET subject = ".($o->subject === null ? "NULL" : "'".$this->db->escape((string) $subject)."'")
+						.", from_name = ".($o->from_name === null ? "NULL" : "'".$this->db->escape((string) $name)."'")." WHERE rowid = ".((int) $o->rowid));
+				}
+			}
+			$done = '1.4.0';
 		}
 		dolibarr_set_const($this->db, 'INBOX_SCHEMA_VERSION', $done, 'chaine', 0, 'Data changes of inbox already done', $conf->entity);
 

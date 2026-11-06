@@ -64,14 +64,14 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Lot W1: reading only. The write capabilities come with the lots that write (W4, W6, W8), each one checked
-	 * against the capabilities of the server.
+	 * Reading, and the flags since lot W3 (read / unread). The other write capabilities come with the lots that write
+	 * (W4, W6, W8), each one checked against the capabilities of the server.
 	 *
 	 * @return string[]
 	 */
 	protected function supportedCapabilities()
 	{
-		$caps = array(self::CAP_READ, self::CAP_FOLDERS, self::CAP_SERVER_SEARCH, self::CAP_CHANGES);
+		$caps = array(self::CAP_READ, self::CAP_FOLDERS, self::CAP_SERVER_SEARCH, self::CAP_CHANGES, self::CAP_FLAGS);
 		$server = $this->serverCapabilities;
 		if (!$server) {
 			$info = $this->account->getServerInfo();
@@ -400,6 +400,7 @@ class InboxImapConnector extends InboxConnector
 	public function fetchRaw($folder, $remoteId)
 	{
 		$this->error = '';
+		$this->notFound = false;
 		if (!preg_match('/^(\d+):(\d+)$/', (string) $remoteId, $m) || !self::isSafeFolderPath($folder)) {
 			$this->error = 'Invalid identifier';
 			return null;
@@ -417,11 +418,80 @@ class InboxImapConnector extends InboxConnector
 				$this->error = 'UIDVALIDITY changed';
 				return null;
 			}
-			return $this->fetchItem((int) $m[2], 'BODY[]');
+			$data = $this->fetchItem((int) $m[2], 'BODY[]');
+			if ($data === null) {
+				// Removed or moved by another client since the last pass
+				$this->notFound = true;
+				$this->error = 'Mail not found in the folder';
+			}
+			return $data;
 		} catch (Exception $e) {
 			$this->error = $this->explainException($e);
 			return null;
 		}
+	}
+
+	/**
+	 * Flags of mails: \\Seen, \\Flagged, \\Answered (UID STORE ... FLAGS.SILENT). The folder is selected (read-write)
+	 * for this only, then examined again by the next reading. A mail renumbered by the server (UIDVALIDITY changed)
+	 * is never written.
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Identifiers "uidvalidity:uid"
+	 * @param string[] $add       Flags to set
+	 * @param string[] $remove    Flags to remove
+	 * @return bool
+	 */
+	public function setFlags($folder, array $remoteIds, array $add, array $remove)
+	{
+		$this->error = '';
+		$allowed = array('\\Seen', '\\Flagged', '\\Answered');
+		$add = array_values(array_intersect($add, $allowed));
+		$remove = array_values(array_intersect($remove, $allowed));
+		if (!self::isSafeFolderPath($folder) || (!$add && !$remove)) {
+			$this->error = 'Invalid flags';
+			return false;
+		}
+		$validity = 0;
+		$uids = array();
+		foreach ($remoteIds as $id) {
+			if (!preg_match('/^(\d+):(\d+)$/', (string) $id, $m) || ($validity && $validity !== (int) $m[1])) {
+				$this->error = 'Invalid identifier';
+				return false;
+			}
+			$validity = (int) $m[1];
+			$uids[] = (int) $m[2];
+		}
+		if (!$uids || !$this->connect()) {
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			$status = $conn->selectFolder($folder);
+			$this->examined = '';
+			if (!is_array($status) || (int) ($status['uidvalidity'] ?? 0) !== $validity) {
+				$this->error = 'UIDVALIDITY changed';
+				return false;
+			}
+			$set = implode(',', $uids);
+			foreach (array('+' => $add, '-' => $remove) as $sign => $flags) {
+				if ($flags) {
+					$conn->requestAndResponse('UID STORE', array($set, $sign.'FLAGS.SILENT', '('.implode(' ', $flags).')'));
+				}
+			}
+			// Back to read only for the next readings of this connection. Never CLOSE here: on a folder selected
+			// read-write, CLOSE expunges the mails marked \\Deleted by another client. Without UNSELECT, EXAMINE.
+			if (in_array('UNSELECT', $this->serverCapabilities, true)) {
+				$conn->requestAndResponse('UNSELECT');
+			} else {
+				$this->examine($folder);
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

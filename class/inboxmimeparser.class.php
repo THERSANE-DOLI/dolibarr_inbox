@@ -410,6 +410,10 @@ class InboxMimeParser
 		if (!mb_check_encoding($text, 'UTF-8')) {
 			$text = mb_convert_encoding($text, 'UTF-8', 'ISO-8859-1');
 		}
+		// Composed form (NFC): some mailers send « e » + combining accent, a search typed « été » would not find it
+		if (class_exists('Normalizer') && !Normalizer::isNormalized($text, Normalizer::FORM_C)) {
+			$text = (string) Normalizer::normalize($text, Normalizer::FORM_C);
+		}
 		$text = preg_replace($multiline ? '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u' : '/[\x00-\x1F\x7F]/u', $multiline ? '' : ' ', $text);
 
 		return trim($multiline ? preg_replace("/\r\n?/", "\n", $text) : preg_replace('/\s+/u', ' ', $text));
@@ -458,7 +462,14 @@ class InboxMimeParser
 	public static function kind($content)
 	{
 		$head = substr((string) $content, 0, 8);
-		if (strpos(substr((string) $content, 0, 1024), '%PDF-') !== false) {
+		// Exact signatures first: a ZIP storing a PDF without compression has « %PDF- » in its first bytes too
+		if (strpos($head, "PK\x03\x04") === 0) {
+			return 'zip';
+		}
+		if ($head === "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
+			return 'ole';
+		}
+		if (strpos($head, '%PDF-') === 0 || strpos(substr((string) $content, 0, 1024), '%PDF-') !== false) {
 			return 'pdf';
 		}
 		if (strpos($head, "\x89PNG") === 0) {
@@ -472,12 +483,6 @@ class InboxMimeParser
 		}
 		if (strpos($head, "II*\x00") === 0 || strpos($head, "MM\x00*") === 0) {
 			return 'tiff';
-		}
-		if (strpos($head, "PK\x03\x04") === 0) {
-			return 'zip';
-		}
-		if ($head === "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1") {
-			return 'ole';
 		}
 
 		return 'other';
