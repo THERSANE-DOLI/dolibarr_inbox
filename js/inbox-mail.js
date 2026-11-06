@@ -138,8 +138,37 @@
 		}
 		return h;
 	}
-	function avatar(name, email, cls) {
-		return '<span class="ibx-avatar' + (cls ? ' ' + cls : '') + '" style="--ibx-avatar-h:' + hue(email) + '" aria-hidden="true">' + esc(initials(name, email)) + '</span>';
+	function avatar(name, email, cls, mailId, reading) {
+		return '<span class="ibx-avatar' + (cls ? ' ' + cls : '') + '" style="--ibx-avatar-h:' + hue(email) + '" aria-hidden="true"'
+			+ (mailId ? ' data-avatar="' + mailId + '"' + (reading ? ' data-reading="1"' : '') + ' data-email="' + esc((email || '').toLowerCase()) + '"' : '') + '>' + esc(initials(name, email)) + '</span>';
+	}
+
+	/**
+	 * Pictures of the correspondents (looked for by the server, ajax/avatar.php): one request per address and per
+	 * page, by the row of a mail (never the address in an URL); the initials stay when there is none
+	 */
+	const avatarCache = new Map();
+	function hydrateAvatars(root) {
+		$$('[data-avatar]:not([data-done])', root).forEach(el => {
+			el.dataset.done = '1';
+			const key = el.dataset.email + (el.dataset.reading ? ':r' : '');
+			let p = avatarCache.get(key);
+			if (!p) {
+				p = new Promise(resolve => {
+					const img = new Image();
+					img.onload = () => resolve(img.src);
+					img.onerror = () => resolve('');
+					img.src = I.ctx('INBOX_AJAX_URL', '') + 'avatar.php?id=' + el.dataset.avatar + (el.dataset.reading ? '&reading=1' : '');
+				});
+				avatarCache.set(key, p);
+			}
+			p.then(src => {
+				if (src) {
+					el.style.backgroundImage = 'url("' + src + '")';
+					el.classList.add('has-picture');
+				}
+			});
+		});
 	}
 
 	// ---------- Folders ----------
@@ -160,6 +189,10 @@
 		const res = await api('folder', 'tree');
 		S.accounts = res.accounts || [];
 		S.admin = !!res.admin;
+		S.marks = S.marks || {};
+		S.accounts.forEach(a => {
+			S.marks[a.id] = Object.assign({}, a.marks || {}, S.marks[a.id] || {});
+		});
 		S.folders.clear();
 		S.accounts.forEach(a => a.folders.forEach(f => S.folders.set(f.id, { folder: f, account: a })));
 	}
@@ -224,6 +257,7 @@
 				+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
 				+ ic(icon, 'ibx-tree__icon')
 				+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
+				+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
 				+ (f.unread ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
@@ -343,7 +377,7 @@
 
 	// ---------- List ----------
 	function listQuery(cursor) {
-		const q = { folder: S.folderId, scope: S.scope, q: S.q, sort: params.list_sort || 'date:desc', cursor: cursor || '', limit: 200 };
+		const q = { folder: S.folderId, scope: S.scope, q: S.q, sort: params.list_sort || 'date:desc', cursor: cursor || '', limit: 200, threads: params.conversation === '0' ? 0 : 1 };
 		Object.keys(S.filters).forEach(k => {
 			if (S.filters[k]) {
 				q[k] = 1;
@@ -381,6 +415,7 @@
 			S.total = res.total;
 			if (res.stamp && S.scope === 'folder' && S.q === '') {
 				S.stamp = res.stamp;
+				S.folderMax = Math.max(S.folderMax || 0, parseInt(res.stamp.split(':')[1], 10) || 0);
 			}
 			body.removeAttribute('aria-busy');
 			renderList();
@@ -466,6 +501,52 @@
 	}
 
 	/** Correspondent of a row: the recipient in Sent and Drafts */
+	/** New mail: arrived after the mark of the user in its folder (when he opened it) and still unread */
+	function isNew(r) {
+		if (r.seen) {
+			return false;
+		}
+		const e = S.folders.get(r.folder);
+		const marks = e && S.shownMarks ? S.shownMarks : null;
+		const mark = marks && marks[r.folder] !== undefined ? marks[r.folder] : null;
+		return mark !== null && r.id > mark;
+	}
+
+	/**
+	 * Leaving a folder (another folder, the tab closed): its new mails are seen, the mark goes to its last mail
+	 * (kept per user and per mailbox, InboxNewMarks)
+	 */
+	function leaveFolder(keepalive) {
+		const id = S.folderId;
+		const e = S.folders.get(id);
+		if (!e || !S.folderMax) {
+			return;
+		}
+		const marks = S.marks[e.account.id] || (S.marks[e.account.id] = {});
+		if ((marks[id] || 0) >= S.folderMax) {
+			return;
+		}
+		marks[id] = S.folderMax;
+		e.folder.new = 0;
+		const body = { action: 'set', token: I.ctx('INBOX_TOKEN', ''), id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) };
+		if (keepalive) {
+			fetch(I.ctx('INBOX_AJAX_URL', '') + 'userparam.php', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+		} else {
+			post('userparam', 'set', { id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) }).catch(() => {});
+		}
+	}
+
+	/** Number of mails of the conversation of a line (none for a mail alone) */
+	function threadBadge(r) {
+		return r.thread && r.thread.count > 1 ? '<span class="ibx-threadcount" title="' + th('InboxThreadCount', r.thread.count) + '">' + ic('thread') + ' ' + r.thread.count + '</span> ' : '';
+	}
+
+	/** Row of Sent or Drafts: its correspondent is the recipient, no picture of the sender (that is us) */
+	function sentLike(row) {
+		const e = S.folders.get(row.folder);
+		return !!e && (e.folder.role === 'sent' || e.folder.role === 'drafts');
+	}
+
 	function correspondent(row) {
 		const entry = S.folders.get(row.folder);
 		const role = entry ? entry.folder.role : '';
@@ -482,8 +563,8 @@
 	const COLUMNS = {
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
-		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
+		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
@@ -718,13 +799,14 @@
 					}
 				}
 				const sel = S.selected.has(r.id);
-				html += '<div class="ibx-mailcard' + (r.seen ? '' : ' is-unread') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
+				html += '<div class="ibx-mailcard' + (r.seen ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
-					+ '<span class="ibx-mailcard__from ibx-ellipsis" title="' + esc(r.from_email) + '">' + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>'
+					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
+					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
 					+ '<span class="ibx-mailcard__meta">' + (r.answered ? ic('reply') : '') + '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : '')
-					+ '<span class="ibx-mailcard__foot">' + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
+					+ '<span class="ibx-mailcard__foot">' + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
 					+ (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '')
 					+ '<span class="ibx-spacer"></span>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</span>'
 					+ '</div>';
@@ -736,6 +818,7 @@
 		}
 		body.innerHTML = html;
 		bindTableHead(body);
+		hydrateAvatars(body);
 		if (anchorId && body.querySelector('[data-mail="' + anchorId + '"]')) {
 			body.scrollTop += body.querySelector('[data-mail="' + anchorId + '"]').getBoundingClientRect().top - anchorTop;
 		} else {
@@ -761,6 +844,29 @@
 
 	function isPhone() {
 		return window.matchMedia('(max-width: 63.9375rem)').matches;
+	}
+
+	/**
+	 * Scroll a pane so that an element is in view, without scrolling the page itself (scrollIntoView moves every
+	 * scrolling ancestor, the document included, and the whole application went up)
+	 */
+	function scrollWithin(box, el, block) {
+		if (!box || !el) {
+			return;
+		}
+		const b = box.getBoundingClientRect();
+		const r = el.getBoundingClientRect();
+		const sticky = $('.ibx-readhead.ibx-convo__head', box);
+		const top = b.top + (sticky && block !== 'nearest' ? sticky.offsetHeight : 0);
+		if (block === 'start') {
+			box.scrollTop += r.top - top - 8;
+		} else if (block === 'end') {
+			box.scrollTop += Math.min(r.top - top - 8, r.bottom - b.bottom + 8);
+		} else if (r.top < b.top + 30) {
+			box.scrollTop += r.top - b.top - 30;
+		} else if (r.bottom > b.bottom) {
+			box.scrollTop += r.bottom - b.bottom;
+		}
 	}
 
 	function firstVisible(body) {
@@ -922,7 +1028,7 @@
 		select(S.rows[i].id);
 		const el = $('[data-mail="' + S.rows[i].id + '"]', S.el);
 		if (el) {
-			el.scrollIntoView({ block: 'nearest' });
+			scrollWithin($('.ibx-pane--list .ibx-pane__body', S.el), el, 'nearest');
 			el.focus({ preventScroll: true });
 		}
 		if (i > S.rows.length - 20) {
@@ -981,12 +1087,19 @@
 		}
 	}
 
-	async function openMail(id) {
+	async function openMail(id, single) {
 		clearTimeout(S.readTimer);
 		S.openId = id;
+		S.mail = null;
+		S.thread = null;
+		S.blocks = {};
 		S.mobile('read');
 		const pane = readPane();
 		const row = S.rows.find(r => r.id === id);
+		if (!single && row && row.thread && row.thread.count > 1) {
+			openThread(id, row);
+			return;
+		}
 		// Headers of the index at once, the body after
 		pane.innerHTML = '<div class="ibx-reading" aria-busy="true"><div class="ibx-readhead">' + (row ? headHtml({
 			from: { name: row.from_name, email: row.from_email }, date: row.date, subject: row.subject, to: [], cc: [], tags: row.tags, folder: row.folder, account: row.account,
@@ -1014,6 +1127,7 @@
 		}
 		S.mail = mail;
 		renderMail(mail);
+		presenceSoon();
 		Dolibarr.executeHook('inbox:mail:open', { account: mail.account, messageId: mail.message_id, subject: mail.subject, from: mail.from });
 		autoRead(mail);
 	}
@@ -1078,6 +1192,11 @@
 			const el = $('[data-mail="' + r.id + '"]', S.el);
 			if (el) {
 				el.classList.toggle('is-unread', !r.seen);
+				el.classList.toggle('is-new', isNew(r));
+				const dot = $('.ibx-newdot--row', el);
+				if (dot && !isNew(r)) {
+					dot.remove();
+				}
 			}
 		});
 	}
@@ -1086,16 +1205,17 @@
 		if (!a) {
 			return '';
 		}
-		return '<span class="ibx-addr" title="' + esc(a.email) + '">' + esc(a.name || a.email) + (a.name ? ' <span class="ibx-muted">&lt;' + esc(a.email) + '&gt;</span>' : '') + '</span>';
+		return '<span class="ibx-addr" data-email="' + esc(a.email) + '" data-name="' + esc(a.name || '') + '" title="' + esc(a.email) + '">' + esc(a.name || a.email) + (a.name ? ' <span class="ibx-muted">&lt;' + esc(a.email) + '&gt;</span>' : '') + '</span>';
 	}
 
-	function headHtml(m, partial) {
+	function headHtml(m, partial, inThread) {
 		const e = S.folders.get(m.folder);
-		const box = e ? e.account.email : (m.mailbox || '');
+		// In a conversation the mailbox is written once, in the head of the conversation
+		const box = inThread ? '' : (e ? e.account.email : (m.mailbox || ''));
 		const recipients = (m.to || []).concat(m.cc || []);
 		const toLine = recipients.length ? th('InboxForShort') + ' ' + recipients.slice(0, 6).map(addressHtml).join(', ') + (recipients.length > 6 ? ' ' + th('InboxAndMore', recipients.length - 6) : '') : '';
-		return '<div class="ibx-readhead__top">' + avatar(m.from.name, m.from.email)
-			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name">' + esc(m.from.name || m.from.email || t('InboxNoSender'))
+		return '<div class="ibx-readhead__top">' + avatar(m.from.name, m.from.email, '', m.id, !partial || inThread)
+			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr" data-email="' + esc(m.from.email) + '" data-name="' + esc(m.from.name || '') + '">' + esc(m.from.name || m.from.email || t('InboxNoSender'))
 			+ (m.from.name ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '') + '</div>'
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
@@ -1114,7 +1234,13 @@
 			{ id: 'zoomin', icon: 'text-size', label: t('InboxZoomMailIn'), run: () => zoomMail(10) },
 			{ id: 'zoomout', icon: 'text-size', label: t('InboxZoomMailOut'), run: () => zoomMail(-10) },
 		];
+		list.forEach(a => {
+			a.own = true;
+		});
 		Dolibarr.executeHook('inbox:mail:actions', { mail: m, actions: list });
+		list.forEach(a => {
+			a.module = !a.own;
+		});
 		return list;
 	}
 	function actionButtons(m) {
@@ -1134,6 +1260,8 @@
 		box.className = 'ibx-menu';
 		box.setAttribute('role', 'menu');
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
+			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
+			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
 			: '<button type="button" class="ibx-menu__item" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		document.body.appendChild(box);
@@ -1141,7 +1269,8 @@
 		const w = box.offsetWidth;
 		const h = box.offsetHeight;
 		box.style.position = 'fixed';
-		box.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+		// Under a button: right edges aligned; at the pointer: starts at the pointer
+		box.style.left = Math.max(8, Math.min(at ? at.x : r.right - w, window.innerWidth - w - 8)) + 'px';
 		box.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
 		box.style.zIndex = 90;
 		const buttons = $$('.ibx-menu__item', box);
@@ -1200,8 +1329,147 @@
 	}
 
 	// ---------- Mail ----------
+	// ---------- Conversation (1.5.0) ----------
+	/**
+	 * The mails of the thread in the whole mailbox (sent mails included), the oldest first. Unfolded: the last one, the
+	 * unread ones and the one clicked; the others on one line, unfolded by a click. Quotes of the previous mails
+	 * folded in each body. My mails (sent from this mailbox) on another background.
+	 */
+	async function openThread(id, row) {
+		const pane = readPane();
+		pane.innerHTML = '<div class="ibx-reading" aria-busy="true"><div class="ibx-readhead"><h2 class="ibx-readhead__subject">' + esc(row.subject || t('InboxNoSubject')) + '</h2></div>'
+			+ '<div class="ibx-readbody"><span class="ibx-skeleton"></span><span class="ibx-skeleton" style="width:70%"></span></div></div>';
+		let res;
+		try {
+			res = await api('mail', 'thread', { id });
+		} catch (err) {
+			if (S.openId === id) {
+				S.thread = null;
+				openMail(id, true);
+			}
+			return;
+		}
+		if (S.openId !== id) {
+			return;
+		}
+		const mails = res.mails || [];
+		if (mails.length < 2) {
+			openMail(id, true);
+			return;
+		}
+		S.thread = mails;
+		const entry = S.folders.get(row.folder);
+		const box = entry ? entry.account.email.toLowerCase() : '';
+		const last = mails[mails.length - 1];
+		pane.innerHTML = '<article class="ibx-reading ibx-convo" aria-label="' + esc(row.subject || t('InboxNoSubject')) + '">'
+			+ '<header class="ibx-readhead ibx-convo__head"><div class="ibx-readhead__top"><div class="ibx-readhead__who"><h2 class="ibx-readhead__subject">' + esc(last.subject || row.subject || t('InboxNoSubject'))
+			+ ' ' + tagsHtml(row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div></div>'
+			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
+			+ mails.map(m => '<section class="ibx-convo__item' + ((m.from_email || '').toLowerCase() === box ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
+				+ '<button type="button" class="ibx-convo__line ibx-js-expand" aria-expanded="false">' + avatar(m.from_name, m.from_email, 'ibx-avatar--sm', m.id)
+				+ '<span class="ibx-convo__who ibx-ellipsis' + (m.seen ? '' : ' is-unread') + '">' + esc(m.from_name || m.from_email || t('InboxNoSender')) + '</span>'
+				+ '<span class="ibx-convo__snippet ibx-ellipsis ibx-muted">' + esc(m.snippet || m.subject || '') + '</span>'
+				+ (m.attachments ? ic('attachment', 'ibx-faint') : '') + '<span class="ibx-convo__date ibx-muted" title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></button>'
+				+ '<div class="ibx-convo__body" hidden></div></section>').join('')
+			+ '</article>';
+		hydrateAvatars(pane);
+		$$('.ibx-js-expand', pane).forEach(b => b.addEventListener('click', () => {
+			const item = b.closest('[data-mailblock]');
+			const open = b.getAttribute('aria-expanded') === 'true';
+			if (open) {
+				b.setAttribute('aria-expanded', 'false');
+				$('.ibx-convo__body', item).hidden = true;
+			} else {
+				expandItem(item, +item.dataset.mailblock, mails);
+			}
+		}));
+		const wanted = mails.filter((m, i) => m.id === id || i === mails.length - 1 || !m.seen).slice(-6);
+		await Promise.all(wanted.map(m => expandItem($('[data-mailblock="' + m.id + '"]', pane), m.id, mails)));
+		const current = $('[data-mailblock="' + id + '"]', pane) || $('[data-mailblock="' + last.id + '"]', pane);
+		if (current) {
+			scrollWithin(pane, current, current === $('[data-mailblock="' + last.id + '"]', pane) ? 'end' : 'start');
+		}
+	}
+
+	/** Unfold one mail of the conversation: its head, banners, body (quotes folded) and attachments */
+	async function expandItem(item, mailId, mails) {
+		if (!item) {
+			return;
+		}
+		const btn = $('.ibx-js-expand', item);
+		const body = $('.ibx-convo__body', item);
+		btn.setAttribute('aria-expanded', 'true');
+		body.hidden = false;
+		if (body.dataset.loaded) {
+			return;
+		}
+		body.innerHTML = '<span class="ibx-skeleton"></span><span class="ibx-skeleton" style="width:60%"></span>';
+		let m;
+		try {
+			m = await api('mail', 'open', { id: mailId });
+		} catch (err) {
+			body.innerHTML = '<div class="ibx-muted">' + esc(err.message) + '</div>';
+			return;
+		}
+		body.dataset.loaded = '1';
+		S.blocks = S.blocks || {};
+		S.blocks[mailId] = m;
+		const first = mails[0] && mails[0].id === mailId;
+		body.innerHTML = '<div class="ibx-readhead ibx-readhead--compact">' + headHtml(m, true, true) + '</div>' + mailBodyHtml(m, { fold: !first, inline: true });
+		bindMail(m, item);
+		hydrateAvatars(item);
+		// A click on the head of an unfolded mail folds it again (the line comes back)
+		const top = $('.ibx-readhead__top', body);
+		top.setAttribute('role', 'button');
+		top.setAttribute('tabindex', '0');
+		top.setAttribute('aria-label', t('InboxCollapse'));
+		const fold = () => {
+			btn.setAttribute('aria-expanded', 'false');
+			body.hidden = true;
+			btn.focus();
+		};
+		top.addEventListener('click', e => {
+			if (!e.target.closest('button, a, .ibx-addr')) {
+				fold();
+			}
+		});
+		top.addEventListener('keydown', e => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				fold();
+			}
+		});
+		if (mailId === S.openId) {
+			S.mail = m;
+			const head = $('.ibx-js-convoactions', readPane());
+			if (head) {
+				head.innerHTML = actionButtons(m);
+				bindActions(head);
+			}
+			autoRead(m);
+			presenceSoon();
+			Dolibarr.executeHook('inbox:mail:open', { account: m.account, messageId: m.message_id, subject: m.subject, from: m.from });
+		}
+	}
+
 	function renderMail(m) {
 		const pane = readPane();
+		S.blocks = { [m.id]: m };
+		const signed = m.security && m.security.signed ? '<span class="ibx-badge" title="' + esc(m.security.signer || '') + '">' + ic(m.security.signed === 'invalid' ? 'warning' : 'check') + ' '
+			+ th(m.security.signed === 'valid' ? 'InboxSigned' : (m.security.signed === 'invalid' ? 'InboxSignatureInvalid' : 'InboxSignedUnchecked')) + '</span>' : '';
+		pane.innerHTML = '<article class="ibx-reading" aria-label="' + esc(m.subject || t('InboxNoSubject')) + '">'
+			+ '<header class="ibx-readhead">' + headHtml(m) + (signed ? '<div class="ibx-readhead__line">' + signed + '</div>' : '') + '</header>'
+			+ mailBodyHtml(m, {}) + '</article>';
+		bindActions(pane);
+		bindMail(m, pane);
+		hydrateAvatars(pane);
+	}
+
+	/**
+	 * Banners, body and attachments of a mail (reading pane, or one mail of a conversation: inline = attachments
+	 * not stuck at the bottom, fold = quotes of the previous mails folded)
+	 */
+	function mailBodyHtml(m, opts) {
 		const att = m.attachments || [];
 		let banners = '';
 		if (m.security && m.security.encrypted) {
@@ -1221,24 +1489,19 @@
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-showimages">' + th('InboxShowImages') + '</button>'
 				+ (m.auth && m.auth.fail ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu">' + th('InboxAlwaysShowImages') + ' ' + ic('chevron-down') + '</button>') + '</div>';
 		}
-		const signed = m.security && m.security.signed ? '<span class="ibx-badge" title="' + esc(m.security.signer || '') + '">' + ic(m.security.signed === 'invalid' ? 'warning' : 'check') + ' '
-			+ th(m.security.signed === 'valid' ? 'InboxSigned' : (m.security.signed === 'invalid' ? 'InboxSignatureInvalid' : 'InboxSignedUnchecked')) + '</span>' : '';
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
 		const open = params.attachments_open === '1';
-		pane.innerHTML = '<article class="ibx-reading" aria-label="' + esc(m.subject || t('InboxNoSubject')) + '">'
-			+ '<header class="ibx-readhead">' + headHtml(m) + (signed ? '<div class="ibx-readhead__line">' + signed + '</div>' : '') + '</header>'
-			+ (banners ? '<div class="ibx-readbanners">' + banners + '</div>' : '')
+		m.fold = !!opts.fold;
+		return (banners ? '<div class="ibx-readbanners">' + banners + '</div>' : '')
 			+ '<div class="ibx-readbody">' + (m.security && m.security.encrypted ? '' : '<iframe class="ibx-mailframe ibx-js-frame" title="' + th('InboxMailBody') + '"'
 				+ ' sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" loading="eager" src="' + bodyUrl(m, m.body.images) + '"></iframe>') + '</div>'
-			+ (files ? '<section class="ibx-attbar" aria-label="' + th('InboxAttachments') + '"><div class="ibx-attbar__head">'
+			+ (files ? '<section class="ibx-attbar' + (opts.inline ? ' ibx-attbar--inline' : '') + '" aria-label="' + th('InboxAttachments') + '"><div class="ibx-attbar__head">'
 				+ '<button type="button" class="ibx-attbar__toggle ibx-js-atttoggle" aria-expanded="' + open + '">' + ic(open ? 'chevron-down' : 'chevron-right') + ic('attachment')
 				+ '<b>' + th('InboxAttachmentsCount', files) + '</b> <span class="ibx-muted">' + esc(size(total)) + '</span>'
 				+ '<span class="ibx-attbar__names ibx-ellipsis ibx-muted">' + esc(att.map(a => a.name).join(', ')) + '</span></button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-saveall">' + ic('download-all') + ' ' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '</button></div>'
-				+ '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div></section>' : '')
-			+ '</article>';
-		bindMail(m);
+				+ '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div></section>' : '');
 	}
 
 	function banner(type, icon, html) {
@@ -1265,7 +1528,7 @@
 	}
 
 	function bodyUrl(m, images) {
-		return I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + (images ? '&images=1' : '');
+		return I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + (images ? '&images=1' : '') + (m.fold ? '&fold=1' : '');
 	}
 
 	const KIND_ICON = { pdf: 'file-pdf', image: 'file-image', zip: 'file-zip', mail: 'mail', csv: 'file-xls' };
@@ -1279,18 +1542,26 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-attdownload" title="' + th('InboxDownload') + '" aria-label="' + th('InboxDownload') + ' ' + esc(a.name) + '">' + ic('download') + '</button></div>';
 	}
 
-	function bindMail(m) {
-		const pane = readPane();
-		$$('.ibx-js-action', pane).forEach(b => b.addEventListener('click', () => {
+	/** Buttons of the actions of the open mail (head of the reading pane or of the conversation) */
+	function bindActions(root) {
+		$$('.ibx-js-action', root).forEach(b => b.addEventListener('click', () => {
 			const a = actions(S.mail).find(x => x.id === b.dataset.action);
 			if (a) {
 				a.run();
 			}
 		}));
-		const more = $('.ibx-js-more', pane);
+		const more = $('.ibx-js-more', root);
 		if (more) {
 			more.addEventListener('click', () => menu(more, actions(S.mail).filter(a => !a.button).map(a => ({ icon: a.icon, label: a.label, key: a.key, run: a.run }))));
 		}
+	}
+
+	/** Root of a mail on screen: its block in a conversation, else the reading pane */
+	function mailRoot(m) {
+		return $('[data-mailblock="' + m.id + '"]', readPane()) || readPane();
+	}
+
+	function bindMail(m, pane) {
 		const frame = $('.ibx-js-frame', pane);
 		if (frame) {
 			frame.addEventListener('load', () => frameReady(frame, m));
@@ -1302,6 +1573,7 @@
 				$('.ibx-js-imagesbar', pane).remove();
 			});
 		}
+		$$('.ibx-addr', pane).forEach(el => el.setAttribute('tabindex', '0'));
 		const allow = $('.ibx-js-allowimages', pane);
 		if (allow) {
 			const domain = '@' + (m.from.email.split('@')[1] || '');
@@ -1338,11 +1610,11 @@
 	async function allowImages(m, what) {
 		try {
 			await post('mail', 'images', { id: m.id, what });
-			const frame = $('.ibx-js-frame', readPane());
+			const frame = $('.ibx-js-frame', mailRoot(m));
 			if (frame) {
 				frame.src = bodyUrl(m, true);
 			}
-			const bar = $('.ibx-js-imagesbar', readPane());
+			const bar = $('.ibx-js-imagesbar', mailRoot(m));
 			if (bar) {
 				bar.remove();
 			}
@@ -1434,10 +1706,7 @@
 	function zoomMail(delta) {
 		const z = Math.max(50, Math.min(200, (parseInt(params.mail_zoom, 10) || 100) + delta));
 		saveParam('mail_zoom', z);
-		const frame = $('.ibx-js-frame', readPane());
-		if (frame && S.mail) {
-			frameReady(frame, S.mail);
-		}
+		$$('.ibx-js-frame', readPane()).forEach(frame => frameReady(frame, S.mail));
 		toast(t('InboxMailZoom', z));
 	}
 
@@ -1455,7 +1724,7 @@
 	}
 
 	function printMail(m) {
-		const frame = $('.ibx-js-frame', readPane());
+		const frame = $('.ibx-js-frame', mailRoot(m));
 		const w = window.open('', '_blank');
 		if (!w) {
 			toast(t('InboxPopupBlocked'), { error: true });
@@ -1861,13 +2130,234 @@
 		}
 	}
 
+	// ---------- Context menus (1.5.0, interface §6 bis) ----------
+	/*
+	 * Menu of inbox where the user acts on objects of inbox (mails of the list, folders, attachments, addresses), menu
+	 * of the browser where he reads or writes text (body of the mail: iframe, fields). Shift + right click gives the
+	 * menu of the browser everywhere; the setting « Context menus of inbox » (My account) gives it back everywhere.
+	 * Same menus by the Menu key or Shift+F10 on the item with the focus, and by a long press on a touch screen.
+	 */
+	const HINT = () => ({ note: t('InboxBrowserMenuHint') });
+
+	function contextEnabled(e) {
+		return params.context_menus !== '0' && !(e && e.shiftKey);
+	}
+
+	/** Mails a menu of a row acts on: the selection if the row is in it, else this row alone (it becomes the selection) */
+	function contextMails(id) {
+		if (!S.selected.has(id)) {
+			select(id);
+		}
+		return Array.from(S.selected);
+	}
+
+	function mailMenu(id, at) {
+		const ids = contextMails(id);
+		const rows = S.rows.filter(r => ids.includes(r.id));
+		const row = rows.find(r => r.id === id) || rows[0];
+		if (!row) {
+			return;
+		}
+		const one = ids.length === 1;
+		const anyUnread = rows.some(r => !r.seen);
+		const items = [];
+		if (ids.length > 1) {
+			items.push({ header: t('InboxSelectedCount', ids.length) });
+		}
+		if (one) {
+			items.push({ icon: 'mail-opened', label: t('InboxOpen'), key: 'Entrée', run: () => openMail(row.id) });
+			items.push({ sep: true });
+		}
+		items.push({ icon: anyUnread ? 'mark-read' : 'unread', label: t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), key: 'M', run: () => setSeenMany(ids, anyUnread) });
+		if (one) {
+			items.push({ sep: true });
+			items.push({ icon: 'download', label: t('InboxSaveEml'), run: () => download(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + row.id + '&part=source&download=1') });
+			items.push({ icon: 'source', label: t('InboxViewSource'), key: 'Ctrl+U', run: () => openViewer({ mail: { id: row.id, subject: row.subject, attachments: [] }, source: true }) });
+			if (row.from_email) {
+				items.push({ sep: true });
+				items.push({ icon: 'copy', label: t('InboxCopyAddress', row.from_email), run: () => copyText(row.from_email) });
+				items.push({ icon: 'search', label: t('InboxMailsOf', row.from_name || row.from_email), run: () => searchFrom(row.from_email) });
+			}
+		}
+		// Actions of the other modules (same registry as the buttons, hook inbox:mail:actions), the mail being known
+		if (one && S.mail && S.mail.id === row.id) {
+			const extra = actions(S.mail).filter(a => a.module);
+			if (extra.length) {
+				items.push({ sep: true });
+				extra.forEach(a => items.push({ icon: a.icon, label: a.label, key: a.key, run: a.run }));
+			}
+		}
+		items.push(HINT());
+		const el = $('[data-mail="' + row.id + '"]', S.el);
+		menu(el || S.el, items, at || rectPoint(el));
+	}
+
+	function folderMenu(folderId, at) {
+		const e = S.folders.get(folderId);
+		if (!e) {
+			return;
+		}
+		const el = $('[data-folder="' + folderId + '"]', S.el);
+		const items = [
+			{ icon: 'folder', label: t('InboxOpen'), run: () => openFolder(folderId) },
+			{ icon: 'mark-read', label: t('InboxSyncNow'), run: () => {
+				requestSync(folderId, true);
+				toast(t('InboxSyncRunning'));
+			} },
+			{ icon: 'search', label: t('InboxSearchInFolder'), run: () => {
+				openFolder(folderId).then(() => $('.ibx-js-search', S.el).focus());
+			} },
+		];
+		if (e.account.level === 'manage' || S.admin) {
+			items.push({ sep: true });
+			items.push({ icon: 'settings', label: t('InboxAccountSettings'), run: () => I.go('#/settings/accounts/' + e.account.id) });
+		}
+		items.push(HINT());
+		menu(el || S.el, items, at || rectPoint(el));
+	}
+
+	function attachmentMenu(m, index, el, at) {
+		const a = m.attachments[index];
+		if (!a) {
+			return;
+		}
+		menu(el, [
+			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
+			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
+			HINT(),
+		], at || rectPoint(el));
+	}
+
+	function addressMenu(email, name, el, at) {
+		if (!email) {
+			return;
+		}
+		menu(el, [
+			{ icon: 'copy', label: t('InboxCopyAddress', email), run: () => copyText(email) },
+			{ icon: 'search', label: t('InboxMailsOf', name || email), run: () => searchFrom(email) },
+			HINT(),
+		], at || rectPoint(el));
+	}
+
+	function rectPoint(el) {
+		if (!el) {
+			return { x: 200, y: 200 };
+		}
+		const r = el.getBoundingClientRect();
+		return { x: Math.min(r.left + 40, r.right - 10), y: r.top + Math.min(r.height, 28) };
+	}
+
+	async function copyText(text) {
+		try {
+			await navigator.clipboard.writeText(text);
+			toast(t('InboxCopied', text));
+		} catch (e) {
+			toast(text);
+		}
+	}
+
+	/** Mails of a correspondent in the whole mailbox */
+	function searchFrom(email) {
+		const search = $('.ibx-js-search', S.el);
+		search.value = t('InboxSearchOpFrom') + ':' + email;
+		S.q = search.value;
+		S.scope = 'account';
+		S.mobile('list');
+		loadList();
+	}
+
+	/** Where a context menu applies: returns a function opening it, or null (the menu of the browser stays) */
+	function contextTarget(target) {
+		const row = target.closest('[data-mail]');
+		if (row && S.el.contains(row)) {
+			return at => mailMenu(+row.dataset.mail, at);
+		}
+		const folder = target.closest('[data-folder]');
+		if (folder && S.el.contains(folder)) {
+			return at => folderMenu(+folder.dataset.folder, at);
+		}
+		const tileEl = target.closest('[data-att]');
+		if (tileEl && S.el.contains(tileEl)) {
+			const block = tileEl.closest('[data-mailblock]');
+			const m = block && S.blocks ? S.blocks[+block.dataset.mailblock] : S.mail;
+			return m ? at => attachmentMenu(m, +tileEl.dataset.att, tileEl, at) : null;
+		}
+		const addr = target.closest('.ibx-addr[data-email]');
+		if (addr && S.el.contains(addr)) {
+			return at => addressMenu(addr.dataset.email, addr.dataset.name, addr, at);
+		}
+		return null;
+	}
+
+	function bindContextMenus() {
+		S.el.addEventListener('contextmenu', e => {
+			if (!contextEnabled(e) || inField(e)) {
+				return;
+			}
+			const open = contextTarget(e.target);
+			if (open) {
+				e.preventDefault();
+				open({ x: e.clientX, y: e.clientY });
+			}
+		});
+		// Keyboard: Menu key or Shift+F10 on the item with the focus (or the mail selected)
+		S.el.addEventListener('keydown', e => {
+			if (!(e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) || params.context_menus === '0') {
+				return;
+			}
+			const target = document.activeElement && S.el.contains(document.activeElement) ? document.activeElement : $('[data-mail][aria-selected="true"]', S.el);
+			const open = target ? contextTarget(target) : null;
+			if (open) {
+				e.preventDefault();
+				open(null);
+			}
+		});
+		// Touch: long press (500 ms) without moving
+		let press = null;
+		S.el.addEventListener('pointerdown', e => {
+			if (e.pointerType !== 'touch' || params.context_menus === '0') {
+				return;
+			}
+			const open = contextTarget(e.target);
+			if (!open) {
+				return;
+			}
+			const x = e.clientX;
+			const y = e.clientY;
+			press = { x, y, timer: setTimeout(() => {
+				press = null;
+				open({ x, y });
+			}, 500) };
+		});
+		const cancel = e => {
+			if (press && (!e || e.type !== 'pointermove' || Math.abs(e.clientX - press.x) > 8 || Math.abs(e.clientY - press.y) > 8)) {
+				clearTimeout(press.timer);
+				press = null;
+			}
+		};
+		S.el.addEventListener('pointermove', cancel);
+		S.el.addEventListener('pointerup', () => cancel());
+		S.el.addEventListener('pointercancel', () => cancel());
+	}
+
 	// ---------- Folder opening, refresh ----------
 	async function openFolder(id, keepRoute) {
 		const entry = S.folders.get(id);
 		if (!entry) {
 			return;
 		}
+		if (S.folderId && S.folderId !== id) {
+			leaveFolder(false);
+		}
+		// Marks used for the dots during this visit: the new mails stay new until the user leaves the folder
+		S.shownMarks = Object.assign({}, S.marks[entry.account.id] || {});
+		S.folderMax = 0;
 		S.folderId = id;
+		// Its new mails are marked in the list now, not in the tree
+		if (entry.folder.new) {
+			entry.folder.new = 0;
+			renderTree();
+		}
 		S.folderRole = entry.folder.role;
 		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
 		let unfolded = S.collapsed.delete('a' + entry.account.id);
@@ -2016,6 +2506,12 @@
 		}
 		pumpSoon(next);
 	}
+	Dolibarr.on('inbox:params:changed', p => {
+		Object.assign(params, p || {});
+		if (S.el) {
+			loadList(true);
+		}
+	});
 	I.channel.on(msg => {
 		if (msg.type === 'sync-request' && I.isLeader()) {
 			requestSync(msg.folder, msg.now);
@@ -2049,13 +2545,17 @@
 			if (S.folderId && !I.isLeader()) {
 				requestSync(S.folderId, false);
 			}
-			const st = await api('list', 'state', { folder: S.folderId || 0 });
+			const st = await api('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0 });
+			showPresence(st.presence);
 			let treeChanged = false;
-			(st.folders || []).forEach(([id, total, unread]) => {
+			(st.folders || []).forEach(([id, total, unread, fresh]) => {
 				const e = S.folders.get(id);
-				if (e && (e.folder.total !== total || e.folder.unread !== unread)) {
+				// The folder open: its new mails are shown in the list, not in the tree
+				const n = id === S.folderId ? 0 : (fresh || 0);
+				if (e && (e.folder.total !== total || e.folder.unread !== unread || (e.folder.new || 0) !== n)) {
 					e.folder.total = total;
 					e.folder.unread = unread;
+					e.folder.new = n;
 					treeChanged = true;
 				}
 			});
@@ -2074,6 +2574,7 @@
 					await loadList(true);
 				}
 				S.stamp = st.open.stamp;
+				S.folderMax = Math.max(S.folderMax || 0, parseInt(st.open.stamp.split(':')[1], 10) || 0);
 			}
 		} catch (err) {
 			// Network lost: next try
@@ -2081,7 +2582,42 @@
 		S.pollTimer = setTimeout(poll, 20000);
 	}
 
+	/** « Marie reads this mail » in the head of the mail open (shared mailboxes) */
+	function showPresence(p) {
+		const head = $('.ibx-pane--read .ibx-readhead', S.el);
+		if (!head) {
+			return;
+		}
+		let box = $('.ibx-js-presence', head);
+		const users = p && S.mail && p.mail === S.mail.id ? p.users : [];
+		if (!users.length) {
+			if (box) {
+				box.remove();
+			}
+			return;
+		}
+		if (!box) {
+			box = document.createElement('div');
+			box.className = 'ibx-readhead__line ibx-presence ibx-js-presence';
+			box.setAttribute('role', 'status');
+			head.appendChild(box);
+		}
+		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => avatar(u.name, 'u' + u.id, 'ibx-avatar--xs')).join('') + '</span> '
+			+ esc(users.length === 1 ? t('InboxPresenceOne', users[0].name) : t('InboxPresenceMany', users.map(u => u.name).join(', ')));
+	}
+
 	// ---------- Keyboard (interface §11, read only keys of lot W3) ----------
+	/** Shared mailbox: the state (and so the presence) asked now, at most once per 2 s */
+	let presenceTimer = 0;
+	function presenceSoon() {
+		const e = S.mail ? S.folders.get(S.mail.folder) : null;
+		if (!e || e.account.personal) {
+			return;
+		}
+		clearTimeout(presenceTimer);
+		presenceTimer = setTimeout(() => poll(), 800);
+	}
+
 	function inField(e) {
 		const el = e.target;
 		return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) && !(el.classList && el.classList.contains('ibx-js-check'));
@@ -2304,6 +2840,7 @@
 		const el = S.el;
 		bindTree();
 		bindSplitters();
+		bindContextMenus();
 		S.mobile = to => {
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
@@ -2327,6 +2864,10 @@
 				{ sep: true },
 				{ label: t('InboxViewTable'), checked: params.view === 'table', run: () => setView('table') },
 				{ label: t('InboxViewCards'), checked: params.view !== 'table', run: () => setView('cards') },
+				{ label: t('InboxConversations'), checked: params.conversation !== '0', run: () => {
+					saveParam('conversation', params.conversation === '0' ? '1' : '0');
+					loadList();
+				} },
 				{ label: t('InboxColumns'), icon: 'view-table', disabled: params.view !== 'table' || isPhone(), run: () => columnsMenu($('.ibx-js-listmenu', el)) },
 				{ sep: true },
 				{ label: t('InboxDensity_compact'), checked: params.density === 'compact', run: () => setDensity('compact') },
@@ -2374,6 +2915,12 @@
 			}
 		});
 		const listBody = $('.ibx-pane--list .ibx-pane__body', el);
+		// Shift + click: no text selection started by the browser (the range of mails is selected by the click)
+		listBody.addEventListener('mousedown', e => {
+			if (e.shiftKey && e.target.closest('[data-mail]')) {
+				e.preventDefault();
+			}
+		});
 		listBody.addEventListener('click', e => {
 			const sortBtn = e.target.closest('[data-sort]');
 			if (sortBtn) {
@@ -2466,6 +3013,7 @@
 				showNothing();
 			}
 			document.addEventListener('keydown', e => onKey(e, false));
+			window.addEventListener('pagehide', () => leaveFolder(true));
 			// Crossing the phone width: table or cards again
 			window.matchMedia('(max-width: 63.9375rem)').addEventListener('change', () => renderList());
 			document.addEventListener('visibilitychange', () => {

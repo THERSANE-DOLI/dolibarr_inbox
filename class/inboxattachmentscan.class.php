@@ -25,7 +25,7 @@
  * Uses the antivirus of Dolibarr (Setup > Security > Antivirus, class AntiVir): no engine of its own.
  * - setting INBOX_AV_SCAN: auto (default, follows MAIN_ANTIVIRUS_UPLOAD_ON), 1 (always), 0 (never);
  * - verdict « clean » kept 7 days by SHA-1 (signatures change), « infected » kept, « not scanned » never kept;
- * - beyond INBOX_AV_MAX_SIZE (MB, 25 by default, as StreamMaxLength of clamd.conf) the antivirus would answer « OK »
+ * - beyond INBOX_ANTIVIRUS_MAX_MB (MB, 25 by default, as StreamMaxLength of clamd.conf) the antivirus would answer « OK »
  *   after reading the beginning only: such a file is « not scanned (too big) », never « clean ».
  */
 class InboxAttachmentScan
@@ -93,7 +93,7 @@ class InboxAttachmentScan
 				return array('state' => (string) $row->result, 'message' => (string) $row->message);
 			}
 		}
-		$max = max(1, getDolGlobalInt('INBOX_AV_MAX_SIZE', 25)) * 1048576;
+		$max = max(1, getDolGlobalInt('INBOX_ANTIVIRUS_MAX_MB', 25)) * 1048576;
 		if (strlen($content) > $max) {
 			return array('state' => self::TOO_BIG, 'message' => '');
 		}

@@ -107,6 +107,105 @@ class InboxSearchSql implements InboxSearchEngine
 	}
 
 	/**
+	 * One page of conversations (sort by date only): one line per thread found in the folder (its last mail there),
+	 * with the number of mails of the thread in the whole mailbox (sent mails included), unread and attachments
+	 * of the thread in the folder. A mail without key yet (before its batch) is its own thread.
+	 *
+	 * @param int[]               $accountIds Mailboxes the user may read
+	 * @param int                 $folderId   Folder (0: every folder of the mailboxes)
+	 * @param array<string,mixed> $query      Parsed query, filters, dir
+	 * @param string              $cursor     Cursor of the previous page
+	 * @param int                 $limit      Threads of the page
+	 * @return array{rows: array<int,array<string,mixed>>, next: string, total: int}
+	 */
+	public function searchThreads(array $accountIds, $folderId, array $query, $cursor, $limit)
+	{
+		$accountIds = array_values(array_filter(array_map('intval', $accountIds)));
+		if (!$accountIds) {
+			return array('rows' => array(), 'next' => '', 'total' => 0);
+		}
+		$limit = max(1, min(500, (int) $limit));
+		$desc = !isset($query['dir']) || $query['dir'] !== 'asc';
+		$p = $this->db->prefix();
+		$date = self::SORTS['date'];
+		$key = "COALESCE(m.thread_key, CONCAT('m', m.rowid))";
+		$where = $this->where($accountIds, (int) $folderId, $query);
+		$from = " FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 WHERE ".implode(' AND ', $where);
+		$total = 0;
+		if ($cursor === '') {
+			$row = $this->db->getRow("SELECT COUNT(DISTINCT ".$key.") AS n".$from);
+			$total = is_object($row) ? (int) $row->n : 0;
+		}
+		$having = '';
+		$after = $this->decodeCursor($cursor, true);
+		if ($after !== null) {
+			$op = $desc ? '<' : '>';
+			$v = "'".$this->db->escape($after[0])."'";
+			$k = "'".$this->db->escape($after[1])."'";
+			$having = " HAVING (last_date ".$op." ".$v." OR (last_date = ".$v." AND tkey ".$op." ".$k."))";
+		}
+		$sql = "SELECT ".$key." AS tkey, MAX(".$date.") AS last_date, COUNT(m.rowid) AS n_here, SUM(CASE WHEN m.seen = 0 THEN 1 ELSE 0 END) AS unread,"
+			." MAX(m.has_attachments) AS att, MAX(m.flagged) AS flagged, MIN(m.fk_account) AS account".$from
+			." GROUP BY tkey".$having." ORDER BY last_date ".($desc ? 'DESC' : 'ASC').", tkey ".($desc ? 'DESC' : 'ASC')." LIMIT ".($limit + 1);
+		$groups = array();
+		$res = $this->db->query($sql);
+		while ($res && ($o = $this->db->fetch_object($res))) {
+			$groups[] = $o;
+		}
+		$next = '';
+		if (count($groups) > $limit) {
+			array_pop($groups);
+			$last = end($groups);
+			$next = rtrim(strtr(base64_encode(json_encode(array((string) $last->last_date, (string) $last->tkey))), '+/', '-_'), '=');
+		}
+		if (!$groups) {
+			return array('rows' => array(), 'next' => '', 'total' => $total);
+		}
+		// Last mail of each thread in the place listed
+		$keys = array_map(function ($g) {
+			return "'".$this->db->escape((string) $g->tkey)."'";
+		}, $groups);
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.size,"
+			." m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc, s.nom AS soc_name, ".$key." AS tkey, ".$date." AS sort_value"
+			." FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc"
+			." WHERE ".implode(' AND ', $where)." AND ".$key." IN (".implode(',', $keys).") ORDER BY sort_value DESC, m.rowid DESC";
+		$best = array();
+		$res = $this->db->query($sql);
+		while ($res && ($o = $this->db->fetch_object($res))) {
+			if (!isset($best[$o->tkey])) {
+				$best[$o->tkey] = $o;
+			}
+		}
+		// Size of each thread in the whole mailbox (a mail in two folders counts once)
+		$sizes = array();
+		$real = array_filter(array_map(function ($g) {
+			return strpos((string) $g->tkey, 'm') === 0 && !preg_match('/^[0-9a-f]{32}$/', (string) $g->tkey) ? null : "'".$this->db->escape((string) $g->tkey)."'";
+		}, $groups));
+		if ($real) {
+			$res = $this->db->query("SELECT thread_key, COUNT(DISTINCT COALESCE(message_id, rowid)) AS n FROM ".$p."inbox_mail WHERE fk_account IN (".implode(',', $accountIds).")"
+				." AND thread_key IN (".implode(',', $real).") GROUP BY thread_key");
+			while ($res && ($o = $this->db->fetch_object($res))) {
+				$sizes[$o->thread_key] = (int) $o->n;
+			}
+		}
+		$rows = array();
+		foreach ($groups as $g) {
+			if (!isset($best[$g->tkey])) {
+				continue;
+			}
+			$r = $this->format($best[$g->tkey]);
+			$r['thread'] = array('key' => (string) $g->tkey, 'count' => max((int) $g->n_here, $sizes[$g->tkey] ?? 1), 'unread' => (int) $g->unread);
+			// The line is unread / starred / with attachment if one mail of the thread here is
+			$r['seen'] = (int) $g->unread > 0 ? 0 : 1;
+			$r['attachments'] = (int) $g->att;
+			$r['flagged'] = (int) $g->flagged;
+			$rows[] = $r;
+		}
+
+		return array('rows' => $rows, 'next' => $next, 'total' => $total);
+	}
+
+	/**
 	 * @param int[]               $accountIds Mailboxes
 	 * @param int                 $folderId   Folder or 0
 	 * @param array<string,mixed> $query      Query
@@ -163,20 +262,24 @@ class InboxSearchSql implements InboxSearchEngine
 	}
 
 	/**
-	 * @param string $cursor Cursor
-	 * @return array{0:string,1:int}|null
+	 * @param string $cursor  Cursor
+	 * @param bool   $threads Cursor of a page of conversations (date, key of the thread)
+	 * @return array{0:string,1:int|string}|null
 	 */
-	protected function decodeCursor($cursor)
+	protected function decodeCursor($cursor, $threads = false)
 	{
 		if ((string) $cursor === '') {
 			return null;
 		}
 		$data = json_decode((string) base64_decode(strtr((string) $cursor, '-_', '+/')), true);
-		if (!is_array($data) || count($data) !== 2 || !is_scalar($data[0]) || !is_int($data[1])) {
+		if (!is_array($data) || count($data) !== 2 || !is_scalar($data[0])) {
 			return null;
 		}
+		if ($threads) {
+			return is_string($data[1]) && preg_match('/^(m\d+|[0-9a-f]{32})$/', $data[1]) ? array((string) $data[0], $data[1]) : null;
+		}
 
-		return array((string) $data[0], (int) $data[1]);
+		return is_int($data[1]) ? array((string) $data[0], (int) $data[1]) : null;
 	}
 
 	/**

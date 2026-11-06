@@ -26,6 +26,7 @@ dol_include_once('/inbox/class/inboxfolder.class.php');
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxtag.class.php');
+dol_include_once('/inbox/class/inboxnewmarks.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(false);
@@ -101,9 +102,17 @@ switch ($action) {
 		$access = new InboxAccess($db);
 		$sync = new InboxSync($db);
 		$tagHelper = new InboxTag($db);
+		$newMarks = new InboxNewMarks($db);
 		$list = array();
 		foreach ($access->getAccounts($user) as $account) {
 			$account->loadSyncState();
+			// New mails of this user (arrived since he last left the folder, still unread)
+			$marks = $newMarks->marks($user, (int) $account->id);
+			$news = $newMarks->counts($marks);
+			$folderTree = inboxFolderTree((int) $account->id);
+			foreach ($folderTree as $k => $f) {
+				$folderTree[$k]['new'] = $news[$f['id']] ?? 0;
+			}
 			$list[] = array(
 				'id' => (int) $account->id,
 				'email' => (string) $account->email,
@@ -115,7 +124,8 @@ switch ($action) {
 				'retry_at' => $account->sync_retry_at ? (int) $account->sync_retry_at : null,
 				'progress' => $sync->progress((int) $account->id),
 				'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null,
-				'folders' => inboxFolderTree((int) $account->id),
+				'folders' => $folderTree,
+				'marks' => (object) $marks,
 				// Tags of the mailbox (its own list or the global one): keyword => label and color
 				'tags' => array_values(array_map(function ($t) {
 					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color']);

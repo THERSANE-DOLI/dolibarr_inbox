@@ -23,6 +23,7 @@
 
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxcontactmatcher.class.php';
+require_once __DIR__.'/inboxthreader.class.php';
 
 /**
  * Rows of the index (headers, flags, keywords), written by the synchronisation. Never the body of a mail.
@@ -77,6 +78,7 @@ class InboxMail
 			}
 		}
 		$added = 0;
+		$newIds = array();
 		$this->failed = 0;
 		$this->lastError = '';
 		$now = $this->db->idate(dol_now());
@@ -115,7 +117,13 @@ class InboxMail
 			}
 			$mailId = (int) $this->db->last_insert_id($p.'inbox_mail');
 			$this->addAddresses($mailId, $m);
+			$newIds[] = $mailId;
 			$added++;
+		}
+		if ($newIds) {
+			// Conversation of each new mail (and threads merged when it links them)
+			$threader = new InboxThreader($this->db);
+			$threader->assign((int) $accountId, $newIds);
 		}
 
 		return $added;

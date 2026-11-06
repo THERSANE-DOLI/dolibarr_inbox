@@ -399,16 +399,16 @@ class InboxReadingTest extends InboxTestCase
 		$scan = new InboxAttachmentScan($this->db);
 		$this->assertSame(InboxAttachmentScan::INFECTED, $scan->check('abc', 'test.virus')['state']);
 
-		$saved = array('INBOX_AV_SCAN' => getDolGlobalString('INBOX_AV_SCAN'), 'MAIN_ANTIVIRUS_COMMAND' => getDolGlobalString('MAIN_ANTIVIRUS_COMMAND'), 'INBOX_AV_MAX_SIZE' => getDolGlobalString('INBOX_AV_MAX_SIZE'));
+		$saved = array('INBOX_AV_SCAN' => getDolGlobalString('INBOX_AV_SCAN'), 'MAIN_ANTIVIRUS_COMMAND' => getDolGlobalString('MAIN_ANTIVIRUS_COMMAND'), 'INBOX_ANTIVIRUS_MAX_MB' => getDolGlobalString('INBOX_ANTIVIRUS_MAX_MB'));
 		$restrict = $dolibarr_main_restrict_os_commands;
 		try {
 			$conf->global->INBOX_AV_SCAN = '1';
 			$conf->global->MAIN_ANTIVIRUS_COMMAND = '/usr/bin/clamdscan';
 			$dolibarr_main_restrict_os_commands = 'mysqldump, mysql';
 			$this->assertSame(InboxAttachmentScan::UNSCANNED, $scan->check('content '.uniqid(), 'a.txt')['state'], 'command not allowed: not scanned, never clean');
-			$conf->global->INBOX_AV_MAX_SIZE = '1';
+			$conf->global->INBOX_ANTIVIRUS_MAX_MB = '1';
 			$this->assertSame(InboxAttachmentScan::TOO_BIG, $scan->check(str_repeat('a', 1048577), 'big.bin')['state']);
-			$conf->global->INBOX_AV_MAX_SIZE = '';
+			$conf->global->INBOX_ANTIVIRUS_MAX_MB = '';
 			$conf->global->INBOX_AV_SCAN = '0';
 			$this->assertSame(InboxAttachmentScan::OFF, $scan->check('content', 'a.txt')['state']);
 			if (is_executable('/usr/bin/clamdscan') && @file_exists('/run/clamav/clamd.ctl')) {

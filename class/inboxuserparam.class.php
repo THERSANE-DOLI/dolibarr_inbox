@@ -72,6 +72,14 @@ class InboxUserParam
 			'folders_hidden' => array('0', 'int:0:1'),
 			'windows' => array('', 'json'),
 			'mail_zoom' => array('100', 'int:50:200'),
+			// Conversations (1.5.0): one line per thread in the lists, the thread in the reading pane
+			'conversation' => array('1', 'int:0:1'),
+			// Context menus of inbox (1.5.0): 0 = the menu of the browser everywhere
+			'context_menus' => array('1', 'int:0:1'),
+			// Presence (1.5.0): mail open now in a shared mailbox {"a": mailbox, "m": Message-ID}, kept 60 s
+			'presence' => array('', 'json'),
+			// New mails (1.5.0): per mailbox, folder => last row seen by the user (InboxNewMarks)
+			'seen_marks' => array('', 'json'),
 		);
 	}
 

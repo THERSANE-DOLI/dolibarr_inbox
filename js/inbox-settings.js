@@ -1161,7 +1161,13 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" id="g-delay" data-name="INBOX_DEFAULT_READ_DELAY" value="' + esc(s.INBOX_DEFAULT_READ_DELAY) + '"> ' + th('InboxSeconds') + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-send">' + th('InboxSendDelay') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-send" data-name="INBOX_SEND_DELAY" value="' + esc(s.INBOX_SEND_DELAY) + '"> ' + th('InboxSeconds') + '</div><div class="ibx-formrow__help">' + th('InboxSendDelayHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
-			+ '</div></section><section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
+			+ '</div></section>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAvatars') + '</h2><p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
+			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
+				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
+				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
+			+ '</div></section>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
 		// Saved field by field, at once (as the switches), with a toast
 		$$('[data-name]', main).forEach(f => f.addEventListener('change', async () => {
 			try {
@@ -1173,6 +1179,17 @@
 			} catch (err) {
 				toast(err.message, { error: true });
 				f.focus();
+			}
+		}));
+		// Switches: saved at once, back if the server refuses
+		$$('.ibx-js-gswitch', main).forEach(sw => sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				await post('general', 'set', { name: sw.dataset.switch, value: on ? '1' : '0' });
+			} catch (err) {
+				sw.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
 			}
 		}));
 		tabTags($('.ibx-js-tags', main), null);
@@ -1203,6 +1220,8 @@
 		}
 		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDisplay') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-view">' + th('InboxView') + '</label><div>' + opt('view', ['cards', 'table'], p.view) + '<div class="ibx-formrow__help">' + th('InboxViewHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-conversation">' + th('InboxConversationsSetting') + '</label><div>' + opt('conversation', ['1', '0'], p.conversation) + '<div class="ibx-formrow__help">' + th('InboxConversationsHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-context_menus">' + th('InboxContextMenus') + '</label><div>' + opt('context_menus', ['1', '0'], p.context_menus) + '<div class="ibx-formrow__help">' + th('InboxContextMenusHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-theme">' + th('InboxTheme') + '</label><div>' + opt('theme', ['auto', 'light', 'dark', 'contrast'], p.theme) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-density">' + th('InboxDensity') + '</label><div>' + opt('density', ['compact', 'normal', 'comfortable'], p.density) + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-text_size">' + th('InboxTextSize') + '</label><div class="ibx-inline"><input type="range" min="90" max="150" step="10" data-param="text_size" id="me-text_size" value="' + esc(p.text_size) + '" aria-valuetext="' + esc(p.text_size) + ' %"><output class="ibx-js-ts">' + esc(p.text_size) + ' %</output></div></div>'
@@ -1225,6 +1244,7 @@
 						: await post('userparam', 'set', { id: accountId, param: f.dataset.param, value: f.value });
 					if (!accountId) {
 						I.applyDisplay(r.params);
+						Dolibarr.executeHook('inbox:params:changed', r.params);
 					}
 					toast(t('InboxSaved'));
 				} catch (err) {

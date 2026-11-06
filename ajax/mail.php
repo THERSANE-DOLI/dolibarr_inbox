@@ -58,6 +58,42 @@ switch ($action) {
 		inboxAjaxReply($reader->describe($user, $raw));
 		// no break
 
+	case 'thread':
+		// Mails of the conversation in the whole mailbox (sent mails included), the oldest first; a mail in two folders
+		// once (the copy outside the trash and the junk first)
+		$key = (string) $reader->row->thread_key;
+		$list = array();
+		if ($key !== '') {
+			$p = $db->prefix();
+			$rows = $db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.seen, m.answered,"
+				." m.flagged, m.has_attachments, f.role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
+				." WHERE m.fk_account = ".((int) $reader->row->fk_account)." AND m.thread_key = '".$db->escape($key)."'"
+				." ORDER BY COALESCE(m.date_received, m.date_mail) ASC, m.rowid ASC LIMIT 200");
+			$byMsg = array();
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$id = $r->message_id ? (string) $r->message_id : 'row'.$r->rowid;
+				$bad = in_array((string) $r->role, array('trash', 'junk'), true);
+				if (isset($byMsg[$id]) && !($byMsg[$id]['bad'] && !$bad) && (int) $r->rowid !== (int) $reader->row->rowid) {
+					continue;
+				}
+				$date = $r->date_received ? $r->date_received : $r->date_mail;
+				$byMsg[$id] = array('bad' => $bad, 'mail' => array(
+					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) $r->from_email, 'from_name' => (string) $r->from_name,
+					'to' => dol_trunc((string) $r->to_text, 300, 'right', 'UTF-8', 1), 'subject' => (string) $r->subject, 'snippet' => (string) $r->snippet,
+					'date' => $date ? (int) $db->jdate($date) : 0, 'seen' => (int) $r->seen, 'answered' => (int) $r->answered, 'flagged' => (int) $r->flagged,
+					'attachments' => (int) $r->has_attachments,
+				));
+			}
+			foreach ($byMsg as $v) {
+				$list[] = $v['mail'];
+			}
+		}
+		if (!$list) {
+			$list[] = array('id' => (int) $reader->row->rowid);
+		}
+		inboxAjaxReply(array('key' => $key, 'mails' => $list));
+		// no break
+
 	case 'seen':
 		$seen = (int) inboxAjaxParam('seen', 'int') === 1;
 		if (!$reader->setSeen($seen)) {

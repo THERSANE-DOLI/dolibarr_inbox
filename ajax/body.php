@@ -130,6 +130,9 @@ if ($message->bodyHtml !== '') {
 if ($intro !== '') {
 	$html = preg_replace('#<body>#', '<body>'.$intro, $html, 1);
 }
+if (GETPOSTINT('fold') === 1) {
+	$html = InboxMimeParser::foldQuotes($html);
+}
 
 header('Content-Type: text/html; charset=utf-8');
 header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:".($images ? ' https: http:' : '')."; font-src data:; script-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'");

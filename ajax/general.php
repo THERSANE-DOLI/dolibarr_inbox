@@ -41,6 +41,10 @@ function inboxGeneralSettings()
 		'INBOX_DEFAULT_READ_DELAY' => array('default' => '3', 'check' => 'int:0:600'),
 		'INBOX_SEND_DELAY' => array('default' => '10', 'check' => 'int:0:120'),
 		'INBOX_ANTIVIRUS_MAX_MB' => array('default' => '25', 'check' => 'int:1:200'),
+		// Pictures of the correspondents (1.5.0): sources looked for by the server
+		'INBOX_AVATAR_DOLIBARR' => array('default' => '1', 'check' => 'int:0:1'),
+		'INBOX_AVATAR_BIMI' => array('default' => '1', 'check' => 'int:0:1'),
+		'INBOX_AVATAR_GRAVATAR' => array('default' => '0', 'check' => 'int:0:1'),
 	);
 }
 

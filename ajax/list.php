@@ -103,7 +103,12 @@ switch ($action) {
 		$query['soc'] = (int) inboxAjaxParam('soc', 'int');
 		$engine = new InboxSearchSql($db);
 		$start = microtime(true);
-		$page = $engine->search($accounts, $folderId, $query, (string) inboxAjaxParam('cursor', 'alphanohtml'), (int) (inboxAjaxParam('limit', 'int') ?: 200));
+		// Conversations: one line per thread, when the list is sorted by date (a search lists the mails one by one)
+		$threads = (int) inboxAjaxParam('threads', 'int') === 1 && $query['sort'] === 'date' && InboxSearchQuery::isEmpty($query);
+		$cursor = (string) inboxAjaxParam('cursor', 'alphanohtml');
+		$limit = (int) (inboxAjaxParam('limit', 'int') ?: 200);
+		$page = $threads ? $engine->searchThreads($accounts, $folderId, $query, $cursor, $limit) : $engine->search($accounts, $folderId, $query, $cursor, $limit);
+		$page['threads'] = $threads;
 		$page['ms'] = (int) round((microtime(true) - $start) * 1000);
 		// Version of the folder read with the page: the refresh compares with it (a change made just after the
 		// page is not missed)
@@ -117,15 +122,49 @@ switch ($action) {
 		// Every 20 s while the application is shown: counters of the tree, last change of the open folder
 		$out = array('folders' => array(), 'open' => null);
 		if ($readable) {
+			dol_include_once('/inbox/class/inboxnewmarks.class.php');
+			$newMarks = new InboxNewMarks($db);
+			$news = array();
+			foreach ($readable as $accId) {
+				$news += $newMarks->counts($newMarks->marks($user, (int) $accId));
+			}
 			$rows = $db->getRows("SELECT rowid, fk_account, total, unread FROM ".$db->prefix()."inbox_folder WHERE fk_account IN (".implode(',', $readable).") AND status = 1 LIMIT 20000");
 			foreach (is_array($rows) ? $rows : array() as $r) {
-				$out['folders'][] = array((int) $r->rowid, (int) $r->total, (int) $r->unread);
+				$out['folders'][] = array((int) $r->rowid, (int) $r->total, (int) $r->unread, $news[(int) $r->rowid] ?? 0);
 			}
 			$sync = $db->getRows("SELECT rowid, sync_state FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', $readable).") LIMIT 10000");
 			$out['accounts'] = array();
 			foreach (is_array($sync) ? $sync : array() as $r) {
 				$out['accounts'][] = array((int) $r->rowid, (string) $r->sync_state);
 			}
+		}
+		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
+		dol_include_once('/inbox/class/inboxuserparam.class.php');
+		$mailId = (int) inboxAjaxParam('mail', 'int');
+		$params = new InboxUserParam($db);
+		$mine = '';
+		if ($mailId > 0) {
+			$m = $db->getRow("SELECT m.fk_account, m.message_id, a.type FROM ".$db->prefix()."inbox_mail as m INNER JOIN ".$db->prefix()."inbox_account as a ON a.rowid = m.fk_account WHERE m.rowid = ".$mailId);
+			if (is_object($m) && in_array((int) $m->fk_account, $readable, true) && $m->type === InboxAccount::TYPE_SHARED && (string) $m->message_id !== '') {
+				$mine = (string) json_encode(array('a' => (int) $m->fk_account, 'm' => (string) $m->message_id));
+				$others = $db->getRows("SELECT u.rowid, u.firstname, u.lastname, u.login FROM ".$db->prefix()."inbox_userparam as p INNER JOIN ".$db->prefix()."user as u ON u.rowid = p.fk_user"
+					." WHERE p.param = 'presence' AND p.fk_account = 0 AND p.fk_user <> ".((int) $user->id)." AND p.value = '".$db->escape($mine)."'"
+					." AND p.tms > '".$db->idate(dol_now() - 60)."' AND u.statut = 1 LIMIT 20");
+				$out['presence'] = array('mail' => $mailId, 'users' => array_map(function ($u) {
+					return array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login);
+				}, is_array($others) ? $others : array()));
+			}
+		}
+		if ($mine === '') {
+			if ($params->get($user, 'presence') !== '') {
+				$params->remove($user, 'presence');
+			}
+		} else {
+			if ($mine !== $params->get($user, 'presence')) {
+				$params->set($user, 'presence', $mine);
+			}
+			// The date (written with the clock of PHP, as the one compared above) says the user is still there
+			$db->query("UPDATE ".$db->prefix()."inbox_userparam SET tms = '".$db->idate(dol_now())."' WHERE fk_user = ".((int) $user->id)." AND fk_account = 0 AND param = 'presence'");
 		}
 		$folderId = (int) inboxAjaxParam('folder', 'int');
 		if ($folderId > 0) {

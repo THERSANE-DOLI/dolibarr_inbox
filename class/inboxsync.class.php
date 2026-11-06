@@ -286,6 +286,11 @@ class InboxSync
 			}
 		}
 		$connector->disconnect();
+		// Mails indexed before the conversations (1.5.0): keys given within the time left
+		if (microtime(true) < $deadline - 1) {
+			$threader = new InboxThreader($this->db);
+			$threader->backfill((int) $account->id, $deadline - 0.5);
+		}
 		if ($onlyFolder > 0) {
 			// One folder: the state of the mailbox is the business of the full passes
 			return 1;

@@ -371,6 +371,144 @@ class InboxMimeParser
 	}
 
 	/**
+	 * Conversation view: quotes of the previous mails folded, as the usual webmails do (« ... » to show them). The
+	 * document is already safe (safeHtml or textDocument): the quotes are wrapped in <details>, that opens without
+	 * any script. Known forms: Gmail (div.gmail_quote), Outlook (div#divRplyFwdMsg / #appendonsend and what follows),
+	 * Thunderbird (div.moz-cite-prefix + blockquote[type=cite]), Apple Mail (blockquote[type=cite]), Yahoo
+	 * (div.yahoo_quoted), text mails (lines starting with « > »).
+	 *
+	 * @param string $html Whole safe document
+	 * @return string
+	 */
+	public static function foldQuotes($html)
+	{
+		$doc = new DOMDocument();
+		$previous = libxml_use_internal_errors(true);
+		$doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NONET | LIBXML_HTML_NODEFDTD);
+		libxml_clear_errors();
+		libxml_use_internal_errors($previous);
+		$xpath = new DOMXPath($doc);
+		$body = $doc->getElementsByTagName('body')->item(0);
+		if (!$body) {
+			return $html;
+		}
+		$wrap = function (array $nodes) use ($doc) {
+			if (!$nodes) {
+				return;
+			}
+			$first = $nodes[0];
+			$details = $doc->createElement('details');
+			$details->setAttribute('class', 'inbox-quote');
+			$summary = $doc->createElement('summary', '•••');
+			$details->appendChild($summary);
+			$first->parentNode->insertBefore($details, $first);
+			foreach ($nodes as $n) {
+				$details->appendChild($n);
+			}
+		};
+		$done = false;
+		// Outlook: the separator block and everything after it, at its level
+		foreach (array("//*[@id='divRplyFwdMsg']", "//*[@id='appendonsend']", "//div[contains(concat(' ', normalize-space(@class), ' '), ' gmail_quote ')]",
+			"//div[contains(concat(' ', normalize-space(@class), ' '), ' yahoo_quoted ')]", "//div[contains(concat(' ', normalize-space(@class), ' '), ' moz-cite-prefix ')]") as $q) {
+			$node = $xpath->query($q)->item(0);
+			if (!$node || !$node->parentNode) {
+				continue;
+			}
+			// Outlook puts an <hr> or a styled div just before: fold from there
+			$start = $node;
+			$prev = $node->previousSibling;
+			while ($prev && $prev->nodeType === XML_TEXT_NODE && trim($prev->textContent) === '') {
+				$prev = $prev->previousSibling;
+			}
+			if ($prev && $prev->nodeType === XML_ELEMENT_NODE && strtolower($prev->nodeName) === 'hr') {
+				$start = $prev;
+			}
+			$nodes = array();
+			for ($n = $start; $n; $n = $n->nextSibling) {
+				$nodes[] = $n;
+			}
+			$wrap($nodes);
+			$done = true;
+			break;
+		}
+		if (!$done) {
+			foreach (iterator_to_array($xpath->query("//blockquote[@type='cite']")) as $bq) {
+				// Outermost quotes only
+				if ($xpath->query("ancestor::blockquote[@type='cite'] | ancestor::details", $bq)->length === 0) {
+					$wrap(array($bq));
+					$done = true;
+				}
+			}
+		}
+		if (!$done) {
+			// Text mail: blocks of lines starting with « > » (and the « On ... wrote: » line just before)
+			$pre = $xpath->query("//pre[contains(concat(' ', normalize-space(@class), ' '), ' inbox-text ')]")->item(0);
+			if ($pre) {
+				$lines = preg_split('/\n/', $pre->textContent);
+				$out = array();
+				$quote = array();
+				$flush = function () use (&$out, &$quote) {
+					if ($quote) {
+						$out[] = array('q', implode("\n", $quote));
+						$quote = array();
+					}
+				};
+				foreach ($lines as $l) {
+					if (preg_match('/^\s*(&gt;|>)/', $l)) {
+						$quote[] = $l;
+					} else {
+						$flush();
+						$out[] = array('t', $l);
+					}
+				}
+				$flush();
+				if (count(array_filter($out, function ($o) {
+					return $o[0] === 'q';
+				}))) {
+					while ($pre->firstChild) {
+						$pre->removeChild($pre->firstChild);
+					}
+					$buffer = '';
+					foreach ($out as $o) {
+						if ($o[0] === 't') {
+							$buffer .= $o[1]."\n";
+							continue;
+						}
+						// The line « Le ... a écrit : » just before the quote goes inside the fold
+						$intro = '';
+						if (preg_match('/\n([^\n]{5,200}(?:wrote|écrit|schrieb|scritto|escribió)\s*:\s*)\n$/iu', "\n".$buffer, $m)) {
+							$intro = $m[1]."\n";
+							$buffer = substr("\n".$buffer, 0, -strlen($m[1]) - 1);
+							$buffer = substr($buffer, 1);
+						}
+						$pre->appendChild($doc->createTextNode($buffer));
+						$buffer = '';
+						$details = $doc->createElement('details');
+						$details->setAttribute('class', 'inbox-quote');
+						$details->appendChild($doc->createElement('summary', '•••'));
+						$details->appendChild($doc->createTextNode($intro.$o[1]."\n"));
+						$pre->appendChild($details);
+					}
+					$pre->appendChild($doc->createTextNode($buffer));
+					$done = true;
+				}
+			}
+		}
+		if (!$done) {
+			return $html;
+		}
+		$head = $doc->getElementsByTagName('head')->item(0);
+		if ($head) {
+			$style = $doc->createElement('style', 'details.inbox-quote>summary{display:inline-block;list-style:none;cursor:pointer;padding:0 8px;margin:6px 0;border:1px solid #ccd;'
+				.'border-radius:8px;color:#556;font-size:12px;line-height:16px;background:#f3f5f7}details.inbox-quote>summary::-webkit-details-marker{display:none}'
+				.'details.inbox-quote[open]>summary{margin-bottom:8px}');
+			$head->appendChild($style);
+		}
+
+		return '<!doctype html>'.$doc->saveHTML($doc->documentElement);
+	}
+
+	/**
 	 * Text body => same document as an HTML one
 	 *
 	 * @param string $text Text body

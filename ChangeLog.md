@@ -1,5 +1,20 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: conversations, context menus, pictures of the correspondents, presence :   1.5.0
+  - conversation of each mail found by its references, its copies, the answers arrived before it, else the same
+    subject and correspondent within 30 days; threads merged when a mail links them; mails already indexed done by
+    small batches at each pass.
+  - one line per conversation in the lists sorted by date (setting per user), the mails of the conversation (sent
+    ones included) stacked in the reading pane, quotes of the previous mails folded.
+  - context menus on the mails, folders, attachments and addresses; Shift + right click gives the menu of the
+    browser, Menu key and Shift+F10 on the keyboard, long press on a touch screen, setting per user.
+  - pictures of the correspondents looked for by the server: photos of Dolibarr, verified logos (BIMI) for the mails
+    that passed DMARC, Gravatar off by default, else the initials; a switch per source in the general settings.
+  - presence in the shared mailboxes: « Marie reads this mail » in the head of the mail.
+  - new mails apart from unread ones: the dot shows the mails arrived since the user last left the folder (per user, in
+    the list and in the folders), bold and the bar show the unread ones.
+  - Shift + click in the list selects a range of mails, never the text of the rows.
+  - size of the antivirus taken from the general settings (it was read under another name).
 - NEW: reading of the mails in the application (space Mail) :   1.4.0
   - mailboxes and folders from the index, unread counters, mailbox in error with the reason and « Try again ».
   - list of a folder as a table or as cards, sort, quick filters (unread, starred, attachment), pages loaded while

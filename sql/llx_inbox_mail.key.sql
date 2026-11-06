@@ -22,3 +22,6 @@ ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_from (from_email);
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_soc (fk_soc);
 -- Lot W3: the application asks every 20 s whether the open folder changed
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_tms (fk_folder, tms);
+-- Conversations (1.5.0): mails of a thread, answers of a mail
+ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_thread (fk_account, thread_key);
+ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_inreplyto (fk_account, in_reply_to);
