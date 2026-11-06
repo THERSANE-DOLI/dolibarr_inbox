@@ -62,7 +62,8 @@ function inboxSyncState(InboxAccount $account)
 	return array(
 		'state' => (string) $account->sync_state, 'error' => (string) $account->sync_error, 'date_sync' => $account->date_sync ?: null,
 		'retry_at' => $account->sync_retry_at ?: null, 'running' => $account->sync_lock && $account->sync_lock > dol_now() - InboxSync::LOCK_SECONDS,
-		'active' => $account->isActive(), 'progress' => $sync->progress((int) $account->id), 'folders' => $list,
+		'active' => $account->isActive(), 'progress' => $sync->progress((int) $account->id),
+		'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null, 'folders' => $list,
 	);
 }
 

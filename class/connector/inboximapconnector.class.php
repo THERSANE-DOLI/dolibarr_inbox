@@ -80,6 +80,9 @@ class InboxImapConnector extends InboxConnector
 		if (in_array('SPECIAL-USE', $server, true)) {
 			$caps[] = self::CAP_SPECIAL_USE;
 		}
+		if (in_array('QUOTA', $server, true)) {
+			$caps[] = self::CAP_QUOTA;
+		}
 
 		return $caps;
 	}
@@ -492,6 +495,36 @@ class InboxImapConnector extends InboxConnector
 		}
 
 		return true;
+	}
+
+	/**
+	 * Space used and allowed of the mailbox (GETQUOTAROOT INBOX, STORAGE in KB), read only
+	 *
+	 * @return array{used:int,limit:int}|null Null when the server gives no quota
+	 */
+	public function quota()
+	{
+		if (!$this->connect() || !in_array('QUOTA', $this->serverCapabilities, true)) {
+			return null;
+		}
+		try {
+			$response = $this->client->getConnection()->requestAndResponse('GETQUOTAROOT', array('INBOX'));
+		} catch (Exception $e) {
+			return null;
+		}
+		foreach (is_array($response) ? $response : array() as $line) {
+			if (!is_array($line) || ($line[0] ?? '') !== 'QUOTA') {
+				continue;
+			}
+			$items = end($line);
+			for ($i = 0; is_array($items) && $i + 2 < count($items) + 0; $i += 3) {
+				if (strtoupper((string) $items[$i]) === 'STORAGE' && (int) $items[$i + 2] > 0) {
+					return array('used' => (int) $items[$i + 1], 'limit' => (int) $items[$i + 2]);
+				}
+			}
+		}
+
+		return null;
 	}
 
 	/**

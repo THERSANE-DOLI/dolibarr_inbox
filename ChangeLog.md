@@ -14,6 +14,8 @@
   - read / unread on the server by the reading setting of the user and the mailbox, key M; keyboard, size of the
     text, density, phone (one screen at a time).
   - texts of the index in composed form (accents sent decomposed found by the search).
+  - columns of the table chosen, sized and ordered by each user; the subject always keeps its room.
+  - space of the mailbox (quota) in the tab Synchronisation, warning in the folders from 90 %.
 - NEW: synchronisation of the index of the mailboxes :   1.3.0
   - index in the database of the folders and of the headers of the mails (sender, recipients, subject, dates,
     size, attachments, flags, tags), never their body; the mail server stays the reference, read only.

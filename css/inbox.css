@@ -768,3 +768,12 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 	.ibx-mailcard { min-height: 2.75rem; }
 	.ibx-attachment__open, .ibx-tree__row { min-height: 2.75rem; }
 }
+
+/* Columns of the table: width by the edge of a header, order by drag and drop */
+.ibx-mailtable th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-mailtable th.is-droptarget { box-shadow: inset 3px 0 0 var(--ibx-accent); }
+.ibx-colresize { position: absolute; top: 0; right: 0; bottom: 0; width: 0.375rem; cursor: col-resize; }
+.ibx-colresize:hover { background: var(--ibx-accent); }
+.ibx-menu__item[aria-disabled="true"] { color: var(--ibx-text-muted); cursor: default; }
+.ibx-tree__note--warning { color: var(--ibx-warning); font-weight: 600; }
+.ibx-tree__note--warning .ibx-icon { width: 0.875rem; height: 0.875rem; vertical-align: -2px; }

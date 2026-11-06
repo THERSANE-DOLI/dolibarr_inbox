@@ -183,6 +183,12 @@ class InboxSync
 			}
 			$folders->syncTree($account, $list);
 			$this->db->query("UPDATE ".$p."inbox_account SET date_folders = '".$this->db->idate(dol_now())."' WHERE rowid = ".((int) $account->id));
+			// Quota read with the folders (every 15 min): kept on the mailbox for the tree and the tab Synchro
+			if ($connector->can(InboxConnectorInterface::CAP_QUOTA) && method_exists($connector, 'quota')) {
+				$q = $connector->quota();
+				$this->db->query("UPDATE ".$p."inbox_account SET quota_used = ".($q ? (int) $q['used'] : "NULL").", quota_limit = ".($q ? (int) $q['limit'] : "NULL")
+					." WHERE rowid = ".((int) $account->id));
+			}
 		}
 		$rows = array_filter($folders->listForAccount((int) $account->id), function ($f) {
 			return (int) $f->selectable === 1 && (int) $f->sync_enabled === 1;

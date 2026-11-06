@@ -986,7 +986,13 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSyncIndexed') + '</span><div>'
 			+ '<progress max="100" value="' + pct + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxSyncIndexed') + '"></progress> '
 			+ th('InboxSyncIndexedOf', st.progress.indexed.toLocaleString(), st.progress.total.toLocaleString())
-			+ (st.progress.first_sync_left ? ' · ' + th('InboxSyncFoldersLeft', st.progress.first_sync_left) : '') + '</div></div></div>';
+			+ (st.progress.first_sync_left ? ' · ' + th('InboxSyncFoldersLeft', st.progress.first_sync_left) : '') + '</div></div>'
+				+ (st.quota ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxQuota') + '</span><div>'
+					+ '<meter min="0" max="' + st.quota.limit + '" low="' + Math.round(st.quota.limit * 0.8) + '" high="' + Math.round(st.quota.limit * 0.9) + '" optimum="0" value="' + st.quota.used + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxQuota') + '"></meter> '
+					+ th('InboxQuotaUsed', (st.quota.used / 1024).toLocaleString(undefined, { maximumFractionDigits: 0 }), (st.quota.limit / 1024).toLocaleString(undefined, { maximumFractionDigits: 0 }), Math.round(100 * st.quota.used / st.quota.limit))
+					+ (st.quota.used >= st.quota.limit * 0.9 ? ' <span class="ibx-status ibx-status--warning">' + th('InboxQuotaAlmostFull', Math.round(100 * st.quota.used / st.quota.limit)) + '</span>' : '')
+					+ '</div></div>' : '')
+				+ '</div>';
 		html += '<div class="ibx-formfoot" style="border-top:0"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-now"'
 			+ (st.active ? '' : ' aria-disabled="true" title="' + th('InboxSyncNeedsActive') + '"') + '>' + ic('check') + ' ' + th('InboxSyncNow') + '</button>'
 			+ '<span class="ibx-formfoot__spacer"></span>' + (isAdmin() ? '<button type="button" class="ibx-btn ibx-js-rebuild">' + th('InboxSyncRebuild') + '</button>' : '') + '</div>';

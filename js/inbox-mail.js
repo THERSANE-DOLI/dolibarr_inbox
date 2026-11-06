@@ -183,6 +183,7 @@
 			const key = 'a' + a.id;
 			const open = !S.collapsed.has(key) || needle !== '';
 			const unread = a.folders.filter(f => f.role === 'inbox').reduce((n, f) => n + f.unread, 0);
+			const quotaPct = a.quota && a.quota.limit ? Math.round(100 * a.quota.used / a.quota.limit) : 0;
 			const inError = !!a.error;
 			const progress = a.state === 'first_sync' && a.progress && a.progress.total ? Math.min(99, Math.floor(100 * a.progress.indexed / a.progress.total)) : -1;
 			html += '<li role="treeitem" aria-expanded="' + open + '" aria-level="1"><div class="ibx-tree__row ibx-tree__row--account' + (inError ? ' has-error' : '') + '" style="--ibx-depth:0" data-account="' + a.id + '">'
@@ -192,7 +193,8 @@
 				+ (!open && unread ? '<span class="ibx-count">' + unread + '</span>' : '')
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
 				+ '</div>'
-				+ (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '');
+				+ (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '')
+				+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '');
 			if (open) {
 				html += '<ul role="group">' + branch(a, 0, 1, needle) + '</ul>';
 			}
@@ -473,6 +475,193 @@
 		return row.from_name || row.from_email || t('InboxNoSender');
 	}
 
+	/**
+	 * Columns of the table (interface §5): chosen, sized and ordered by the user (setting list_columns), the subject
+	 * always shown. Each one: label, width by default, sort key, cell
+	 */
+	const COLUMNS = {
+		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
+		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
+		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + ' ' + tagsHtml(r) + '</td>' },
+		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
+		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
+		box: { label: 'InboxMailboxFolder', width: '22%', cell: r => '<td class="ibx-muted">' + esc(boxLabel(r)) + '</td>' },
+		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
+	};
+	const DEFAULT_COLUMNS = ['flag', 'att', 'from', 'subject', 'date'];
+
+	/** Columns of the user: [{id, w (px, optional)}], subject always there; search in every mailbox: mailbox added */
+	function tableColumns() {
+		let cols = null;
+		try {
+			cols = JSON.parse(params.list_columns || 'null');
+		} catch (e) {
+			cols = null;
+		}
+		cols = Array.isArray(cols) ? cols.filter(c => c && COLUMNS[c.id]) : [];
+		if (!cols.length) {
+			cols = DEFAULT_COLUMNS.map(id => ({ id }));
+		}
+		if (!cols.some(c => c.id === 'subject')) {
+			cols.splice(Math.min(cols.length, 3), 0, { id: 'subject' });
+		}
+		if (S.scope === 'all' && !cols.some(c => c.id === 'box')) {
+			cols.splice(cols.findIndex(c => c.id === 'subject') + 1, 0, { id: 'box', auto: true });
+		}
+		return cols;
+	}
+	/**
+	 * Width the table needs so that the subject keeps 12 rem: the other columns take their width (px, rem or % of the
+	 * table); beyond the pane, the list scrolls sideways instead of hiding the subject
+	 */
+	function tableMinWidth(cols) {
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		let fixed = 1.625 * rem + 12 * rem;
+		let pct = 0;
+		cols.forEach(c => {
+			const w = c.w ? c.w + 'px' : COLUMNS[c.id].width;
+			if (!w) {
+				return;
+			}
+			if (w.endsWith('%')) {
+				pct += parseFloat(w) / 100;
+			} else if (w.endsWith('rem')) {
+				fixed += parseFloat(w) * rem;
+			} else {
+				fixed += parseFloat(w);
+			}
+		});
+		return Math.ceil(fixed / Math.max(0.2, 1 - pct));
+	}
+	function saveColumns(cols) {
+		saveParam('list_columns', JSON.stringify(cols.filter(c => !c.auto).map(c => (c.w ? { id: c.id, w: c.w } : { id: c.id }))));
+	}
+	function colHead(id) {
+		const c = COLUMNS[id];
+		const label = id === 'from' && (S.folderRole === 'sent' || S.folderRole === 'drafts') ? 'InboxRecipient' : c.label;
+		const inner = c.icon ? ic(c.icon) + '<span class="ibx-sr-only">' + th(label) + '</span>' : th(label);
+		const [k, dir] = (params.list_sort || 'date:desc').split(':');
+		const on = c.sort && k === c.sort;
+		return '<th data-col="' + id + '" draggable="true" title="' + th(label) + '"' + (c.sort ? ' aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>'
+			+ (c.sort ? '<button type="button" class="ibx-sorthead" data-sort="' + c.sort + '">' + inner + (on ? ' ' + ic(dir === 'asc' ? 'chevron-up' : 'chevron-down') : '') + '</button>' : inner)
+			+ (c.icon ? '' : '<span class="ibx-colresize" data-resize="' + id + '" aria-hidden="true"></span>') + '</th>';
+	}
+
+	/** Columns menu: one check per column, the subject cannot be removed */
+	function columnsMenu(anchor) {
+		const cols = tableColumns();
+		menu(anchor, Object.keys(COLUMNS).map(id => ({
+			label: t(COLUMNS[id].label), checked: cols.some(c => c.id === id && !c.auto), disabled: id === 'subject',
+			run: () => {
+				const now = tableColumns().filter(c => !c.auto);
+				const idx = now.findIndex(c => c.id === id);
+				if (idx >= 0) {
+					now.splice(idx, 1);
+				} else {
+					// Back at its usual place: before the date, or at the end
+					const at = now.findIndex(c => c.id === 'date');
+					now.splice(at >= 0 && id !== 'date' ? at : now.length, 0, { id });
+				}
+				saveColumns(now);
+				renderList();
+			},
+		})).concat([{ sep: true }, {
+			label: t('InboxColumnsDefault'), run: () => {
+				saveParam('list_columns', '');
+				renderList();
+			},
+		}]));
+	}
+
+	/** Width by the edge of a header (double click = default), order by drag and drop of the headers */
+	function bindTableHead(body) {
+		const table = $('.ibx-mailtable', body);
+		if (!table) {
+			return;
+		}
+		table.addEventListener('pointerdown', e => {
+			const grip = e.target.closest('[data-resize]');
+			if (!grip) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			const id = grip.dataset.resize;
+			const col = $('col[data-col="' + id + '"]', table);
+			const thEl = grip.closest('th');
+			const start = e.clientX;
+			const base = thEl.getBoundingClientRect().width;
+			grip.setPointerCapture(e.pointerId);
+			const move = ev => {
+				col.style.width = Math.max(48, Math.round(base + ev.clientX - start)) + 'px';
+			};
+			const up = () => {
+				grip.removeEventListener('pointermove', move);
+				grip.removeEventListener('pointerup', up);
+				const cols = tableColumns();
+				const c = cols.find(x => x.id === id);
+				if (c) {
+					c.w = Math.round(thEl.getBoundingClientRect().width);
+					saveColumns(cols);
+				}
+			};
+			grip.addEventListener('pointermove', move);
+			grip.addEventListener('pointerup', up);
+		});
+		table.addEventListener('dblclick', e => {
+			const grip = e.target.closest('[data-resize]');
+			if (grip) {
+				const cols = tableColumns();
+				const c = cols.find(x => x.id === grip.dataset.resize);
+				if (c) {
+					delete c.w;
+					saveColumns(cols);
+					renderList();
+				}
+			}
+		});
+		let dragged = '';
+		table.addEventListener('dragstart', e => {
+			const thEl = e.target.closest('th[data-col]');
+			if (!thEl) {
+				return;
+			}
+			dragged = thEl.dataset.col;
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', dragged);
+		});
+		table.addEventListener('dragover', e => {
+			const thEl = e.target.closest('th[data-col]');
+			if (dragged && thEl && thEl.dataset.col !== dragged) {
+				e.preventDefault();
+				$$('th.is-droptarget', table).forEach(x => x.classList.remove('is-droptarget'));
+				thEl.classList.add('is-droptarget');
+			}
+		});
+		table.addEventListener('drop', e => {
+			const thEl = e.target.closest('th[data-col]');
+			if (!dragged || !thEl) {
+				return;
+			}
+			e.preventDefault();
+			const cols = tableColumns().filter(c => !c.auto);
+			const from = cols.findIndex(c => c.id === dragged);
+			const target = cols.findIndex(c => c.id === thEl.dataset.col);
+			if (from >= 0 && target >= 0) {
+				const moved = cols.splice(from, 1)[0];
+				cols.splice(from < target ? target : target, 0, moved);
+				saveColumns(cols);
+			}
+			dragged = '';
+			renderList();
+		});
+		table.addEventListener('dragend', () => {
+			dragged = '';
+			$$('th.is-droptarget', table).forEach(x => x.classList.remove('is-droptarget'));
+		});
+	}
+
 	function renderList() {
 		const body = $('.ibx-pane--list .ibx-pane__body', S.el);
 		const scroll = body.scrollTop;
@@ -488,18 +677,16 @@
 		const view = params.view === 'table' && !isPhone() ? 'table' : 'cards';
 		let html = '';
 		if (view === 'table') {
-			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true"><colgroup><col class="ibx-col--icon"><col class="ibx-col--icon"><col class="ibx-col--icon"><col class="ibx-col--from"><col><col class="ibx-col--date"></colgroup>'
-				+ '<thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th><th>' + ic('star') + '<span class="ibx-sr-only">' + th('InboxFlagged') + '</span></th><th>' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxAttachments') + '</span></th>'
-				+ sortHead('from', S.folderRole === 'sent' ? 'InboxRecipient' : 'InboxCorrespondent') + sortHead('subject', 'InboxSubject') + sortHead('date', 'InboxDate') + '</tr></thead><tbody>';
+			const cols = tableColumns();
+			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true" style="min-width:' + tableMinWidth(cols) + 'px"><colgroup><col class="ibx-col--icon">'
+				+ cols.map(c => '<col data-col="' + c.id + '"' + (c.w ? ' style="width:' + c.w + 'px"' : (COLUMNS[c.id].width ? ' style="width:' + COLUMNS[c.id].width + '"' : '')) + '>').join('')
+				+ '</colgroup><thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th>'
+				+ cols.map(c => colHead(c.id)).join('') + '</tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
 				html += '<tr class="ibx-mailrow' + (r.seen ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
-					+ '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>'
-					+ '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>'
-					+ '<td title="' + esc(r.from_email) + '">' + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>'
-					+ '<td>' + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + ' ' + tagsHtml(r) + (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '') + '</td>'
-					+ '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td></tr>';
+					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '</tr>';
 			});
 			html += '</tbody></table>';
 		} else {
@@ -532,6 +719,7 @@
 			html += '<div class="ibx-js-more ibx-listmore">' + '<span class="ibx-skeleton" style="width:60%"></span>' + '</div>';
 		}
 		body.innerHTML = html;
+		bindTableHead(body);
 		if (anchorId && body.querySelector('[data-mail="' + anchorId + '"]')) {
 			body.scrollTop += body.querySelector('[data-mail="' + anchorId + '"]').getBoundingClientRect().top - anchorTop;
 		} else {
@@ -568,13 +756,6 @@
 	function boxLabel(r) {
 		const e = S.folders.get(r.folder);
 		return e ? accountName(e.account) + ' / ' + folderName(e.folder) : '';
-	}
-
-	function sortHead(key, label) {
-		const [k, dir] = (params.list_sort || 'date:desc').split(':');
-		const on = k === key;
-		return '<th aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="ibx-sorthead" data-sort="' + key + '">' + th(label)
-			+ (on ? ' ' + ic(dir === 'asc' ? 'chevron-up' : 'chevron-down') : '') + '</button></th>';
 	}
 
 	function hasFilter() {
@@ -1961,6 +2142,7 @@
 				{ sep: true },
 				{ label: t('InboxViewTable'), checked: params.view === 'table', run: () => setView('table') },
 				{ label: t('InboxViewCards'), checked: params.view !== 'table', run: () => setView('cards') },
+				{ label: t('InboxColumns'), icon: 'view-table', disabled: params.view !== 'table' || isPhone(), run: () => columnsMenu($('.ibx-js-listmenu', el)) },
 				{ sep: true },
 				{ label: t('InboxDensity_compact'), checked: params.density === 'compact', run: () => setDensity('compact') },
 				{ label: t('InboxDensity_normal'), checked: (params.density || 'normal') === 'normal', run: () => setDensity('normal') },

@@ -13,6 +13,8 @@
 	<a href="#bulkbar">Barre de masse</a>
 	<h2>Réglages (lot W1)</h2>
 	<a href="#settings">Réglages : navigation, page</a><a href="#form">Formulaire</a><a href="#switch">Interrupteur</a><a href="#tabs">Onglets</a><a href="#table">Tableau de données</a><a href="#checklist">Liste de contrôle</a><a href="#notice">Avis</a><a href="#dialog">Dialogue</a><a href="#dolibanner">Bandeau Dolibarr</a>
+	<h2>Lecture (lot W3)</h2>
+	<a href="#readhead">En-tête de lecture, bandeaux</a><a href="#attbar">Barre des pièces jointes</a><a href="#viewer">Aperçu</a><a href="#columns">Colonnes, notes, nouveaux mails</a>
 </nav>
 <main class="ibx-doc-main">
 	<div class="ibx-doc-themebar">
@@ -273,6 +275,58 @@
 		<h2>Dialogue <code>ibx-dialog</code></h2>
 		<div class="ibx-doc-rules"><ul><li><code>&lt;dialog&gt;</code> natif, jamais <code>confirm()</code> ni <code>prompt()</code>.</li><li>Annuler à gauche, action principale à droite ; une suppression définitive nomme l'objet et fait taper son nom.</li><li>Une erreur laisse le dialogue ouvert avec ce qui a été saisi.</li></ul></div>
 		<div class="ibx-doc-example"><button type="button" class="ibx-btn ibx-btn--danger ibx-js-doc-dialog"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-delete"/></svg> Ouvrir l'exemple</button></div>
+	</section>
+	<section class="ibx-doc-section" id="readhead">
+		<h2>En-tête de lecture <code>ibx-readhead</code>, bandeaux <code>ibx-readbanners</code></h2>
+		<div class="ibx-doc-rules"><ul><li>Adresse de l'expéditeur toujours visible à côté du nom ; la boîte qui a reçu le mail toujours écrite (« reçu sur »).</li><li>Bandeaux dans l'ordre : chiffré ou signé, non distribué, nom imité, images bloquées. Toujours une icône et une phrase, jamais la couleur seule.</li><li>Les actions des lots suivants n'apparaissent qu'avec leur lot (pas de bouton mort).</li></ul></div>
+		<div class="ibx-doc-example ibx-doc-example--block" style="max-width:720px">
+			<div class="ibx-reading" style="min-height:0">
+				<header class="ibx-readhead" style="position:static"><div class="ibx-readhead__top"><span class="ibx-avatar" style="--ibx-avatar-h:210" aria-hidden="true">JD</span><div class="ibx-readhead__who"><div class="ibx-readhead__name">Jean Dupont <span class="ibx-readhead__email">&lt;j.dupont@example.com&gt;</span></div><div class="ibx-readhead__line"><span>vendredi 6 novembre 2026 à 19:57</span></div></div>
+				<div class="ibx-readhead__actions"><button class="ibx-btn ibx-btn--icon" aria-label="Marquer comme lu"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-mark-read"/></svg></button><button class="ibx-btn ibx-btn--icon" aria-label="Plus d'actions"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-more"/></svg></button></div></div>
+				<div class="ibx-readhead__line ibx-readhead__to">Pour <span class="ibx-addr">devis@example.com</span> · reçu sur <b>devis@example.com</b></div>
+				<h2 class="ibx-readhead__subject">Devis DN50 <span class="ibx-tag ibx-tag--2">En attente</span></h2></header>
+				<div class="ibx-readbanners">
+					<div class="ibx-banner ibx-banner--warning" role="status"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-warning"/></svg><div class="ibx-banner__text"><b>Non distribué à nobody@client.example</b><br>550 5.1.1 User unknown</div></div>
+					<div class="ibx-banner ibx-banner--warning" role="status"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-spoof"/></svg><div class="ibx-banner__text">Le nom « Direction Société » ressemble au nôtre mais le mail vient d'une adresse extérieure : méfiez-vous d'une imitation.</div></div>
+					<div class="ibx-banner ibx-banner--info"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-remote-blocked"/></svg><div class="ibx-banner__text">Images distantes bloquées. 1 traceur bloqué.</div><button class="ibx-btn ibx-btn--sm">Afficher</button><button class="ibx-btn ibx-btn--sm">Toujours afficher <svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-chevron-down"/></svg></button></div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="ibx-doc-section" id="attbar">
+		<h2>Barre des pièces jointes <code>ibx-attbar</code></h2>
+		<div class="ibx-doc-rules"><ul><li>Collée en bas du volet de lecture (elle suit le mail sur téléphone), repliée par défaut, état mémorisé par utilisateur (<code>aria-expanded</code>).</li><li>Chaque tuile : ouvrir (fenêtre d'aperçu) et télécharger, toujours visibles ; un avertissement (nom trompeur, programme, PDF avec JavaScript) en texte sur la tuile.</li><li>Antivirus avant tout affichage : infecté = bloqué pour tous ; non analysé = avertissement puis « Ouvrir quand même ».</li></ul></div>
+		<div class="ibx-doc-example ibx-doc-example--block" style="max-width:720px">
+			<section class="ibx-attbar" style="position:static"><div class="ibx-attbar__head"><button type="button" class="ibx-attbar__toggle" aria-expanded="true"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-chevron-down"/></svg><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-attachment"/></svg><b>3 pièce(s) jointe(s)</b> <span class="ibx-muted">1,4 Mo</span><span class="ibx-attbar__names ibx-ellipsis ibx-muted">plan.pdf, liste.csv, facture.pdf.exe</span></button><button type="button" class="ibx-btn ibx-btn--sm"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-download-all"/></svg> Tout enregistrer (.zip)</button></div>
+			<div class="ibx-attachments">
+				<div class="ibx-attachment"><button type="button" class="ibx-attachment__open"><svg class="ibx-icon ibx-attachment__icon ibx-attachment__icon--pdf" aria-hidden="true"><use href="__ICONS__#ibx-i-file-pdf"/></svg><span class="ibx-attachment__info"><span class="ibx-ellipsis">plan.pdf</span><span class="ibx-attachment__size">1,2 Mo</span></span></button><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm" aria-label="Télécharger"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-download"/></svg></button></div>
+				<div class="ibx-attachment"><button type="button" class="ibx-attachment__open"><svg class="ibx-icon ibx-attachment__icon" aria-hidden="true"><use href="__ICONS__#ibx-i-file-xls"/></svg><span class="ibx-attachment__info"><span class="ibx-ellipsis">liste.csv</span><span class="ibx-attachment__size">2 Ko</span></span></button><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm" aria-label="Télécharger"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-download"/></svg></button></div>
+				<div class="ibx-attachment is-warning"><button type="button" class="ibx-attachment__open"><svg class="ibx-icon ibx-attachment__icon" aria-hidden="true"><use href="__ICONS__#ibx-i-attachment"/></svg><span class="ibx-attachment__info"><span class="ibx-ellipsis">facture.pdf.exe</span><span class="ibx-attachment__size">15 Ko · <span class="ibx-attachment__warn">nom trompeur, programme : téléchargement seul</span></span></span></button><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm" aria-label="Télécharger"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-download"/></svg></button></div>
+			</div></section>
+		</div>
+	</section>
+
+	<section class="ibx-doc-section" id="viewer">
+		<h2>Aperçu dans la fenêtre flottante <code>ibx-viewer</code></h2>
+		<p>Contenu de <code>ibx-window</code> : PDF par la visionneuse du navigateur, image ajustée (double clic = taille réelle), mail joint dans un cadre sans script, texte, CSV en tableau (500 lignes), zip listé sans extraction.</p>
+		<div class="ibx-doc-example ibx-doc-example--block" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+			<div class="ibx-window" style="position:static;display:flex;height:220px;resize:none" open><div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis">facture.com <span class="ibx-window__sub">68 o · Facture impayée</span></span><button class="ibx-btn ibx-btn--icon ibx-btn--sm" aria-label="Fermer"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-close"/></svg></button></div>
+				<div class="ibx-window__body ibx-viewer"><div class="ibx-viewer__pad"><div class="ibx-banner ibx-banner--danger" role="alert"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-virus"/></svg><div class="ibx-banner__text">Virus détecté : Eicar-Test-Signature. Ce fichier ne peut être ni ouvert ni téléchargé.</div></div></div></div></div>
+			<div class="ibx-window" style="position:static;display:flex;height:220px;resize:none" open><div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis">liste.csv <span class="ibx-window__sub">2 Ko</span></span><button class="ibx-btn ibx-btn--icon ibx-btn--sm" aria-label="Fermer"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-close"/></svg></button></div>
+				<div class="ibx-window__body ibx-viewer"><div class="ibx-viewer__pad"><div class="ibx-banner ibx-banner--warning"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-virus-off"/></svg><div class="ibx-banner__text">L'antivirus n'a pas pu analyser ce fichier.</div></div><table class="ibx-table ibx-table--csv"><tbody><tr><td>Ref</td><td>Qte</td><td>Prix</td></tr><tr><td>DN50</td><td>12</td><td>14,20</td></tr></tbody></table></div></div></div>
+		</div>
+	</section>
+
+	<section class="ibx-doc-section" id="columns">
+		<h2>Colonnes du tableau <code>ibx-colresize</code>, note de l'arbre <code>ibx-tree__note</code>, nouveaux mails <code>ibx-newpill</code></h2>
+		<div class="ibx-doc-rules"><ul><li>Colonnes choisies dans le menu « Colonnes… », largeur par le bord de l'en-tête (double clic = largeur par défaut), ordre par glisser-déposer des en-têtes ; le sujet garde toujours 12 rem, la liste défile en largeur au-delà.</li><li>Une boîte remplie à 90 % ou en première indexation le dit sous son nom, en texte.</li><li>Des mails arrivés en haut pendant qu'on lit plus bas : pastille « N nouveaux mails », jamais un saut de la liste.</li></ul></div>
+		<div class="ibx-doc-example ibx-doc-example--block" style="max-width:520px">
+			<table class="ibx-mailtable"><colgroup><col class="ibx-col--icon"><col style="width:40%"><col><col style="width:5.75rem"></colgroup><thead><tr><th></th><th style="position:relative">Correspondant<span class="ibx-colresize" aria-hidden="true"></span></th><th class="is-droptarget" style="position:relative">Sujet<span class="ibx-colresize" aria-hidden="true"></span></th><th>Date</th></tr></thead>
+			<tbody><tr class="ibx-mailrow is-unread"><td><input type="checkbox" aria-label="Sélectionner"></td><td>Jean Dupont</td><td>Demande de prix</td><td class="ibx-mailrow__date">10:12</td></tr></tbody></table>
+			<ul class="ibx-tree" style="margin-top:12px;max-width:280px"><li><div class="ibx-tree__row ibx-tree__row--account" style="--ibx-depth:0"><button class="ibx-tree__twisty"></button><svg class="ibx-icon ibx-tree__icon" aria-hidden="true"><use href="__ICONS__#ibx-i-account"/></svg><span class="ibx-tree__label">devis@example.com</span></div><div class="ibx-tree__note ibx-tree__note--warning"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-warning"/></svg> Boîte presque pleine : 92 %</div><div class="ibx-tree__note">Indexation 40 %</div></li></ul>
+			<div style="position:relative;height:40px"><button type="button" class="ibx-newpill" style="top:4px">2 nouveau(x) mail(s)</button></div>
+		</div>
 	</section>
 </main>
 </div>

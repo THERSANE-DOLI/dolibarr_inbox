@@ -201,7 +201,7 @@ class InboxAccount extends CommonObject
 
 	/** @var string[] State of the synchronisation: written only by InboxSync (never by create / update, so that saving
 	 * the card during a pass does not write old values over it), loaded by fetch() */
-	const SYNC_FIELDS = array('sync_state', 'sync_error', 'date_sync_error', 'date_sync', 'date_folders', 'sync_lock', 'sync_retry_at', 'sync_fail_count');
+	const SYNC_FIELDS = array('sync_state', 'sync_error', 'date_sync_error', 'date_sync', 'date_folders', 'sync_lock', 'sync_retry_at', 'sync_fail_count', 'quota_used', 'quota_limit');
 
 	/** @var string[] Columns of the server: a change is written in the journal (values, never a password) */
 	const SERVER_FIELDS = array('imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert',

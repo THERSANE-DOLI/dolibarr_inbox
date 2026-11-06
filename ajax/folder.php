@@ -99,6 +99,7 @@ switch ($action) {
 				'error' => in_array((string) $account->sync_state, array('auth_failed', 'unreachable', 'error'), true) ? (string) $account->sync_error : '',
 				'retry_at' => $account->sync_retry_at ? (int) $account->sync_retry_at : null,
 				'progress' => $sync->progress((int) $account->id),
+				'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null,
 				'folders' => inboxFolderTree((int) $account->id),
 				// Tags of the mailbox (its own list or the global one): keyword => label and color
 				'tags' => array_values(array_map(function ($t) {

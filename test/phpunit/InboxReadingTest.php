@@ -307,6 +307,21 @@ class InboxReadingTest extends InboxTestCase
 	}
 
 	/**
+	 * B12: quota read with the folders and kept on the mailbox
+	 *
+	 * @return void
+	 */
+	public function testQuota()
+	{
+		$this->needDovecot();
+		$a = $this->readyBox();
+		$a->loadSyncState();
+		$this->assertSame(102400, (int) $a->quota_limit, 'quota of the test Dovecot: 100 MB');
+		$this->assertGreaterThan(0, (int) $a->quota_used);
+		$this->assertLessThan((int) $a->quota_limit, (int) $a->quota_used);
+	}
+
+	/**
 	 * Mail removed by another client after the last pass: « gone », its row leaves the index
 	 *
 	 * @return void

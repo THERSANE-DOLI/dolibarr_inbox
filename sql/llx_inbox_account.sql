@@ -56,6 +56,8 @@ CREATE TABLE llx_inbox_account(
 	sync_lock datetime DEFAULT NULL,
 	sync_retry_at datetime DEFAULT NULL,
 	sync_fail_count integer DEFAULT 0 NOT NULL,
+	quota_used bigint DEFAULT NULL,
+	quota_limit bigint DEFAULT NULL,
 	date_creation datetime NOT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	fk_user_creat integer NOT NULL,
