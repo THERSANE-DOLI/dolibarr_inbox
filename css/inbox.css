@@ -956,3 +956,9 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 @media (forced-colors: active) {
 	.ibx-tooltip::after { border-color: CanvasText; }
 }
+/* A mail alone: head and attachments as fixed bands, only the body scrolls (a sticky bar at the bottom moved by a
+   fraction of pixel at the end of the scroll). A conversation keeps the scroll of the whole pane. */
+.ibx-pane--read > .ibx-pane__body:has(> .ibx-reading:not(.ibx-convo)) { display: flex; flex-direction: column; overflow: hidden; }
+.ibx-pane--read .ibx-reading:not(.ibx-convo) { flex: 1; min-height: 0; }
+.ibx-reading:not(.ibx-convo) > .ibx-readhead, .ibx-reading:not(.ibx-convo) > .ibx-attbar { position: static; flex: none; }
+.ibx-reading:not(.ibx-convo) > .ibx-readbody { flex: 1; min-height: 0; overflow: auto; }

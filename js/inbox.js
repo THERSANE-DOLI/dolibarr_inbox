@@ -173,6 +173,16 @@
 	function toast(text, o) {
 		o = o || {};
 		const box = $('#ibx-toasts');
+		// A toast with a key (zoom, text size...) is updated in place: one toast, its delay started again
+		if (o.key) {
+			const same = $('[data-toast-key="' + o.key + '"]', box);
+			if (same && same._ibxTimer) {
+				$('span', same).textContent = text;
+				clearTimeout(same._ibxTimer);
+				same._ibxTimer = setTimeout(() => same.remove(), o.duration || 4000);
+				return same;
+			}
+		}
 		const el = document.createElement('div');
 		el.className = 'ibx-toast' + (o.error ? ' ibx-toast--error' : '');
 		el.setAttribute('role', o.error ? 'alert' : 'status');
@@ -185,8 +195,11 @@
 				}
 			});
 		}
+		if (o.key) {
+			el.dataset.toastKey = o.key;
+		}
 		box.appendChild(el);
-		setTimeout(() => el.remove(), o.duration || (o.action ? 8000 : 4000));
+		el._ibxTimer = setTimeout(() => el.remove(), o.duration || (o.action ? 8000 : 4000));
 		return el;
 	}
 

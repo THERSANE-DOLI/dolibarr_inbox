@@ -2598,12 +2598,21 @@
 			return;
 		}
 		doc.documentElement.style.zoom = (parseInt(params.mail_zoom, 10) || 100) + '%';
+		// Height of the content as drawn (zoom included): the box of the document, not its scrollHeight (never below
+		// the height of the frame, so a frame never got smaller, and without the zoom)
 		const fit = () => {
-			frame.style.height = Math.max(120, doc.documentElement.scrollHeight * (parseInt(params.mail_zoom, 10) || 100) / 100 + 8) + 'px';
+			frame.style.height = Math.max(120, Math.ceil(doc.documentElement.getBoundingClientRect().height) + 8) + 'px';
 		};
 		fit();
+		// Called again at each change of zoom: the listeners are bound once per document
+		if (doc.ibxBound) {
+			return;
+		}
+		doc.ibxBound = true;
 		if (typeof ResizeObserver === 'function' && doc.body) {
-			new ResizeObserver(fit).observe(doc.body);
+			const ro = new ResizeObserver(fit);
+			ro.observe(doc.documentElement);
+			ro.observe(doc.body);
 		}
 		doc.addEventListener('click', e => {
 			const a = e.target.closest ? e.target.closest('a[href]') : null;
@@ -2666,7 +2675,7 @@
 		const z = Math.max(50, Math.min(200, (parseInt(params.mail_zoom, 10) || 100) + delta));
 		saveParam('mail_zoom', z);
 		$$('.ibx-js-frame', readPane()).forEach(frame => frameReady(frame, S.mail));
-		toast(t('InboxMailZoom', z));
+		toast(t('InboxMailZoom', z), { key: 'mail-zoom' });
 	}
 
 	function headersDialog(m) {
@@ -3601,7 +3610,7 @@
 			const next = e.key === '0' ? 100 : steps[Math.max(0, Math.min(steps.length - 1, i + (e.key === '-' ? -1 : 1)))];
 			saveParam('text_size', next);
 			I.applyDisplay(params);
-			toast(t('InboxTextSizeNow', next));
+			toast(t('InboxTextSizeNow', next), { key: 'text-size' });
 			return;
 		}
 		if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U') && S.mail) {
@@ -3671,7 +3680,8 @@
 			}
 		} else if (key === 'PageDown' || key === 'PageUp') {
 			e.preventDefault();
-			const pane = $('.ibx-pane--read .ibx-pane__body', S.el);
+			// A mail alone scrolls in its body (head and attachments stay), a conversation in the whole pane
+			const pane = $('.ibx-pane--read .ibx-reading:not(.ibx-convo) > .ibx-readbody', S.el) || $('.ibx-pane--read .ibx-pane__body', S.el);
 			pane.scrollBy({ top: (key === 'PageDown' ? 1 : -1) * pane.clientHeight * 0.85 });
 		} else if (key === '?') {
 			e.preventDefault();
@@ -3840,6 +3850,13 @@
 		bindBulkBar();
 		bindDragDrop();
 		bindSwipes();
+		// Ctrl + wheel on the reading pane, around the frame of the mail too: zoom of the mail, never of the browser
+		$('.ibx-pane--read', el).addEventListener('wheel', e => {
+			if (e.ctrlKey && S.mail) {
+				e.preventDefault();
+				zoomMail(e.deltaY < 0 ? 10 : -10);
+			}
+		}, { passive: false });
 		S.mobile = to => {
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
