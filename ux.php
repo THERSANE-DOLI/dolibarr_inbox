@@ -57,8 +57,9 @@ $icons = (string) file_get_contents(__DIR__.'/dev/icons.json');
 $html = (string) file_get_contents(__DIR__.'/tpl/ux.html');
 $html = strtr($html, array(
 	'__ICONS__' => dol_escape_htmltag($asset('/img/inbox-icons.svg')),
-	'__APP__' => dol_escape_htmltag(dol_buildpath('/inbox/index.php', 1).'#/settings'),
-	'__BACK__' => dol_escape_htmltag($langs->trans('InboxAppName')),
+	// Opened from a tab of the setup of the module: the link goes back there
+	'__APP__' => dol_escape_htmltag(dol_buildpath('/inbox/admin/setup.php', 1)),
+	'__BACK__' => dol_escape_htmltag($langs->trans('InboxSetup')),
 ));
 
 top_httphead('text/html');

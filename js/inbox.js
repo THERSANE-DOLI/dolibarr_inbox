@@ -359,6 +359,9 @@
 		}
 		root.dataset.ibxDensity = params.density || 'normal';
 		root.style.fontSize = (parseInt(params.text_size, 10) || 100) + '%';
+		// Styles computed again at once for the whole page (a change of theme could leave texts in the colors of
+		// the previous one until a full reload)
+		void root.offsetHeight;
 	}
 
 	// ---------- Spaces and router ----------
@@ -429,7 +432,6 @@
 		rail.innerHTML = spaces.filter(s => !s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
 			+ '<span class="ibx-rail__spacer"></span>'
 			+ spaces.filter(s => s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
-			+ '' + (rights().account_admin ? '<a class="ibx-rail__item" href="' + esc(ctx('INBOX_URL', '').replace(/index\.php$/, 'ux.php')) + '" title="' + th('InboxCatalogue') + '" aria-label="' + th('InboxCatalogue') + '">' + ic('catalogue') + '</a>' : '')
 			+ '<a class="ibx-rail__item" href="' + esc(ctx('INBOX_DOLIBARR_URL', '/')) + '" title="' + th('InboxBackToDolibarr') + '" aria-label="' + th('InboxBackToDolibarr') + '">' + ic('logout') + '</a>';
 		app.prepend(rail);
 	}

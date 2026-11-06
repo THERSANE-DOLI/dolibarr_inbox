@@ -7,6 +7,8 @@
  */
 /* ===== 1. Tokens ===== */
 :root {
+	/* Native parts of the page (fields, lists, scrollbars) drawn for the theme */
+	color-scheme: light;
 	/* Accent (configurable in the module setup) */
 	--ibx-accent: #1d6a8a;
 	--ibx-accent-hover: color-mix(in srgb, var(--ibx-accent) 85%, black);
@@ -21,8 +23,8 @@
 	--ibx-bg-hover: #e8eef1;
 	--ibx-border: #d9e1e5;
 	--ibx-border-strong: #b9c6cc;
-	--ibx-text: #1c2a30;
-	--ibx-text-muted: #5b6b72;
+	--ibx-text: #0f1a1f;
+	--ibx-text-muted: #4b5a61;
 	--ibx-text-faint: #85949a;
 
 	/* Semantic */
@@ -75,6 +77,7 @@
 /* Dark mode: auto, or forced by data-ibx-theme */
 @media (prefers-color-scheme: dark) {
 	:root:not([data-ibx-theme="light"]) {
+		color-scheme: dark;
 		--ibx-accent: #4fa8c9;
 		--ibx-on-accent: #081a22;
 		--ibx-bg: #151c20;
@@ -96,6 +99,7 @@
 	}
 }
 :root[data-ibx-theme="dark"] {
+	color-scheme: dark;
 	--ibx-accent: #4fa8c9;
 	--ibx-on-accent: #081a22;
 	--ibx-bg: #151c20;
@@ -653,6 +657,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 
 /* ===== 25. High contrast (AAA) and forced colours ===== */
 :root[data-ibx-theme="contrast"] {
+	color-scheme: light;
 	--ibx-accent: #0b3d91;
 	--ibx-on-accent: #ffffff;
 	--ibx-bg: #ffffff;
@@ -978,3 +983,11 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-toast > span { flex: 1; min-width: 0; }
 .ibx-toast > .ibx-btn { flex: none; white-space: nowrap; }
 /* Label of the gesture beside the card: on one line (beside the card its available width is 0, it wrapped at each word) */
+/* The box of the toasts spans the width (centring): no background of its own, only the toasts are drawn */
+.ibx-toasts { background: transparent; }
+/* Scrollbars in the colors of the theme (Chrome 121+, Firefox): thumb of the borders, track transparent */
+.ibx-app, .ibx-app *, .ibx-dialog, .ibx-dialog *, .ibx-menu { scrollbar-color: var(--ibx-border-strong) transparent; }
+/* Bottom line of a card (tags, thread, attachment, star): only when it holds something, in compact and normal
+   densities; comfortable keeps it, even empty. Compact also drops the snippet. */
+:root[data-ibx-density="compact"] .ibx-mailcard__snippet { display: none; }
+:root:not([data-ibx-density="comfortable"]) .ibx-mailcard__foot:not(:has(> :not(.ibx-spacer))) { display: none; }

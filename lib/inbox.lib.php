@@ -45,6 +45,12 @@ function inboxAdminPrepareHead()
 	$head[$h][2] = 'readlog';
 	$h++;
 
+	// Catalogue of the components of the interface: a page for the developers and the admins, not in the application
+	$head[$h][0] = dol_buildpath("/inbox/ux.php", 1);
+	$head[$h][1] = $langs->trans("InboxCatalogue");
+	$head[$h][2] = 'catalogue';
+	$h++;
+
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'inbox@inbox');
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'inbox@inbox', 'remove');
 
