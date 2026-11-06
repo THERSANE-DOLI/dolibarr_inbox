@@ -307,6 +307,41 @@ class InboxReadingTest extends InboxTestCase
 	}
 
 	/**
+	 * Recette of 2026-11-06: a subject with an emoji (4 bytes) was refused by the database connected in utf8 and the
+	 * mail silently left out of the index. It is indexed now (emoji removed from the index only), and an error of the
+	 * database is reported on the folder instead of being taken for « already there »
+	 *
+	 * @return void
+	 */
+	public function testEmojiIndexed()
+	{
+		$fake = new stdClass();
+		$fake->forcecharset = 'utf8';
+		$this->assertSame('Zomb vient de publier', InboxHeaderParser::forDb($fake, "\u{1F44B}Zomb vient de publier"));
+		$this->assertSame('Lien : x', InboxHeaderParser::forDb($fake, "Lien : \u{1F517} x"));
+		$this->assertSame('Été à 10 €', InboxHeaderParser::forDb($fake, 'Été à 10 €'), '3 bytes characters kept');
+		$fake->forcecharset = 'utf8mb4';
+		$this->assertSame("\u{1F44B}Zomb", InboxHeaderParser::forDb($fake, "\u{1F44B}Zomb"), 'kept with utf8mb4');
+
+		$this->needDovecot();
+		$a = $this->readyBox();
+		$raw = "Message-ID: <reading-emoji@inbox-test.invalid>\r\nFrom: =?UTF-8?Q?Zomb_=F0=9F=91=8B?= <x@facebookmail.example.invalid>\r\nTo: ".self::BOX
+			."\r\nSubject: =?UTF-8?Q?=F0=9F=91=8BZomb_vient_de_publier?=\r\nDate: ".date('r')."\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCorps \xF0\x9F\x94\x97 lien\r\n";
+		$this->append($raw, 'reading-emoji@inbox-test.invalid');
+		$s = new InboxSync($this->db);
+		$a->fetch($a->id);
+		$s->run($a, microtime(true) + 30, array('force' => true));
+		$id = $this->rowId($a, 'reading-emoji@inbox-test.invalid');
+		$this->assertGreaterThan(0, $id, 'mail with emojis indexed');
+		$row = $this->db->getRow("SELECT subject, from_name FROM ".$this->db->prefix()."inbox_mail WHERE rowid = ".$id);
+		$this->assertStringContainsString('Zomb vient de publier', $row->subject);
+		$r = new InboxReader($this->db);
+		$this->assertTrue($r->load($this->admin, $id));
+		$d = $r->describe($this->admin, $r->raw($this->admin));
+		$this->assertStringContainsString("\u{1F44B}", $d['subject'], 'the reading keeps the emoji (read on the server)');
+	}
+
+	/**
 	 * B12: quota read with the folders and kept on the mailbox
 	 *
 	 * @return void

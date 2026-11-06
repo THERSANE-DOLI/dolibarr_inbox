@@ -53,6 +53,20 @@ function inboxFolderTree($accountId)
 		$byLabel[$tmp[$i]['label']] = (int) $f->rowid;
 	}
 	$order = array('inbox' => 0, 'drafts' => 1, 'sent' => 2, 'archive' => 3, 'junk' => 4, 'trash' => 5);
+	// Several folders may have the same role (Junk and Spam): only the first one (SPECIAL-USE flag first, then the
+	// shortest path) is shown with the name of the role, the others keep their own name
+	$primary = array();
+	foreach ($rows as $f) {
+		$role = (string) $f->role;
+		if ($role === '') {
+			continue;
+		}
+		$special = stripos((string) $f->flags, '\\'.$role) !== false || ($role === 'trash' && stripos((string) $f->flags, '\\trash') !== false);
+		$score = ($special ? 0 : 1000) + strlen((string) $f->path);
+		if (!isset($primary[$role]) || $score < $primary[$role][1]) {
+			$primary[$role] = array((int) $f->rowid, $score);
+		}
+	}
 	$out = array();
 	foreach ($rows as $i => $f) {
 		$label = $tmp[$i]['label'];
@@ -66,7 +80,8 @@ function inboxFolderTree($accountId)
 			'label' => $label,
 			'parent' => $parentLabel !== '' && isset($byLabel[$parentLabel]) ? $byLabel[$parentLabel] : 0,
 			'role' => $role,
-			'rank' => isset($order[$role]) ? $order[$role] : 9,
+			'primary' => $role !== '' && isset($primary[$role]) && $primary[$role][0] === (int) $f->rowid,
+			'rank' => isset($order[$role]) ? $order[$role] + (($role !== '' && isset($primary[$role]) && $primary[$role][0] === (int) $f->rowid) ? 0 : 0.5) : 9,
 			'selectable' => (int) $f->selectable,
 			'followed' => (int) $f->sync_enabled,
 			'total' => (int) $f->total,

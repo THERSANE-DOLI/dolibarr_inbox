@@ -268,6 +268,7 @@ class InboxSync
 				$mails->clearFolder($folderId);
 			}
 			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
 			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
 			$this->stats['deleted'] += $mails->removeMany($folderId, $res['deleted']);
 			$this->stats['folders']++;
@@ -276,7 +277,7 @@ class InboxSync
 			$complete = is_array($cursor) && !empty($cursor['done']) || ($maxMails > 0 && $after['count'] >= $maxMails);
 			$folders->saveState($folderId, array(
 				'sync_cursor' => $res['cursor'], 'total' => $res['total'], 'unread' => $res['unread'], 'indexed' => $after['count'],
-				'oldest_indexed' => $after['oldest'], 'first_sync_done' => $complete ? 1 : 0, 'sync_error' => '',
+				'oldest_indexed' => $after['oldest'], 'first_sync_done' => $complete ? 1 : 0, 'sync_error' => $indexError,
 			));
 			$f->first_sync_done = $complete ? 1 : 0;
 			$f->sync_cursor = $res['cursor'];

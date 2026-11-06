@@ -147,7 +147,7 @@
 	const ROLE_KEY = { inbox: 'InboxFolderRoleInbox', drafts: 'InboxFolderRoleDrafts', sent: 'InboxFolderRoleSent', archive: 'InboxFolderRoleArchive', junk: 'InboxFolderRoleJunk', trash: 'InboxFolderRoleTrash' };
 	/** Name shown for a folder: the special ones in the language of the user at the first level */
 	function folderName(f) {
-		return f.role && ROLE_KEY[f.role] && !f.parent ? t(ROLE_KEY[f.role]) : f.name;
+		return f.role && ROLE_KEY[f.role] && !f.parent && f.primary !== false ? t(ROLE_KEY[f.role]) : f.name;
 	}
 	function accountName(a) {
 		return a.label && a.label !== a.email ? a.label : a.email;
@@ -483,13 +483,14 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (r.seen ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + ' ' + tagsHtml(r) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
+		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
 		box: { label: 'InboxMailboxFolder', width: '22%', cell: r => '<td class="ibx-muted">' + esc(boxLabel(r)) + '</td>' },
 		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
 	};
-	const DEFAULT_COLUMNS = ['flag', 'att', 'from', 'subject', 'date'];
+	const DEFAULT_COLUMNS = ['flag', 'att', 'from', 'subject', 'tags', 'date'];
 
 	/** Columns of the user: [{id, w (px, optional)}], subject always there; search in every mailbox: mailbox added */
 	function tableColumns() {
@@ -517,7 +518,7 @@
 	 */
 	function tableMinWidth(cols) {
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-		let fixed = 1.625 * rem + 12 * rem;
+		let fixed = 2 * 1.625 * rem + 12 * rem;
 		let pct = 0;
 		cols.forEach(c => {
 			const w = c.w ? c.w + 'px' : COLUMNS[c.id].width;
@@ -549,7 +550,7 @@
 	}
 
 	/** Columns menu: one check per column, the subject cannot be removed */
-	function columnsMenu(anchor) {
+	function columnsMenu(anchor, at) {
 		const cols = tableColumns();
 		menu(anchor, Object.keys(COLUMNS).map(id => ({
 			label: t(COLUMNS[id].label), checked: cols.some(c => c.id === id && !c.auto), disabled: id === 'subject',
@@ -571,7 +572,7 @@
 				saveParam('list_columns', '');
 				renderList();
 			},
-		}]));
+		}]), at);
 	}
 
 	/** Width by the edge of a header (double click = default), order by drag and drop of the headers */
@@ -580,6 +581,19 @@
 		if (!table) {
 			return;
 		}
+		const picker = $('.ibx-js-colpicker', table);
+		picker.addEventListener('click', e => {
+			e.stopPropagation();
+			columnsMenu(picker);
+		});
+		$('thead', table).addEventListener('contextmenu', e => {
+			// Browser menu kept with Shift (interface §6 bis)
+			if (e.shiftKey) {
+				return;
+			}
+			e.preventDefault();
+			columnsMenu(picker, { x: e.clientX, y: e.clientY });
+		});
 		table.addEventListener('pointerdown', e => {
 			const grip = e.target.closest('[data-resize]');
 			if (!grip) {
@@ -678,15 +692,17 @@
 		let html = '';
 		if (view === 'table') {
 			const cols = tableColumns();
+			S.tagsColumn = cols.some(c => c.id === 'tags');
 			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true" style="min-width:' + tableMinWidth(cols) + 'px"><colgroup><col class="ibx-col--icon">'
 				+ cols.map(c => '<col data-col="' + c.id + '"' + (c.w ? ' style="width:' + c.w + 'px"' : (COLUMNS[c.id].width ? ' style="width:' + COLUMNS[c.id].width + '"' : '')) + '>').join('')
-				+ '</colgroup><thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th>'
-				+ cols.map(c => colHead(c.id)).join('') + '</tr></thead><tbody>';
+				+ '<col class="ibx-col--icon"></colgroup><thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th>'
+				+ cols.map(c => colHead(c.id)).join('')
+				+ '<th class="ibx-colpicker"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-colpicker" aria-haspopup="menu" title="' + th('InboxChooseColumns') + '" aria-label="' + th('InboxChooseColumns') + '">' + ic('view-table') + '</button></th></tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
 				html += '<tr class="ibx-mailrow' + (r.seen ? '' : ' is-unread') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
-					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '</tr>';
+					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '<td></td></tr>';
 			});
 			html += '</tbody></table>';
 		} else {
@@ -817,7 +833,8 @@
 		$('.ibx-js-view', S.el).setAttribute('aria-label', $('.ibx-js-view', S.el).title);
 		const qf = $('.ibx-js-quickfilter', S.el);
 		qf.setAttribute('aria-pressed', params.quick_filter === '1' ? 'true' : 'false');
-		$('.ibx-js-scopehint', S.el).textContent = S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '';
+		const sortKey = { 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFrom', 'from:desc': 'InboxSortFrom', 'subject:asc': 'InboxSortSubject', 'subject:desc': 'InboxSortSubject', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSize' }[params.list_sort || 'date:desc'];
+		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortKey ? ' · ' + t('InboxSortedBy', t(sortKey)) : '');
 		renderPills();
 	}
 
@@ -1106,7 +1123,12 @@
 	}
 
 	/** Small menu under a button; closes on Escape, outside click; arrows move */
-	function menu(anchor, items) {
+	function menu(anchor, items, at) {
+		if (S.menu && S.menuAnchor === anchor && !at) {
+			// Second click on the button of the open menu: it closes
+			closeMenu();
+			return;
+		}
 		closeMenu();
 		const box = document.createElement('div');
 		box.className = 'ibx-menu';
@@ -1115,7 +1137,7 @@
 			: '<button type="button" class="ibx-menu__item" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		document.body.appendChild(box);
-		const r = anchor.getBoundingClientRect();
+		const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor.getBoundingClientRect();
 		const w = box.offsetWidth;
 		const h = box.offsetHeight;
 		box.style.position = 'fixed';
@@ -1143,6 +1165,7 @@
 			}
 		});
 		S.menu = box;
+		S.menuAt = !!at;
 		anchor.setAttribute('aria-expanded', 'true');
 		S.menuAnchor = anchor;
 		if (buttons[0]) {
@@ -1151,10 +1174,20 @@
 		setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
 	}
 	function outside(e) {
-		if (S.menu && !S.menu.contains(e.target)) {
+		// The button of the menu toggles it itself (its click comes after this pointerdown)
+		if (S.menu && !S.menu.contains(e.target) && !(S.menuAnchor && S.menuAnchor.contains(e.target) && !S.menuAt)) {
 			closeMenu();
 		}
 	}
+	// A click in the body of a mail (iframe: its events do not reach the page) moves the focus out of the page; a
+	// scroll or a resize would leave the menu away from its button
+	window.addEventListener('blur', () => closeMenu());
+	window.addEventListener('resize', () => closeMenu());
+	document.addEventListener('scroll', e => {
+		if (S.menu && !S.menu.contains(e.target)) {
+			closeMenu();
+		}
+	}, true);
 	function closeMenu() {
 		if (S.menu) {
 			S.menu.remove();
@@ -1373,7 +1406,10 @@
 			activity();
 			onKey(e, true);
 		});
-		doc.addEventListener('pointerdown', activity);
+		doc.addEventListener('pointerdown', () => {
+			activity();
+			closeMenu();
+		});
 		doc.addEventListener('wheel', activity, { passive: true });
 		// Real address of a link at hover and focus (title), also read by the screen readers
 		Array.from(doc.querySelectorAll('a[href]')).forEach(a => {
@@ -1833,6 +1869,15 @@
 		}
 		S.folderId = id;
 		S.folderRole = entry.folder.role;
+		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
+		let unfolded = S.collapsed.delete('a' + entry.account.id);
+		for (let p = entry.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
+			unfolded = S.collapsed.delete('f' + p) || unfolded;
+		}
+		if (unfolded) {
+			saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+			renderTree();
+		}
 		S.scope = 'folder';
 		S.selected.clear();
 		S.anchor = 0;

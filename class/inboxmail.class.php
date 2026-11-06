@@ -35,6 +35,12 @@ class InboxMail
 	/** @var InboxContactMatcher|null */
 	protected $matcher = null;
 
+	/** @var int Mails of the last addMany() the database refused (other than already there) */
+	public $failed = 0;
+
+	/** @var string First error of the database of the last addMany() */
+	public $lastError = '';
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -71,6 +77,8 @@ class InboxMail
 			}
 		}
 		$added = 0;
+		$this->failed = 0;
+		$this->lastError = '';
 		$now = $this->db->idate(dol_now());
 		foreach ($mails as $m) {
 			if (isset($existing[$m['remote_id']])) {
@@ -82,7 +90,7 @@ class InboxMail
 				return $ts > 0 ? "'".$this->db->idate((int) $ts)."'" : 'NULL';
 			};
 			$str = function ($v, $max = 255) {
-				$v = (string) $v;
+				$v = InboxHeaderParser::forDb($this->db, (string) $v);
 				return $v === '' ? 'NULL' : "'".$this->db->escape(dol_trunc($v, $max, 'right', 'UTF-8', 1))."'";
 			};
 			$sql = "INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, in_reply_to, refs, date_mail, date_received,";
@@ -94,7 +102,15 @@ class InboxMail
 			$sql .= " ".((int) $m['seen']).", ".((int) $m['answered']).", ".((int) $m['flagged']).", ".((int) $m['draft']).", ".$str(implode(' ', (array) $m['keywords']), 1024).",";
 			$sql .= " ".($match['fk_soc'] ? (int) $match['fk_soc'] : 'NULL').", ".($match['fk_socpeople'] ? (int) $match['fk_socpeople'] : 'NULL').", '".$now."')";
 			if (!$this->db->query($sql)) {
-				// Another pass wrote it in between (unique key): not an error
+				// Another pass wrote it in between (unique key): not an error. Any other error is kept: the mail is not
+				// in the index, the folder says it
+				if ($this->db->lasterrno() !== 'DB_ERROR_RECORD_ALREADY_EXISTS') {
+					$this->failed++;
+					if ($this->lastError === '') {
+						$this->lastError = $this->db->lasterror();
+					}
+					dol_syslog(__METHOD__.' mail '.$m['remote_id'].' not indexed: '.$this->db->lasterror(), LOG_WARNING);
+				}
 				continue;
 			}
 			$mailId = (int) $this->db->last_insert_id($p.'inbox_mail');
@@ -123,7 +139,8 @@ class InboxMail
 			}
 		}
 		foreach (array_slice($list, 0, InboxHeaderParser::MAX_ADDRESSES) as $a) {
-			$values[] = "(".((int) $mailId).", '".$a[0]."', '".$this->db->escape($a[1])."', ".($a[2] !== '' ? "'".$this->db->escape($a[2])."'" : 'NULL').")";
+			$name = InboxHeaderParser::forDb($this->db, $a[2]);
+			$values[] = "(".((int) $mailId).", '".$a[0]."', '".$this->db->escape($a[1])."', ".($name !== '' ? "'".$this->db->escape($name)."'" : 'NULL').")";
 		}
 		if ($values) {
 			$this->db->query("INSERT INTO ".$this->db->prefix()."inbox_mail_address (fk_mail, type, email, name) VALUES ".implode(', ', $values));

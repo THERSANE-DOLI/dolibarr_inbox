@@ -22,6 +22,7 @@
  */
 
 require_once __DIR__.'/inboxsearchengine.class.php';
+require_once __DIR__.'/inboxheaderparser.class.php';
 
 /**
  * Pages by cursor (sort value + row), never OFFSET: the page 37 of a folder costs as much as the first one.
@@ -118,7 +119,7 @@ class InboxSearchSql implements InboxSearchEngine
 			$where[] = "m.fk_folder = ".((int) $folderId);
 		}
 		$like = function ($col, $value) {
-			return $col." LIKE '%".$this->db->escape($this->db->escapeforlike((string) $value))."%'";
+			return $col." LIKE '%".$this->db->escape($this->db->escapeforlike(InboxHeaderParser::forDb($this->db, (string) $value)))."%'";
 		};
 		foreach ((array) ($query['words'] ?? array()) as $w) {
 			$or = array();

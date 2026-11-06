@@ -113,6 +113,25 @@ class InboxHeaderParser
 	}
 
 	/**
+	 * Text as the database accepts it: Dolibarr connects in « utf8 » (3 bytes) on most installations, MariaDB / MySQL
+	 * then refuse the characters of 4 bytes (emojis of LinkedIn, Facebook...) and the whole row is lost. They are
+	 * removed from the index unless the connection is utf8mb4; the mail itself, read on the server, keeps them.
+	 *
+	 * @param DoliDB $db   Database
+	 * @param string $text Text
+	 * @return string
+	 */
+	public static function forDb($db, $text)
+	{
+		$text = (string) $text;
+		if (stripos((string) ($db->forcecharset ?? ''), 'utf8mb4') !== false || !preg_match('/[\x{10000}-\x{10FFFF}]/u', $text)) {
+			return $text;
+		}
+
+		return trim(preg_replace('/ {2,}/', ' ', preg_replace('/[\x{10000}-\x{10FFFF}]\x{FE0F}?/u', '', $text)));
+	}
+
+	/**
 	 * @param string $text Text
 	 * @param int    $max  Characters
 	 * @return string       One line, no control character, bounded

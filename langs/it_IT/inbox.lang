@@ -632,3 +632,6 @@ InboxQuotaUsed = %s MB usati su %s MB (%s %%)
 InboxQuotaAlmostFull = Casella quasi piena: %s %%
 InboxSyncPaused = Aggiornamento in pausa: nessuna attività da 30 min.
 InboxSyncResume = Riprendi
+InboxSortedBy = ordine: %s
+InboxChooseColumns = Scegli le colonne
+InboxTags = Etichette

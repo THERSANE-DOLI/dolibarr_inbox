@@ -632,3 +632,6 @@ InboxQuotaUsed = %s Mo utilisés sur %s Mo (%s %%)
 InboxQuotaAlmostFull = Boîte presque pleine : %s %%
 InboxSyncPaused = Mise à jour en pause : aucune activité depuis 30 min.
 InboxSyncResume = Reprendre
+InboxSortedBy = tri : %s
+InboxChooseColumns = Choisir les colonnes
+InboxTags = Étiquettes

@@ -632,3 +632,6 @@ InboxQuotaUsed = %s MB used of %s MB (%s %%)
 InboxQuotaAlmostFull = Mailbox almost full: %s %%
 InboxSyncPaused = Updates paused: no activity for 30 min.
 InboxSyncResume = Resume
+InboxSortedBy = sorted: %s
+InboxChooseColumns = Choose the columns
+InboxTags = Tags

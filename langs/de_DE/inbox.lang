@@ -632,3 +632,6 @@ InboxQuotaUsed = %s MB von %s MB belegt (%s %%)
 InboxQuotaAlmostFull = Postfach fast voll: %s %%
 InboxSyncPaused = Aktualisierung pausiert: seit 30 Min. keine Aktivität.
 InboxSyncResume = Fortsetzen
+InboxSortedBy = Sortierung: %s
+InboxChooseColumns = Spalten auswählen
+InboxTags = Schlagwörter

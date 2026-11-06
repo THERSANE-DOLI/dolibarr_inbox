@@ -26,6 +26,7 @@ require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
+require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
@@ -150,7 +151,7 @@ class InboxReader
 		$p = $this->db->prefix();
 		// Snippet of the cards, when the server did not give it
 		if (trim((string) $this->row->snippet) === '' && $message->bodyText !== '') {
-			$snippet = dol_trunc(InboxMimeParser::clean(mb_substr($message->bodyText, 0, 600, 'UTF-8')), 200, 'right', 'UTF-8', 1);
+			$snippet = dol_trunc(InboxHeaderParser::forDb($this->db, InboxMimeParser::clean(mb_substr($message->bodyText, 0, 600, 'UTF-8'))), 200, 'right', 'UTF-8', 1);
 			$this->db->query("UPDATE ".$p."inbox_mail SET snippet = '".$this->db->escape($snippet)."' WHERE rowid = ".((int) $this->row->rowid));
 		}
 		$attachments = array();

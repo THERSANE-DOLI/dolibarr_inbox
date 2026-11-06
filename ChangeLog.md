@@ -14,8 +14,11 @@
   - read / unread on the server by the reading setting of the user and the mailbox, key M; keyboard, size of the
     text, density, phone (one screen at a time).
   - texts of the index in composed form (accents sent decomposed found by the search).
-  - columns of the table chosen, sized and ordered by each user; the subject always keeps its room.
+  - columns of the table chosen (menu, picker at the end of the header, right click on the header), sized and
+    ordered by each user, column of the tags; the subject always keeps its room.
   - space of the mailbox (quota) in the tab Synchronisation, warning in the folders from 90 %.
+  - mails with emojis (characters of 4 bytes) indexed on a database connected in utf8 (they were left out of the
+    index without any error); an error of the database is shown on the folder.
   - synchronisation by the browser when the scheduled job does not run (no run for 3 min): one tab only does it
     for every tab of the browser, in calls of 10 s at most that never block the session; every automatic call
     stops after 30 min without activity, so that the session of Dolibarr can expire as on its other pages.
