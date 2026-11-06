@@ -25,7 +25,7 @@ require_once __DIR__.'/inboxmessage.class.php';
 
 /**
  * Raw mail (RFC 822 source) => InboxMessage, with the Webklex classes shipped with Dolibarr (Header, Structure: no
- * IMAP connection needed). Generic MIME parser.
+ * IMAP connection needed).
  *
  * Nothing of the mail is trusted: the HTML body is shown only cleaned by an allow list (safeHtml) and inside a
  * sandboxed iframe without scripts, the file names are sanitized, the attachments are typed by their content, not by

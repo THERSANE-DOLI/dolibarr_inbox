@@ -25,7 +25,7 @@ require_once __DIR__.'/inboxmessage.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxmsgparser.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
-require_once __DIR__.'/inboximapreader.class.php';
+require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
 /**
  * Entry point of inbox for the other modules.
@@ -93,7 +93,7 @@ class Inbox
 	/**
 	 * Raw mail read in a mailbox by its Message-ID, from the cache when it was read lately
 	 *
-	 * @param string $mailbox   Email address of the mailbox (declared in crmclientconnector)
+	 * @param string $mailbox   Email address of the mailbox (an active mailbox of inbox, else given by another module through the hook inboxResolveAccount)
 	 * @param string $messageId Message-ID, complete
 	 * @param User   $user      User asking (right inbox > message > read)
 	 * @param string $origin    Module or screen asking, written in the journal
@@ -134,22 +134,22 @@ class Inbox
 			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_message WHERE rowid = ".((int) $cached->rowid));
 		}
 
-		$accounts = new InboxAccount($this->db);
-		if (!InboxAccount::isAvailable()) {
-			return $this->finish(self::RESULT_ERROR, 'Module crmclientconnector (mailboxes) not enabled', $user, $origin, $mailbox, $normalized);
-		}
-		$account = $accounts->fetchByEmail($mailbox);
+		$account = $this->resolveAccount($mailbox);
 		if ($account === null) {
-			return $this->finish(self::RESULT_INVALID, 'Mailbox not declared in crmclientconnector', $user, $origin, $mailbox, $normalized);
+			return $this->finish(self::RESULT_INVALID, 'Mailbox unknown', $user, $origin, $mailbox, $normalized);
 		}
-
-		$reader = new InboxImapReader($this->db);
-		$found = $reader->fetchRawByMessageId($account, $normalized);
+		$error = '';
+		$connector = InboxConnectorFactory::forAccount($this->db, $account, $error);
+		if (!$connector) {
+			return $this->finish(self::RESULT_ERROR, $error, $user, $origin, $mailbox, $normalized);
+		}
+		$found = $connector->findByMessageId($normalized);
+		$connector->disconnect();
 		if ($found === null) {
-			if ($reader->notFound) {
+			if ($connector->notFound()) {
 				return $this->finish(self::RESULT_NOT_FOUND, 'Mail not found in the mailbox', $user, $origin, $mailbox, $normalized);
 			}
-			return $this->finish(self::RESULT_ERROR, $reader->error, $user, $origin, $mailbox, $normalized);
+			return $this->finish(self::RESULT_ERROR, $connector->getError(), $user, $origin, $mailbox, $normalized);
 		}
 
 		$this->folder = $found['folder'];
@@ -157,6 +157,59 @@ class Inbox
 		$this->finish(self::RESULT_FOUND, '', $user, $origin, $mailbox, $normalized);
 
 		return $found['raw'];
+	}
+
+	/**
+	 * Mailbox of an address for the reading by Message-ID: an active mailbox of inbox first, else the one given by
+	 * another module (hook inboxResolveAccount, context "inbox": its method puts an InboxAccount, not saved, with the
+	 * address asked, in $this->results['account'] and returns 1). Knowing the Message-ID is the access: no access
+	 * per mailbox here, the right "read a mail from its Message-ID" and the journal apply.
+	 *
+	 * @param string $mailbox Email address, lower case
+	 * @return InboxAccount|null
+	 */
+	public function resolveAccount($mailbox)
+	{
+		global $hookmanager;
+
+		$account = new InboxAccount($this->db);
+		if ($account->fetchByEmail($mailbox) > 0 && $account->isActive()) {
+			return $account;
+		}
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($this->db);
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$parameters = array('mailbox' => $mailbox);
+		$action = '';
+		$object = null;
+		$reshook = $hookmanager->executeHooks('inboxResolveAccount', $parameters, $object, $action);
+		$given = ($reshook >= 0 && isset($hookmanager->resArray['account'])) ? $hookmanager->resArray['account'] : null;
+		if ($given instanceof InboxAccount && strtolower(trim((string) $given->email)) === $mailbox) {
+			return $given;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Mailboxes readable by Message-ID from the setup: the active mailboxes of inbox
+	 *
+	 * @return array<int,array{id:int,email:string,label:string}>
+	 */
+	public function listMailboxes()
+	{
+		global $conf;
+
+		$out = array();
+		$rows = $this->db->getRows("SELECT rowid, email, label FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)
+			." AND status = ".InboxAccount::STATUS_ACTIVE." ORDER BY email LIMIT 1000");
+		foreach (is_array($rows) ? $rows : array() as $row) {
+			$out[] = array('id' => (int) $row->rowid, 'email' => (string) $row->email, 'label' => (string) $row->label);
+		}
+
+		return $out;
 	}
 
 	/**
@@ -263,10 +316,12 @@ class Inbox
 			return;
 		}
 		dolChmod($dir.'/'.$file);
+		// Column uid of the lot 0 cache: the UID part of the opaque identifier of the IMAP connector, 0 for others
+		$uid = isset($found['uid']) ? (int) $found['uid'] : (preg_match('/^\d+:(\d+)$/', (string) (isset($found['remote_id']) ? $found['remote_id'] : ''), $m) ? (int) $m[1] : 0);
 		$header = InboxMimeParser::parse(substr($found['raw'], 0, (int) (strpos($found['raw'], "\r\n\r\n") ?: 65536))."\r\n\r\n");
 		$sql = "INSERT INTO ".$this->db->prefix()."inbox_message (entity, mailbox, folder, uid, message_id, sha1, date_mail, from_email, subject, filepath, size, date_fetch, fk_user_fetch)"
 			." VALUES (".((int) $conf->entity).", '".$this->db->escape($mailbox)."', '".$this->db->escape(dol_trunc($found['folder'], 250, 'right', 'UTF-8', 1))."',"
-			." ".((int) $found['uid']).", '".$this->db->escape($messageId)."', '".$this->db->escape($sha1)."',"
+			." ".$uid.", '".$this->db->escape($messageId)."', '".$this->db->escape($sha1)."',"
 			." ".($header->date > 0 ? "'".$this->db->idate($header->date)."'" : "NULL").","
 			." '".$this->db->escape(dol_trunc($header->fromEmail, 250, 'right', 'UTF-8', 1))."',"
 			." '".$this->db->escape(dol_trunc($header->subject, 250, 'right', 'UTF-8', 1))."',"
@@ -401,6 +456,10 @@ class Inbox
 		}
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_readlog WHERE entity = ".((int) $conf->entity)
 			." AND datec < '".$this->db->idate(dol_now() - $logDays * 86400)."'");
+		// Journal of the changes of the mailboxes (own retention, INBOX_ACCOUNT_LOG_DAYS)
+		require_once __DIR__.'/inboxaccountlog.class.php';
+		$accountLog = new InboxAccountLog($this->db);
+		$accountLog->purge();
 
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)

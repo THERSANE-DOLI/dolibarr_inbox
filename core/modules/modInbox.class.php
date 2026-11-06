@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
@@ -61,8 +61,7 @@ class modInbox extends DolibarrModules
 		$this->config_page_url = array("setup.php@inbox");
 
 		$this->hidden = false;
-		// The mailboxes and their IMAP access live in crmclientconnector (optional: without it, only the mails given
-		// as files are read)
+		// No dependency: other modules plug into inbox through its hooks and triggers, never the reverse
 		$this->depends = array();
 		$this->requiredby = array();
 		$this->conflictwith = array();
@@ -76,6 +75,7 @@ class modInbox extends DolibarrModules
 		$this->const = array(
 			array('INBOX_CACHE_DAYS', 'chaine', '30', 'Days a raw mail read from a mailbox stays in the cache', 0, 'current', 0),
 			array('INBOX_LOG_DAYS', 'chaine', '365', 'Days the journal of the readings is kept', 0, 'current', 0),
+			array('INBOX_ACCOUNT_LOG_DAYS', 'chaine', '730', 'Days the journal of the changes of the mailboxes is kept', 0, 'current', 0),
 		);
 
 		if (!isModEnabled("inbox")) {
@@ -112,8 +112,35 @@ class modInbox extends DolibarrModules
 		$this->rights[$r][4] = 'message';
 		$this->rights[$r][5] = 'read';
 		$r++;
+		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'InboxRightWebmailUse';
+		$this->rights[$r][4] = 'webmail';
+		$this->rights[$r][5] = 'use';
+		$r++;
+		// Managing the mailboxes never gives the reading of their mails (access per mailbox, llx_inbox_account_access)
+		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'InboxRightAccountAdmin';
+		$this->rights[$r][4] = 'account';
+		$this->rights[$r][5] = 'admin';
+		$r++;
 
 		$this->menu = array();
+		// Top menu: opens the inbox application (full page, without the menus of Dolibarr)
+		$this->menu[0] = array(
+			'fk_menu' => '',
+			'type' => 'top',
+			'titre' => 'InboxAppName',
+			'prefix' => img_picto('', 'fa-inbox', 'class="pictofixedwidth valignmiddle"'),
+			'mainmenu' => 'inbox',
+			'leftmenu' => '',
+			'url' => '/inbox/index.php',
+			'langs' => 'inbox@inbox',
+			'position' => 1000,
+			'enabled' => 'isModEnabled("inbox")',
+			'perms' => '$user->hasRight("inbox", "webmail", "use")',
+			'target' => '',
+			'user' => 0,
+		);
 	}
 
 	/**
@@ -133,6 +160,10 @@ class modInbox extends DolibarrModules
 
 		$sql = array();
 		$result = $this->_init($sql, $options);
+		if ($result > 0 && $this->installDefaultTags() < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
 
 		// README of the cache directory (created by _init from $this->dirs)
 		if ($result > 0) {
@@ -143,6 +174,51 @@ class modInbox extends DolibarrModules
 		}
 
 		return $result;
+	}
+
+	/**
+	 *  Insert the 5 default tags of Thunderbird in the global list of the entity, once: the constant
+	 *  INBOX_DEFAULT_TAGS_DONE (kept when the module is disabled) stops a reactivation from bringing back a tag the
+	 *  admin removed, and the check per keyword never duplicates one.
+	 *
+	 *  @return int<-1,1>   1 if OK, -1 if KO
+	 */
+	private function installDefaultTags()
+	{
+		global $conf, $langs, $user;
+
+		if (getDolGlobalString('INBOX_DEFAULT_TAGS_DONE')) {
+			return 1;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		$langs->load('inbox@inbox');
+		$defaults = array(
+			array('$label1', 'InboxTagImportant', '#FF0000'),
+			array('$label2', 'InboxTagWork', '#FF9900'),
+			array('$label3', 'InboxTagPersonal', '#009900'),
+			array('$label4', 'InboxTagToDo', '#3333FF'),
+			array('$label5', 'InboxTagLater', '#993399'),
+		);
+		$entity = (int) $conf->entity;
+		$table = MAIN_DB_PREFIX.'inbox_tag';
+		foreach ($defaults as $pos => $tag) {
+			$sql = "SELECT rowid FROM ".$table." WHERE entity = ".$entity." AND fk_account = 0 AND keyword = '".$this->db->escape($tag[0])."'";
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				return -1;
+			}
+			if ($this->db->num_rows($resql) > 0) {
+				continue;
+			}
+			$sql = "INSERT INTO ".$table." (entity, fk_account, keyword, label, color, position, status, date_creation, fk_user_creat)";
+			$sql .= " VALUES (".$entity.", 0, '".$this->db->escape($tag[0])."', '".$this->db->escape($langs->transnoentitiesnoconv($tag[1]))."',";
+			$sql .= " '".$this->db->escape($tag[2])."', ".($pos + 1).", 1, '".$this->db->idate(dol_now())."', ".(empty($user->id) ? 'NULL' : (int) $user->id).")";
+			if (!$this->db->query($sql)) {
+				return -1;
+			}
+		}
+		dolibarr_set_const($this->db, 'INBOX_DEFAULT_TAGS_DONE', '1', 'chaine', 0, 'Default tags of Thunderbird installed once', $entity);
+		return 1;
 	}
 
 	/**

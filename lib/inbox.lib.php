@@ -40,6 +40,11 @@ function inboxAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
+	$head[$h][0] = dol_buildpath("/inbox/admin/readlog.php", 1);
+	$head[$h][1] = $langs->trans("InboxReadLog");
+	$head[$h][2] = 'readlog';
+	$h++;
+
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'inbox@inbox');
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'inbox@inbox', 'remove');
 
