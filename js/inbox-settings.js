@@ -217,7 +217,7 @@
 		}
 		const title = isNew ? t('InboxNewAccount') : (account.label || account.email);
 		let html = '<div class="ibx-page"><a class="ibx-page__back" href="#/settings/accounts">' + ic('chevron-left') + ' ' + th('InboxNavAccounts') + '</a>'
-			+ '<div class="ibx-page__head"><h1 class="ibx-page__title">' + esc(title) + '</h1>' + (account ? statusBadge(account.status) : '') + '</div>';
+			+ '<div class="ibx-page__head"><h1 class="ibx-page__title">' + esc(title) + '</h1>' + (account ? statusSwitch(account) : '') + '</div>';
 		html += '<div class="ibx-tabs" role="tablist">' + tabs.map(x => {
 			const disabled = isNew && x.id !== 'server';
 			return '<a class="ibx-tab" role="tab" href="' + (disabled ? '#' : '#/settings/accounts/' + id + '/' + x.id) + '" aria-selected="' + (x.id === tab) + '"'
@@ -225,6 +225,9 @@
 		}).join('') + '</div><div class="ibx-js-tab"></div></div>';
 		main.innerHTML = html;
 		$$('.ibx-tab[aria-disabled="true"]', main).forEach(a => a.addEventListener('click', e => e.preventDefault()));
+		if (account) {
+			bindStatusSwitch(main, account, tab);
+		}
 		const box = $('.ibx-js-tab', main);
 		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags, sync: tabSync };
 		fns[tab](box, account, main);
@@ -303,7 +306,7 @@
 			+ '<div class="ibx-js-testresult"></div>'
 			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-test">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>'
 			+ '<span class="ibx-formfoot__spacer"></span>'
-			+ (account ? statusActions(account) : '')
+			+ (account ? '<span class="ibx-js-statusactions">' + statusActions(account) + '</span>' : '')
 			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + th(account ? 'InboxSave' : 'InboxCreate') + '</button></div>'
 			+ '</form>';
 		box.innerHTML = html;
@@ -429,54 +432,80 @@
 				+ '<span class="ibx-checklist__time">' + esc(s.duration) + ' s</span></li>').join('') + '</ul></section>';
 	}
 
-	function statusActions(account) {
-		if (account.status === 1) {
-			return '<button type="button" class="ibx-btn ibx-js-disable">' + th('InboxDisable') + '</button>';
+	/**
+	 * Switch Active / Disabled of the header of the card (admins of the mailboxes); others see the status only.
+	 * Enabling needs a successful connection test (greyed with the reason); the change is shown in place, no message.
+	 */
+	function statusSwitch(account) {
+		if (!isAdmin()) {
+			return statusBadge(account.status);
 		}
-		const canEnable = ['ok', 'warning'].includes(account.last_test_result);
-		return (account.status === 9 ? '<button type="button" class="ibx-btn ibx-btn--danger ibx-js-delete">' + ic('delete') + ' ' + th('InboxDeleteAccount') + '</button>' : '')
-			+ '<button type="button" class="ibx-btn ibx-js-enable"' + (canEnable ? '' : ' aria-disabled="true" title="' + th('InboxErrorEnableNeedsTest') + '"') + '>' + th('InboxEnable') + '</button>';
+		const active = account.status === 1;
+		const canEnable = active || ['ok', 'warning'].includes(account.last_test_result);
+		const label = th(active ? 'InboxAccountStatusActive' : (account.status === 9 ? 'InboxAccountStatusDisabled' : 'InboxAccountStatusDraft'));
+		return '<span class="ibx-inline"><span class="ibx-js-statuslabel">' + label + '</span>'
+			+ '<button type="button" class="ibx-switch ibx-js-statusswitch" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" aria-label="' + th('InboxAccountStatusActive') + '"'
+			+ (canEnable ? '' : ' aria-disabled="true" title="' + th('InboxErrorEnableNeedsTest') + '"') + '></button></span>';
 	}
-	function bindStatusActions(form, account, main) {
+	function bindStatusSwitch(main, account, tab) {
+		const sw = $('.ibx-js-statusswitch', main);
+		if (!sw) {
+			return;
+		}
+		const setStatus = async status => {
+			await post('account', 'status', { id: account.id, status });
+			I.changed('account', account.id);
+		};
+		// Shown in place, at once: no reload of the card (it would flash), back to the old state on an error only
+		const show = status => {
+			account.status = status;
+			sw.setAttribute('aria-checked', status === 1 ? 'true' : 'false');
+			const label = $('.ibx-js-statuslabel', main);
+			if (label) {
+				label.textContent = t(status === 1 ? 'InboxAccountStatusActive' : (status === 9 ? 'InboxAccountStatusDisabled' : 'InboxAccountStatusDraft'));
+			}
+			const actions = $('.ibx-js-statusactions', main);
+			if (actions) {
+				actions.innerHTML = statusActions(account);
+				bindStatusActions(actions, account);
+			}
+		};
+		let busy = false;
+		sw.addEventListener('click', async () => {
+			if (sw.getAttribute('aria-disabled') === 'true') {
+				toast(sw.title, { error: true });
+				return;
+			}
+			if (busy) {
+				return;
+			}
+			busy = true;
+			const before = account.status;
+			const status = sw.getAttribute('aria-checked') === 'true' ? 9 : 1;
+			show(status);
+			try {
+				// The switch shows the new state by itself: no message (John 2026-11-06), only the errors
+				await setStatus(status);
+			} catch (err) {
+				show(before);
+				toast(err.message, { error: true });
+			}
+			busy = false;
+		});
+	}
+	function statusActions(account) {
+		return account.status === 9 ? '<button type="button" class="ibx-btn ibx-btn--danger ibx-js-delete">' + ic('delete') + ' ' + th('InboxDeleteAccount') + '</button>' : '';
+	}
+	function bindStatusActions(form, account) {
 		if (!account) {
 			return;
 		}
 		const on = (sel, fn) => {
 			const b = $(sel, form);
 			if (b) {
-				b.addEventListener('click', e => {
-					if (b.getAttribute('aria-disabled') === 'true') {
-						toast(b.title, { error: true });
-						return;
-					}
-					fn(e);
-				});
+				b.addEventListener('click', fn);
 			}
 		};
-		on('.ibx-js-enable', async () => {
-			try {
-				await post('account', 'status', { id: account.id, status: 1 });
-				I.changed('account', account.id);
-				toast(t('InboxAccountEnabled'));
-				renderAccountCard(main, account.id, 'server');
-			} catch (err) {
-				toast(err.message, { error: true });
-			}
-		});
-		on('.ibx-js-disable', async () => {
-			const ok = await confirmDialog({ title: t('InboxDisableTitle', account.email), text: t('InboxDisableText'), confirm: t('InboxDisable') });
-			if (!ok) {
-				return;
-			}
-			try {
-				await post('account', 'status', { id: account.id, status: 9 });
-				I.changed('account', account.id);
-				toast(t('InboxAccountDisabled'));
-				renderAccountCard(main, account.id, 'server');
-			} catch (err) {
-				toast(err.message, { error: true });
-			}
-		});
 		on('.ibx-js-delete', async () => {
 			const ok = await confirmDialog({ title: t('InboxDeleteTitle', account.email), text: t('InboxDeleteText'), confirm: t('InboxDeleteAccount'), danger: true, typeToConfirm: account.email });
 			if (!ok) {

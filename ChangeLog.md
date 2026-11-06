@@ -13,6 +13,7 @@
     changes.
   - tab Synchronisation of a mailbox: state, progress, folders followed, « Synchronise now », « Rebuild the
     index »; the caps of the indexing are optional (0 = everything by default).
+  - switch in the head of the mailbox card to enable or disable it, updated in place.
   - translations of the application asked again after an update of the module (cache of the browser).
 - NEW: mailboxes of inbox, inbox application (settings) :   1.2.0
   - mailboxes managed in inbox (IMAP connector, SMTP, Sieve): personal or shared, passwords encrypted and never
