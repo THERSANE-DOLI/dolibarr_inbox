@@ -74,7 +74,7 @@ InboxInline = nel corpo
 InboxFromEmbeddedMail = da una e-mail allegata
 InboxBodyText = Testo
 
-# Tags (default list of Thunderbird, installed once)
+# Tags (default list, installed once)
 InboxTagImportant = Importante
 InboxTagWork = Lavoro
 InboxTagPersonal = Personale
@@ -354,7 +354,7 @@ InboxMoveUp = Sposta su
 InboxMoveDown = Sposta giù
 InboxNewTag = Nuova etichetta
 InboxAddTag = Aggiungi
-InboxTagsKeysHelp = I tasti da 1 a 9 applicano le prime nove etichette attive, 0 le rimuove tutte (come Thunderbird). Trascinare le righe, o usare le frecce, per cambiare l'ordine.
+InboxTagsKeysHelp = I tasti da 1 a 9 applicano le prime nove etichette attive, 0 le rimuove tutte. Trascinare le righe, o usare le frecce, per cambiare l'ordine.
 InboxDeleteTagTitle = Eliminare l'etichetta %s?
 InboxDeleteTagText = Le e-mail mantengono la loro parola chiave sul server; inbox la mostrerà come etichetta sconosciuta.
 InboxImportIntro = Copiare in inbox le caselle dichiarate da un altro modulo. Sono create in bozza, testate subito, senza alcun accesso: nulla viene aperto automaticamente.
@@ -397,7 +397,7 @@ Inbox_read_mode_delay = Dopo qualche secondo
 Inbox_read_mode_manual = Solo a mano (tasto M)
 InboxSectionDisplay = Visualizzazione
 InboxView = Elenco delle e-mail
-InboxViewHelp = La stessa per tutte le cartelle e tutte le caselle, come Thunderbird.
+InboxViewHelp = La stessa per tutte le cartelle e tutte le caselle.
 Inbox_view_cards = Schede
 Inbox_view_table = Tabella
 InboxTheme = Tema
@@ -429,7 +429,7 @@ InboxMasterSeparatorHelp = Carattere tra la casella e l'utente master nell'utent
 InboxSetupAppHelp = Le impostazioni della webmail (caselle, accessi, etichette, valori predefiniti) sono nell'applicazione inbox.
 InboxOpenSettings = Apri le impostazioni dell'applicazione
 InboxReadLog = Registro delle letture
-InboxReadLogHelp = Letture di una e-mail tramite il suo Message-ID richieste da altri moduli (per esempio per precompilare un preventivo), conservate %s giorni. La lettura nella webmail non è registrata (come Thunderbird).
+InboxReadLogHelp = Letture di una e-mail tramite il suo Message-ID richieste da altri moduli (per esempio per precompilare un preventivo), conservate %s giorni. La lettura nella webmail non è registrata.
 InboxOrigin = Richiesto da
 InboxResult = Risultato
 InboxFolder = Cartella

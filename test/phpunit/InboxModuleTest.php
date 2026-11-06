@@ -72,6 +72,8 @@ class InboxModuleTest extends InboxTestCase
 			$this->assertStringNotContainsString("\u{2014}", (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'));
 			// Public module: no customer named in the texts shown to the users
 			$this->assertDoesNotMatchRegularExpression('/thersane/i', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'), $lang);
+			// Nor the products the interface is inspired by (« as Thunderbird »)
+			$this->assertDoesNotMatchRegularExpression('/thunderbird|gmail|trello|roundcube/i', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'), $lang);
 		}
 	}
 }

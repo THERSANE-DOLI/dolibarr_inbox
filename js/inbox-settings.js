@@ -486,7 +486,7 @@
 			const current = data.roles[r] || '';
 			html += '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-role-' + r + '">' + th(roleKey(r)) + '</label><div><select class="ibx-field ibx-field--medium" id="f-role-' + r + '" name="role_' + r + '">'
 				+ '<option value="">' + th('InboxFolderNone') + '</option>'
-				+ selectable.map(f => '<option value="' + esc(f.path) + '"' + (f.path === current ? ' selected' : '') + '>' + esc(f.name) + (f.role === r ? ' (' + th('InboxFolderFound') + ')' : '') + '</option>').join('')
+				+ selectable.map(f => '<option value="' + esc(f.path) + '"' + (f.path === current ? ' selected' : '') + ' title="' + esc(f.path) + '">' + esc(f.label || f.name) + (f.role === r ? ' (' + th('InboxFolderFound') + ')' : '') + '</option>').join('')
 				+ '</select>' + (current ? '' : '<div class="ibx-formrow__help">' + th('InboxFolderMissing') + '</div>') + '</div></div>';
 		});
 		html += '<div class="ibx-formfoot"><span class="ibx-muted">' + th('InboxFoldersCount', data.folders.length) + '</span><span class="ibx-formfoot__spacer"></span><button type="submit" class="ibx-btn ibx-btn--primary">' + th('InboxSave') + '</button></div></form>';

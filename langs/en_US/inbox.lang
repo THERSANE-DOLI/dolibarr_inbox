@@ -74,7 +74,7 @@ InboxInline = in the body
 InboxFromEmbeddedMail = from an attached mail
 InboxBodyText = Text
 
-# Tags (default list of Thunderbird, installed once)
+# Tags (default list, installed once)
 InboxTagImportant = Important
 InboxTagWork = Work
 InboxTagPersonal = Personal
@@ -354,7 +354,7 @@ InboxMoveUp = Move up
 InboxMoveDown = Move down
 InboxNewTag = New tag
 InboxAddTag = Add
-InboxTagsKeysHelp = Keys 1 to 9 set the first nine active tags, 0 removes them all (as Thunderbird). Drag the rows, or use the arrows, to change the order.
+InboxTagsKeysHelp = Keys 1 to 9 set the first nine active tags, 0 removes them all. Drag the rows, or use the arrows, to change the order.
 InboxDeleteTagTitle = Delete the tag %s?
 InboxDeleteTagText = The mails keep their keyword on the server; inbox will show it as an unknown tag.
 InboxImportIntro = Copy into inbox the mailboxes declared by another module. They are created as drafts, tested at once, without any access: nothing is opened automatically.
@@ -397,7 +397,7 @@ Inbox_read_mode_delay = After a few seconds
 Inbox_read_mode_manual = Only by hand (key M)
 InboxSectionDisplay = Display
 InboxView = List of the mails
-InboxViewHelp = The same for all the folders and all the mailboxes, as Thunderbird.
+InboxViewHelp = The same for all the folders and all the mailboxes.
 Inbox_view_cards = Cards
 Inbox_view_table = Table
 InboxTheme = Theme
@@ -429,7 +429,7 @@ InboxMasterSeparatorHelp = Character between the mailbox and the master user in 
 InboxSetupAppHelp = The settings of the webmail (mailboxes, accesses, tags, defaults) are in the inbox application.
 InboxOpenSettings = Open the settings of the application
 InboxReadLog = Journal of the readings
-InboxReadLogHelp = Readings of a mail by its Message-ID asked by other modules (for example to prefill a quote), kept %s days. The reading in the webmail is not journaled (as Thunderbird).
+InboxReadLogHelp = Readings of a mail by its Message-ID asked by other modules (for example to prefill a quote), kept %s days. The reading in the webmail is not journaled.
 InboxOrigin = Asked by
 InboxResult = Result
 InboxFolder = Folder

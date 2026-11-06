@@ -128,6 +128,22 @@ class InboxImapConnectorTest extends InboxTestCase
 	/**
 	 * @return void
 	 */
+	public function testLabels()
+	{
+		$f = array(
+			array('path' => 'INBOX', 'delimiter' => '.'), array('path' => 'INBOX.Sent', 'delimiter' => '.'),
+			array('path' => 'INBOX.Archives.2025', 'delimiter' => '.'), array('path' => 'INBOX.Clients &AOk-t&AOk-', 'delimiter' => '.'),
+		);
+		InboxImapConnector::addLabels($f);
+		$this->assertSame(array('INBOX', 'Sent', 'Archives / 2025', 'Clients été'), array_column($f, 'label'), 'common prefix INBOX. hidden');
+		$g = array(array('path' => 'INBOX', 'delimiter' => '/'), array('path' => 'Sent', 'delimiter' => '/'), array('path' => 'INBOX/Work', 'delimiter' => '/'));
+		InboxImapConnector::addLabels($g);
+		$this->assertSame(array('INBOX', 'Sent', 'INBOX / Work'), array_column($g, 'label'), 'no common prefix: kept');
+	}
+
+	/**
+	 * @return void
+	 */
 	public function testGuessRole()
 	{
 		$this->assertSame('sent', InboxImapConnector::guessRole('INBOX.Envoy&AOk-s'));

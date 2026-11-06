@@ -284,6 +284,7 @@ class InboxImapConnector extends InboxConnector
 				'flags' => $flags,
 			);
 		}
+		self::addLabels($out);
 		usort($out, function ($a, $b) {
 			if (strtoupper($a['path']) === 'INBOX') {
 				return -1;
@@ -295,6 +296,41 @@ class InboxImapConnector extends InboxConnector
 		});
 
 		return $out;
+	}
+
+	/**
+	 * Readable label of each folder: path decoded, levels joined by " / ", and without the common prefix of the
+	 * server when every other folder starts with it (Dovecot, Plesk: « INBOX. »), as « Archives / 2025 ». The stored
+	 * value stays the real path.
+	 *
+	 * @param array<int,array<string,mixed>> $folders Folders of listFolders(), changed in place (key label)
+	 * @return void
+	 */
+	public static function addLabels(array &$folders)
+	{
+		$prefix = null;
+		foreach ($folders as $f) {
+			if (strtoupper($f['path']) === 'INBOX' || $f['delimiter'] === '') {
+				continue;
+			}
+			$candidate = 'INBOX'.$f['delimiter'];
+			if (stripos($f['path'], $candidate) !== 0) {
+				$prefix = '';
+				break;
+			}
+			$prefix = $candidate;
+		}
+		foreach ($folders as $i => $f) {
+			$path = $f['path'];
+			if ($prefix && strtoupper($path) !== 'INBOX' && stripos($path, $prefix) === 0) {
+				$path = substr($path, strlen($prefix));
+			}
+			$label = self::decodeFolderName($path);
+			if ($f['delimiter'] !== '') {
+				$label = implode(' / ', explode($f['delimiter'], $label));
+			}
+			$folders[$i]['label'] = $label;
+		}
 	}
 
 	/**

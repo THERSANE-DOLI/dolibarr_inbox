@@ -74,7 +74,7 @@ InboxInline = dans le corps
 InboxFromEmbeddedMail = d'un mail joint
 InboxBodyText = Texte
 
-# Tags (default list of Thunderbird, installed once)
+# Tags (default list, installed once)
 InboxTagImportant = Important
 InboxTagWork = Travail
 InboxTagPersonal = Personnel
@@ -354,7 +354,7 @@ InboxMoveUp = Monter
 InboxMoveDown = Descendre
 InboxNewTag = Nouvelle étiquette
 InboxAddTag = Ajouter
-InboxTagsKeysHelp = Les touches 1 à 9 posent les neuf premières étiquettes actives, 0 les retire toutes (comme Thunderbird). Glissez les lignes, ou utilisez les flèches, pour changer l'ordre.
+InboxTagsKeysHelp = Les touches 1 à 9 posent les neuf premières étiquettes actives, 0 les retire toutes. Glissez les lignes, ou utilisez les flèches, pour changer l'ordre.
 InboxDeleteTagTitle = Supprimer l'étiquette %s ?
 InboxDeleteTagText = Les mails gardent leur mot-clé sur le serveur ; inbox l'affichera comme une étiquette inconnue.
 InboxImportIntro = Copiez dans inbox les boîtes déclarées par un autre module. Elles sont créées en brouillon, testées aussitôt, sans aucun accès : rien n'est ouvert automatiquement.
@@ -397,7 +397,7 @@ Inbox_read_mode_delay = Après quelques secondes
 Inbox_read_mode_manual = Seulement à la main (touche M)
 InboxSectionDisplay = Affichage
 InboxView = Liste des mails
-InboxViewHelp = La même pour tous les dossiers et toutes les boîtes, comme Thunderbird.
+InboxViewHelp = La même pour tous les dossiers et toutes les boîtes.
 Inbox_view_cards = Cartes
 Inbox_view_table = Tableau
 InboxTheme = Thème
@@ -429,7 +429,7 @@ InboxMasterSeparatorHelp = Caractère entre la boîte et le compte maître dans 
 InboxSetupAppHelp = Les réglages du webmail (boîtes, accès, étiquettes, valeurs par défaut) sont dans l'application inbox.
 InboxOpenSettings = Ouvrir les réglages de l'application
 InboxReadLog = Journal des lectures
-InboxReadLogHelp = Lectures d'un mail par son Message-ID demandées par d'autres modules (par exemple pour préremplir un devis), gardées %s jours. La lecture dans le webmail n'est pas journalisée (comme Thunderbird).
+InboxReadLogHelp = Lectures d'un mail par son Message-ID demandées par d'autres modules (par exemple pour préremplir un devis), gardées %s jours. La lecture dans le webmail n'est pas journalisée.
 InboxOrigin = Demandé par
 InboxResult = Résultat
 InboxFolder = Dossier

@@ -74,7 +74,7 @@ InboxInline = en el cuerpo
 InboxFromEmbeddedMail = de un correo adjunto
 InboxBodyText = Texto
 
-# Tags (default list of Thunderbird, installed once)
+# Tags (default list, installed once)
 InboxTagImportant = Importante
 InboxTagWork = Trabajo
 InboxTagPersonal = Personal
@@ -354,7 +354,7 @@ InboxMoveUp = Subir
 InboxMoveDown = Bajar
 InboxNewTag = Nueva etiqueta
 InboxAddTag = Añadir
-InboxTagsKeysHelp = Las teclas 1 a 9 ponen las nueve primeras etiquetas activas, 0 las quita todas (como Thunderbird). Arrastre las líneas, o use las flechas, para cambiar el orden.
+InboxTagsKeysHelp = Las teclas 1 a 9 ponen las nueve primeras etiquetas activas, 0 las quita todas. Arrastre las líneas, o use las flechas, para cambiar el orden.
 InboxDeleteTagTitle = ¿Eliminar la etiqueta %s?
 InboxDeleteTagText = Los correos conservan su palabra clave en el servidor; inbox la mostrará como una etiqueta desconocida.
 InboxImportIntro = Copie en inbox los buzones declarados por otro módulo. Se crean como borrador, se prueban enseguida, sin ningún acceso: nada se abre automáticamente.
@@ -397,7 +397,7 @@ Inbox_read_mode_delay = Tras unos segundos
 Inbox_read_mode_manual = Solo a mano (tecla M)
 InboxSectionDisplay = Visualización
 InboxView = Lista de los correos
-InboxViewHelp = La misma para todas las carpetas y todos los buzones, como Thunderbird.
+InboxViewHelp = La misma para todas las carpetas y todos los buzones.
 Inbox_view_cards = Tarjetas
 Inbox_view_table = Tabla
 InboxTheme = Tema
@@ -429,7 +429,7 @@ InboxMasterSeparatorHelp = Carácter entre el buzón y el usuario maestro en el 
 InboxSetupAppHelp = Los ajustes del webmail (buzones, accesos, etiquetas, valores por defecto) están en la aplicación inbox.
 InboxOpenSettings = Abrir los ajustes de la aplicación
 InboxReadLog = Registro de lecturas
-InboxReadLogHelp = Lecturas de un correo por su Message-ID pedidas por otros módulos (por ejemplo para rellenar un presupuesto), conservadas %s días. La lectura en el webmail no se registra (como Thunderbird).
+InboxReadLogHelp = Lecturas de un correo por su Message-ID pedidas por otros módulos (por ejemplo para rellenar un presupuesto), conservadas %s días. La lectura en el webmail no se registra.
 InboxOrigin = Pedido por
 InboxResult = Resultado
 InboxFolder = Carpeta

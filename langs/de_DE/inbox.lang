@@ -74,7 +74,7 @@ InboxInline = im Text
 InboxFromEmbeddedMail = aus einer angehängten E-Mail
 InboxBodyText = Text
 
-# Tags (default list of Thunderbird, installed once)
+# Tags (default list, installed once)
 InboxTagImportant = Wichtig
 InboxTagWork = Arbeit
 InboxTagPersonal = Persönlich
@@ -354,7 +354,7 @@ InboxMoveUp = Nach oben
 InboxMoveDown = Nach unten
 InboxNewTag = Neues Schlagwort
 InboxAddTag = Hinzufügen
-InboxTagsKeysHelp = Die Tasten 1 bis 9 setzen die ersten neun aktiven Schlagwörter, 0 entfernt alle (wie Thunderbird). Ziehen Sie die Zeilen oder nutzen Sie die Pfeile, um die Reihenfolge zu ändern.
+InboxTagsKeysHelp = Die Tasten 1 bis 9 setzen die ersten neun aktiven Schlagwörter, 0 entfernt alle. Ziehen Sie die Zeilen oder nutzen Sie die Pfeile, um die Reihenfolge zu ändern.
 InboxDeleteTagTitle = Schlagwort %s löschen?
 InboxDeleteTagText = Die E-Mails behalten ihr Schlüsselwort auf dem Server; inbox zeigt es als unbekanntes Schlagwort.
 InboxImportIntro = Kopieren Sie die von einem anderen Modul angegebenen Postfächer in inbox. Sie werden als Entwurf angelegt, sofort getestet, ohne jeden Zugriff: nichts wird automatisch geöffnet.
@@ -397,7 +397,7 @@ Inbox_read_mode_delay = Nach einigen Sekunden
 Inbox_read_mode_manual = Nur von Hand (Taste M)
 InboxSectionDisplay = Anzeige
 InboxView = Liste der E-Mails
-InboxViewHelp = Dieselbe für alle Ordner und alle Postfächer, wie Thunderbird.
+InboxViewHelp = Dieselbe für alle Ordner und alle Postfächer.
 Inbox_view_cards = Karten
 Inbox_view_table = Tabelle
 InboxTheme = Design
@@ -429,7 +429,7 @@ InboxMasterSeparatorHelp = Zeichen zwischen Postfach und Master-Benutzer im Benu
 InboxSetupAppHelp = Die Einstellungen des Webmails (Postfächer, Zugriffe, Schlagwörter, Standardwerte) sind in der inbox-Anwendung.
 InboxOpenSettings = Einstellungen der Anwendung öffnen
 InboxReadLog = Leseprotokoll
-InboxReadLogHelp = Lesevorgänge einer E-Mail anhand ihrer Message-ID, die von anderen Modulen angefragt wurden (z. B. um ein Angebot vorauszufüllen), %s Tage aufbewahrt. Das Lesen im Webmail wird nicht protokolliert (wie Thunderbird).
+InboxReadLogHelp = Lesevorgänge einer E-Mail anhand ihrer Message-ID, die von anderen Modulen angefragt wurden (z. B. um ein Angebot vorauszufüllen), %s Tage aufbewahrt. Das Lesen im Webmail wird nicht protokolliert.
 InboxOrigin = Angefragt von
 InboxResult = Ergebnis
 InboxFolder = Ordner
