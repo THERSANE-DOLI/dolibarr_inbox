@@ -764,3 +764,5 @@ InboxJournal_tag = Étiquettes
 InboxJournalKeep = Conservation du journal des actions
 InboxJournalKeepHelp = Les lignes plus anciennes sont effacées par la tâche planifiée de nettoyage. 0 = gardées sans limite.
 InboxMonths = mois
+InboxSwipeSeen = Lu
+InboxSwipeUnseen = Non lu

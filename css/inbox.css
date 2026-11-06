@@ -477,9 +477,11 @@ html.ibx-html, html.ibx-html body { height: 100%; margin: 0; background: var(--i
 .ibx-viewer__img { width: 80%; aspect-ratio: 4 / 3; border-radius: var(--ibx-radius); background: linear-gradient(135deg, #8fb9a8, #3d6f73 60%, #23434a); }
 
 /* ===== 13. Toast, menu ===== */
-.ibx-toasts { position: fixed; left: 50%; bottom: var(--ibx-s5); transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; gap: var(--ibx-s2); align-items: center; }
+/* Centred over the whole width (a left: 50% box was limited to half the screen, the texts wrapped on 3 lines) */
+.ibx-toasts { position: fixed; left: var(--ibx-s4); right: var(--ibx-s4); bottom: var(--ibx-s5); z-index: 80; display: flex; flex-direction: column; gap: var(--ibx-s2); align-items: center; pointer-events: none; }
 .ibx-toast {
 	display: flex; align-items: center; gap: var(--ibx-s3); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s4);
+	width: max-content; max-width: min(36rem, 100%); pointer-events: auto;
 	color: var(--ibx-bg); background: var(--ibx-text); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float);
 	animation: ibx-in var(--ibx-dur) ease-out;
 }
@@ -866,11 +868,22 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-mailcard { touch-action: pan-y; }
 .ibx-mailcard.is-swiping { transition: none; z-index: 1; box-shadow: var(--ibx-shadow-float); }
 .ibx-mailcard:not(.is-swiping) { transition: transform var(--ibx-dur) ease-out; }
-.ibx-mailcard[data-swipe]::after { content: var(--ibx-swipe-label); position: absolute; top: 50%; transform: translateY(-50%); font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text-muted); }
-.ibx-mailcard[data-swipe="left"]::after { left: 100%; margin-left: var(--ibx-s3); }
-.ibx-mailcard[data-swipe="right"]::after { right: 100%; margin-right: var(--ibx-s3); }
-.ibx-mailcard.is-swipe-armed { border-color: var(--ibx-accent); }
-.ibx-mailcard.is-swipe-armed::after { color: var(--ibx-accent); }
+/* The action under the card: grey, big icon and word on the side the card uncovers; accent once the gesture is far
+   enough to run it on release (danger for delete) */
+.ibx-maillist { position: relative; }
+.ibx-mailcard.is-swiping { position: relative; z-index: 1; }
+.ibx-swipebg {
+	position: absolute; z-index: 0; display: flex; align-items: center; gap: var(--ibx-s2); padding: 0 var(--ibx-s4);
+	background: var(--ibx-bg-sunken); color: var(--ibx-text-muted); border-radius: var(--ibx-radius); pointer-events: none;
+	font-size: var(--ibx-fs-md); font-weight: 600; white-space: nowrap; transition: background var(--ibx-dur), color var(--ibx-dur);
+}
+.ibx-swipebg[data-side="right"] { justify-content: flex-start; }
+.ibx-swipebg[data-side="left"] { justify-content: flex-start; flex-direction: row-reverse; }
+.ibx-swipebg .ibx-swipebg__icon { width: 1.5rem; height: 1.5rem; stroke-width: 1.75; transition: transform var(--ibx-dur); }
+.ibx-swipebg.is-armed { background: var(--ibx-accent); color: var(--ibx-on-accent); }
+.ibx-swipebg.is-armed[data-act="delete"] { background: var(--ibx-danger); color: #ffffff; }
+.ibx-swipebg.is-armed .ibx-swipebg__icon { transform: scale(1.2); }
+@media (prefers-reduced-motion: reduce) { .ibx-swipebg, .ibx-swipebg .ibx-swipebg__icon { transition: none; } }
 
 /* Journal of the actions (card of the mailbox) */
 .ibx-journal__filters { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); align-items: center; margin-bottom: var(--ibx-s3); }
@@ -962,3 +975,6 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-pane--read .ibx-reading:not(.ibx-convo) { flex: 1; min-height: 0; }
 .ibx-reading:not(.ibx-convo) > .ibx-readhead, .ibx-reading:not(.ibx-convo) > .ibx-attbar { position: static; flex: none; }
 .ibx-reading:not(.ibx-convo) > .ibx-readbody { flex: 1; min-height: 0; overflow: auto; }
+.ibx-toast > span { flex: 1; min-width: 0; }
+.ibx-toast > .ibx-btn { flex: none; white-space: nowrap; }
+/* Label of the gesture beside the card: on one line (beside the card its available width is 0, it wrapped at each word) */

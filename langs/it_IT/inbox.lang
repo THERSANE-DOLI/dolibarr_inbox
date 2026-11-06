@@ -764,3 +764,5 @@ InboxJournal_tag = Etichette
 InboxJournalKeep = Conservazione del registro delle azioni
 InboxJournalKeepHelp = Le righe più vecchie sono cancellate dal job pianificato di pulizia. 0 = conservate senza limite.
 InboxMonths = mesi
+InboxSwipeSeen = Letto
+InboxSwipeUnseen = Non letto

@@ -199,6 +199,11 @@
 			el.dataset.toastKey = o.key;
 		}
 		box.appendChild(el);
+		// The last two only: older ones are not worth stacking (their « Undo » stays in the journal)
+		while (box.children.length > 2) {
+			clearTimeout(box.firstElementChild._ibxTimer);
+			box.firstElementChild.remove();
+		}
 		el._ibxTimer = setTimeout(() => el.remove(), o.duration || (o.action ? 8000 : 4000));
 		return el;
 	}

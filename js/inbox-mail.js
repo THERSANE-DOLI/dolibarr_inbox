@@ -2074,7 +2074,7 @@
 
 	// ---------- Gestures of the phone: a card slid left or right ----------
 	const SWIPES = { archive: ['archive', 'InboxArchive'], delete: ['delete', 'InboxDelete'], read: ['mark-read', 'InboxKeyRead'], flag: ['star', 'InboxFlag'],
-		tag: ['tag', 'InboxTagMenu'], move: ['folder-move', 'InboxMoveToMenu'] };
+		tag: ['tag', 'InboxTagMenu'], move: ['folder-move', 'InboxMove'] };
 	function swipeAction(side) {
 		const v = params[side === 'left' ? 'swipe_left' : 'swipe_right'];
 		const def = side === 'left' ? 'archive' : 'read';
@@ -2088,10 +2088,11 @@
 			doDelete(ids, { stay: true });
 		} else if (act === 'read') {
 			const r = rowOf(id);
-			runAction('seen', ids, { on: r && seenOf(r) ? 0 : 1 });
+			// Undone by the same gesture or the key M: no toast (archive and the other moves keep « Undo »)
+			runAction('seen', ids, { on: r && seenOf(r) ? 0 : 1 }, { quiet: true });
 		} else if (act === 'flag') {
 			const r = rowOf(id);
-			runAction('flag', ids, { on: r && r.flagged ? 0 : 1 });
+			runAction('flag', ids, { on: r && r.flagged ? 0 : 1 }, { quiet: true });
 		} else if (act === 'tag') {
 			tagMenu(card, ids);
 		} else if (act === 'move') {
@@ -2134,25 +2135,52 @@
 				g.card.classList.add('is-swiping');
 			}
 			g.dx = dx;
-			const act = swipeAction(dx < 0 ? 'left' : 'right');
+			const side = dx < 0 ? 'left' : 'right';
+			const act = swipeAction(side);
 			const s = SWIPES[act] || ['', ''];
-			g.card.style.transform = 'translateX(' + dx + 'px)';
-			g.card.dataset.swipe = dx < 0 ? 'left' : 'right';
-			g.card.style.setProperty('--ibx-swipe-label', '"' + t(s[1]).replace(/"/g, '') + '"');
-			g.card.classList.toggle('is-swipe-armed', Math.abs(dx) > 80);
+			// Read / unread: the state the mail will get (a short word, the card covers a long one)
+			let label = t(s[1]);
+			let icon = s[0];
+			if (act === 'read') {
+				const r = rowOf(+g.card.dataset.mail);
+				const seen = r && seenOf(r);
+				label = t(seen ? 'InboxSwipeUnseen' : 'InboxSwipeSeen');
+				icon = seen ? 'unread' : 'mark-read';
+			}
+			// The action under the card (the card slides over it): big icon and word on the side it uncovers
+			if (!g.bg) {
+				g.bg = document.createElement('div');
+				g.bg.className = 'ibx-swipebg';
+				g.bg.setAttribute('aria-hidden', 'true');
+				g.card.parentElement.insertBefore(g.bg, g.card);
+			}
+			const c = g.card;
+			Object.assign(g.bg.style, { top: c.offsetTop + 'px', left: c.offsetLeft + 'px', width: c.offsetWidth + 'px', height: c.offsetHeight + 'px' });
+			const key = side + ':' + act + ':' + label;
+			if (g.bg.dataset.key !== key) {
+				g.bg.dataset.key = key;
+				g.bg.dataset.side = side;
+				g.bg.dataset.act = act;
+				g.bg.innerHTML = ic(icon, 'ibx-swipebg__icon') + '<span class="ibx-swipebg__label">' + esc(label) + '</span>';
+			}
+			g.bg.classList.toggle('is-armed', Math.abs(dx) > 80);
+			c.style.transform = 'translateX(' + dx + 'px)';
 		}, { passive: true });
 		const end = () => {
 			if (!g) {
 				return;
 			}
-			const { card, dx, on } = g;
+			const { card, dx, on, bg } = g;
 			g = null;
 			if (!on) {
 				return;
 			}
-			card.classList.remove('is-swiping', 'is-swipe-armed');
+			card.classList.remove('is-swiping');
 			card.style.transform = '';
-			delete card.dataset.swipe;
+			// The background goes once the card is back over it
+			if (bg) {
+				setTimeout(() => bg.remove(), 220);
+			}
 			// The click that may follow the gesture does not open the mail
 			S.swipedAt = Date.now();
 			if (Math.abs(dx) > 80) {
@@ -2162,8 +2190,12 @@
 		list.addEventListener('pointerup', end);
 		list.addEventListener('pointercancel', () => {
 			if (g && g.card) {
-				g.card.classList.remove('is-swiping', 'is-swipe-armed');
+				g.card.classList.remove('is-swiping');
 				g.card.style.transform = '';
+				if (g.bg) {
+					const bg = g.bg;
+					setTimeout(() => bg.remove(), 220);
+				}
 			}
 			g = null;
 		});

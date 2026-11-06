@@ -764,3 +764,5 @@ InboxJournal_tag = Tags
 InboxJournalKeep = Retention of the journal of the actions
 InboxJournalKeepHelp = Older lines are erased by the scheduled cleaning job. 0 = kept without limit.
 InboxMonths = months
+InboxSwipeSeen = Read
+InboxSwipeUnseen = Unread

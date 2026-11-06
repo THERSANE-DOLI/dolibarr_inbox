@@ -764,3 +764,5 @@ InboxJournal_tag = Schlagwörter
 InboxJournalKeep = Aufbewahrung des Aktionsprotokolls
 InboxJournalKeepHelp = Ältere Zeilen werden vom geplanten Bereinigungsauftrag gelöscht. 0 = ohne Grenze behalten.
 InboxMonths = Monate
+InboxSwipeSeen = Gelesen
+InboxSwipeUnseen = Ungelesen
