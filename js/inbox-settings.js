@@ -1016,10 +1016,19 @@
 				+ '<td class="ibx-table__actions">' + (editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="1" title="' + th('InboxMoveDown') + '" aria-label="' + th('InboxMoveDown') + '"' + (n === data.tags.length - 1 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-down') + '</button>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-deltag="1" title="' + th('InboxDelete') + '" aria-label="' + th('InboxDelete') + '">' + ic('delete') + '</button>' : '') + '</td></tr>').join('')
-			+ '</tbody></table>';
+			+ '</tbody>';
+		// New tag: a last row, each field under its column (a form cannot wrap a row: the fields join it by form="")
+		const formId = 'ibx-addtag-' + (account ? account.id : 0);
 		if (editable) {
-			html += '<form class="ibx-inline ibx-js-addtag" style="margin-top:1rem"><input class="ibx-field ibx-field--medium" name="label" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"><input type="color" class="ibx-color" name="color" value="#0072b2" aria-label="' + th('InboxTagColor') + '">'
-				+ borderSelect('none', 'name="border"') + '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></form>';
+			html += '<tfoot><tr class="ibx-tagadd"><td></td><td></td>'
+				+ '<td><input class="ibx-field" name="label" form="' + formId + '" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"></td>'
+				+ '<td><input type="color" class="ibx-color" name="color" form="' + formId + '" value="#0072b2" aria-label="' + th('InboxTagColor') + '"></td>'
+				+ '<td>' + borderSelect('none', 'name="border" form="' + formId + '"') + '</td><td></td>'
+				+ '<td class="ibx-table__actions"><button type="submit" form="' + formId + '" class="ibx-btn ibx-btn--primary ibx-btn--sm">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></td></tr></tfoot>';
+		}
+		html += '</table>';
+		if (editable) {
+			html += '<form class="ibx-js-addtag" id="' + formId + '"></form>';
 			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + '</p>';
 		}
 		html += '<div class="ibx-js-cvd" aria-live="polite"></div>';
@@ -1163,11 +1172,11 @@
 			add.addEventListener('submit', async e => {
 				e.preventDefault();
 				try {
-					await post('tag', 'create', Object.assign({ label: add.label.value, color: add.color.value, border: add.border.value }, params));
+					await post('tag', 'create', Object.assign({ label: add.elements.label.value, color: add.elements.color.value, border: add.elements.border.value }, params));
 					reload();
 				} catch (err) {
 					toast(err.message, { error: true });
-					add.label.focus();
+					add.elements.label.focus();
 				}
 			});
 		}

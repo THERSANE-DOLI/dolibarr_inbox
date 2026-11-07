@@ -1015,3 +1015,6 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-palette__swatches { display: flex; gap: 3px; }
 .ibx-palette__swatches span { width: 1.125rem; height: 1.125rem; border-radius: 2px; }
 .ibx-palette__tags { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); }
+/* Row of a new tag, under the list: each field under its column */
+.ibx-tagadd td { border-bottom: 0; padding-top: var(--ibx-s3); }
+.ibx-tagadd .ibx-table__actions { white-space: nowrap; }
