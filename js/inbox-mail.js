@@ -4881,6 +4881,7 @@
 			renderTree();
 		}
 		S.folderRole = entry.folder.role;
+		Dolibarr.executeHook('inbox:folder:open', { role: entry.folder.role, account: entry.account.id, el: S.el });
 		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
 		let unfolded = S.collapsed.delete('a' + entry.account.id);
 		for (let p = entry.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
@@ -5462,6 +5463,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-clearfilters" hidden>' + th('InboxClearFilter') + '</button></div>'
 			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm">' + th('InboxSyncResume') + '</button></div>'
+			+ '<div class="ibx-banner ibx-banner--info ibx-js-outboxbar" role="status" hidden></div>'
 			+ '<button type="button" class="ibx-newpill ibx-js-newpill" hidden></button>'
 			+ '<div class="ibx-bulkbar ibx-js-bulkbar" role="toolbar" aria-label="' + th('InboxBulkActions') + '" hidden></div>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'

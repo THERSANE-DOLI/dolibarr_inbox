@@ -39,9 +39,9 @@ function inboxComposeFail(InboxComposer $composer)
 	global $langs;
 
 	$code = (string) $composer->errorCode;
-	$http = array('not_found' => 404, 'no_send' => 403, 'bad_mode' => 400, 'bad_address' => 422, 'no_recipient' => 422, 'too_big' => 413,
+	$http = array('already_sent' => 409, 'bad_date' => 422, 'not_found' => 404, 'no_send' => 403, 'bad_mode' => 400, 'bad_address' => 422, 'no_recipient' => 422, 'too_big' => 413,
 		'infected' => 422, 'mails_disabled' => 409, 'no_drafts' => 409);
-	$keys = array('not_found' => 'InboxComposeGone', 'no_send' => 'InboxErrorNeedSend', 'bad_address' => 'InboxComposeBadAddress',
+	$keys = array('already_sent' => 'InboxOutboxAlreadySent', 'bad_date' => 'InboxComposeBadDate', 'interrupted' => 'InboxOutboxInterrupted', 'not_found' => 'InboxComposeGone', 'no_send' => 'InboxErrorNeedSend', 'bad_address' => 'InboxComposeBadAddress',
 		'no_recipient' => 'InboxComposeNoRecipient', 'too_big' => 'InboxComposeTooBig', 'infected' => 'InboxComposeInfected',
 		'mails_disabled' => 'InboxComposeMailsDisabled', 'no_drafts' => 'InboxComposeNoDrafts', 'smtp_no_server' => 'InboxComposeSmtpNoServer',
 		'smtp_auth' => 'InboxComposeSmtpAuth', 'smtp_recipient' => 'InboxComposeSmtpRecipient', 'smtp_too_big' => 'InboxComposeTooBig',
@@ -114,8 +114,35 @@ switch ($action) {
 		inboxAjaxReply($res);
 		break;
 	case 'send':
-		$res = $composer->send($user, $token, inboxComposeTyped());
+		// at: date of a sending scheduled; record: pieces (« type:id ») to record the sending on
+		$record = inboxAjaxParam('record', 'none');
+		$res = $composer->send($user, $token, inboxComposeTyped(), array('at' => (int) inboxAjaxParam('at', 'int'), 'record' => is_array($record) ? array_map('strval', $record) : array()));
 		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
+	case 'dispatch':
+	case 'cancel':
+	case 'record':
+	case 'outbox':
+		// Queue of the sending (1.17.0): send now, undo (the writing comes back), record on pieces, my mails waiting
+		dol_include_once('/inbox/class/inboxoutbox.class.php');
+		$outbox = new InboxOutbox($db);
+		$id = (int) inboxAjaxParam('id', 'int');
+		if ($action === 'outbox') {
+			inboxAjaxReply(array('items' => $outbox->listMine($user)));
+		}
+		if ($action === 'record') {
+			$pieces = inboxAjaxParam('pieces', 'none');
+			$res = $outbox->record($user, $id, is_array($pieces) ? array_map('strval', $pieces) : array());
+			$res = $res === null ? null : array('recorded' => $res);
+		} else {
+			$res = $action === 'dispatch' ? $outbox->dispatch($user, $id) : $outbox->cancel($user, $id);
+		}
+		if ($res === null) {
+			$composer->errorCode = $outbox->errorCode;
+			$composer->error = $outbox->error;
 			inboxComposeFail($composer);
 		}
 		inboxAjaxReply($res);

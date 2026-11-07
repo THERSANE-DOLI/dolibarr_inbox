@@ -83,7 +83,7 @@ abstract class InboxTestCase extends TestCase
 		$rows = $db->getRows("SELECT rowid FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid' LIMIT 10000");
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $r->rowid).")");
-			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log') as $t) {
+			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification') as $t) {
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}
@@ -92,6 +92,9 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_notification WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (".$refs.")");
+		// Events recorded on pieces by the sending tests (1.17.0)
+		$db->query("DELETE FROM ".$p."actioncomm_resources WHERE fk_actioncomm IN (SELECT id FROM ".$p."actioncomm WHERE email_msgid LIKE '%@inbox-test.invalid')");
+		$db->query("DELETE FROM ".$p."actioncomm WHERE email_msgid LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_note WHERE fk_mailref IN (".$refs.")");
 		// Mails without Message-ID of the tests: their key is a print, the mailref keeps the sender
 		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");

@@ -1488,6 +1488,7 @@
 			+ tagColorsRow(data, opt)
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-folder_icons">' + th('InboxFolderIcons') + '</label><div>' + opt('folder_icons', ['color', 'plain'], p.folder_icons) + '<div class="ibx-formrow__help">' + th('InboxFolderIconsHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-dolibar_position">' + th('InboxDolibarrPosition') + '</label><div>' + opt('dolibar_position', ['auto', 'right', 'top'], p.dolibar_position) + '<div class="ibx-formrow__help">' + th('InboxDolibarrPositionHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_delay">' + th('InboxSendDelayMine') + '</label><div>' + opt('send_delay', ['-1', '0', '5', '10', '20', '30', '60'], String(p.send_delay)) + '<div class="ibx-formrow__help">' + th('InboxSendDelayMineHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_shortcut">' + th('InboxSendShortcut') + '</label><div>' + opt('send_shortcut', ['ctrl_enter', 'off'], p.send_shortcut) + '<div class="ibx-formrow__help">' + th('InboxSendShortcutHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'

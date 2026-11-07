@@ -45,8 +45,14 @@ class InboxComposeTest extends InboxImapTestCase
 		parent::setUp();
 		$this->disabled = getDolGlobalString('MAIN_DISABLE_ALL_MAILS');
 		$conf->global->MAIN_DISABLE_ALL_MAILS = 0;
+		// Sent at once unless a test asks a delay (1.17.0)
+		$this->delay = getDolGlobalString('INBOX_SEND_DELAY');
+		$conf->global->INBOX_SEND_DELAY = 0;
 		$_SESSION['inbox_compose'] = array();
 	}
+
+	/** @var string|null Delay before the test */
+	protected $delay = null;
 
 	/**
 	 * @return void
@@ -56,6 +62,7 @@ class InboxComposeTest extends InboxImapTestCase
 		global $conf;
 
 		$conf->global->MAIN_DISABLE_ALL_MAILS = $this->disabled;
+		$conf->global->INBOX_SEND_DELAY = $this->delay;
 		// Mails written by the tests (subject ZzCompose) removed from Sent and Drafts
 		try {
 			$p = $this->imap();
@@ -268,6 +275,98 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertNotNull($c->saveDraft($this->admin, $open['token'], array('identity' => $open['identity'], 'to' => 'jean@client.invalid', 'subject' => 'ZzCompose noid', 'html' => '<p>x</p>')), $c->error);
 		$this->assertCount(1, $this->onServerSubject('INBOX.Drafts', 'ZzCompose noid'));
 		$this->assertTrue($c->close($this->admin, $open['token'], true));
+	}
+
+	/**
+	 * Queue (1.17.0): undo gives the writing back, « send now » sends once, the scheduled job sends what is due,
+	 * a failure is told in the bell, the sending recorded on a piece linked to the mail answered
+	 *
+	 * @return void
+	 */
+	public function testQueue()
+	{
+		global $conf;
+
+		$a = $this->ready();
+		if ($this->mailpit('/api/v1/messages', 'DELETE') === null) {
+			$this->markTestSkipped('Mailpit not started (dev/dovecot/run.sh)');
+		}
+		dol_include_once('/inbox/class/inboxoutbox.class.php');
+		dol_include_once('/inbox/class/inboxlink.class.php');
+		dol_include_once('/inbox/class/inboxmailref.class.php');
+		$identity = $this->identity($a);
+		$p = $this->db->prefix();
+		$conf->global->INBOX_SEND_DELAY = 10;
+		$c = new InboxComposer($this->db);
+		$outbox = new InboxOutbox($this->db);
+		$typed = array('identity' => $identity, 'to' => 'jean@client.invalid', 'subject' => 'ZzCompose queue', 'html' => '<p>Bonjour</p>');
+
+		// Delay: queued, nothing left; undo gives the writing back as typed
+		$open = $c->open($this->admin, 'new', 0, (int) $a->id);
+		$q = $c->send($this->admin, $open['token'], $typed);
+		$this->assertNotNull($q, $c->errorCode.' '.$c->error);
+		$this->assertGreaterThan(0, $q['queued']);
+		$this->assertSame(10, $q['delay']);
+		$this->assertSame(0, (int) json_decode((string) $this->mailpit('/api/v1/messages'), true)['total']);
+		$back = $outbox->cancel($this->admin, $q['queued']);
+		$this->assertNotNull($back, $outbox->errorCode);
+		$this->assertSame('ZzCompose queue', $back['subject']);
+		$this->assertSame('jean@client.invalid', $back['to'][0]['email']);
+		$this->assertSame($open['token'], $back['token'], 'the same writing (its attachments) comes back');
+
+		// Send now: once only
+		$q = $c->send($this->admin, $back['token'], $typed);
+		$sent = $outbox->dispatch($this->admin, $q['queued']);
+		$this->assertNotNull($sent, $outbox->errorCode.' '.$outbox->error);
+		$this->assertNull($outbox->dispatch($this->admin, $q['queued']));
+		$this->assertSame('already_sent', $outbox->errorCode);
+		$this->assertNull($outbox->cancel($this->admin, $q['queued']), 'too late to undo');
+		$this->assertSame(1, (int) json_decode((string) $this->mailpit('/api/v1/messages'), true)['total']);
+
+		// Scheduled: not before its date, then by the scheduled job
+		$open = $c->open($this->admin, 'new', 0, (int) $a->id);
+		$q = $c->send($this->admin, $open['token'], array_merge($typed, array('subject' => 'ZzCompose scheduled')), array('at' => dol_now() + 3600));
+		$this->assertSame(1, $q['scheduled']);
+		$outbox->cronRun();
+		$this->assertSame(0, (int) $this->db->getRow("SELECT status FROM ".$p."inbox_outbox WHERE rowid = ".((int) $q['queued']))->status);
+		$this->db->query("UPDATE ".$p."inbox_outbox SET date_send = '".$this->db->idate(dol_now() - 1)."' WHERE rowid = ".((int) $q['queued']));
+		$outbox->cronRun();
+		$this->assertSame(InboxOutbox::SENT, (int) $this->db->getRow("SELECT status FROM ".$p."inbox_outbox WHERE rowid = ".((int) $q['queued']))->status);
+		$this->assertCount(1, $this->onServerSubject('INBOX.Sent', 'ZzCompose scheduled'));
+		$this->assertNull($c->send($this->admin, $c->open($this->admin, 'new', 0, (int) $a->id)['token'], $typed, array('at' => dol_now() + 10)), 'a date too close');
+		$this->assertSame('bad_date', $c->errorCode);
+
+		// Failure: told in the bell, kept to be taken back
+		$open = $c->open($this->admin, 'new', 0, (int) $a->id);
+		$q = $c->send($this->admin, $open['token'], array_merge($typed, array('subject' => 'ZzCompose failed')));
+		$this->db->query("UPDATE ".$p."inbox_account SET smtp_port = 1 WHERE rowid = ".((int) $a->id));
+		$this->db->query("UPDATE ".$p."inbox_outbox SET date_send = '".$this->db->idate(dol_now() - 1)."' WHERE rowid = ".((int) $q['queued']));
+		$outbox->cronRun();
+		$row = $this->db->getRow("SELECT status, error FROM ".$p."inbox_outbox WHERE rowid = ".((int) $q['queued']));
+		$this->assertSame(InboxOutbox::FAILED, (int) $row->status, (string) $row->error);
+		$this->assertTrue(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_notification WHERE type = 'send_failed' AND fk_user = ".((int) $this->admin->id))));
+		$this->assertSame('ZzCompose failed', $outbox->listMine($this->admin)[0]['subject']);
+		$this->assertNotNull($outbox->cancel($this->admin, $q['queued']), 'a failed mail is taken back');
+		$this->db->query("UPDATE ".$p."inbox_account SET smtp_port = ".self::SMTP_PORT." WHERE rowid = ".((int) $a->id));
+
+		// Record on a piece linked to the mail answered: event of the agenda, mail sent linked to the piece
+		$conf->global->INBOX_SEND_DELAY = 0;
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_record', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$socid = (int) $this->db->last_insert_id($p.'societe');
+		$refs = new InboxMailRef($this->db);
+		$links = new InboxLink($this->db);
+		$links->link($refs->fetchOrCreateByMessageId('m2'.self::MARK), 'societe', $socid, $this->admin);
+		$m2 = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE message_id = 'm2".self::MARK."'");
+		$open = $c->open($this->admin, 'reply', (int) $m2->rowid);
+		$this->assertSame('societe:'.$socid, $open['pieces'][0]['type'].':'.$open['pieces'][0]['id'], 'the piece linked is offered');
+		$sent = $c->send($this->admin, $open['token'], array('identity' => $identity, 'to' => $open['to'], 'subject' => 'ZzCompose record', 'html' => '<p>Merci</p>'), array('record' => array('societe:'.$socid, 'societe:999999')));
+		$this->assertNotNull($sent, $c->errorCode.' '.$c->error);
+		$this->assertSame(array('societe:'.$socid), $sent['recorded'], 'only a piece offered');
+		$event = $this->db->getRow("SELECT fk_soc, code FROM ".$p."actioncomm WHERE email_msgid = '".$this->db->escape($sent['message_id'])."'");
+		$this->assertSame($socid, (int) $event->fk_soc);
+		$sentRef = $refs->fetchOrCreateByMessageId($sent['message_id']);
+		$this->assertCount(1, $links->listFor(array($sentRef)), 'the mail sent is linked to the piece');
+		$this->db->query("DELETE FROM ".$p."inbox_link WHERE element_type = 'societe' AND fk_element = ".$socid);
 	}
 
 	/**

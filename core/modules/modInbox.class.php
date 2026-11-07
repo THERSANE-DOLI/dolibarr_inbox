@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.16.1';
+		$this->version = '1.17.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
@@ -127,6 +127,23 @@ class modInbox extends DolibarrModules
 			'status' => 1,
 			'test' => 'isModEnabled("inbox")',
 			'priority' => 40,
+		);
+
+		// Queue of the sending (lot W6 1.17.0): mails due after their delay or at their date, every minute (the page
+		// sends them itself when it is open)
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronOutbox',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxoutbox.class.php',
+			'objectname' => 'InboxOutbox',
+			'method' => 'cronRun',
+			'parameters' => '',
+			'comment' => 'InboxCronOutboxComment',
+			'frequency' => 1,
+			'unitfrequency' => 60,
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 30,
 		);
 
 		$this->rights = array();

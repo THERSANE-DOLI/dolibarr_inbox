@@ -107,6 +107,9 @@
 		if (n.type === 'assign') {
 			return t('InboxNotifAssign', who);
 		}
+		if (n.type === 'send_failed') {
+			return t('InboxNotifSendFailed');
+		}
 		return n.text || n.type;
 	}
 
@@ -290,6 +293,9 @@
 			if (I.route().space !== 'mail') {
 				I.go('#/mail');
 			}
+		} else if (res.url && res.url.indexOf('#/outbox') === 0 && I.outboxDialog) {
+			// A sending failed: the list of the mails waiting, to take it back
+			I.outboxDialog();
 		} else if (res.url) {
 			I.go(res.url);
 		}

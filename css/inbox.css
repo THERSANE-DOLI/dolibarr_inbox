@@ -1518,3 +1518,25 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 	.ibx-borderbox__side--t, .ibx-borderbox__side--b { left: 1.375rem; right: 1.375rem; height: 1.375rem; }
 	.ibx-borderbox__side--l, .ibx-borderbox__side--r { top: 1.375rem; bottom: 1.375rem; width: 1.375rem; }
 }
+
+/* Queue of the sending (1.17.0): send split (now | later), bars of the sending, record on a piece, warnings */
+.ibx-sendsplit { display: inline-flex; }
+.ibx-sendsplit .ibx-js-send { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ibx-sendsplit__arrow { width: 1.75rem; padding: 0; border-left: 1px solid color-mix(in srgb, var(--ibx-on-accent) 35%, transparent); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ibx-sendbars { position: fixed; left: 50%; bottom: var(--ibx-s5); z-index: 85; display: flex; flex-direction: column; gap: var(--ibx-s2); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 2rem); }
+.ibx-sendbar {
+	display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); color: var(--ibx-bg); background: var(--ibx-text);
+	border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); animation: ibx-in var(--ibx-dur) ease-out;
+}
+.ibx-sendbar__text { font-weight: 600; white-space: nowrap; }
+.ibx-sendbar__subject { max-width: 16rem; opacity: 0.8; }
+.ibx-sendbar .ibx-btn { --_bg: transparent; --_fg: var(--ibx-bg); --_bd: color-mix(in srgb, var(--ibx-bg) 40%, transparent); --_bg-h: color-mix(in srgb, var(--ibx-bg) 15%, transparent); }
+.ibx-sendbar .ibx-btn--primary { --_bg: var(--ibx-bg); --_fg: var(--ibx-text); --_bd: var(--ibx-bg); --_bg-h: var(--ibx-bg); }
+.ibx-compose__record { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s3); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-sm); }
+.ibx-compose__warn { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-warning, #b26a00); background: var(--ibx-warning-soft); }
+@media (max-width: 39.9375rem) {
+	.ibx-sendbars { left: var(--ibx-s3); right: var(--ibx-s3); transform: none; width: auto; }
+	.ibx-sendbar { flex-wrap: wrap; }
+	.ibx-sendbar__subject { display: none; }
+}
+.ibx-text-danger { color: var(--ibx-danger); font-weight: 600; }

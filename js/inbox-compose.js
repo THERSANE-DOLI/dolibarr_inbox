@@ -444,7 +444,8 @@
 		toast(t('InboxComposeDiscarded'));
 	}
 
-	async function send(w) {
+	async function send(w, opts) {
+		opts = opts || {};
 		if (w.sending) {
 			return;
 		}
@@ -471,6 +472,11 @@
 				return;
 			}
 		}
+		if (!await guards(w, d)) {
+			return;
+		}
+		d.at = opts.at || 0;
+		d.record = $$('.ibx-js-record:checked', w.dlg).map(c => c.value);
 		const ctx = { writing: { mode: w.mode, source: w.source }, data: d, cancel: false, reason: '' };
 		try {
 			if (Dolibarr.executeHookAwait) {
@@ -496,8 +502,12 @@
 			const res = await post('compose', 'send', ctx.data);
 			w.closed = true;
 			finish(w);
-			toast(res.sent_copy ? t('InboxComposeSent') : t('InboxComposeSentNoCopy'), res.sent_copy ? {} : { error: true, duration: 10000 });
-			Dolibarr.executeHook('inbox:compose:sent', { message_id: res.message_id, account: res.account, mode: w.mode, source: w.source });
+			if (res.queued) {
+				sendBar(res);
+			} else {
+				sentDone(res);
+				Dolibarr.executeHook('inbox:compose:sent', { message_id: res.message_id, account: res.account, mode: w.mode, source: w.source });
+			}
 		} catch (err) {
 			w.sending = false;
 			btn.removeAttribute('aria-disabled');
@@ -512,6 +522,341 @@
 			}
 		}
 	}
+
+	// ---------- Before the sending: the usual slips (lot W6 1.17.0, B16, B17, B18) ----------
+	/** An answer from another mailbox than the one that got the mail: said in the window, never blocking */
+	function paintBoxWarning(w) {
+		const box = $('.ibx-js-boxwarn', w.dlg);
+		const src = w.data.source;
+		const id = identityOf(w);
+		const other = src && src.account && id && id.account !== src.account && src.mailbox;
+		box.hidden = !other;
+		if (other) {
+			box.innerHTML = ic('warning') + '<span>' + esc(t('InboxComposeOtherMailbox', id.mailbox, src.mailbox)) + '</span>';
+		}
+	}
+	/** Attachment announced but none attached; many recipients that see each other. True: send. */
+	async function guards(w, d) {
+		const words = String(t('InboxAttachWords')).toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+		const text = (w.sourceMode ? ($('.ibx-compose__source', w.dlg).value || '').replace(/<[^>]+>/g, ' ') : (w.editor.getText ? w.editor.getText() : '')).toLowerCase();
+		if (!w.attachments.length && words.some(x => text.includes(x))) {
+			const ok = await confirmDialog({ title: t('InboxGuardAttachTitle'), text: t('InboxGuardAttachText'), confirm: t('InboxComposeSendAnyway') });
+			if (!ok) {
+				$('.ibx-js-file', w.dlg).closest('label').focus();
+				return false;
+			}
+		}
+		const visible = d.to.length + d.cc.length;
+		if (visible > 10) {
+			const choice = await new Promise(resolve => {
+				let done = false;
+				const dlg = dialog({
+					title: t('InboxGuardManyTitle', visible),
+					body: '<p>' + esc(t('InboxGuardManyText', visible)) + '</p>',
+					actions: [
+						{ label: t('InboxGuardManyBcc'), run: () => {
+							done = true;
+							resolve('bcc');
+						} },
+						{ label: t('InboxComposeSendAnyway'), primary: true, run: () => {
+							done = true;
+							resolve('send');
+						} },
+					],
+				});
+				dlg.addEventListener('close', () => {
+					if (!done) {
+						resolve('');
+					}
+				});
+			});
+			if (!choice) {
+				return false;
+			}
+			if (choice === 'bcc') {
+				// Everyone in hidden copy, the mailbox itself as the visible recipient
+				const me = identityOf(w);
+				const all = w.to.clear().concat(w.cc.clear());
+				w.bcc.add(all);
+				w.to.add([{ email: me.email, name: me.name || '' }]);
+				$('[data-kind="bcc"]', w.dlg).hidden = false;
+				$('[data-show="bcc"]', w.dlg).hidden = true;
+				d.to = w.to.get();
+				d.cc = [];
+				d.bcc = w.bcc.get();
+			}
+		}
+		return true;
+	}
+
+	// ---------- Later: tomorrow 8:00, Monday 8:00, a date chosen ----------
+	function laterMenu(w, anchor) {
+		const at = (days, hour) => {
+			const dt = new Date();
+			dt.setDate(dt.getDate() + days);
+			dt.setHours(hour, 0, 0, 0);
+			return dt;
+		};
+		const tomorrow = at(1, 8);
+		const monday = at(((8 - new Date().getDay()) % 7) || 7, 8);
+		const fmt = dt => dt.toLocaleString(I.ctx('MAIN_LANG_DEFAULT', 'en_US').replace('_', '-'), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+		popMenu(anchor, [
+			{ header: t('InboxSendLater') },
+			{ label: t('InboxSendTomorrow', fmt(tomorrow)), icon: 'send-later', run: () => send(w, { at: Math.floor(tomorrow.getTime() / 1000) }) },
+			{ label: t('InboxSendMonday', fmt(monday)), icon: 'send-later', run: () => send(w, { at: Math.floor(monday.getTime() / 1000) }) },
+			{ label: t('InboxSendChoose'), icon: 'agenda', run: () => chooseDate(w) },
+		]);
+	}
+	function chooseDate(w) {
+		const pad = n => String(n).padStart(2, '0');
+		const local = dt => dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) + 'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+		const min = new Date(Date.now() + 5 * 60000);
+		const start = new Date(Date.now() + 3600000);
+		start.setMinutes(0, 0, 0);
+		dialog({
+			title: t('InboxSendChoose'),
+			body: '<label class="ibx-formrow__label" for="ibx-send-at">' + th('InboxSendAt') + '</label><input type="datetime-local" class="ibx-field" id="ibx-send-at" min="' + local(min) + '" value="' + local(start) + '">',
+			actions: [{ label: t('InboxSendSchedule'), primary: true, run: d => {
+				const v = $('#ibx-send-at', d).value;
+				const dt = v ? new Date(v) : null;
+				if (!dt || isNaN(dt.getTime()) || dt.getTime() < Date.now() + 60000) {
+					$('#ibx-send-at', d).focus();
+					return false;
+				}
+				send(w, { at: Math.floor(dt.getTime() / 1000) });
+			} }],
+			onOpen: d => $('#ibx-send-at', d).focus(),
+		});
+	}
+
+	// ---------- Bar of the sending: « Sending in 8 s · Undo · Send now · Record on PR… ? » ----------
+	function sendBars() {
+		let box = $('.ibx-sendbars');
+		if (!box) {
+			box = document.createElement('div');
+			box.className = 'ibx-sendbars';
+			box.setAttribute('role', 'status');
+			box.setAttribute('aria-live', 'polite');
+			document.body.appendChild(box);
+		}
+		return box;
+	}
+	const bars = new Map();
+	function sendBar(res) {
+		const id = res.queued;
+		if (bars.has(id)) {
+			return;
+		}
+		const el = document.createElement('div');
+		el.className = 'ibx-sendbar';
+		sendBars().appendChild(el);
+		const b = { id, el, at: res.send_at * 1000, scheduled: !!res.scheduled, pieces: res.pieces || [], recorded: (res.record || []).map(r => r.type + ':' + r.id), subject: res.subject || '', timer: 0 };
+		bars.set(id, b);
+		paintBar(b);
+		if (!b.scheduled) {
+			b.timer = setInterval(() => {
+				if (Date.now() >= b.at) {
+					clearInterval(b.timer);
+					dispatch(b);
+				} else {
+					paintBar(b);
+				}
+			}, 500);
+		} else {
+			setTimeout(() => removeBar(b), 10000);
+		}
+	}
+	function recordButton(b) {
+		const left = b.pieces.filter(pc => !b.recorded.includes(pc.type + ':' + pc.id));
+		if (!left.length) {
+			return '';
+		}
+		return '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-barrecord">' + ic('event-new') + ' ' + esc(left.length === 1 ? t('InboxRecordOnOne', left[0].kind + ' ' + left[0].ref) : t('InboxRecordOnMany', left.length)) + '</button>';
+	}
+	function paintBar(b) {
+		const subject = '<span class="ibx-sendbar__subject ibx-ellipsis">' + esc(b.subject || t('InboxNoSubject')) + '</span>';
+		if (b.state === 'sent') {
+			b.el.innerHTML = ic('check') + '<span class="ibx-sendbar__text">' + esc(t(b.copy === 0 ? 'InboxComposeSentNoCopy' : 'InboxComposeSent')) + '</span>' + subject + recordButton(b);
+		} else if (b.state === 'error') {
+			b.el.innerHTML = ic('warning') + '<span class="ibx-sendbar__text">' + esc(b.error) + '</span>' + subject
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxOutboxReopen') + '</button>';
+		} else if (b.scheduled) {
+			b.el.innerHTML = ic('send-later') + '<span class="ibx-sendbar__text">' + esc(t('InboxSendScheduled', new Date(b.at).toLocaleString())) + '</span>' + subject
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxSendUnschedule') + '</button>';
+		} else {
+			const left = Math.max(0, Math.ceil((b.at - Date.now()) / 1000));
+			b.el.innerHTML = ic('sent') + '<span class="ibx-sendbar__text">' + esc(b.sending ? t('InboxComposeSending') : t('InboxSendIn', left)) + '</span>' + subject
+				+ (b.sending ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxUndo') + '</button><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-barnow">' + th('InboxSendNow') + '</button>') + recordButton(b);
+		}
+		b.el.onclick = e => {
+			if (e.target.closest('.ibx-js-barundo')) {
+				undo(b);
+			} else if (e.target.closest('.ibx-js-barnow')) {
+				clearInterval(b.timer);
+				dispatch(b);
+			} else if (e.target.closest('.ibx-js-barrecord')) {
+				recordFromBar(b, e.target.closest('.ibx-js-barrecord'));
+			}
+		};
+	}
+	function removeBar(b) {
+		clearInterval(b.timer);
+		b.el.remove();
+		bars.delete(b.id);
+	}
+	async function dispatch(b) {
+		b.sending = true;
+		paintBar(b);
+		try {
+			const res = await post('compose', 'dispatch', { id: b.id });
+			b.state = 'sent';
+			b.copy = res.sent_copy;
+			b.recorded = b.recorded.concat(res.recorded || []);
+			Dolibarr.executeHook('inbox:compose:sent', { message_id: res.message_id, account: res.account });
+		} catch (err) {
+			if (err.code === 'already_sent') {
+				// Sent by the scheduled job meanwhile
+				b.state = 'sent';
+			} else {
+				b.state = 'error';
+				b.error = err.message;
+			}
+		}
+		b.sending = false;
+		paintBar(b);
+		if (b.state === 'sent') {
+			setTimeout(() => removeBar(b), recordButton(b) ? 12000 : 5000);
+		}
+	}
+	async function undo(b) {
+		clearInterval(b.timer);
+		try {
+			const d = await post('compose', 'cancel', { id: b.id });
+			removeBar(b);
+			compose({ restore: d });
+		} catch (err) {
+			if (err.code === 'already_sent') {
+				b.state = 'sent';
+				paintBar(b);
+				toast(t('InboxOutboxAlreadySent'), { error: true });
+			} else {
+				toast(err.message, { error: true });
+			}
+		}
+	}
+	async function recordFromBar(b, anchor) {
+		const left = b.pieces.filter(pc => !b.recorded.includes(pc.type + ':' + pc.id));
+		const go = async keys => {
+			try {
+				const res = await post('compose', 'record', { id: b.id, pieces: keys });
+				b.recorded = b.recorded.concat(res.recorded || keys);
+				toast(t('InboxRecorded', left.filter(pc => keys.includes(pc.type + ':' + pc.id)).map(pc => pc.ref).join(', ')));
+				paintBar(b);
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		};
+		if (left.length === 1) {
+			go([left[0].type + ':' + left[0].id]);
+			return;
+		}
+		popMenu(anchor, left.map(pc => ({ label: pc.kind + ' ' + pc.ref, icon: 'event-new', run: () => go([pc.type + ':' + pc.id]) })).concat([{ sep: true }, { label: t('InboxRecordAll'), icon: 'event-new', run: () => go(left.map(pc => pc.type + ':' + pc.id)) }]));
+	}
+	/** Sent at once: said, and the record on a piece offered when there is one */
+	function sentDone(res) {
+		if ((res.pieces || []).length) {
+			const b = { id: res.outbox, el: null, pieces: res.pieces, recorded: res.recorded || [], subject: res.subject || '', state: 'sent', copy: res.sent_copy };
+			b.el = document.createElement('div');
+			b.el.className = 'ibx-sendbar';
+			sendBars().appendChild(b.el);
+			bars.set(b.id, b);
+			paintBar(b);
+			setTimeout(() => removeBar(b), 12000);
+			return;
+		}
+		toast(res.sent_copy ? t('InboxComposeSent') : t('InboxComposeSentNoCopy'), res.sent_copy ? {} : { error: true, duration: 10000 });
+	}
+
+	// ---------- Mails waiting (scheduled, failed): bar of the Drafts folder, list ----------
+	async function outboxDialog() {
+		let items = [];
+		try {
+			items = (await post('compose', 'outbox', {})).items || [];
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const row = it => '<tr data-id="' + it.id + '"><td><b class="ibx-ellipsis">' + esc(it.subject || t('InboxNoSubject')) + '</b><div class="ibx-muted ibx-ellipsis">' + esc(it.to) + '</div></td>'
+			+ '<td>' + (it.status < 0 ? '<span class="ibx-text-danger">' + ic('warning') + ' ' + esc(t('InboxOutboxFailed')) + '</span><div class="ibx-muted">' + esc(it.error) + '</div>' : esc(new Date(it.send_at * 1000).toLocaleString())) + '</td>'
+			+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-act="edit">' + th('InboxOutboxReopen') + '</button> '
+			+ (it.status === 0 ? '<button type="button" class="ibx-btn ibx-btn--sm" data-act="now">' + th('InboxSendNow') + '</button>' : '') + '</td></tr>';
+		const dlg = dialog({
+			title: t('InboxOutboxTitle'),
+			wide: true,
+			body: items.length ? '<table class="ibx-table"><thead><tr><th>' + th('InboxSubject') + '</th><th>' + th('InboxOutboxWhen') + '</th><th></th></tr></thead><tbody>' + items.map(row).join('') + '</tbody></table>'
+				: '<div class="ibx-empty">' + ic('sent', 'ibx-empty__icon') + '<div>' + th('InboxOutboxEmpty') + '</div></div>',
+			noCancel: true,
+			actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }],
+		});
+		dlg.addEventListener('click', async e => {
+			const b = e.target.closest('[data-act]');
+			if (!b) {
+				return;
+			}
+			const id = +b.closest('[data-id]').dataset.id;
+			try {
+				if (b.dataset.act === 'edit') {
+					const d = await post('compose', 'cancel', { id });
+					dlg.close();
+					compose({ restore: d });
+				} else {
+					await post('compose', 'dispatch', { id });
+					b.closest('tr').remove();
+					toast(t('InboxComposeSent'));
+					Dolibarr.executeHook('inbox:compose:sent', {});
+				}
+				Dolibarr.executeHook('inbox:outbox:changed', {});
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
+	}
+	async function outboxBar(ctx) {
+		const bar = ctx && ctx.el ? $('.ibx-js-outboxbar', ctx.el) : null;
+		if (!bar) {
+			return;
+		}
+		bar.hidden = true;
+		if (ctx.role !== 'drafts') {
+			return;
+		}
+		let items = [];
+		try {
+			items = (await post('compose', 'outbox', {})).items || [];
+		} catch (e) {
+			return;
+		}
+		const waiting = items.filter(it => it.scheduled || it.status < 0);
+		if (!waiting.length) {
+			return;
+		}
+		const failed = waiting.filter(it => it.status < 0).length;
+		bar.innerHTML = ic(failed ? 'warning' : 'send-later') + '<div class="ibx-banner__text">' + esc(failed ? t('InboxOutboxBarFailed', waiting.length, failed) : t('InboxOutboxBar', waiting.length)) + '</div>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-outboxopen">' + th('InboxOutboxSee') + '</button>';
+		bar.hidden = false;
+		$('.ibx-js-outboxopen', bar).onclick = () => outboxDialog();
+	}
+	Dolibarr.on('inbox:folder:open', ctx => outboxBar(ctx));
+	// After a reload: the mails still in their delay get their bar back
+	Dolibarr.on('inbox:app:ready', async () => {
+		try {
+			const items = (await post('compose', 'outbox', {})).items || [];
+			items.filter(it => it.status === 0 && !it.scheduled).forEach(it => sendBar({ queued: it.id, send_at: it.send_at, subject: it.subject }));
+		} catch (e) {
+			// the bar only
+		}
+	});
+	I.outboxDialog = outboxDialog;
 
 	async function addFiles(w, files) {
 		for (const file of Array.from(files || [])) {
@@ -1076,6 +1421,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cclose" title="' + th('InboxComposeClose') + '" aria-label="' + th('InboxComposeClose') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-window__body ibx-compose__body">'
 			+ '<div class="ibx-cfield ibx-cfield--select" data-filled><span class="ibx-cfield__lead"></span>' + label(w.id + '-from', 'InboxFrom', 'InboxComposeShortFrom') + '<select class="ibx-cfield__input ibx-js-from" id="' + w.id + '-from">' + from + '</select>' + ic('chevron-down', 'ibx-cfield__caret') + '</div>'
+			+ '<div class="ibx-compose__warn ibx-js-boxwarn" role="status" hidden></div>'
 			+ rcpt('to', 'InboxTo', 'InboxComposeShortTo', false) + rcpt('cc', 'InboxComposeCcLabel', 'InboxComposeCc', !d.cc.length) + rcpt('bcc', 'InboxComposeBccLabel', 'InboxComposeBcc', !d.bcc.length)
 			+ '<div class="ibx-cfield ibx-cfield--subject"' + (d.subject ? ' data-filled' : '') + '><span class="ibx-cfield__lead"></span>' + label(w.id + '-subject', 'InboxSubject', 'InboxSubject') + '<input class="ibx-cfield__input ibx-js-subject" aria-label="' + th('InboxSubject') + '" id="' + w.id + '-subject" type="text" autocomplete="off" maxlength="998" value="' + esc(d.subject) + '"></div>'
 			+ '<div class="ibx-compose__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '" aria-controls="' + w.id + '-editor">'
@@ -1089,10 +1435,13 @@
 				+ '<iframe sandbox="" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteon" hidden>' + th('InboxComposePutQuoteBack') + '</button>' : '')
 			+ '<ul class="ibx-compose__atts ibx-js-atts" hidden aria-label="' + th('InboxAttachments') + '"></ul>'
+			+ ((d.pieces || []).length ? '<div class="ibx-compose__record" role="group" aria-label="' + th('InboxRecordOn') + '">' + ic('event-new') + '<span class="ibx-muted">' + th('InboxRecordOn') + '</span>'
+				+ d.pieces.map(pc => '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(pc.type + ':' + pc.id) + '"> ' + esc(pc.kind + ' ' + pc.ref) + '</label>').join('') + '</div>' : '')
 			+ '<div class="ibx-compose__drop" hidden>' + ic('attachment') + ' ' + th('InboxComposeDropHere') + '</div>'
 			+ '</div>'
 			+ '<div class="ibx-window__foot ibx-compose__foot">'
-			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
+			+ '<span class="ibx-sendsplit"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-sendsplit__arrow ibx-js-sendlater" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSendLater') + '" aria-label="' + th('InboxSendLater') + '">' + ic('chevron-down') + '</button></span>'
 			+ '<label class="ibx-btn ibx-btn--icon" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
 			+ '<span class="ibx-compose__status ibx-js-status" role="status" aria-live="polite"></span>'
 			+ '<span class="ibx-spacer"></span>'
@@ -1119,6 +1468,7 @@
 		});
 		$('.ibx-js-from', dlg).addEventListener('change', () => {
 			paintSignature(w);
+			paintBoxWarning(w);
 			w.changed();
 		});
 		dlg.addEventListener('click', e => {
@@ -1255,6 +1605,7 @@
 			}
 		});
 		$('.ibx-js-send', dlg).addEventListener('click', () => send(w));
+		$('.ibx-js-sendlater', dlg).addEventListener('click', e => laterMenu(w, e.currentTarget));
 		$('.ibx-js-cdiscard', dlg).addEventListener('click', () => discard(w));
 		$('.ibx-js-cmore', dlg).addEventListener('click', e => moreMenu(w, e.currentTarget));
 		$('.ibx-js-cclose', dlg).addEventListener('click', () => close(w));
@@ -1362,12 +1713,14 @@
 			restore(same);
 			return same;
 		}
-		let d;
-		try {
-			d = await post('compose', 'open', { mode, mail: o.mail || 0, account: o.account || 0 });
-		} catch (err) {
-			toast(err.message, { error: true });
-			return null;
+		let d = o.restore || null;
+		if (!d) {
+			try {
+				d = await post('compose', 'open', { mode, mail: o.mail || 0, account: o.account || 0 });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return null;
+			}
 		}
 		if (o.to) {
 			d.to = d.to.concat(parseList(o.to));
@@ -1378,8 +1731,8 @@
 		if (o.subject && !d.subject) {
 			d.subject = o.subject;
 		}
-		const w = { id: 'ibx-cw' + (++seq), token: d.compose || d.token, mode, source: o.mail || 0, data: d, attachments: (d.attachments || []).slice(),
-			quote: !!d.quote, signature: !d.signature_off, receipt: !!d.receipt, dirty: false, saved: !!d.draft };
+		const w = { id: 'ibx-cw' + (++seq), token: d.compose || d.token, mode: d.mode || mode, source: o.mail || (d.source ? d.source.mail : 0), data: d, attachments: (d.attachments || []).slice(),
+			quote: !!d.quote && !d.quote_off, signature: !d.signature_off, receipt: !!d.receipt, dirty: !!o.restore, saved: !!d.draft };
 		w.token = d.token;
 		const dlg = document.createElement('dialog');
 		dlg.className = 'ibx-window ibx-compose';
@@ -1397,6 +1750,12 @@
 		place();
 		paintSignature(w);
 		paintAttachments(w);
+		paintBoxWarning(w);
+		if (d.quote && d.quote_off) {
+			const q = $('.ibx-js-quote', dlg);
+			q.hidden = true;
+			$('.ibx-js-quoteon', dlg).hidden = false;
+		}
 		try {
 			w.editor = await I.editors.create($('.ibx-js-editor', dlg), { html: d.html || '', placeholder: t('InboxComposePlaceholder'), label: t('InboxComposeBody') });
 		} catch (e) {

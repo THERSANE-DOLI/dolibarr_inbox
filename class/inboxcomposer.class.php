@@ -137,7 +137,7 @@ class InboxComposer
 	 * @param string $token Token
 	 * @return string|null Folder of the writing, null if the token is not one of the user
 	 */
-	protected static function dirOf(User $user, $token)
+	public static function dirOf(User $user, $token)
 	{
 		if (!preg_match('/^[0-9a-f]{32}$/', (string) $token)) {
 			return null;
@@ -151,7 +151,7 @@ class InboxComposer
 	 * @param string $dir Folder of the writing
 	 * @return array<string,mixed>
 	 */
-	protected static function readState($dir)
+	public static function readState($dir)
 	{
 		$state = json_decode((string) @file_get_contents($dir.'/state.json'), true);
 
@@ -339,22 +339,126 @@ class InboxComposer
 				$identityId = $identities[0]['id'];
 			}
 		}
+		// Pieces linked to the mail answered: the sending may be recorded on them (lot W6 1.17.0)
+		$state['pieces'] = $this->piecesOf($user, $state['source'] ?? null);
 		self::writeState($dir, $state);
 		$this->hold($token);
+		$langs->loadLangs(array('inbox@inbox'));
 
+		return $this->view($user, $token, $dir, $state, $out, $identityId, $identities);
+	}
+
+	/**
+	 * Data of a writing for the browser (open, or back from the queue)
+	 *
+	 * @param User                $user       User
+	 * @param string              $token      Writing
+	 * @param string              $dir        Its folder
+	 * @param array<string,mixed> $state      State
+	 * @param array<string,mixed> $out        Fields (to, cc, bcc, subject, html, receipt...)
+	 * @param int                 $identityId Identity chosen
+	 * @param array<int,array<string,mixed>> $identities Identities of the user
+	 * @return array<string,mixed>
+	 */
+	protected function view(User $user, $token, $dir, array $state, array $out, $identityId, array $identities)
+	{
 		$out['token'] = $token;
-		$out['mode'] = $mode;
+		$out['mode'] = (string) $state['mode'];
 		$out['identity'] = $identityId;
 		$out['identities'] = $identities;
 		$out['quote'] = !empty($state['quote']) ? (string) @file_get_contents($dir.'/quote.html') : '';
 		$out['attachments'] = self::attachmentsView($state);
-		$out['source'] = $state['source'] ? array('mail' => (int) ($state['source']['mail'] ?? 0), 'mode' => (string) $state['source']['mode']) : null;
-		$out['draft'] = $state['draft'] ? 1 : 0;
+		$out['source'] = null;
+		if (!empty($state['source'])) {
+			$box = $this->db->getRow("SELECT email FROM ".$this->db->prefix()."inbox_account WHERE rowid = ".((int) ($state['source']['account'] ?? 0)));
+			$out['source'] = array('mail' => (int) ($state['source']['mail'] ?? 0), 'mode' => (string) $state['source']['mode'], 'account' => (int) ($state['source']['account'] ?? 0),
+				'mailbox' => is_object($box) ? (string) $box->email : '');
+		}
+		$out['draft'] = !empty($state['draft']) ? 1 : 0;
 		$out['max_size'] = self::maxBytes();
-		$out['autocopy'] = '';
-		$langs->loadLangs(array('inbox@inbox'));
+		$out['pieces'] = array_values((array) ($state['pieces'] ?? array()));
+		$out['send_delay'] = self::delayFor($user);
 
 		return $out;
+	}
+
+	/**
+	 * Delay before a mail leaves (seconds): the one of the user (My account), else the one of the setup
+	 *
+	 * @param User $user User
+	 * @return int
+	 */
+	public static function delayFor(User $user)
+	{
+		global $db;
+
+		require_once __DIR__.'/inboxuserparam.class.php';
+		$params = new InboxUserParam($db);
+		$mine = (int) $params->get($user, 'send_delay');
+
+		return $mine >= 0 ? min(120, $mine) : max(0, min(120, getDolGlobalInt('INBOX_SEND_DELAY', 10)));
+	}
+
+	/**
+	 * Pieces linked to a mail (through its Message-ID) that the user may read and write, and record a sending on
+	 *
+	 * @param User                     $user   User
+	 * @param array<string,mixed>|null $source Mail answered
+	 * @return array<int,array{type:string,id:int,ref:string,kind:string,icon:string}>
+	 */
+	public function piecesOf(User $user, $source)
+	{
+		if (!$source || (string) ($source['message_id'] ?? '') === '' || !$user->hasRight('agenda', 'myactions', 'create')) {
+			return array();
+		}
+		require_once __DIR__.'/inboxlink.class.php';
+		require_once __DIR__.'/inboxelements.class.php';
+		$p = $this->db->prefix();
+		$ref = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mailref WHERE message_id = '".$this->db->escape((string) $source['message_id'])."'");
+		if (!is_object($ref)) {
+			return array();
+		}
+		$links = new InboxLink($this->db);
+		$elements = new InboxElements($this->db);
+		$out = array();
+		foreach ($links->listFor(array((int) $ref->rowid)) as $l) {
+			$type = (string) $l['type'];
+			if (!InboxElements::canWriteType($user, $type)) {
+				continue;
+			}
+			$d = $elements->describe($user, $type, (int) $l['element']);
+			if ($d && !empty($d['readable'])) {
+				$out[] = array('type' => $type, 'id' => (int) $l['element'], 'ref' => (string) ($d['ref'] ?? ''), 'kind' => (string) $d['kind'], 'icon' => (string) $d['icon']);
+			}
+		}
+
+		return array_slice($out, 0, 20);
+	}
+
+	/**
+	 * A writing back from the queue (sending cancelled, or failed): what was typed, in its window again
+	 *
+	 * @param User                $user  User
+	 * @param string              $token Writing
+	 * @param array<string,mixed> $typed What was typed
+	 * @return array<string,mixed>|null
+	 */
+	public function restore(User $user, $token, array $typed)
+	{
+		$dir = self::dirOf($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		$this->hold($token);
+		$list = function ($v) {
+			return InboxMailBuilder::parseAddresses($v);
+		};
+		$out = array('to' => $list($typed['to'] ?? array()), 'cc' => $list($typed['cc'] ?? array()), 'bcc' => $list($typed['bcc'] ?? array()),
+			'subject' => (string) ($typed['subject'] ?? ''), 'html' => InboxMailBuilder::cleanHtml((string) ($typed['html'] ?? '')), 'receipt' => (int) !empty($typed['receipt']),
+			'signature_off' => empty($typed['signature']) ? 1 : 0, 'quote_off' => empty($typed['quote']) ? 1 : 0);
+
+		return $this->view($user, $token, $dir, $state, $out, (int) ($typed['identity'] ?? 0), $this->identities($user));
 	}
 
 	/**
@@ -363,7 +467,7 @@ class InboxComposer
 	 * @param string $token Token
 	 * @return void
 	 */
-	protected function hold($token)
+	public function hold($token)
 	{
 		if (!isset($_SESSION['inbox_compose']) || !is_array($_SESSION['inbox_compose'])) {
 			$_SESSION['inbox_compose'] = array();
@@ -380,7 +484,7 @@ class InboxComposer
 	 * @param string $token Token
 	 * @return string|null Folder, if the writing is one of this user and this session
 	 */
-	protected function held(User $user, $token)
+	public function held(User $user, $token)
 	{
 		$dir = self::dirOf($user, $token);
 		if ($dir === null || empty($_SESSION['inbox_compose'][$token])) {
@@ -678,7 +782,7 @@ class InboxComposer
 	 * @param bool                $draft For a draft (private headers, no check of the recipients)
 	 * @return array{builder:InboxMailBuilder,account:InboxAccount,identity:array<string,mixed>}|null
 	 */
-	protected function prepare(User $user, $dir, array $state, array $data, $draft)
+	public function prepare(User $user, $dir, array $state, array $data, $draft)
 	{
 		$identity = null;
 		foreach ($this->identities($user) as $i) {
@@ -831,7 +935,7 @@ class InboxComposer
 	 * @param int                          $accountId Its mailbox
 	 * @return void
 	 */
-	protected function removeDraft($draft, $connector, $accountId)
+	public function removeDraft($draft, $connector, $accountId)
 	{
 		if (!$draft || (string) ($draft['remote_id'] ?? '') === '') {
 			return;
@@ -886,15 +990,17 @@ class InboxComposer
 	}
 
 	/**
-	 * Send: built here, sent by the SMTP server of the mailbox, its copy put in Sent (with the Bcc), the mail answered
-	 * marked, the draft removed, the journal written
+	 * Send: the mail is built and frozen here, put in the queue (InboxOutbox) with what remains to do after the
+	 * sending; it leaves at once when there is no delay, else after the delay (page or scheduled job), or at the date
+	 * chosen. Checks of the sending at once (recipients, hook of the other modules).
 	 *
 	 * @param User                $user  User
 	 * @param string              $token Writing
 	 * @param array<string,mixed> $data  Typed
-	 * @return array{message_id:string,sent_copy:int,account:int}|null
+	 * @param array<string,mixed> $opts  at (date of a scheduled sending), record (pieces « type:id » to record it on)
+	 * @return array<string,mixed>|null Sent: message_id, sent_copy, account, outbox; queued: queued (id), send_at, delay
 	 */
-	public function send(User $user, $token, array $data)
+	public function send(User $user, $token, array $data, array $opts = array())
 	{
 		global $hookmanager;
 
@@ -918,10 +1024,14 @@ class InboxComposer
 		if (getDolGlobalString('MAIN_DISABLE_ALL_MAILS')) {
 			return $this->fail('mails_disabled');
 		}
+		$at = (int) ($opts['at'] ?? 0);
+		if ($at && ($at < dol_now() + 60 || $at > dol_now() + 366 * 86400)) {
+			return $this->fail('bad_date');
+		}
 		// Other modules may check the mail and stop it (P5): hook inboxBeforeSend, context inbox
 		if (is_object($hookmanager)) {
 			$hookmanager->initHooks(array('inbox'));
-			$parameters = array('account' => (int) $account->id, 'identity' => $prepared['identity']['id'], 'to' => $b->to, 'cc' => $b->cc, 'bcc' => $b->bcc, 'subject' => $b->subject, 'source' => $state['source']);
+			$parameters = array('account' => (int) $account->id, 'identity' => $prepared['identity']['id'], 'to' => $b->to, 'cc' => $b->cc, 'bcc' => $b->bcc, 'subject' => $b->subject, 'source' => $state['source'], 'at' => $at);
 			$action = 'send';
 			$reshook = $hookmanager->executeHooks('inboxBeforeSend', $parameters, $b, $action);
 			if ($reshook < 0) {
@@ -932,48 +1042,39 @@ class InboxComposer
 		if (!$built) {
 			return $this->fail('error', $b->error);
 		}
-		$error = '';
-		$connector = InboxConnectorFactory::forAccount($this->db, $account, $error);
-		if (!$connector) {
-			return $this->fail('error', $error);
+		// Pieces to record the sending on: only those offered when the writing opened (linked, readable, writable)
+		$allowed = array();
+		foreach ((array) ($state['pieces'] ?? array()) as $pc) {
+			$allowed[$pc['type'].':'.$pc['id']] = $pc;
 		}
-		if (!$connector->can(InboxConnectorInterface::CAP_SEND)) {
-			$connector->disconnect();
-			return $this->fail('smtp_no_server');
-		}
-		if (!$connector->send($built['wire'], array('from' => $b->from['email'], 'recipients' => $built['recipients']))) {
-			$code = method_exists($connector, 'getErrorCode') ? (string) $connector->getErrorCode() : '';
-			$this->fail($code !== '' ? $code : 'smtp_refused', $connector->getError());
-			$connector->disconnect();
-			return null;
-		}
-		// Sent: from here nothing may make the user send it again
-		$roles = array('sent' => $this->roleFolder($account, 'sent'), 'drafts' => $this->roleFolder($account, 'drafts'));
-		$sentCopy = 0;
-		if (!empty($roles['sent'])) {
-			$sentCopy = $connector->importRaw($roles['sent'], $built['raw'], array('\\Seen')) !== null ? 1 : 0;
-			if (!$sentCopy) {
-				dol_syslog(__METHOD__.' copy in Sent failed: '.$connector->getError(), LOG_WARNING);
+		$record = array();
+		foreach ((array) ($opts['record'] ?? array()) as $key) {
+			if (isset($allowed[(string) $key])) {
+				$record[] = array('type' => $allowed[$key]['type'], 'id' => (int) $allowed[$key]['id']);
 			}
 		}
-		$source = $state['source'] ?? null;
-		if ($source && !in_array($source['mode'], array('forward', 'forward_attach'), true) && (int) $source['mail'] > 0) {
-			$this->markAnswered($user, $source, (int) $account->id === (int) $source['account'] ? $connector : null);
+		require_once __DIR__.'/inboxoutbox.class.php';
+		$outbox = new InboxOutbox($this->db);
+		$delay = $at ? 0 : self::delayFor($user);
+		$id = $outbox->queue($user, $account, $prepared['identity'], $b, $built, array(
+			'token' => $token, 'source' => $state['source'] ?? null, 'draft' => $state['draft'] ?? null, 'record' => $record, 'pieces' => array_values($allowed),
+			'typed' => $data, 'at' => $at ?: dol_now() + $delay, 'scheduled' => $at ? 1 : 0,
+		));
+		if ($id <= 0) {
+			return $this->fail('error', $outbox->error);
 		}
-		if (!empty($state['draft'])) {
-			$this->removeDraft($state['draft'], $connector, (int) $account->id);
+		if (!$at && $delay === 0) {
+			$res = $outbox->deliver($id, $user, true);
+			if ($res === null) {
+				$this->errorCode = $outbox->errorCode;
+				$this->error = $outbox->error;
+				return null;
+			}
+			return $res;
 		}
-		$connector->disconnect();
-		InboxActionLog::add($this->db, $user, (int) $account->id, 'send', array((object) array('message_id' => $built['message_id'], 'subject' => $b->subject)),
-			'', (string) ($roles['sent'] ?? ''), 0, (string) count($built['recipients']));
-		$account->context['inbox'] = array('message_id' => $built['message_id'], 'identity' => $prepared['identity']['id'], 'recipients' => $built['recipients'],
-			'subject' => $b->subject, 'source' => $source ? (string) ($source['message_id'] ?? '') : '', 'mode' => $source ? (string) $source['mode'] : 'new');
-		$account->call_trigger('INBOX_MAIL_SENT', $user);
-		$this->refreshFolders($account, array_filter(array((string) ($roles['sent'] ?? ''), (string) ($roles['drafts'] ?? ''))));
-		dol_delete_dir_recursive($dir);
-		unset($_SESSION['inbox_compose'][$token]);
 
-		return array('message_id' => $built['message_id'], 'sent_copy' => $sentCopy, 'account' => (int) $account->id);
+		return array('queued' => $id, 'send_at' => $at ?: dol_now() + $delay, 'delay' => $delay, 'scheduled' => $at ? 1 : 0, 'subject' => $b->subject,
+			'pieces' => array_values($allowed), 'record' => $record);
 	}
 
 	/**
@@ -984,7 +1085,7 @@ class InboxComposer
 	 * @param InboxConnectorInterface|null $connector Connector of its mailbox (null: opened here)
 	 * @return void
 	 */
-	protected function markAnswered(User $user, array $source, $connector)
+	public function markAnswered(User $user, array $source, $connector)
 	{
 		$access = new InboxAccess($this->db);
 		if ($access->getLevel($user, (int) $source['account']) === InboxAccess::LEVEL_NONE) {
@@ -1014,7 +1115,7 @@ class InboxComposer
 	 * @param string[]     $paths   Folders
 	 * @return void
 	 */
-	protected function refreshFolders(InboxAccount $account, array $paths)
+	public function refreshFolders(InboxAccount $account, array $paths)
 	{
 		require_once __DIR__.'/inboxsync.class.php';
 		$p = $this->db->prefix();
@@ -1097,7 +1198,17 @@ class InboxComposer
 
 		$base = self::baseDir();
 		$n = 0;
+		global $db;
+
+		$queued = array();
+		$rows = $db->getRows("SELECT compose_token FROM ".$db->prefix()."inbox_outbox WHERE status IN (0, 1, -1) AND compose_token IS NOT NULL LIMIT 10000");
+		foreach (is_array($rows) ? $rows : array() as $q) {
+			$queued[(string) $q->compose_token] = true;
+		}
 		foreach (glob($base.'/*/*', GLOB_ONLYDIR) ?: array() as $dir) {
+			if (isset($queued[basename($dir)])) {
+				continue;
+			}
 			if (preg_match('#/\d+/[0-9a-f]{32}$#', $dir) && @filemtime($dir.'/state.json') < dol_now() - self::KEEP_DAYS * 86400) {
 				dol_delete_dir_recursive($dir);
 				$n++;

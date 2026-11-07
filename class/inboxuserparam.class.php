@@ -95,6 +95,8 @@ class InboxUserParam
 			'dolibar_position' => array('auto', array('auto', 'right', 'top')),
 			// Writing (1.16.0): Ctrl+Enter sends (or nothing), size of the writing windows
 			'send_shortcut' => array('ctrl_enter', array('ctrl_enter', 'off')),
+			// Delay before a mail leaves (1.17.0): -1 = the one of the setup, 0 = at once
+			'send_delay' => array('-1', 'int:-1:120'),
 			'compose_size' => array('', 'json'),
 			// Colours of the writing (1.16.1): last colour of the text and of the highlight, recent ones
 			'compose_colors' => array('', 'json'),

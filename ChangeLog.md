@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: queue of the sending, sending later, checks before sending, record on the piece :   1.17.0
+  - a mail leaves after a delay (10 s by default, setup and My account): « Sending in 8 s · Undo · Send now »;
+    undo gives the writing back as it was; a closed tab does not stop it (scheduled job every minute).
+  - « Send later »: tomorrow 8:00, Monday 8:00 or a date chosen; the mails waiting are listed in the Drafts folder.
+  - a mail leaves once (one lock); a failure is told in the bell and the mail is taken back from the list.
+  - before sending: attachment announced but missing, more than 10 recipients who see each other (hidden copy offered),
+    an answer from another mailbox than the one that got the mail.
+  - record on the piece linked to the mail answered (box in the window, or question in the bar of the sending): event
+    of the agenda, mail (.eml) in the documents of the piece, mail sent linked to the piece.
 - FIX: editor of the writing: HTML, colours, tables :   1.16.1
   - HTML pasted as text (an answer prepared by an AI, a « ```html » block) is put in formatted; Ctrl+Z takes it back.
   - « HTML source » button: the text as HTML, to read, change or paste HTML; back to the formatted text.

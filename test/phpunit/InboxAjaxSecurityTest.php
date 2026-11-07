@@ -253,5 +253,9 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/compose.php?action=send&compose=0123456789abcdef0123456789abcdef&token='.urlencode($token))['code'], 'send by GET refused');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'send', 'compose' => '0123456789abcdef0123456789abcdef', 'to' => 'x@inbox-test.invalid', 'token' => $token))['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'save', 'compose' => '../../etc', 'token' => $token))['code'], 'a path is not a writing');
+		// Queue (1.17.0): a mail of the queue of nobody (or of another user) not found, never sent nor taken back
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/compose.php?action=dispatch&id=1&token='.urlencode($token))['code'], 'send now by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'dispatch', 'id' => 99999999, 'token' => $token))['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'cancel', 'id' => 99999999, 'token' => $token))['code']);
 	}
 }
