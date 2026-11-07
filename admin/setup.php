@@ -184,7 +184,7 @@ $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_valu
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 $head = inboxAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'fa-inbox');
+print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'inbox@inbox');
 
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
 // The webmail settings live in the application, not here (analyse-lot-w1 §5)

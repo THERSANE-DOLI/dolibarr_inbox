@@ -182,6 +182,105 @@
 		main.innerHTML = html + '</div>';
 	}
 
+	/** Greys of the interface (pure): light, dark (same values as css/inbox.css and inboxLookTokens()) */
+	const GREYS = {
+		light: { 'bg-pane': '#f7f7f8', 'bg-sunken': '#efeff1', 'bg-hover': '#e9e9ec', border: '#dddde1', 'border-strong': '#c1c1c7', text: '#18181b', 'text-muted': '#53535a', 'text-faint': '#86868e' },
+		dark: { bg: '#18181b', 'bg-pane': '#1f1f23', 'bg-sunken': '#131316', 'bg-hover': '#2a2a2f', border: '#34343a', 'border-strong': '#48484f', text: '#e7e7ea', 'text-muted': '#a5a5ad', 'text-faint': '#76767e' },
+	};
+	/** Colours offered for the accent: readable in light and in dark, far from the red of the errors */
+	const ACCENTS = [['#8a2b6e', 'prune'], ['#6b46c1', 'violet'], ['#3f4fbf', 'indigo'], ['#1f63b5', 'blue'], ['#1d6a8a', 'teal'], ['#2f7d4f', 'green'], ['#995400', 'amber'], ['#4a5568', 'slate']];
+
+	/**
+	 * Look of the setup for each theme (same computation as inboxLookTokens() in lib/inboxapp.lib.php): the accent in
+	 * light (darker under 4.5:1 on white), a lighter tone in dark (6:1 on its background) or the one chosen, the text
+	 * on it, and the greys, pure or tinted with the hue of the accent
+	 * @param {string} hex #rrggbb
+	 * @param {string} darkHex accent chosen for the dark theme, '' = computed
+	 * @param {string} greys neutral or accent
+	 * @returns {object} {light: tokens, dark: tokens, auto (computed dark accent), darkContrast}
+	 */
+	function lookTokens(hex, darkHex, greys) {
+		const rgb = h => [0, 2, 4].map(i => parseInt(h.slice(1 + i, 3 + i), 16));
+		const lum = c => {
+			const l = c.map(v => {
+				v /= 255;
+				return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+			});
+			return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+		};
+		const contrast = (a, b) => {
+			const x = lum(a);
+			const y = lum(b);
+			return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+		};
+		const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+		const hexOf = c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+		const toHsl = c => {
+			const [r, g, b] = c.map(v => v / 255);
+			const max = Math.max(r, g, b);
+			const min = Math.min(r, g, b);
+			const l = (max + min) / 2;
+			let h = 0;
+			let sat = 0;
+			if (max !== min) {
+				const dd = max - min;
+				sat = l > 0.5 ? dd / (2 - max - min) : dd / (max + min);
+				h = (max === r ? (g - b) / dd + (g < b ? 6 : 0) : (max === g ? (b - r) / dd + 2 : (r - g) / dd + 4)) / 6;
+			}
+			return [h, sat, l];
+		};
+		const fromHsl = (h, sat, l) => {
+			const f = (pp, q, tt) => {
+				tt = tt < 0 ? tt + 1 : (tt > 1 ? tt - 1 : tt);
+				return tt < 1 / 6 ? pp + (q - pp) * 6 * tt : (tt < 1 / 2 ? q : (tt < 2 / 3 ? pp + (q - pp) * (2 / 3 - tt) * 6 : pp));
+			};
+			const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
+			const pp = 2 * l - q;
+			return [f(pp, q, h + 1 / 3), f(pp, q, h), f(pp, q, h - 1 / 3)].map(v => Math.round(v * 255));
+		};
+		const white = [255, 255, 255];
+		const black = [0, 0, 0];
+		const base = rgb(/^#[0-9a-f]{6}$/i.test(hex) ? hex : '#8a2b6e');
+		const hsl = toHsl(base);
+		let light = base;
+		for (let l = hsl[2]; contrast(light, white) < 4.5 && l > 0; l -= 0.02) {
+			light = fromHsl(hsl[0], hsl[1], Math.max(0, l));
+		}
+		const greyLight = Object.assign({}, GREYS.light);
+		const greyDark = Object.assign({}, GREYS.dark);
+		if (greys === 'accent') {
+			[[greyLight, 0.06], [greyDark, 0.10]].forEach(([g, sat]) => Object.keys(g).forEach(k => {
+				g[k] = hexOf(fromHsl(hsl[0], sat, toHsl(rgb(g[k]))[2]));
+			}));
+		}
+		const bg = rgb(greyDark.bg);
+		let dark = base;
+		for (let l = hsl[2]; contrast(dark, bg) < 6 && l < 1; l += 0.02) {
+			dark = fromHsl(hsl[0], hsl[1], Math.min(1, l));
+		}
+		const auto = dark;
+		if (/^#[0-9a-f]{6}$/i.test(darkHex || '')) {
+			dark = rgb(darkHex);
+		}
+		const on = c => {
+			const deep = mix(c, black, 0.8);
+			return hexOf(contrast(c, white) >= contrast(c, deep) ? white : deep);
+		};
+		return {
+			light: Object.assign({ accent: hexOf(light), 'on-accent': on(light) }, greyLight),
+			dark: Object.assign({ accent: hexOf(dark), 'on-accent': on(dark) }, greyDark),
+			auto: hexOf(auto),
+			darkContrast: contrast(dark, bg),
+		};
+	}
+	/** CSS of the look (the high contrast theme keeps its own) */
+	function accentCss(hex, darkHex, greys) {
+		const tk = lookTokens(hex, darkHex, greys);
+		const css = set => Object.keys(set).map(k => '--ibx-' + k + ':' + set[k] + ';').join('');
+		const d = css(tk.dark);
+		return ':root:not([data-ibx-theme="contrast"]){' + css(tk.light) + '}@media (prefers-color-scheme: dark){:root:not([data-ibx-theme="light"]):not([data-ibx-theme="contrast"]){' + d + '}}:root[data-ibx-theme="dark"]{' + d + '}';
+	}
+
 	// ---------- Mailbox: card ----------
 	const TABS = [
 		{ id: 'server', key: 'InboxTabServer', admin: true },
@@ -1599,8 +1698,28 @@
 			return;
 		}
 		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavGeneral') + '</h1></div><p class="ibx-page__intro">' + th('InboxGeneralIntro') + '</p>'
+			// Look (accent, accent of the dark theme, greys, preview): applied at once to the page
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionLook') + '</h2><div class="ibx-form ibx-js-look">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-accent-label">' + th('InboxAccent') + '</span><div><div class="ibx-swatches" role="radiogroup" aria-labelledby="g-accent-label">'
+			+ ACCENTS.map(([c, k]) => '<label class="ibx-swatchpick" title="' + th('InboxAccent_' + k) + '"><input type="radio" name="g-accent" value="' + c + '" aria-label="' + th('InboxAccent_' + k) + '"><span class="ibx-swatchpick__dot" data-color="' + c + '"></span></label>').join('')
+			+ '<label class="ibx-inline"><input type="radio" name="g-accent" value="other"> ' + th('InboxAccentOther') + ' <input type="color" class="ibx-color" id="g-accent" aria-label="' + th('InboxAccentOther') + '" value="' + esc(s.INBOX_ACCENT) + '"></label></div>'
+			+ '<div class="ibx-formrow__help">' + th('InboxAccentHelp') + '</div></div></div>'
+			// Accent of the dark theme: computed from the accent (default), or chosen
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-accentdark-label">' + th('InboxAccentDark') + '</span><div class="ibx-accentdark ibx-js-accentdark" role="radiogroup" aria-labelledby="g-accentdark-label">'
+			+ '<label class="ibx-radio"><input type="radio" name="g-accentdark" value="auto"' + (s.INBOX_ACCENT_DARK ? '' : ' checked') + '> ' + th('InboxAccentDarkAuto') + ' <span class="ibx-accentdark__swatch ibx-js-darkauto" aria-hidden="true"></span><code class="ibx-js-darkautohex"></code></label>'
+			+ '<label class="ibx-radio"><input type="radio" name="g-accentdark" value="own"' + (s.INBOX_ACCENT_DARK ? ' checked' : '') + '> ' + th('InboxAccentDarkOwn') + '</label>'
+			+ '<input type="color" class="ibx-color ibx-js-darkown" aria-label="' + th('InboxAccentDark') + '" value="' + esc(s.INBOX_ACCENT_DARK || '#d881be') + '"' + (s.INBOX_ACCENT_DARK ? '' : ' disabled') + '>'
+			+ '<div class="ibx-notice ibx-notice--warning ibx-js-darkwarn" hidden>' + ic('warning') + '<div class="ibx-notice__text"><span class="ibx-js-darkwarntext"></span> <button type="button" class="ibx-btn ibx-btn--sm ibx-js-darkuseauto">' + th('InboxAccentDarkUseAuto') + '</button></div></div>'
+			+ '<div class="ibx-formrow__help">' + th('InboxAccentDarkHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-greys-label">' + th('InboxGreys') + '</span><div><div class="ibx-inline" role="radiogroup" aria-labelledby="g-greys-label">'
+			+ ['neutral', 'accent'].map(v => '<label class="ibx-radio"><input type="radio" name="g-greys" value="' + v + '"' + ((s.INBOX_GREYS || 'neutral') === v ? ' checked' : '') + '> ' + th('InboxGreys_' + v) + '</label>').join(' ')
+			+ '</div><div class="ibx-formrow__help">' + th('InboxGreysHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxLookPreview') + '</span><div class="ibx-apreview" aria-hidden="true">'
+			+ ['light', 'dark'].map(k => '<div class="ibx-apreview__theme" data-k="' + k + '"><div class="ibx-apreview__pane"><span class="ibx-apreview__row is-on">' + th('InboxFolderRoleInbox') + '</span><span class="ibx-apreview__row">' + th('InboxFolderRoleDrafts') + '</span><span class="ibx-apreview__row is-hover">' + th('InboxFolderRoleSent') + '</span></div>'
+				+ '<div class="ibx-apreview__list"><span class="ibx-apreview__search">' + th('InboxSearchPlaceholder') + '</span><span class="ibx-apreview__mail">' + th('InboxLookPreviewMail') + '<span>' + th('InboxLookPreviewText') + '</span></span><span class="ibx-apreview__btn">' + th('InboxNewMail') + '</span></div></div>').join('')
+			+ '</div></div>'
+			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDefaults') + '</h2><div class="ibx-form ibx-js-general">'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-accent">' + th('InboxAccent') + '</label><div class="ibx-inline"><input type="color" class="ibx-color" id="g-accent" data-name="INBOX_ACCENT" value="' + esc(s.INBOX_ACCENT) + '"><span class="ibx-formrow__help">' + th('InboxAccentHelp') + '</span></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-read">' + th('InboxReadMode') + '</label><div><select class="ibx-field ibx-field--medium" id="g-read" data-name="INBOX_DEFAULT_READ_MODE">' + ['immediate', 'delay', 'manual'].map(v => '<option value="' + v + '"' + (v === s.INBOX_DEFAULT_READ_MODE ? ' selected' : '') + '>' + th('InboxReadMode_' + v) + '</option>').join('') + '</select><div class="ibx-formrow__help">' + th('InboxReadModeDefaultHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" id="g-delay" data-name="INBOX_DEFAULT_READ_DELAY" value="' + esc(s.INBOX_DEFAULT_READ_DELAY) + '"> ' + th('InboxSeconds') + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-send">' + th('InboxSendDelay') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-send" data-name="INBOX_SEND_DELAY" value="' + esc(s.INBOX_SEND_DELAY) + '"> ' + th('InboxSeconds') + '</div><div class="ibx-formrow__help">' + th('InboxSendDelayHelp') + '</div></div></div>'
@@ -1618,14 +1737,73 @@
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
+		// Look: accent (offered colours or another one), accent of the dark theme, greys; preview and page at once
+		const look = $('.ibx-js-look', main);
+		const accentInput = $('#g-accent', look);
+		const darkBox = $('.ibx-js-accentdark', look);
+		const darkOwn = $('.ibx-js-darkown', darkBox);
+		$$('[data-color]', look).forEach(el => {
+			el.style.background = el.dataset.color;
+		});
+		const pick = $('[name="g-accent"][value="' + String(s.INBOX_ACCENT).toLowerCase() + '"]', look) || $('[name="g-accent"][value="other"]', look);
+		pick.checked = true;
+		const accentValue = () => {
+			const v = $('[name="g-accent"]:checked', look).value;
+			return v === 'other' ? accentInput.value : v;
+		};
+		const darkValue = () => ($('[name="g-accentdark"]:checked', darkBox).value === 'own' ? darkOwn.value : '');
+		const greysValue = () => $('[name="g-greys"]:checked', look).value;
+		const paintAccent = () => {
+			const c = lookTokens(accentValue(), darkValue(), greysValue());
+			$('.ibx-js-darkauto', darkBox).style.background = c.auto;
+			$('.ibx-js-darkautohex', darkBox).textContent = c.auto;
+			darkOwn.disabled = darkValue() === '';
+			const weak = darkValue() !== '' && c.darkContrast < 4.5;
+			$('.ibx-js-darkwarn', darkBox).hidden = !weak;
+			if (weak) {
+				$('.ibx-js-darkwarntext', darkBox).textContent = t('InboxAccentDarkWeak', c.darkContrast.toFixed(1));
+			}
+			// Preview: each theme with its own colours (the soft accent mixed with its own background)
+			['light', 'dark'].forEach(k => {
+				const box = $('.ibx-apreview__theme[data-k="' + k + '"]', look);
+				const set = Object.assign({ bg: k === 'light' ? '#ffffff' : c.dark.bg }, c[k]);
+				Object.keys(set).forEach(n => box.style.setProperty('--ibx-' + n, set[n]));
+				box.style.setProperty('--ibx-accent-soft', 'color-mix(in srgb, ' + set.accent + ' 14%, ' + set.bg + ')');
+			});
+			const st = document.getElementById('ibx-accent-css');
+			if (st) {
+				st.textContent = accentCss(accentValue(), darkValue(), greysValue());
+			}
+		};
+		const saveLook = async (name, value) => {
+			try {
+				await post('general', 'set', { name, value });
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			paintAccent();
+		};
+		paintAccent();
+		$$('[name="g-accent"]', look).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_ACCENT', accentValue())));
+		accentInput.addEventListener('input', () => {
+			$('[name="g-accent"][value="other"]', look).checked = true;
+			paintAccent();
+		});
+		accentInput.addEventListener('change', () => saveLook('INBOX_ACCENT', accentValue()));
+		$$('[name="g-accentdark"]', darkBox).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_ACCENT_DARK', darkValue())));
+		darkOwn.addEventListener('input', paintAccent);
+		darkOwn.addEventListener('change', () => saveLook('INBOX_ACCENT_DARK', darkValue()));
+		$('.ibx-js-darkuseauto', darkBox).addEventListener('click', () => {
+			$('[name="g-accentdark"][value="auto"]', darkBox).checked = true;
+			saveLook('INBOX_ACCENT_DARK', '');
+		});
+		$$('[name="g-greys"]', look).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_GREYS', greysValue())));
 		// Saved field by field, at once (as the switches), with a toast
 		$$('[data-name]', main).forEach(f => f.addEventListener('change', async () => {
 			try {
 				await post('general', 'set', { name: f.dataset.name, value: f.value });
 				toast(t('InboxSaved'));
-				if (f.dataset.name === 'INBOX_ACCENT') {
-					document.documentElement.style.setProperty('--ibx-accent', f.value);
-				}
 			} catch (err) {
 				toast(err.message, { error: true });
 				f.focus();

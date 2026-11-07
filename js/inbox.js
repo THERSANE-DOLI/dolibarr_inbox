@@ -476,12 +476,76 @@
 		rail.setAttribute('aria-label', t('InboxSpaces'));
 		rail.innerHTML = spaces.filter(s => !s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
 			+ '<span class="ibx-rail__spacer"></span>'
+			// Light / dark in one click (the choice of My account, saved), above the bell
+			+ '<button type="button" class="ibx-rail__item ibx-js-themeswitch" role="switch" aria-checked="false">' + ic('theme-dark', 'ibx-rail__moon') + ic('theme-light', 'ibx-rail__sun') + '</button>'
 			// The bell of the notifications (js/inbox-notify.js), above the buttons of the bottom
 			+ '<button type="button" class="ibx-rail__item ibx-js-bell" aria-haspopup="dialog" aria-expanded="false" title="' + th('InboxNotifications') + '" aria-label="' + th('InboxNotifications') + '">'
 			+ ic('bell') + '<span class="ibx-rail__badge" aria-hidden="true" hidden></span></button>'
 			+ spaces.filter(s => s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
 			+ '<a class="ibx-rail__item" href="' + esc(ctx('INBOX_DOLIBARR_URL', '/')) + '" title="' + th('InboxBackToDolibarr') + '" aria-label="' + th('InboxBackToDolibarr') + '">' + ic('logout') + '</a>';
 		app.prepend(rail);
+		bindThemeSwitch($('.ibx-js-themeswitch', rail));
+	}
+
+	/** The theme shown now is dark: forced dark, or « auto » with a dark system */
+	function isDark() {
+		const forced = document.documentElement.dataset.ibxTheme;
+		return forced ? forced === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+	}
+
+	/**
+	 * Switch of the rail: light <-> dark, saved as the theme of My account. The new theme grows in a circle from the
+	 * button (View Transitions API), else the colours cross-fade; at once when the user asks for reduced motion.
+	 * @param {HTMLElement} btn
+	 */
+	function bindThemeSwitch(btn) {
+		const root = document.documentElement;
+		const paint = () => {
+			const dark = isDark();
+			btn.setAttribute('aria-checked', String(dark));
+			const label = t(dark ? 'InboxThemeToLight' : 'InboxThemeToDark');
+			btn.title = label;
+			btn.setAttribute('aria-label', t('InboxDarkTheme'));
+		};
+		paint();
+		if (window.matchMedia) {
+			window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint);
+		}
+		Dolibarr.on('inbox:params:changed', () => setTimeout(paint, 0));
+		btn.addEventListener('click', async () => {
+			const theme = isDark() ? 'light' : 'dark';
+			const apply = () => {
+				root.dataset.ibxTheme = theme;
+				void root.offsetHeight;
+				paint();
+			};
+			const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			if (reduced) {
+				apply();
+			} else if (document.startViewTransition) {
+				const box = btn.getBoundingClientRect();
+				const x = box.left + box.width / 2;
+				const y = box.top + box.height / 2;
+				const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+				const tr = document.startViewTransition(apply);
+				tr.ready.then(() => {
+					root.animate({ clipPath: ['circle(0 at ' + x + 'px ' + y + 'px)', 'circle(' + radius + 'px at ' + x + 'px ' + y + 'px)'] },
+						{ duration: 550, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' });
+				}).catch(() => {
+					// applied without animation
+				});
+			} else {
+				root.classList.add('ibx-theme-fading');
+				apply();
+				setTimeout(() => root.classList.remove('ibx-theme-fading'), 400);
+			}
+			try {
+				const r = await post('userparam', 'set', { id: 0, param: 'theme', value: theme });
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
 	}
 
 	// Mail space: js/inbox-mail.js (lot W3), registered first so that it is the default space
@@ -495,8 +559,19 @@
 		$, $$,
 	};
 	Dolibarr.defineTool('inbox', inbox);
-	// setEventMessage of the context shown as an inbox toast (no jnotify on this page)
-	Dolibarr.defineTool('setEventMessage', (msg, type) => toast(String(msg), { error: type === 'errors' || type === 'error' }), true);
+	// setEventMessage of the context shown as an inbox toast. Its tool is never redefined (the context makes every tool
+	// non-configurable: a second definition throws); without jnotify, the tool of Dolibarr writes into
+	// #alert-message-container when it exists (else a window.alert): the messages written there become toasts.
+	const alerts = document.createElement('div');
+	alerts.id = 'alert-message-container';
+	alerts.hidden = true;
+	document.body.appendChild(alerts);
+	new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(n => {
+		if (n.nodeType === 1) {
+			toast(String(n.textContent || ''), { error: n.classList.contains('error') });
+			n.remove();
+		}
+	}))).observe(alerts, { childList: true });
 
 	// ---------- Tooltips ----------
 	/**

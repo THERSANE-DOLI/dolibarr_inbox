@@ -198,7 +198,7 @@
 	}
 
 	// Background of the folders pane (--ibx-bg-pane), light and dark theme
-	const PANE = { light: '#f6f8f9', dark: '#1b2328' };
+	const PANE = { light: '#f7f7f8', dark: '#1f1f23' };
 
 	/**
 	 * A colour chosen for an icon, kept readable (3:1, WCAG 1.4.11) on the pane: mixed with black (light theme) or

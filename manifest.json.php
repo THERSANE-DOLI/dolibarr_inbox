@@ -59,9 +59,9 @@ if (!$res) {
 $langs->loadLangs(array('inbox@inbox'));
 
 $company = getDolGlobalString('MAIN_INFO_SOCIETE_NOM');
-$accent = getDolGlobalString('INBOX_ACCENT', '#1d6a8a');
+$accent = getDolGlobalString('INBOX_ACCENT', '#8a2b6e');
 if (!preg_match('/^#[0-9a-f]{6}$/i', $accent)) {
-	$accent = '#1d6a8a';
+	$accent = '#8a2b6e';
 }
 $scope = dol_buildpath('/inbox/', 1);
 $manifest = array(

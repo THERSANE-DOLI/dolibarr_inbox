@@ -5,8 +5,8 @@
 # Module
 #
 ModuleInboxName = Inbox
-ModuleInboxDesc = Mail foundation: one mail read by its Message-ID, .eml and .msg files parsed
-ModuleInboxDescLong = Inbox: the mailboxes of the team in Dolibarr. Their mails can be read by other modules from a Message-ID, always read only (the mail stays unread), and the mails given as files (.eml, Outlook .msg) are read with their attachments. Other modules use it, for example to prefill a quote from a price request.
+ModuleInboxDesc = Webmail in Dolibarr: the mailboxes of the team, shared or personal, read and written next to your customers and your documents
+ModuleInboxDescLong = Inbox is a webmail inside Dolibarr. Each user finds the mailboxes opened to them by the team (shared or personal, IMAP), reads, sorts, tags and assigns the mails, writes with templates and a full editor, and sends from the server of the mailbox. Beside each mail, Dolibarr: the thirdparty and the contact recognised, the linked proposals, orders and invoices, the notes of the team; a mail is linked to a piece or creates it in one click, and a sending can be recorded on it. Rights by mailbox (read, send, manage), journal of the actions, installable on a phone. Other modules plug into it through its hooks.
 
 #
 # Permissions
@@ -1360,3 +1360,29 @@ InboxMailtoLinks = Mail links (mailto)
 InboxMailtoRegister = Open them in inbox
 InboxMailtoHelp = The browser asks for your agreement, on this computer only. A mail address clicked in any site then opens a new mail here.
 InboxMailtoAsked = Answer the question of the browser (often in its address bar)
+InboxDarkTheme = Dark theme
+InboxThemeToDark = Switch to the dark theme
+InboxThemeToLight = Switch to the light theme
+InboxAccentDark = Accent in the dark theme
+InboxAccentDarkAuto = Automatic
+InboxAccentDarkOwn = Choose
+InboxAccentDarkHelp = Automatic: the same hue as the accent, lighter so that it reads on the dark background.
+InboxAccentDarkWeak = This colour reads badly on the dark background (contrast %s:1, 4.5:1 at least).
+InboxAccentDarkUseAuto = Use the computed colour
+InboxSectionLook = Look
+InboxAccentOther = Other…
+InboxAccent_prune = Plum (default)
+InboxAccent_violet = Violet
+InboxAccent_indigo = Indigo
+InboxAccent_blue = Blue
+InboxAccent_teal = Teal
+InboxAccent_green = Green
+InboxAccent_amber = Amber
+InboxAccent_slate = Slate
+InboxGreys = Greys
+InboxGreys_neutral = Neutral
+InboxGreys_accent = Tinted with the accent
+InboxGreysHelp = Backgrounds, borders and texts of the interface. Tinted: a hint of the hue of the accent, for a more marked look.
+InboxLookPreview = Preview
+InboxLookPreviewMail = Quote request
+InboxLookPreviewText = Hello, could you send us...

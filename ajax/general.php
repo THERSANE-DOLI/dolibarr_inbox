@@ -36,7 +36,11 @@ inboxAjaxNeedAdmin();
 function inboxGeneralSettings()
 {
 	return array(
-		'INBOX_ACCENT' => array('default' => '#1d6a8a', 'check' => 'color'),
+		'INBOX_ACCENT' => array('default' => '#8a2b6e', 'check' => 'color'),
+		// Accent of the dark theme: '' = computed from INBOX_ACCENT (lighter, same hue)
+		'INBOX_ACCENT_DARK' => array('default' => '', 'check' => 'color_or_empty'),
+		// Greys of the interface: pure, or tinted with the hue of the accent
+		'INBOX_GREYS' => array('default' => 'neutral', 'check' => array('neutral', 'accent')),
 		'INBOX_DEFAULT_READ_MODE' => array('default' => 'delay', 'check' => array('immediate', 'delay', 'manual')),
 		'INBOX_DEFAULT_READ_DELAY' => array('default' => '3', 'check' => 'int:0:600'),
 		'INBOX_SEND_DELAY' => array('default' => '10', 'check' => 'int:0:120'),
@@ -64,6 +68,9 @@ function inboxGeneralValid($check, $value)
 {
 	if (is_array($check)) {
 		return in_array($value, $check, true);
+	}
+	if ($check === 'color_or_empty') {
+		return $value === '' || (bool) preg_match('/^#[0-9a-f]{6}$/i', $value);
 	}
 	if ($check === 'color') {
 		return (bool) preg_match('/^#[0-9a-f]{6}$/i', $value);

@@ -95,26 +95,49 @@ file_put_contents($root.'/img/inbox-icon-choices.json', json_encode($choices)."\
 echo 'choices: '.count($choices)."\n";
 echo 'missing: '.($missing ? implode(', ', $missing) : 'none')."\n";
 
-// Icons of the installable application: white envelope on the accent colour (square for maskable, the safe zone
-// keeps the drawing inside the inner 80 %)
-$accent = '#1d6a8a';
-$envelope = (string) file_get_contents($root.'/dev/tabler/outline/mail.svg');
-$paths = preg_replace('/^.*?<svg\b[^>]*>|<\/svg>\s*$/s', '', $envelope);
-$paths = preg_replace('/<path stroke="none" d="M0 0h24v24H0z" fill="none"\s*\/>/', '', $paths);
-$make = function ($rounded, $scale) use ($accent, $paths) {
-	$offset = (24 - 24 * $scale) / 2;
-	return '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 24 24">'
-		.'<rect width="24" height="24" rx="'.($rounded ? '5' : '0').'" fill="'.$accent.'"/>'
-		.'<g transform="translate('.$offset.' '.$offset.') scale('.$scale.')" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'.$paths.'</g></svg>';
-};
-file_put_contents($root.'/img/app-icon.svg', $make(true, 0.72));
+// Icons of the installable application: the logo of the module (img/inbox.svg) in white on the accent colour
+// (square for maskable, the safe zone keeps the drawing inside the inner 80 %)
+$accent = '#8a2b6e';
+$logo = (string) file_get_contents($root.'/img/inbox.svg');
+// Only the drawing: no namedview nor metadata of Inkscape, every colour of the drawing white
+$logo = preg_replace('/<sodipodi:namedview\b.*?\/>|<metadata\b.*?<\/metadata>|<defs\b[^>]*\/>/s', '', $logo);
+$inner = preg_replace('/^.*?<svg\b[^>]*>|<\/svg>\s*$/s', '', $logo);
+$inner = preg_replace('/\s(inkscape|sodipodi):[a-z-]+="[^"]*"/i', '', $inner);
+$inner = preg_replace('/(fill|stroke):#[0-9a-f]{6}/i', '$1:#ffffff', $inner);
+// Real box of the drawing (the page of Inkscape is larger): drawn on a large canvas and trimmed by ImageMagick
+$box = array(0, 0, 512, 512);
 $convert = trim((string) shell_exec('command -v convert 2>/dev/null'));
+if ($convert !== '') {
+	$big = sys_get_temp_dir().'/inbox-logo-box-'.getmypid().'.svg';
+	file_put_contents($big, '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="-256 -256 1024 1024">'.$inner.'</svg>');
+	$info = (string) shell_exec(escapeshellcmd($convert).' -background none -density 96 '.escapeshellarg($big).' -trim info:');
+	unlink($big);
+	if (preg_match('/ (\d+)x(\d+) \d+x\d+\+(\d+)\+(\d+) /', $info, $m)) {
+		$box = array((int) $m[3] - 256, (int) $m[4] - 256, (int) $m[1], (int) $m[2]);
+	}
+}
+// The drawing centred, its width (or height) at $scale of the icon
+$make = function ($rounded, $scale) use ($accent, $inner, $box) {
+	$k = 512 * $scale / max($box[2], $box[3]);
+	$tx = 256 - ($box[0] + $box[2] / 2) * $k;
+	$ty = 256 - ($box[1] + $box[3] / 2) * $k;
+	return '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">'
+		.'<rect width="512" height="512" rx="'.($rounded ? '107' : '0').'" fill="'.$accent.'"/>'
+		.'<g transform="translate('.round($tx, 2).' '.round($ty, 2).') scale('.round($k, 4).')">'.trim($inner).'</g></svg>';
+};
+file_put_contents($root.'/img/app-icon.svg', $make(true, 0.78));
+// Icon of the tab (favicon): too small for the bird, a white envelope of Tabler on the accent
+$envelope = (string) file_get_contents($root.'/dev/tabler/outline/mail.svg');
+$envelope = preg_replace('/^.*?<svg\b[^>]*>|<\/svg>\s*$/s', '', $envelope);
+$envelope = preg_replace('/<path stroke="none" d="M0 0h24v24H0z" fill="none"\s*\/>/', '', $envelope);
+file_put_contents($root.'/img/favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="'.$accent.'"/>'
+	.'<g transform="translate(3.36 3.36) scale(0.72)" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'.trim($envelope).'</g></svg>'."\n");
 if ($convert === '') {
 	echo "ImageMagick not found: application icons not built\n";
 	exit(0);
 }
 $tmp = sys_get_temp_dir().'/inbox-app-maskable-'.getmypid().'.svg';
-file_put_contents($tmp, $make(false, 0.56));
+file_put_contents($tmp, $make(false, 0.62));
 foreach (array(192, 512) as $size) {
 	shell_exec(escapeshellcmd($convert).' -background none -density 600 '.escapeshellarg($root.'/img/app-icon.svg').' -resize '.$size.'x'.$size.' '.escapeshellarg($root.'/img/app-'.$size.'.png'));
 }

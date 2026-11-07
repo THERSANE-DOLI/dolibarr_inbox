@@ -10,22 +10,22 @@
 	/* Native parts of the page (fields, lists, scrollbars) drawn for the theme */
 	color-scheme: light;
 	/* Accent (configurable in the module setup) */
-	--ibx-accent: #1d6a8a;
+	--ibx-accent: #8a2b6e;
 	--ibx-accent-hover: color-mix(in srgb, var(--ibx-accent) 85%, black);
 	--ibx-accent-soft: color-mix(in srgb, var(--ibx-accent) 12%, var(--ibx-bg));
 	--ibx-accent-softer: color-mix(in srgb, var(--ibx-accent) 6%, var(--ibx-bg));
 	--ibx-on-accent: #ffffff;
 
-	/* Neutrals, cool grey tinted to the accent */
+	/* Neutrals: pure greys (setup: tinted with the accent, lib/inboxapp.lib.php inboxAccentCss) */
 	--ibx-bg: #ffffff;
-	--ibx-bg-pane: #f6f8f9;
-	--ibx-bg-sunken: #eef2f4;
-	--ibx-bg-hover: #e8eef1;
-	--ibx-border: #d9e1e5;
-	--ibx-border-strong: #b9c6cc;
-	--ibx-text: #0f1a1f;
-	--ibx-text-muted: #4b5a61;
-	--ibx-text-faint: #85949a;
+	--ibx-bg-pane: #f7f7f8;
+	--ibx-bg-sunken: #efeff1;
+	--ibx-bg-hover: #e9e9ec;
+	--ibx-border: #dddde1;
+	--ibx-border-strong: #c1c1c7;
+	--ibx-text: #18181b;
+	--ibx-text-muted: #53535a;
+	--ibx-text-faint: #86868e;
 
 	/* Semantic */
 	--ibx-danger: #c0392b;
@@ -43,7 +43,7 @@
 	--ibx-folder-sent: #2f855a;
 	--ibx-folder-archive: #8a5a2b;
 	--ibx-folder-junk: #c0392b;
-	--ibx-folder-trash: #5f6b70;
+	--ibx-folder-trash: #65656c;
 	--ibx-folder-other: #a86d00;
 
 	/* Thunderbird tags */
@@ -87,17 +87,17 @@
 @media (prefers-color-scheme: dark) {
 	:root:not([data-ibx-theme="light"]) {
 		color-scheme: dark;
-		--ibx-accent: #4fa8c9;
-		--ibx-on-accent: #081a22;
-		--ibx-bg: #151c20;
-		--ibx-bg-pane: #1b2328;
-		--ibx-bg-sunken: #11171a;
-		--ibx-bg-hover: #243038;
-		--ibx-border: #2c3a42;
-		--ibx-border-strong: #3e4f58;
-		--ibx-text: #e3eaed;
-		--ibx-text-muted: #a1b0b6;
-		--ibx-text-faint: #73848b;
+		--ibx-accent: #d58bc0;
+		--ibx-on-accent: #2a0d22;
+		--ibx-bg: #18181b;
+		--ibx-bg-pane: #1f1f23;
+		--ibx-bg-sunken: #131316;
+		--ibx-bg-hover: #2a2a2f;
+		--ibx-border: #34343a;
+		--ibx-border-strong: #48484f;
+		--ibx-text: #e7e7ea;
+		--ibx-text-muted: #a5a5ad;
+		--ibx-text-faint: #76767e;
 		--ibx-danger: #ef6f62;
 		--ibx-danger-soft: #3a1f1c;
 		--ibx-warning: #e3b04b;
@@ -108,24 +108,24 @@
 		--ibx-folder-sent: #5cc28c;
 		--ibx-folder-archive: #d1a26e;
 		--ibx-folder-junk: #ef6f62;
-		--ibx-folder-trash: #a1b0b6;
+		--ibx-folder-trash: #a5a5ad;
 		--ibx-folder-other: #e3b04b;
 		--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 	}
 }
 :root[data-ibx-theme="dark"] {
 	color-scheme: dark;
-	--ibx-accent: #4fa8c9;
-	--ibx-on-accent: #081a22;
-	--ibx-bg: #151c20;
-	--ibx-bg-pane: #1b2328;
-	--ibx-bg-sunken: #11171a;
-	--ibx-bg-hover: #243038;
-	--ibx-border: #2c3a42;
-	--ibx-border-strong: #3e4f58;
-	--ibx-text: #e3eaed;
-	--ibx-text-muted: #a1b0b6;
-	--ibx-text-faint: #73848b;
+	--ibx-accent: #d58bc0;
+	--ibx-on-accent: #2a0d22;
+	--ibx-bg: #18181b;
+	--ibx-bg-pane: #1f1f23;
+	--ibx-bg-sunken: #131316;
+	--ibx-bg-hover: #2a2a2f;
+	--ibx-border: #34343a;
+	--ibx-border-strong: #48484f;
+	--ibx-text: #e7e7ea;
+	--ibx-text-muted: #a5a5ad;
+	--ibx-text-faint: #76767e;
 	--ibx-danger: #ef6f62;
 	--ibx-danger-soft: #3a1f1c;
 	--ibx-warning: #e3b04b;
@@ -136,7 +136,7 @@
 	--ibx-folder-sent: #5cc28c;
 	--ibx-folder-archive: #d1a26e;
 	--ibx-folder-junk: #ef6f62;
-	--ibx-folder-trash: #a1b0b6;
+	--ibx-folder-trash: #a5a5ad;
 	--ibx-folder-other: #e3b04b;
 	--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 }
@@ -273,9 +273,12 @@
 
 /* ===== 6. App layout ===== */
 /* Shell: rail + the space shown (Mail, Settings...). Each space keeps its own layout and its state. */
+/* The page itself never scrolls: only the panes do (the rail stays in place, even when a field deep in a pane gets the focus) */
 html.ibx-html, html.ibx-html body { height: 100%; margin: 0; background: var(--ibx-bg); }
-.ibx-app { height: 100vh; height: 100dvh; display: grid; grid-template-columns: var(--ibx-rail-w) minmax(0, 1fr); overflow: hidden; }
-.ibx-space { min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
+/* position: the hidden fields (sr-only, absolute) are placed inside it, never under the page; clip: not scrollable by a focus */
+.ibx-app { position: relative; height: 100vh; height: 100dvh; display: grid; grid-template-columns: var(--ibx-rail-w) minmax(0, 1fr); overflow: hidden; overflow: clip; }
+.ibx-space { position: relative; min-width: 0; min-height: 0; height: 100%; overflow: hidden; overflow: clip; }
 .ibx-space[hidden] { display: none !important; }
 /* Mail space: 3 panes, as Thunderbird */
 .ibx-mail { height: 100%; min-height: 0; display: grid; grid-template-columns: var(--ibx-rail-w) var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); overflow: hidden; }
@@ -578,7 +581,7 @@ html.ibx-html, html.ibx-html body { height: 100%; margin: 0; background: var(--i
 }
 @media (max-width: 63.9375rem) {
 	.ibx-attbar { position: static; box-shadow: none; }
-	.ibx-app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+	.ibx-app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
 	.ibx-rail { flex-direction: row; padding: 0 var(--ibx-s2); height: 3rem; border-right: 0; border-bottom: 1px solid var(--ibx-border); }
 	.ibx-rail__spacer { flex: 1; }
 	.ibx-splitter { display: none; }
@@ -593,14 +596,14 @@ html.ibx-html, html.ibx-html body { height: 100%; margin: 0; background: var(--i
 a.ibx-btn, a.ibx-btn:hover { text-decoration: none; }
 
 /* ===== 16. Settings space: navigation + content ===== */
-.ibx-settings { height: 100%; display: grid; grid-template-columns: 15rem minmax(0, 1fr); }
+.ibx-settings { height: 100%; display: grid; grid-template-columns: 15rem minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .ibx-settings__nav { overflow: auto; padding: var(--ibx-s3) var(--ibx-s2); background: var(--ibx-bg-pane); border-right: 1px solid var(--ibx-border); }
 .ibx-settings__navtitle { padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); font-size: var(--ibx-fs-lg); font-weight: 600; }
 .ibx-settings__navgroup { padding: var(--ibx-s3) var(--ibx-s2) var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; color: var(--ibx-text-faint); text-transform: uppercase; letter-spacing: .04em; }
 .ibx-navlink { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2rem; padding: 0 var(--ibx-s2); color: var(--ibx-text); text-decoration: none; border-radius: var(--ibx-radius); }
 .ibx-navlink:hover { background: var(--ibx-bg-hover); }
 .ibx-navlink[aria-current="page"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); font-weight: 600; }
-.ibx-settings__main { overflow: auto; }
+.ibx-settings__main { position: relative; overflow: auto; }
 .ibx-page { max-width: 60rem; padding: var(--ibx-s5) var(--ibx-s6) var(--ibx-s6); }
 .ibx-page__head { display: flex; align-items: center; gap: var(--ibx-s3); flex-wrap: wrap; margin-bottom: var(--ibx-s4); }
 .ibx-page__title { margin: 0; flex: 1; min-width: 0; font-size: var(--ibx-fs-xl); font-weight: 600; }
@@ -698,7 +701,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 /* ===== 25. High contrast (AAA) and forced colours ===== */
 :root[data-ibx-theme="contrast"] {
 	color-scheme: light;
-	--ibx-accent: #0b3d91;
+	--ibx-accent: #5c1648;
 	--ibx-on-accent: #ffffff;
 	--ibx-bg: #ffffff;
 	--ibx-bg-pane: #ffffff;
@@ -743,7 +746,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 
 /* ===== 18. Mail space of the application (lot W3) ===== */
 /* The rail is outside the space here (shell .ibx-app): 3 panes and their 2 splitters */
-.ibx-mailapp { height: 100%; min-height: 0; display: grid; grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); overflow: hidden; }
+.ibx-mailapp { height: 100%; min-height: 0; display: grid; grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); overflow: hidden; overflow: clip; }
 .ibx-mailapp[data-folders="collapsed"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); }
 .ibx-mailapp[data-folders="collapsed"] .ibx-pane--folders,
 .ibx-mailapp[data-folders="collapsed"] .ibx-splitter[data-split="1"] { display: none; }
@@ -968,9 +971,9 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
    The bubble is the ::after of the element (text of data-title), its arrow the ::before. */
 :root { --ibx-tip-fg: #f9fafb; --ibx-tip-bg: #1f2937; --ibx-tip-border: #374151; --ibx-tip-arrow: 6px; }
 @media (prefers-color-scheme: dark) {
-	:root:not([data-ibx-theme="light"]) { --ibx-tip-bg: #0d1418; --ibx-tip-border: #4b5b62; }
+	:root:not([data-ibx-theme="light"]) { --ibx-tip-bg: #111114; --ibx-tip-border: #55555c; }
 }
-:root[data-ibx-theme="dark"] { --ibx-tip-bg: #0d1418; --ibx-tip-border: #4b5b62; }
+:root[data-ibx-theme="dark"] { --ibx-tip-bg: #111114; --ibx-tip-border: #55555c; }
 :root[data-ibx-theme="contrast"] { --ibx-tip-fg: #ffffff; --ibx-tip-bg: #000000; --ibx-tip-border: #ffffff; }
 
 .ibx-tooltip { position: relative; }
@@ -1560,3 +1563,39 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-tpledit__tools select { margin-left: auto; max-width: 16rem; }
 .ibx-tpledit__editor { min-height: 12rem; max-height: 50vh; overflow: auto; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: 0 0 var(--ibx-radius) var(--ibx-radius); background: var(--ibx-bg); }
 .ibx-tpledit__editor .ibx-editor__content { min-height: 10rem; outline: none; }
+
+/* Switch of the theme in the rail: moon in light (to go dark), sun in dark; the new theme grows in a circle from it
+   (View Transitions API), else the colours cross-fade (js/inbox.js) */
+.ibx-rail__item .ibx-rail__sun { display: none; }
+.ibx-js-themeswitch[aria-checked="true"] .ibx-rail__moon { display: none; }
+.ibx-js-themeswitch[aria-checked="true"] .ibx-rail__sun { display: inline-block; }
+html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading *::after {
+	transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, fill 0.35s ease !important;
+}
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* Accent of the dark theme in the setup: automatic (its colour shown) or chosen */
+.ibx-accentdark { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2) var(--ibx-s4); }
+.ibx-accentdark .ibx-formrow__help, .ibx-accentdark .ibx-notice { flex-basis: 100%; }
+.ibx-accentdark__swatch { display: inline-block; width: 1rem; height: 1rem; vertical-align: middle; border-radius: var(--ibx-radius-sm); box-shadow: inset 0 0 0 1px var(--ibx-border-strong); }
+.ibx-accentdark code { font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+
+/* Look of the setup: colours offered for the accent, preview in light and dark */
+.ibx-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
+.ibx-swatchpick { position: relative; display: inline-flex; }
+.ibx-swatchpick input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.ibx-swatchpick__dot { width: 1.75rem; height: 1.75rem; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15); }
+.ibx-swatchpick input:checked + .ibx-swatchpick__dot { box-shadow: 0 0 0 2px var(--ibx-bg), 0 0 0 4px var(--ibx-text); }
+.ibx-swatchpick input:focus-visible + .ibx-swatchpick__dot { box-shadow: var(--ibx-focus); }
+@media (pointer: coarse) { .ibx-swatchpick__dot { width: 2.5rem; height: 2.5rem; } }
+.ibx-apreview { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: var(--ibx-s3); }
+.ibx-apreview__theme { display: grid; grid-template-columns: 6.5rem 1fr; min-height: 9rem; overflow: hidden; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg); color: var(--ibx-text); font-size: var(--ibx-fs-sm); }
+.ibx-apreview__pane { display: flex; flex-direction: column; gap: 2px; padding: var(--ibx-s2); background: var(--ibx-bg-pane); border-right: 1px solid var(--ibx-border); }
+.ibx-apreview__row { padding: 0.2rem 0.4rem; border-radius: var(--ibx-radius-sm); color: var(--ibx-text-muted); }
+.ibx-apreview__row.is-on { color: var(--ibx-text); background: var(--ibx-accent-soft); }
+.ibx-apreview__row.is-hover { background: var(--ibx-bg-hover); }
+.ibx-apreview__list { display: flex; flex-direction: column; gap: var(--ibx-s2); padding: var(--ibx-s2); }
+.ibx-apreview__search { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0.2rem 0.4rem; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-sm); background: var(--ibx-bg-sunken); color: var(--ibx-text-faint); }
+.ibx-apreview__mail { padding: 0.3rem 0.5rem; border: 1px solid var(--ibx-border); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius-sm); }
+.ibx-apreview__mail span { display: block; color: var(--ibx-text-muted); }
+.ibx-apreview__btn { align-self: flex-start; padding: 0.15rem 0.6rem; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent); color: var(--ibx-on-accent); font-weight: 600; }

@@ -53,7 +53,7 @@ class modInbox extends DolibarrModules
 		$this->editor_url = 'https://www.thersane.fr';
 		$this->version = '1.18.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
-		$this->picto = 'fa-inbox';
+		$this->picto = 'inbox@inbox';
 
 		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
 		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0)
@@ -172,7 +172,7 @@ class modInbox extends DolibarrModules
 			'fk_menu' => '',
 			'type' => 'top',
 			'titre' => 'InboxAppName',
-			'prefix' => img_picto('', 'fa-inbox', 'class="pictofixedwidth valignmiddle"'),
+			'prefix' => img_picto('', 'fa-envelope', 'class="pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'inbox',
 			'leftmenu' => '',
 			'url' => '/inbox/index.php',

@@ -82,11 +82,11 @@ $asset = function ($path) use ($version) {
 $vars['INBOX_EDITOR_URL'] = $asset('/js/vendor/tiptap/tiptap.min.js');
 $title = $langs->trans('InboxAppName').($vars['INBOX_COMPANY'] !== '' ? ' '.$vars['INBOX_COMPANY'] : '');
 $theme = in_array($params['theme'], array('light', 'dark', 'contrast'), true) ? $params['theme'] : '';
-$accent = preg_match('/^#[0-9a-f]{6}$/i', (string) $vars['INBOX_ACCENT']) ? $vars['INBOX_ACCENT'] : '#1d6a8a';
+$accent = preg_match('/^#[0-9a-f]{6}$/i', (string) $vars['INBOX_ACCENT']) ? $vars['INBOX_ACCENT'] : '#8a2b6e';
 
 top_httphead('text/html');
 print '<!DOCTYPE html>'."\n";
-print '<html lang="'.dol_escape_htmltag(substr($langs->getDefaultLang(), 0, 2)).'" class="ibx-html"'.($theme !== '' ? ' data-ibx-theme="'.$theme.'"' : '')
+print '<html lang="'.dol_escape_htmltag(substr($langs->getDefaultLang(), 0, 2)).'" class="ibx-html ibx-html--app"'.($theme !== '' ? ' data-ibx-theme="'.$theme.'"' : '')
 	.' data-ibx-density="'.dol_escape_htmltag($params['density']).'" style="font-size:'.((int) $params['text_size']).'%">'."\n";
 print '<head>'."\n";
 print '<meta charset="utf-8">'."\n";
@@ -95,10 +95,10 @@ print '<meta name="robots" content="noindex,nofollow">'."\n";
 print '<meta name="theme-color" content="'.$accent.'">'."\n";
 print '<title>'.dol_escape_htmltag($title).'</title>'."\n";
 print '<link rel="manifest" href="'.dol_buildpath('/inbox/manifest.json.php', 1).'">'."\n";
-print '<link rel="icon" type="image/svg+xml" href="'.dol_buildpath('/inbox/img/app-icon.svg', 1).'">'."\n";
+print '<link rel="icon" type="image/svg+xml" href="'.dol_buildpath('/inbox/img/favicon.svg', 1).'">'."\n";
 print '<link rel="apple-touch-icon" href="'.dol_buildpath('/inbox/img/app-192.png', 1).'">'."\n";
 print '<link rel="stylesheet" href="'.$asset('/css/inbox.css').'">'."\n";
-print '<style nonce="'.getNonce().'">:root{--ibx-accent:'.$accent.'}</style>'."\n";
+print '<style nonce="'.getNonce().'" id="ibx-accent-css">'.inboxAccentCss($accent, getDolGlobalString('INBOX_ACCENT_DARK'), getDolGlobalString('INBOX_GREYS', 'neutral')).'</style>'."\n";
 if (!inboxPrintJsContext($vars)) {
 	print '</head><body class="ibx-doc"><p class="ibx-notice ibx-notice--error">'.dol_escape_htmltag($langs->trans('InboxNeedBackportDolContext')).'</p></body></html>';
 	exit;

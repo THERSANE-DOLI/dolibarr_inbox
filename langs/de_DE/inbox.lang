@@ -5,8 +5,8 @@
 # Module
 #
 ModuleInboxName = Inbox
-ModuleInboxDesc = Mail-Grundlage: eine E-Mail über ihre Message-ID lesen, .eml- und .msg-Dateien auswerten
-ModuleInboxDescLong = Inbox: die Postfächer des Teams in Dolibarr. Andere Module können darin eine E-Mail anhand ihrer Message-ID lesen, immer nur lesend (die E-Mail bleibt ungelesen), und als Datei gelieferte E-Mails (.eml, Outlook .msg) werden mit ihren Anhängen gelesen. Andere Module nutzen es, zum Beispiel um ein Angebot aus einer Preisanfrage vorauszufüllen.
+ModuleInboxDesc = Webmail in Dolibarr: die Postfächer des Teams, geteilt oder persönlich, gelesen und geschrieben neben Ihren Kunden und Vorgängen
+ModuleInboxDescLong = Inbox ist ein in Dolibarr integriertes Webmail. Jeder findet die Postfächer, auf die das Team Zugriff gewährt (geteilt oder persönlich, IMAP), liest, ordnet, markiert und weist E-Mails zu, schreibt mit Vorlagen und einem vollständigen Editor und sendet über den Server des Postfachs. Neben jeder E-Mail Dolibarr: der erkannte Geschäftspartner und Kontakt, die verknüpften Angebote, Aufträge und Rechnungen, die Notizen des Teams; eine E-Mail wird mit einem Klick mit einem Vorgang verknüpft oder erstellt ihn, und ein Versand kann dort gespeichert werden. Rechte pro Postfach (lesen, senden, verwalten), Protokoll der Aktionen, auf einem Telefon installierbar. Andere Module docken über seine Hooks an.
 
 #
 # Permissions
@@ -1360,3 +1360,29 @@ InboxMailtoLinks = Mail-Links (mailto)
 InboxMailtoRegister = In inbox öffnen
 InboxMailtoHelp = Der Browser fragt nach Ihrer Zustimmung, nur auf diesem Computer. Eine auf einer beliebigen Seite angeklickte Adresse öffnet dann hier eine neue E-Mail.
 InboxMailtoAsked = Beantworten Sie die Frage des Browsers (oft in der Adressleiste)
+InboxDarkTheme = Dunkles Design
+InboxThemeToDark = Zum dunklen Design wechseln
+InboxThemeToLight = Zum hellen Design wechseln
+InboxAccentDark = Akzent im dunklen Design
+InboxAccentDarkAuto = Automatisch
+InboxAccentDarkOwn = Wählen
+InboxAccentDarkHelp = Automatisch: derselbe Farbton wie der Akzent, heller, damit er auf dem dunklen Hintergrund lesbar ist.
+InboxAccentDarkWeak = Diese Farbe ist auf dem dunklen Hintergrund schlecht lesbar (Kontrast %s:1, mindestens 4,5:1).
+InboxAccentDarkUseAuto = Berechnete Farbe verwenden
+InboxSectionLook = Erscheinungsbild
+InboxAccentOther = Andere…
+InboxAccent_prune = Pflaume (Standard)
+InboxAccent_violet = Violett
+InboxAccent_indigo = Indigo
+InboxAccent_blue = Blau
+InboxAccent_teal = Blaugrün
+InboxAccent_green = Grün
+InboxAccent_amber = Bernstein
+InboxAccent_slate = Schiefer
+InboxGreys = Grautöne
+InboxGreys_neutral = Neutral
+InboxGreys_accent = Mit dem Akzent getönt
+InboxGreysHelp = Hintergründe, Rahmen und Texte der Oberfläche. Getönt: ein Hauch des Akzentfarbtons, für ein markanteres Aussehen.
+InboxLookPreview = Vorschau
+InboxLookPreviewMail = Angebotsanfrage
+InboxLookPreviewText = Guten Tag, könnten Sie uns...

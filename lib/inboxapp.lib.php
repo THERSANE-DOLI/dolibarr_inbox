@@ -61,10 +61,10 @@ function inboxPrintJsContext(array $vars)
 }
 
 /**
- * Values of inbox given to the JavaScript context of the application page (never a secret)
+ * The user may send from at least one mailbox (level send or manage)
  *
  * @param User $user Current user
- * @return array<string,mixed>
+ * @return bool
  */
 function inboxCanSend(User $user)
 {
@@ -114,7 +114,7 @@ function inboxAppContextVars(User $user)
 		// Lot W6: the user may write (an active mailbox with the level « send » at least)
 		'INBOX_CAN_SEND' => inboxCanSend($user),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
-		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#1d6a8a'),
+		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#8a2b6e'),
 		// Colour blindness declared in the card of the user (tab Interface): flashy, protanopia, deuteranopes, tritanopes
 		'INBOX_COLORBLIND' => $colorblind,
 		// Labels of Dolibarr for this option and its value (My account cites them)
@@ -125,4 +125,130 @@ function inboxAppContextVars(User $user)
 		// Changes with the language file: the page clears the translations cached by the browser when it changed
 		'INBOX_LANG_STAMP' => $moduleVersion.'-'.@filemtime(dirname(__DIR__).'/langs/'.$GLOBALS['langs']->getDefaultLang().'/inbox.lang'),
 	);
+}
+
+/**
+ * Look of the setup for each theme: the accent (INBOX_ACCENT) as it is in light (darker if it would not read on white),
+ * a lighter tone of it in dark (or INBOX_ACCENT_DARK), the colour of the text written on it, and the greys: pure, or
+ * tinted with the hue of the accent (INBOX_GREYS = accent). Same computation in js/inbox-settings.js (lookTokens) for
+ * the live preview. The high contrast theme keeps its own colours.
+ *
+ * @param string $hex     Accent #rrggbb
+ * @param string $darkHex Accent of the dark theme, '' = computed
+ * @param string $greys   neutral or accent
+ * @return array{light:array<string,string>,dark:array<string,string>,auto:string,darkContrast:float} Tokens (without --ibx-)
+ */
+function inboxLookTokens($hex, $darkHex = '', $greys = 'neutral')
+{
+	$rgb = function ($h) {
+		$h = ltrim((string) $h, '#');
+		return array(hexdec(substr($h, 0, 2)), hexdec(substr($h, 2, 2)), hexdec(substr($h, 4, 2)));
+	};
+	$lum = function ($c) {
+		$l = array_map(function ($v) {
+			$v /= 255;
+			return $v <= 0.03928 ? $v / 12.92 : pow(($v + 0.055) / 1.055, 2.4);
+		}, $c);
+		return 0.2126 * $l[0] + 0.7152 * $l[1] + 0.0722 * $l[2];
+	};
+	$contrast = function ($a, $b) use ($lum) {
+		$x = $lum($a);
+		$y = $lum($b);
+		return (max($x, $y) + 0.05) / (min($x, $y) + 0.05);
+	};
+	$mix = function ($a, $b, $t) {
+		return array((int) round($a[0] + ($b[0] - $a[0]) * $t), (int) round($a[1] + ($b[1] - $a[1]) * $t), (int) round($a[2] + ($b[2] - $a[2]) * $t));
+	};
+	$hexOf = function ($c) {
+		return sprintf('#%02x%02x%02x', $c[0], $c[1], $c[2]);
+	};
+	// The same hue and saturation, another lightness (a mix with white would make it dull)
+	$toHsl = function ($c) {
+		list($r, $g, $b) = array($c[0] / 255, $c[1] / 255, $c[2] / 255);
+		$max = max($r, $g, $b);
+		$min = min($r, $g, $b);
+		$l = ($max + $min) / 2;
+		$h = 0;
+		$s = 0;
+		if ($max !== $min) {
+			$dd = $max - $min;
+			$s = $l > 0.5 ? $dd / (2 - $max - $min) : $dd / ($max + $min);
+			$h = $max === $r ? ($g - $b) / $dd + ($g < $b ? 6 : 0) : ($max === $g ? ($b - $r) / $dd + 2 : ($r - $g) / $dd + 4);
+			$h /= 6;
+		}
+		return array($h, $s, $l);
+	};
+	$fromHsl = function ($h, $s, $l) {
+		$f = function ($p, $q, $t) {
+			$t = $t < 0 ? $t + 1 : ($t > 1 ? $t - 1 : $t);
+			return $t < 1 / 6 ? $p + ($q - $p) * 6 * $t : ($t < 1 / 2 ? $q : ($t < 2 / 3 ? $p + ($q - $p) * (2 / 3 - $t) * 6 : $p));
+		};
+		$q = $l < 0.5 ? $l * (1 + $s) : $l + $s - $l * $s;
+		$p = 2 * $l - $q;
+		return array((int) round($f($p, $q, $h + 1 / 3) * 255), (int) round($f($p, $q, $h) * 255), (int) round($f($p, $q, $h - 1 / 3) * 255));
+	};
+	$white = array(255, 255, 255);
+	$black = array(0, 0, 0);
+	$base = $rgb(preg_match('/^#[0-9a-f]{6}$/i', (string) $hex) ? $hex : '#8a2b6e');
+	$hsl = $toHsl($base);
+	// Light theme: darker until 4.5:1 on white (a very light colour chosen stays readable)
+	$light = $base;
+	for ($l = $hsl[2]; $contrast($light, $white) < 4.5 && $l > 0; $l -= 0.02) {
+		$light = $fromHsl($hsl[0], $hsl[1], max(0, $l));
+	}
+	// Greys: pure, or the hue of the accent with a very low saturation (6 % light, 10 % dark)
+	$greyLight = array('bg-pane' => '#f7f7f8', 'bg-sunken' => '#efeff1', 'bg-hover' => '#e9e9ec', 'border' => '#dddde1', 'border-strong' => '#c1c1c7', 'text' => '#18181b', 'text-muted' => '#53535a', 'text-faint' => '#86868e');
+	$greyDark = array('bg' => '#18181b', 'bg-pane' => '#1f1f23', 'bg-sunken' => '#131316', 'bg-hover' => '#2a2a2f', 'border' => '#34343a', 'border-strong' => '#48484f', 'text' => '#e7e7ea', 'text-muted' => '#a5a5ad', 'text-faint' => '#76767e');
+	if ($greys === 'accent') {
+		foreach (array(array(&$greyLight, 0.06), array(&$greyDark, 0.10)) as $g) {
+			foreach ($g[0] as $k => $v) {
+				$g[0][$k] = $hexOf($fromHsl($hsl[0], $g[1], $toHsl($rgb($v))[2]));
+			}
+		}
+		unset($g);
+	}
+	// Dark theme: lighter until 6:1 on its background
+	$bg = $rgb($greyDark['bg']);
+	$dark = $base;
+	for ($l = $hsl[2]; $contrast($dark, $bg) < 6 && $l < 1; $l += 0.02) {
+		$dark = $fromHsl($hsl[0], $hsl[1], min(1, $l));
+	}
+	$auto = $dark;
+	// A colour chosen for the dark theme replaces the computed one (the setup warns when it reads badly)
+	if (preg_match('/^#[0-9a-f]{6}$/i', (string) $darkHex)) {
+		$dark = $rgb($darkHex);
+	}
+	// Text on the accent: white, or a very dark tone of the colour, whichever reads better
+	$on = function ($c) use ($contrast, $mix, $white, $black, $hexOf) {
+		$deep = $mix($c, $black, 0.8);
+		return $hexOf($contrast($c, $white) >= $contrast($c, $deep) ? $white : $deep);
+	};
+
+	return array('light' => array('accent' => $hexOf($light), 'on-accent' => $on($light)) + $greyLight,
+		'dark' => array('accent' => $hexOf($dark), 'on-accent' => $on($dark)) + $greyDark, 'auto' => $hexOf($auto), 'darkContrast' => $contrast($dark, $bg));
+}
+
+/**
+ * CSS of the look of the setup (inboxLookTokens), for the page
+ *
+ * @param string $hex     Accent #rrggbb
+ * @param string $darkHex Accent of the dark theme, '' = computed
+ * @param string $greys   neutral or accent
+ * @return string CSS
+ */
+function inboxAccentCss($hex, $darkHex = '', $greys = 'neutral')
+{
+	$t = inboxLookTokens($hex, $darkHex, $greys);
+	$css = function ($set) {
+		$out = '';
+		foreach ($set as $k => $v) {
+			$out .= '--ibx-'.$k.':'.$v.';';
+		}
+		return $out;
+	};
+	$d = $css($t['dark']);
+
+	return ':root:not([data-ibx-theme="contrast"]){'.$css($t['light']).'}'
+		.'@media (prefers-color-scheme: dark){:root:not([data-ibx-theme="light"]):not([data-ibx-theme="contrast"]){'.$d.'}}'
+		.':root[data-ibx-theme="dark"]{'.$d.'}';
 }

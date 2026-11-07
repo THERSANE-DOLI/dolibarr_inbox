@@ -5,8 +5,8 @@
 # Module
 #
 ModuleInboxName = Inbox
-ModuleInboxDesc = Base mail: lettura di una e-mail tramite il suo Message-ID, analisi dei file .eml e .msg
-ModuleInboxDescLong = Inbox: le caselle di posta del team in Dolibarr. Altri moduli possono leggervi una e-mail a partire dal suo Message-ID, sempre in sola lettura (la e-mail resta non letta), e le e-mail fornite come file (.eml, .msg Outlook) vengono lette con i loro allegati. Altri moduli lo usano, per esempio per precompilare un preventivo da una richiesta di prezzo.
+ModuleInboxDesc = Webmail in Dolibarr: le caselle di posta del team, condivise o personali, lette e scritte accanto ai vostri clienti e documenti
+ModuleInboxDescLong = Inbox è una webmail integrata in Dolibarr. Ognuno ritrova le caselle a cui ha accesso (condivise o personali, IMAP), legge, ordina, etichetta e assegna le mail, scrive con modelli e un editor completo, e invia tramite il server della casella. Accanto a ogni mail, Dolibarr: il soggetto terzo e il contatto riconosciuti, i preventivi, ordini e fatture collegati, le note del team; una mail si collega a un documento o lo crea con un clic, e un invio può esservi registrato. Diritti per casella (leggere, inviare, gestire), registro delle azioni, installabile su un telefono. Gli altri moduli vi si collegano tramite i suoi hook.
 
 #
 # Permissions
@@ -1360,3 +1360,29 @@ InboxMailtoLinks = Link di mail (mailto)
 InboxMailtoRegister = Aprirli in inbox
 InboxMailtoHelp = Il browser chiede il tuo consenso, solo su questo computer. Un indirizzo mail cliccato in qualsiasi sito apre allora una nuova mail qui.
 InboxMailtoAsked = Rispondi alla domanda del browser (spesso nella barra degli indirizzi)
+InboxDarkTheme = Tema scuro
+InboxThemeToDark = Passa al tema scuro
+InboxThemeToLight = Passa al tema chiaro
+InboxAccentDark = Accento nel tema scuro
+InboxAccentDarkAuto = Automatico
+InboxAccentDarkOwn = Scegli
+InboxAccentDarkHelp = Automatico: la stessa tinta dell'accento, più chiara per leggersi sullo sfondo scuro.
+InboxAccentDarkWeak = Questo colore si legge male sullo sfondo scuro (contrasto %s:1, almeno 4,5:1).
+InboxAccentDarkUseAuto = Usa il colore calcolato
+InboxSectionLook = Aspetto
+InboxAccentOther = Altro…
+InboxAccent_prune = Prugna (predefinito)
+InboxAccent_violet = Viola
+InboxAccent_indigo = Indaco
+InboxAccent_blue = Blu
+InboxAccent_teal = Verde acqua
+InboxAccent_green = Verde
+InboxAccent_amber = Ambra
+InboxAccent_slate = Ardesia
+InboxGreys = Grigi
+InboxGreys_neutral = Neutri
+InboxGreys_accent = Tinti dell'accento
+InboxGreysHelp = Sfondi, bordi e testi dell'interfaccia. Tinti: un accenno della tinta dell'accento, per un aspetto più marcato.
+InboxLookPreview = Anteprima
+InboxLookPreviewMail = Richiesta di preventivo
+InboxLookPreviewText = Buongiorno, potreste inviarci...

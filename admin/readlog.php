@@ -103,7 +103,7 @@ llxHeader('', $langs->trans('InboxReadLog'), '', '', 0, 0, '', '', '', 'mod-inbo
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"')
 	.'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
 print load_fiche_titre($langs->trans('InboxSetup'), $linkback, 'title_setup');
-print dol_get_fiche_head(inboxAdminPrepareHead(), 'readlog', $langs->trans('InboxSetup'), -1, 'fa-inbox');
+print dol_get_fiche_head(inboxAdminPrepareHead(), 'readlog', $langs->trans('InboxSetup'), -1, 'inbox@inbox');
 print '<span class="opacitymedium">'.$langs->trans('InboxReadLogHelp', getDolGlobalInt('INBOX_LOG_DAYS', 365)).'</span><br><br>';
 
 print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
