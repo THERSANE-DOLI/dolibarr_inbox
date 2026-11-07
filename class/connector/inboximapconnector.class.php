@@ -926,6 +926,170 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
+	 * The folder answers (EXAMINE), without keeping it examined
+	 *
+	 * @param string $path Path
+	 * @return bool
+	 */
+	protected function folderExists($path)
+	{
+		$this->examined = '';
+		$ok = is_array($this->client->getConnection()->examineFolder($path));
+		$this->examined = '';
+
+		return $ok;
+	}
+
+	/**
+	 * Rename or move a folder (RENAME: its subfolders follow), subscription moved with it, checked
+	 *
+	 * @param string $from Current path
+	 * @param string $to   New path
+	 * @return bool
+	 */
+	public function renameFolder($from, $to)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($from) || !self::isSafeFolderPath($to) || strtoupper($from) === 'INBOX' || !$this->connect()) {
+			$this->error = $this->error ?: 'Invalid folder';
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			// Never the folder renamed while selected
+			if (in_array('UNSELECT', $this->serverCapabilities, true)) {
+				$conn->requestAndResponse('UNSELECT');
+			}
+			$this->examined = '';
+			if ($this->folderExists($to)) {
+				$this->error = 'A folder of this name already exists';
+				return false;
+			}
+			$conn->requestAndResponse('RENAME', array($conn->escapeString($from), $conn->escapeString($to)));
+			if (!$this->folderExists($to) || $this->folderExists($from)) {
+				$this->error = 'The server refused to rename the folder';
+				return false;
+			}
+			$conn->requestAndResponse('UNSUBSCRIBE', array($conn->escapeString($from)));
+			$conn->requestAndResponse('SUBSCRIBE', array($conn->escapeString($to)));
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Remove a folder for good, checked (it does not answer any more)
+	 *
+	 * @param string $path Path
+	 * @return bool
+	 */
+	public function deleteFolder($path)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($path) || strtoupper($path) === 'INBOX' || !$this->connect()) {
+			$this->error = $this->error ?: 'Invalid folder';
+			return false;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			if (in_array('UNSELECT', $this->serverCapabilities, true)) {
+				$conn->requestAndResponse('UNSELECT');
+			}
+			$this->examined = '';
+			$conn->requestAndResponse('UNSUBSCRIBE', array($conn->escapeString($path)));
+			$conn->requestAndResponse('DELETE', array($conn->escapeString($path)));
+			if ($this->folderExists($path)) {
+				$this->error = 'The server refused to remove the folder';
+				return false;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Every unread mail of a folder marked read, checked
+	 *
+	 * @param string $folder Path
+	 * @return int|null Mails changed
+	 */
+	public function markFolderSeen($folder)
+	{
+		$this->error = '';
+		if (!$this->selectForWrite($folder, 0)) {
+			return null;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			$uids = array_map('intval', $this->searchUids(array('UNSEEN')));
+			foreach (array_chunk($uids, 500) as $chunk) {
+				$conn->requestAndResponse('UID STORE', array(implode(',', $chunk), '+FLAGS.SILENT', '(\\Seen)'));
+			}
+			// Only the mails changed are checked: a mail arrived meanwhile stays new
+			$left = $uids ? array_intersect($uids, array_map('intval', $this->searchUids(array('UNSEEN')))) : array();
+			if ($left) {
+				$this->error = count($left).' mail(s) still unread';
+				return null;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return count($uids);
+	}
+
+	/**
+	 * Every mail of a folder removed for good (UID EXPUNGE of its UIDs only: needs UIDPLUS), checked
+	 *
+	 * @param string $folder Path
+	 * @return int|null Mails removed
+	 */
+	public function emptyFolder($folder)
+	{
+		$this->error = '';
+		if (!$this->connect()) {
+			return null;
+		}
+		if (!in_array('UIDPLUS', $this->serverCapabilities, true)) {
+			$this->error = 'The server does not know UIDPLUS: folder not emptied';
+			return null;
+		}
+		if (!$this->selectForWrite($folder, 0)) {
+			return null;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			$uids = array_map('intval', $this->searchUids(array('ALL')));
+			foreach (array_chunk($uids, 500) as $chunk) {
+				$set = implode(',', $chunk);
+				$conn->requestAndResponse('UID STORE', array($set, '+FLAGS.SILENT', '(\\Deleted)'));
+				$conn->requestAndResponse('UID EXPUNGE', array($set));
+			}
+			$left = $uids ? $this->presentUids($uids) : array();
+			if ($left) {
+				$this->error = count($left).' mail(s) still there after the removal';
+				return null;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return count($uids);
+	}
+
+	/**
 	 * One item of a mail, with PEEK (the mail stays unread)
 	 *
 	 * @param int    $uid  UID in the examined folder

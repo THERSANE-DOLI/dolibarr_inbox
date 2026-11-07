@@ -80,7 +80,7 @@ function inboxListStamp($folderId)
  */
 function inboxListQuery()
 {
-	global $langs;
+	global $langs, $user;
 
 	$query = InboxSearchQuery::parse((string) inboxAjaxParam('q', 'alphanohtml'), $langs);
 	$sort = explode(':', (string) inboxAjaxParam('sort', 'alphanohtml'));
@@ -96,6 +96,11 @@ function inboxListQuery()
 		$query['tag'][] = $tag;
 	}
 	$query['soc'] = (int) inboxAjaxParam('soc', 'int');
+	// « My mails » (lot W4 1.9.0): the mails where the user is assigned; out of a folder, the archived ones only if asked
+	if ((int) inboxAjaxParam('mine', 'int') === 1) {
+		$query['mine'] = (int) $user->id;
+		$query['mine_archived'] = (int) inboxAjaxParam('archived', 'int') === 1;
+	}
 
 	return $query;
 }
@@ -141,6 +146,14 @@ switch ($action) {
 		$limit = (int) (inboxAjaxParam('limit', 'int') ?: 200);
 		$page = $threads ? $engine->searchThreads($accounts, $folderId, $query, $cursor, $limit) : $engine->search($accounts, $folderId, $query, $cursor, $limit);
 		$page['threads'] = $threads;
+		// People assigned to each line, and their names
+		dol_include_once('/inbox/class/inboxassign.class.php');
+		$assign = new InboxAssign($db);
+		$page['people'] = (object) $assign->decorate($page['rows'], $threads);
+		// Threads ignored (the mailbox) or watched (this user)
+		dol_include_once('/inbox/class/inboxthreadmark.class.php');
+		$threadMarks = new InboxThreadMark($db);
+		$threadMarks->decorate($user, $page['rows']);
 		$page['ms'] = (int) round((microtime(true) - $start) * 1000);
 		// Version of the folder read with the page: the refresh compares with it (a change made just after the
 		// page is not missed)
@@ -170,6 +183,10 @@ switch ($action) {
 				$out['accounts'][] = array((int) $r->rowid, (string) $r->sync_state);
 			}
 		}
+		// The bell: unread notifications and the last one (a new one rings in every tab)
+		dol_include_once('/inbox/class/inboxnotification.class.php');
+		$notify = new InboxNotification($db);
+		$out['notif'] = $notify->counts($user);
 		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
 		dol_include_once('/inbox/class/inboxuserparam.class.php');
 		$mailId = (int) inboxAjaxParam('mail', 'int');

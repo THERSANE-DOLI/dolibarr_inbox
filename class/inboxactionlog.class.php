@@ -28,7 +28,8 @@
 class InboxActionLog
 {
 	/** Actions of the journal */
-	const ACTIONS = array('move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag');
+	const ACTIONS = array('move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign',
+		'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export');
 
 	/** @var int[] Lines written during this request (given back to the browser for the undo) */
 	public static $written = array();
@@ -59,6 +60,10 @@ class InboxActionLog
 		}
 		$n = count($mails);
 		$first = reset($mails);
+		// An action on a folder: one line carrying its number of mails
+		if ($n === 1 && isset($first->nb)) {
+			$n = max(1, (int) $first->nb);
+		}
 		$name = trim($user->firstname.' '.$user->lastname);
 		$s = function ($v, $len = 255) use ($db) {
 			$v = (string) $v;

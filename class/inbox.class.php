@@ -514,6 +514,9 @@ class Inbox
 		// Journal of the actions on the mails (INBOX_ACTION_LOG_MONTHS)
 		require_once __DIR__.'/inboxactionlog.class.php';
 		InboxActionLog::purge($this->db);
+		// Notifications of the bell (INBOX_NOTIFICATION_DAYS)
+		require_once __DIR__.'/inboxnotification.class.php';
+		InboxNotification::purge($this->db);
 
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)

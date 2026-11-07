@@ -229,6 +229,49 @@ class InboxAccess
 	}
 
 	/**
+	 * People who can use a mailbox, whatever the way (owner, direct access, group): active internal users only
+	 *
+	 * @param int $accountId Mailbox
+	 * @return array<int,array{id:int,name:string,level:string}> User id => person, ordered by name
+	 */
+	public function usersOf($accountId)
+	{
+		global $conf;
+
+		$prefix = $this->db->prefix();
+		$account = $this->db->getRow("SELECT rowid, type, fk_user_owner, status FROM ".$prefix."inbox_account WHERE rowid = ".((int) $accountId)." AND entity = ".((int) $conf->entity));
+		if (!is_object($account) || (int) $account->status !== InboxAccount::STATUS_ACTIVE) {
+			return array();
+		}
+		$levels = array();
+		if ($account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner > 0) {
+			$levels[(int) $account->fk_user_owner] = self::LEVEL_MANAGE;
+		}
+		$sql = "SELECT COALESCE(ug.fk_user, aa.fk_user) as uid, aa.level FROM ".$prefix."inbox_account_access as aa";
+		$sql .= " LEFT JOIN ".$prefix."usergroup_user as ug ON aa.fk_usergroup > 0 AND ug.fk_usergroup = aa.fk_usergroup AND ug.entity IN (0, ".((int) $conf->entity).")";
+		$sql .= " WHERE aa.fk_account = ".((int) $accountId)." LIMIT 100000";
+		$rows = $this->db->getRows($sql);
+		foreach (is_array($rows) ? $rows : array() as $row) {
+			$uid = (int) $row->uid;
+			if ($uid > 0 && self::rank((string) $row->level) > self::rank(isset($levels[$uid]) ? $levels[$uid] : self::LEVEL_NONE)) {
+				$levels[$uid] = (string) $row->level;
+			}
+		}
+		if (!$levels) {
+			return array();
+		}
+		$out = array();
+		$users = $this->db->getRows("SELECT rowid, firstname, lastname, login FROM ".$prefix."user WHERE rowid IN (".implode(',', array_keys($levels)).")"
+			." AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) ORDER BY lastname, firstname, login LIMIT 100000");
+		foreach (is_array($users) ? $users : array() as $u) {
+			$name = trim($u->firstname.' '.$u->lastname);
+			$out[(int) $u->rowid] = array('id' => (int) $u->rowid, 'name' => $name !== '' ? $name : (string) $u->login, 'level' => $levels[(int) $u->rowid]);
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Give or change the access of a user or a group (one of the two), written in the journal
 	 *
 	 * @param User   $author    User doing it (has the right to manage the accesses: checked by the caller)

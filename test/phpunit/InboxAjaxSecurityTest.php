@@ -232,5 +232,16 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$flag = $this->call('/custom/inbox/ajax/action.php', array('action' => 'run', 'what' => 'flag', 'on' => 1, 'ids' => array((int) $row->rowid), 'token' => $token));
 		$this->assertSame(200, $flag['code'], 'level read: starred allowed '.$flag['body']);
 		$this->assertSame(1, $flag['json']['count']);
+		// Assignment and bell (1.9.0): token and POST for the writes, a forged mail or mailbox not found
+		$set = array('action' => 'set', 'ids' => array((int) $row->rowid), 'add' => array(99999999));
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/assign.php', $set)['code'], 'assign without token refused');
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/assign.php?action=set&ids='.$row->rowid.'&add=1&token='.urlencode($token))['code'], 'assign by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/assign.php', array('action' => 'set', 'ids' => array(99999999), 'add' => array(1), 'token' => $token))['code']);
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/assign.php', $set + array('token' => $token))['code'], 'a person without access to the mailbox');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/assign.php?action=people&id=99999999')['code']);
+		$this->assertSame(200, $this->call('/custom/inbox/ajax/notification.php?action=count')['code']);
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/notification.php', array('action' => 'read'))['code'], 'read without token refused');
+		$open = $this->call('/custom/inbox/ajax/notification.php', array('action' => 'open', 'id' => 99999999, 'token' => $token));
+		$this->assertSame('not_found', $open['json']['problem'], 'the notification of nobody');
 	}
 }

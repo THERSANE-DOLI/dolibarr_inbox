@@ -1,5 +1,38 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: import and export of mails :   1.12.0
+  - files dropped on a folder (or « Import mails… » of its menu): .eml files and mbox files (the local folders of
+    most mail software), read by slices in the browser and sent by batches that fit the server; progress, « Stop »,
+    a report. Read, answered, starred and tags written by the mail software kept; the mails it had removed, the mails
+    already in the folder and the ones where the antivirus finds a virus are not imported. Level « manage ».
+  - « Export the folder… »: one mbox file or a zip of .eml, read from the mail server; said when inbox does not know
+    all the mails of the folder (limit of the synchronisation). Both written in the journal of the actions.
+- NEW: unsubscribe from newsletters, threads ignored or watched :   1.11.0
+  - a newsletter shows « Unsubscribe »: the one-click request (RFC 8058) is sent by the server of Dolibarr after a
+    confirmation, never the link opened in the browser; refused when the header is not signed (DKIM) or aims at a
+    local or private address; by mail when the writing of the mails comes. Level « manage », journaled.
+  - K ignores a thread for the whole mailbox: its mails are read now and the answers that come later arrive read;
+    W watches a thread for oneself: its lines are highlighted with an eye. Also in the menus of the mails.
+- NEW: folders managed from inbox :   1.10.0
+  - right click (or « ⋯ ») on a folder: new subfolder, rename, move to, remove, mark the folder read; on the trash
+    and the junk, empty; on a mailbox, a new folder at the top. Written on the mail server and checked, then in the
+    index: a folder renamed or moved keeps its mails, its colour and its icon.
+  - a folder removed goes to the trash with its subfolders and mails; in the trash, it is removed for good after a
+    confirmation that says how many mails; emptying the trash removes its subfolders too.
+  - the special folders (inbox, sent, drafts, archives, junk, trash) keep their name and place: the actions are
+    greyed with the reason; level « manage » of the mailbox, « mark the folder read » with the level « read ».
+  - written in the journal of the actions; triggers INBOX_FOLDER_CREATE, _MOVE, _DELETE, _SEEN, _EMPTY.
+- NEW: assignment of the mails and notifications (bell) :   1.9.0
+  - Space (or the menus, the bulk bar, « Assigned to » in the reading) assigns me or removes me; « Assign a
+    person… » picks among the people who can read the mailbox; several people per mail. Initials on the cards and in
+    the column « Assigned » of the table, mine in the accent colour.
+  - an assignment follows the mail in every move, even to another mailbox, and shows on each copy for the people who
+    can read it; nothing is written on the mail server; written in the journal of the actions; undo 8 s.
+  - quick filter « My mails »; out of a folder, the archived mails, the trash and the junk only if asked.
+  - bell in the rail: « Marie Martin assigned a mail to you », the mail opened where it is now; Shift+N; kept 90 days.
+  - a person who loses the access to a mailbox loses the assignments on its mails; a user deleted, all of them.
+  - triggers INBOX_MAIL_ASSIGN, INBOX_MAIL_UNASSIGN, INBOX_MAILREF_CREATE; InboxNotification::add() for the other
+    modules.
 - NEW: colour and icon of the folders and mailboxes :   1.8.0
   - icons of the folders in the colour of their role (inbox, drafts, sent, archives, junk, trash, other folders),
     readable on the light and dark themes; an ordinary folder unfolded is drawn open.

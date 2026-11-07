@@ -42,6 +42,9 @@ class InboxMail
 	/** @var string First error of the database of the last addMany() */
 	public $lastError = '';
 
+	/** @var int[] Rows added by the last addMany() (ignored threads, lot W4 1.11.0) */
+	public $lastNewIds = array();
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -60,6 +63,7 @@ class InboxMail
 	 */
 	public function addMany($accountId, $folderId, array $mails)
 	{
+		$this->lastNewIds = array();
 		if (!$mails) {
 			return 0;
 		}
@@ -120,6 +124,7 @@ class InboxMail
 			$newIds[] = $mailId;
 			$added++;
 		}
+		$this->lastNewIds = $newIds;
 		if ($newIds) {
 			// Conversation of each new mail (and threads merged when it links them)
 			$threader = new InboxThreader($this->db);

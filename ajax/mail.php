@@ -25,7 +25,7 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxreader.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('seen', 'images'), true));
+inboxAjaxStart(in_array($action, array('seen', 'images', 'unsubscribe'), true));
 $reader = new InboxReader($db);
 
 /**
@@ -55,7 +55,15 @@ switch ($action) {
 		if ($raw === null) {
 			inboxMailFail($reader);
 		}
-		inboxAjaxReply($reader->describe($user, $raw));
+		$out = $reader->describe($user, $raw);
+		// « Assigned to » of the reading (lot W4 1.9.0)
+		dol_include_once('/inbox/class/inboxassign.class.php');
+		$assign = new InboxAssign($db);
+		$assignees = $assign->forRows(array($reader->row));
+		$out['assignees'] = $assignees[(int) $reader->row->rowid] ?? array();
+		$out['people'] = (object) $assign->names($assignees);
+		$out['has_message_id'] = (string) $reader->row->message_id !== '';
+		inboxAjaxReply($out);
 		// no break
 
 	case 'thread':
@@ -82,7 +90,7 @@ switch ($action) {
 					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) $r->from_email, 'from_name' => (string) $r->from_name,
 					'to' => dol_trunc((string) $r->to_text, 300, 'right', 'UTF-8', 1), 'subject' => (string) $r->subject, 'snippet' => (string) $r->snippet,
 					'date' => $date ? (int) $db->jdate($date) : 0, 'seen' => (int) $r->seen, 'answered' => (int) $r->answered, 'flagged' => (int) $r->flagged,
-					'attachments' => (int) $r->has_attachments,
+					'attachments' => (int) $r->has_attachments, 'has_mid' => (string) $r->message_id !== '' ? 1 : 0,
 				));
 			}
 			foreach ($byMsg as $v) {
@@ -92,7 +100,17 @@ switch ($action) {
 		if (!$list) {
 			$list[] = array('id' => (int) $reader->row->rowid);
 		}
-		inboxAjaxReply(array('key' => $key, 'mails' => $list));
+		// People assigned to each mail of the conversation
+		dol_include_once('/inbox/class/inboxassign.class.php');
+		$assign = new InboxAssign($db);
+		$found = $db->getRows("SELECT rowid, fk_account, message_id, date_mail, from_email FROM ".$db->prefix()."inbox_mail WHERE rowid IN (".implode(',', array_map(function ($m) {
+			return (int) $m['id'];
+		}, $list)).") LIMIT 500");
+		$assignees = $assign->forRows(is_array($found) ? $found : array());
+		foreach ($list as $i => $m) {
+			$list[$i]['assignees'] = $assignees[(int) $m['id']] ?? array();
+		}
+		inboxAjaxReply(array('key' => $key, 'mails' => $list, 'people' => (object) $assign->names($assignees)));
 		// no break
 
 	case 'seen':
@@ -117,6 +135,21 @@ switch ($action) {
 			$db->query("INSERT INTO ".$p."inbox_image_allow (fk_user, address, date_creation) VALUES (".((int) $user->id).", '".$db->escape($address)."', '".$db->idate(dol_now())."')");
 		}
 		inboxAjaxReply(array('address' => $address));
+		// no break
+
+	case 'unsubscribe':
+		// List-Unsubscribe one-click (RFC 8058), sent by this server; the mail is read again here, never an address
+		// given by the browser
+		$raw = $reader->raw($user);
+		if ($raw === null) {
+			inboxMailFail($reader);
+		}
+		$key = $reader->unsubscribe($user, $raw);
+		if ($key !== '') {
+			$codes = array('InboxErrorNeedManage' => 403, 'InboxErrorUnsubscribeNone' => 422, 'InboxErrorUnsubscribeNoOneClick' => 422, 'InboxErrorUnsubscribeNotSigned' => 422);
+			inboxAjaxReply(array('error' => $langs->transnoentities($key, $reader->error), 'code' => $key), $codes[$key] ?? 502);
+		}
+		inboxAjaxReply(array('done' => 1));
 		// no break
 
 	default:

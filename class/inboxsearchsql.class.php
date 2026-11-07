@@ -84,7 +84,7 @@ class InboxSearchSql implements InboxSearchEngine
 			$op = $desc ? '<' : '>';
 			$where[] = "(".$expr." ".$op." ".$value." OR (".$expr." = ".$value." AND m.rowid ".$op." ".((int) $after[1])."))";
 		}
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
 		$sql .= " m.date_received, m.date_mail, m.size, m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc,";
 		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value";
 		$sql .= $from." LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc";
@@ -167,7 +167,7 @@ class InboxSearchSql implements InboxSearchEngine
 		$keys = array_map(function ($g) {
 			return "'".$this->db->escape((string) $g->tkey)."'";
 		}, $groups);
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
 			." m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc, s.nom AS soc_name, ".$key." AS tkey, ".$date." AS sort_value"
 			." FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc"
 			." WHERE ".implode(' AND ', $where)." AND ".$key." IN (".implode(',', $keys).") ORDER BY sort_value DESC, m.rowid DESC";
@@ -259,6 +259,18 @@ class InboxSearchSql implements InboxSearchEngine
 		if (!empty($query['soc'])) {
 			$where[] = "m.fk_soc = ".((int) $query['soc']);
 		}
+		if (!empty($query['mine'])) {
+			// Assigned by the mailref (the Message-ID): follows the mail in every move
+			global $conf;
+			$p = $this->db->prefix();
+			$where[] = "m.message_id IN (SELECT r.message_id FROM ".$p."inbox_mailref as r INNER JOIN ".$p."inbox_mail_assign as a ON a.fk_mailref = r.rowid"
+				." WHERE a.fk_user = ".((int) $query['mine'])." AND r.entity = ".((int) $conf->entity).")";
+			if ($folderId <= 0 && empty($query['mine_archived'])) {
+				// Handled mails: out of « my mails » (archives, with their subfolders, trash, junk)
+				$where[] = "NOT EXISTS (SELECT fa.rowid FROM ".$p."inbox_folder as fa WHERE fa.fk_account = m.fk_account AND fa.role IN ('archive', 'trash', 'junk')"
+					." AND (fa.rowid = f.rowid OR f.path LIKE CONCAT(fa.path, COALESCE(fa.delimiter, '/'), '%')))";
+			}
+		}
 
 		return $where;
 	}
@@ -314,6 +326,10 @@ class InboxSearchSql implements InboxSearchEngine
 			'draft' => (int) $o->draft,
 			'tags' => trim((string) $o->keywords) === '' ? array() : array_values(array_filter(explode(' ', (string) $o->keywords))),
 			'soc' => $o->fk_soc ? array('id' => (int) $o->fk_soc, 'name' => (string) $o->soc_name) : null,
+			// A Message-ID: the key of an assignment (lot W4 1.9.0)
+			'has_mid' => (string) ($o->message_id ?? '') !== '' ? 1 : 0,
+			// Key of the conversation (ignored, watched: lot W4 1.11.0)
+			'tkey' => (string) ($o->thread_key ?? ''),
 		);
 	}
 }

@@ -215,6 +215,39 @@ interface InboxConnectorInterface
 	public function createFolder($path);
 
 	/**
+	 * Rename or move a folder (its subfolders follow), checked: the new path answers, the old one does not
+	 *
+	 * @param string $from Current path
+	 * @param string $to   New path
+	 * @return bool
+	 */
+	public function renameFolder($from, $to);
+
+	/**
+	 * Remove a folder for good (an empty folder without subfolder: the caller removes them first)
+	 *
+	 * @param string $path Path
+	 * @return bool
+	 */
+	public function deleteFolder($path);
+
+	/**
+	 * Every mail of a folder marked read
+	 *
+	 * @param string $folder Path
+	 * @return int|null Mails changed, null on error
+	 */
+	public function markFolderSeen($folder);
+
+	/**
+	 * Every mail of a folder removed for good (trash, junk)
+	 *
+	 * @param string $folder Path
+	 * @return int|null Mails removed, null on error
+	 */
+	public function emptyFolder($folder);
+
+	/**
 	 * Send a mail and keep its copy in the sent folder (lot W6)
 	 *
 	 * @param string $raw RFC 822 source

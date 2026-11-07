@@ -394,7 +394,7 @@ class InboxAccount extends CommonObject
 		$this->db->begin();
 		// Index of the mailbox (rebuilt from the server at any time) with it
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$this->db->prefix()."inbox_mail WHERE fk_account = ".((int) $this->id).")");
-		foreach (array('inbox_mail', 'inbox_folder', 'inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam') as $table) {
+		foreach (array('inbox_mail', 'inbox_folder', 'inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam', 'inbox_thread_mark') as $table) {
 			if (!$this->db->query("DELETE FROM ".$this->db->prefix().$table." WHERE fk_account = ".((int) $this->id))) {
 				$this->error = $this->db->lasterror();
 				$this->db->rollback();

@@ -88,6 +88,8 @@ function inboxFolderTree($accountId)
 			'followed' => (int) $f->sync_enabled,
 			'total' => (int) $f->total,
 			'unread' => (int) $f->unread,
+			// Mails known to inbox (the synchronisation may stop before the oldest ones): the export says it
+			'indexed' => (int) $f->indexed,
 			'error' => (string) $f->sync_error !== '',
 			// Colour and icon shared by the users of the mailbox ('' = by default; a special folder keeps its icon)
 			'color' => (string) InboxLook::cleanColor((string) $f->color),

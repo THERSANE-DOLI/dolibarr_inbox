@@ -235,7 +235,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -258,6 +258,27 @@
 			const where = l => {
 				if (l.action === 'tag') {
 					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
+				}
+				if (l.action === 'assign' || l.action === 'unassign') {
+					return esc(l.detail);
+				}
+				if (l.action === 'import') {
+					return esc(l.to);
+				}
+				if (l.action === 'export') {
+					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
+				}
+				if (l.action === 'folder_create') {
+					return esc(l.to);
+				}
+				if (l.action === 'unsubscribe') {
+					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
+				}
+				if (l.action === 'thread_ignore' || l.action === 'thread_unignore') {
+					return esc(l.from);
+				}
+				if (l.action === 'folder_destroy' || l.action === 'empty') {
+					return esc(l.from);
 				}
 				if (l.action === 'destroy') {
 					return esc(l.from);

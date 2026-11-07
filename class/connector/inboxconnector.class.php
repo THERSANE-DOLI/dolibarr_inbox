@@ -232,6 +232,45 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
+	 * @param string $from Current path
+	 * @param string $to   New path
+	 * @return bool
+	 */
+	public function renameFolder($from, $to)
+	{
+		$this->unsupported('renameFolder');
+		return false;
+	}
+
+	/**
+	 * @param string $path Path
+	 * @return bool
+	 */
+	public function deleteFolder($path)
+	{
+		$this->unsupported('deleteFolder');
+		return false;
+	}
+
+	/**
+	 * @param string $folder Path
+	 * @return int|null
+	 */
+	public function markFolderSeen($folder)
+	{
+		return $this->unsupported('markFolderSeen');
+	}
+
+	/**
+	 * @param string $folder Path
+	 * @return int|null
+	 */
+	public function emptyFolder($folder)
+	{
+		return $this->unsupported('emptyFolder');
+	}
+
+	/**
 	 * @param string $raw Source
 	 * @return bool
 	 */

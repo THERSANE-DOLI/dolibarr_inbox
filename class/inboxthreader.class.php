@@ -156,6 +156,9 @@ class InboxThreader
 			if (count($list) > 1) {
 				// This mail links several threads: one thread
 				$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = ".$esc($key)." WHERE fk_account = ".$accountId." AND thread_key IN (".implode(',', array_map($esc, array_slice($list, 1))).")");
+				// Ignored or watched (1.11.0): the mark follows the thread kept
+				require_once __DIR__.'/inboxthreadmark.class.php';
+				InboxThreadMark::merge($this->db, $accountId, $key, array_slice($list, 1));
 			}
 		} else {
 			$key = substr(sha1($accountId.':'.($msgid !== '' ? $msgid : 'row'.$r->rowid)), 0, 32);

@@ -108,6 +108,9 @@
 			const err = new Error((json && json.error) || t('InboxErrorServer', resp.status));
 			err.status = resp.status;
 			err.fields = (json && json.fields) || {};
+			// Key of the error and the data that go with it (a confirmation asked, a count)
+			err.code = (json && json.code) || '';
+			err.data = json || {};
 			throw err;
 		}
 		return json;
@@ -431,6 +434,9 @@
 		rail.setAttribute('aria-label', t('InboxSpaces'));
 		rail.innerHTML = spaces.filter(s => !s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
 			+ '<span class="ibx-rail__spacer"></span>'
+			// The bell of the notifications (js/inbox-notify.js), above the buttons of the bottom
+			+ '<button type="button" class="ibx-rail__item ibx-js-bell" aria-haspopup="dialog" aria-expanded="false" title="' + th('InboxNotifications') + '" aria-label="' + th('InboxNotifications') + '">'
+			+ ic('bell') + '<span class="ibx-rail__badge" aria-hidden="true" hidden></span></button>'
 			+ spaces.filter(s => s.bottom).map(s => '<a class="ibx-rail__item" href="#/' + esc(s.id) + '" data-space="' + esc(s.id) + '" title="' + esc(s.label()) + '" aria-label="' + esc(s.label()) + '">' + ic(s.icon) + '</a>').join('')
 			+ '<a class="ibx-rail__item" href="' + esc(ctx('INBOX_DOLIBARR_URL', '/')) + '" title="' + th('InboxBackToDolibarr') + '" aria-label="' + th('InboxBackToDolibarr') + '">' + ic('logout') + '</a>';
 		app.prepend(rail);

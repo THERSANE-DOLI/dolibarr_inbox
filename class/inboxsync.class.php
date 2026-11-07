@@ -271,6 +271,13 @@ class InboxSync
 				$mails->clearFolder($folderId);
 			}
 			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			// Answers in an ignored thread arrive read (1.11.0); never in Sent or Drafts
+			$readNow = 0;
+			if ($mails->lastNewIds && !in_array((string) $f->role, array('sent', 'drafts'), true)) {
+				require_once __DIR__.'/inboxthreadmark.class.php';
+				$marks = new InboxThreadMark($this->db);
+				$readNow = $marks->applyIgnored($connector, (int) $account->id, (string) $f->path, $mails->lastNewIds);
+			}
 			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
 			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
 			$this->stats['deleted'] += $mails->removeMany($folderId, $res['deleted']);
@@ -279,7 +286,7 @@ class InboxSync
 			$cursor = json_decode((string) $res['cursor'], true);
 			$complete = is_array($cursor) && !empty($cursor['done']) || ($maxMails > 0 && $after['count'] >= $maxMails);
 			$folders->saveState($folderId, array(
-				'sync_cursor' => $res['cursor'], 'total' => $res['total'], 'unread' => $res['unread'], 'indexed' => $after['count'],
+				'sync_cursor' => $res['cursor'], 'total' => $res['total'], 'unread' => max(0, (int) $res['unread'] - $readNow), 'indexed' => $after['count'],
 				'oldest_indexed' => $after['oldest'], 'first_sync_done' => $complete ? 1 : 0, 'sync_error' => $indexError,
 			));
 			$f->first_sync_done = $complete ? 1 : 0;

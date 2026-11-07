@@ -1074,3 +1074,41 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 @media (forced-colors: active) {
 	.ibx-look__swatch { forced-color-adjust: none; }
 }
+
+/* ===== Assignment and bell (1.9.0, webmail §5.4 quinquies and sexies) ===== */
+/* My initials in the accent: seen at a glance among the people assigned */
+.ibx-avatar.is-me { color: var(--ibx-on-accent); background: var(--ibx-accent); }
+.ibx-assignees__more { margin-left: 0.125rem; font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); align-self: center; }
+.ibx-mailcard__assign { margin-left: auto; }
+.ibx-mailrow__assign { white-space: nowrap; }
+.ibx-assignline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s2); }
+.ibx-assignline__label { color: var(--ibx-text-muted); }
+.ibx-assignline__person { display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 600; }
+.ibx-assignline__person .ibx-avatar--xs { border: 0; }
+.ibx-assignline__actions { display: inline-flex; gap: var(--ibx-s1); }
+.ibx-assignpick { list-style: none; margin: var(--ibx-s2) 0 0; padding: 0; max-height: 50vh; overflow: auto; }
+.ibx-assignpick__row { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; padding: 0 var(--ibx-s2); border-radius: var(--ibx-radius); cursor: pointer; }
+.ibx-assignpick__row:hover { background: var(--ibx-bg-hover); }
+.ibx-assignpick__row .ibx-avatar--xs { border: 0; }
+.ibx-notifpanel__title { flex: 1; margin: 0; font-size: var(--ibx-fs-lg); font-weight: 600; }
+.ibx-notifpanel__body { overflow: auto; min-height: 0; }
+.ibx-notifpanel__list { list-style: none; margin: 0; }
+.ibx-notifpanel__empty { padding: var(--ibx-s4, 1.5rem) var(--ibx-s3); }
+.ibx-notif__what { font-weight: 600; }
+.ibx-notif__subject { color: var(--ibx-text); }
+@media (pointer: coarse) {
+	.ibx-assignpick__row, .ibx-notif { min-height: 2.75rem; }
+}
+
+/* ===== Threads watched or ignored (1.11.0, keys W and K) ===== */
+/* Watched: a tinted background and the eye (the bar on the left already says « unread »); ignored: muted text (no
+   opacity: the contrast stays readable) and its mark says why */
+.ibx-threadmark { display: inline-flex; vertical-align: middle; margin-right: 0.25rem; color: var(--ibx-text-muted); }
+.ibx-threadmark .ibx-icon { width: 0.875rem; height: 0.875rem; }
+.ibx-threadmark--watch { color: var(--ibx-accent); }
+.ibx-mailcard.is-watched, .ibx-mailrow.is-watched td { background: var(--ibx-accent-soft); }
+.ibx-mailcard.is-ignored .ibx-mailcard__from, .ibx-mailcard.is-ignored .ibx-mailcard__subject, .ibx-mailrow.is-ignored td { color: var(--ibx-text-muted); }
+
+/* ===== Import and export of mails (1.12.0) ===== */
+.ibx-progress { width: 100%; height: 0.5rem; accent-color: var(--ibx-accent); }
+.ibx-importfails { max-height: 12rem; overflow: auto; margin: var(--ibx-s2) 0 0; padding-left: 1.25rem; font-size: var(--ibx-fs-sm, 0.8125rem); }

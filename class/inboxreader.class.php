@@ -25,6 +25,7 @@ require_once __DIR__.'/inbox.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
+require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
@@ -199,7 +200,8 @@ class InboxReader
 			'auth' => $auth,
 			'security' => self::security($raw, $headers, $message),
 			'report' => self::deliveryReport($raw, $headers),
-			'unsubscribe' => self::headerValue($headers, 'List-Unsubscribe') !== '',
+			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
+			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			'read_mode' => $params->get($user, 'read_mode', (int) $this->row->fk_account),
 			'read_delay' => (int) $params->get($user, 'read_delay', (int) $this->row->fk_account),
 			'can_flag' => true,
@@ -318,6 +320,94 @@ class InboxReader
 		}
 
 		return $out;
+	}
+
+	/**
+	 * What the reading shows of List-Unsubscribe (not the address of the sender)
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers
+	 * @param array<string,mixed>                 $auth    authResults()
+	 * @return array{oneclick:bool,signed:bool,mailto:string}|null
+	 */
+	public static function unsubscribeView(array $headers, array $auth)
+	{
+		$info = self::unsubscribeInfo($headers);
+		if (!$info) {
+			return null;
+		}
+
+		return array('oneclick' => $info['oneclick'], 'signed' => $auth['dkim'] === 'pass', 'mailto' => $info['mailto']);
+	}
+
+	/**
+	 * List-Unsubscribe of a mail (RFC 2369) and its one-click form (RFC 8058: an https address and List-Unsubscribe-Post)
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers
+	 * @return array{https:string,mailto:string,oneclick:bool}|null Null when the mail offers nothing
+	 */
+	public static function unsubscribeInfo(array $headers)
+	{
+		$value = self::headerValue($headers, 'List-Unsubscribe');
+		if ($value === '' || !preg_match_all('/<([^>]{1,2000})>/', $value, $m)) {
+			return null;
+		}
+		$https = '';
+		$mailto = '';
+		foreach ($m[1] as $uri) {
+			$uri = trim($uri);
+			if ($https === '' && preg_match('#^https://[^\s"<>]+$#i', $uri)) {
+				$https = $uri;
+			} elseif ($mailto === '' && preg_match('/^mailto:([^?\s]+)/i', $uri, $mm)) {
+				$address = rawurldecode($mm[1]);
+				$mailto = isValidEmail($address) ? $address : '';
+			}
+		}
+		if ($https === '' && $mailto === '') {
+			return null;
+		}
+		$post = self::headerValue($headers, 'List-Unsubscribe-Post');
+
+		return array('https' => $https, 'mailto' => $mailto, 'oneclick' => $https !== '' && stripos($post, 'List-Unsubscribe=One-Click') !== false);
+	}
+
+	/**
+	 * Unsubscribe the mailbox from the list of this mail (level manage): the POST of RFC 8058 sent by the server of
+	 * Dolibarr, never the address opened in the browser; only when the header is signed (DKIM pass) and the address
+	 * is an outside one (private and local addresses refused by getURLContent)
+	 *
+	 * @param User   $user User
+	 * @param string $raw  Raw mail
+	 * @return string '' if OK, else the key of the error
+	 */
+	public function unsubscribe(User $user, $raw)
+	{
+		if ($this->level !== InboxAccess::LEVEL_MANAGE) {
+			return 'InboxErrorNeedManage';
+		}
+		$headers = self::headers($raw);
+		$info = self::unsubscribeInfo($headers);
+		if (!$info) {
+			return 'InboxErrorUnsubscribeNone';
+		}
+		if (!$info['oneclick']) {
+			return 'InboxErrorUnsubscribeNoOneClick';
+		}
+		if (self::authResults($headers)['dkim'] !== 'pass') {
+			return 'InboxErrorUnsubscribeNotSigned';
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+		$res = getURLContent($info['https'], 'POST', 'List-Unsubscribe=One-Click', 0, array('Content-Type: application/x-www-form-urlencoded'), array('https'), 0, -1, 5, 15);
+		$code = (int) ($res['http_code'] ?? 0);
+		if ($code < 200 || $code >= 300) {
+			dol_syslog(__METHOD__.' '.$code.' '.($res['curl_error_msg'] ?? '').' '.dol_trunc((string) ($res['content'] ?? ''), 200), LOG_WARNING);
+			// An address refused before any call (local or private network) comes with its reason
+			$this->error = !empty($res['curl_error_msg']) ? (string) $res['curl_error_msg'] : 'HTTP '.$code;
+			return 'InboxErrorUnsubscribeFailed';
+		}
+		InboxActionLog::add($this->db, $user, (int) $this->row->fk_account, 'unsubscribe', array($this->row), (string) $this->row->folder_path, '', 0,
+			(string) parse_url($info['https'], PHP_URL_HOST));
+
+		return '';
 	}
 
 	/**

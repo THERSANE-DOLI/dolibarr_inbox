@@ -87,6 +87,11 @@ abstract class InboxTestCase extends TestCase
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}
+		// Assignments and notifications (1.9.0): test mails have a Message-ID of the test domain
+		$refs = "SELECT rowid FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%'";
+		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
+		$db->query("DELETE FROM ".$p."inbox_notification WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
+		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%'");
 		$db->query("DELETE FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");
@@ -163,6 +168,7 @@ abstract class InboxTestCase extends TestCase
 		$this->db->query("INSERT INTO ".$p."user (entity, login, lastname, firstname, statut, fk_soc, datec) VALUES (1, 'inboxtest_".$this->db->escape($login)."', '".$this->db->escape($login)."', 'T', 1, ".($socid ? (int) $socid : 'NULL').", '".$this->db->idate(dol_now())."')");
 		$u = new User($this->db);
 		$u->fetch((int) $this->db->last_insert_id($p.'user'));
+		$u->id = (int) $u->id;
 
 		return $u;
 	}
