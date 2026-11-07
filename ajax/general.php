@@ -43,6 +43,8 @@ function inboxGeneralSettings()
 		'INBOX_ANTIVIRUS_MAX_MB' => array('default' => '25', 'check' => 'int:1:200'),
 		// Journal of the actions on the mails (lot W4): months kept, 0 = kept without limit
 		'INBOX_ACTION_LOG_MONTHS' => array('default' => '12', 'check' => 'int:0:120'),
+		// Lot W5 1.15.0: receiving servers whose Authentication-Results are trusted (imitation, junk probably legitimate)
+		'INBOX_AUTH_SERVERS' => array('default' => '', 'check' => 'hosts'),
 		// Pictures of the correspondents (1.5.0): sources looked for by the server
 		'INBOX_AVATAR_DOLIBARR' => array('default' => '1', 'check' => 'int:0:1'),
 		'INBOX_AVATAR_BIMI' => array('default' => '1', 'check' => 'int:0:1'),
@@ -62,6 +64,9 @@ function inboxGeneralValid($check, $value)
 	}
 	if ($check === 'color') {
 		return (bool) preg_match('/^#[0-9a-f]{6}$/i', $value);
+	}
+	if ($check === 'hosts') {
+		return $value === '' || (bool) preg_match('/^[a-z0-9.-]{1,253}(\s*,\s*[a-z0-9.-]{1,253}){0,9}$/i', $value);
 	}
 	list(, $min, $max) = explode(':', $check);
 

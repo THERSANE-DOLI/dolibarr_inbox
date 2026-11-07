@@ -1067,3 +1067,12 @@ InboxErrorCannotCreate = Non puoi creare questo tipo di documento
 InboxErrorCannotAttach = Non puoi aggiungere file a questo documento
 InboxErrorAttachmentInfected = È stato trovato un virus in questo file: non viene copiato
 InboxJournal_attach = File messo in un documento
+
+# Imitation and junk probably legitimate (1.15.0)
+InboxImitationTitle = Probabile imitazione.
+InboxImitationText = Dolibarr conosce %s (%s), ma questa mail non è autenticata: non rispondere, non aprire nulla, verifica con il mittente in un altro modo.
+InboxJunkLegitText = Questa mail è nella posta indesiderata, ma Dolibarr conosce %s e la mail è autenticata (DKIM, SPF, DMARC): probabilmente non è indesiderata.
+InboxJunkLegitShort = Mittente noto e autenticato: probabilmente non indesiderata
+InboxJunkLegitCount = %s mail probabilmente non indesiderate
+InboxAuthServers = Server di autenticazione attendibili
+InboxAuthServersHelp = Nome dei server di ricezione dell'azienda, come lo scrivono in « Authentication-Results » (più di uno: separati da virgole). Senza, inbox non dice nulla dell'autenticazione dei mittenti.

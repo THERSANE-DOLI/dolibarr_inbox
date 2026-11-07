@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: imitation of a known sender, junk probably legitimate :   1.15.0
+  - a known sender (active customer or supplier, their contacts, users of Dolibarr) whose mail is not authenticated,
+    or whose address is written in the display name over another one: red alert above the mail.
+  - in the junk, a mail of a known and authenticated sender: orange mark on its line, counter beside the folder,
+    banner with « Not junk »; checked by the synchronisation (the headers of these mails only).
+  - the authentication (DKIM, SPF, DMARC) is read only in the headers of the receiving servers of the company:
+    setting « Trusted authentication servers » (Settings > General); without it nothing is said.
 - NEW: create a piece from a mail, files of a mail in the documents of a piece, actions of the other modules :   1.14.0
   - « Create ▾ » of the Dolibarr part: thirdparty, contact, proposal, order, price request, supplier order, event,
     ticket, project; the page of creation of Dolibarr opens in a new tab, filled from the mail (name, address, subject,

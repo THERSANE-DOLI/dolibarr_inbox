@@ -443,6 +443,32 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
+	 * Headers of one mail (BODY.PEEK[HEADER]: the mail stays unread), for the checks of the sender (lot W5 1.15.0)
+	 *
+	 * @param string $folder   Folder path
+	 * @param string $remoteId Identifier "uidvalidity:uid"
+	 * @return string|null Raw headers, null if not found
+	 */
+	public function fetchHeaders($folder, $remoteId)
+	{
+		$this->error = '';
+		if (!preg_match('/^(\d+):(\d+)$/', (string) $remoteId, $m) || !self::isSafeFolderPath($folder) || !$this->connect()) {
+			$this->error = $this->error ?: 'Invalid identifier';
+			return null;
+		}
+		try {
+			if (!$this->examine($folder) || $this->examinedValidity !== (int) $m[1]) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			return $this->fetchItem((int) $m[2], 'BODY[HEADER]');
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		}
+	}
+
+	/**
 	 * Flags of mails: \\Seen, \\Flagged, \\Answered (UID STORE ... FLAGS.SILENT). The folder is selected (read-write)
 	 * for this only, then examined again by the next reading. A mail renumbered by the server (UIDVALIDITY changed)
 	 * is never written.

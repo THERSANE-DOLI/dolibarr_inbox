@@ -1290,3 +1290,8 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-createattach { margin-top: var(--ibx-s3); }
 .ibx-piece.is-droptarget { border-color: var(--ibx-accent); box-shadow: 0 0 0 2px var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-attachment[draggable="true"] { cursor: grab; }
+
+/* ===== Junk probably legitimate (1.15.0): an orange mark, its words for the screen readers ===== */
+.ibx-junklegit { color: var(--ibx-warning, #b26a00); }
+.ibx-tree__legit { display: inline-flex; align-items: center; gap: 0.125rem; margin-left: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; color: var(--ibx-warning, #b26a00); }
+.ibx-tree__legit .ibx-icon { width: 0.875rem; height: 0.875rem; }

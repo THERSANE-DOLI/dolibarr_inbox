@@ -88,6 +88,8 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 		}
 		foreach (array_unique(array_map('strtolower', $emails)) as $email) {
 			$matcher->refreshAddress($email);
+			// Known senders changed: their mails of the junk are checked again by the next pass (1.15.0)
+			$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET junk_check = 0 WHERE from_email = '".$this->db->escape(trim($email))."'");
 		}
 
 		return 0;

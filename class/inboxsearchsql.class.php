@@ -84,7 +84,7 @@ class InboxSearchSql implements InboxSearchEngine
 			$op = $desc ? '<' : '>';
 			$where[] = "(".$expr." ".$op." ".$value." OR (".$expr." = ".$value." AND m.rowid ".$op." ".((int) $after[1])."))";
 		}
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
 		$sql .= " m.date_received, m.date_mail, m.size, m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc,";
 		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value";
 		$sql .= $from." LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc";
@@ -167,7 +167,7 @@ class InboxSearchSql implements InboxSearchEngine
 		$keys = array_map(function ($g) {
 			return "'".$this->db->escape((string) $g->tkey)."'";
 		}, $groups);
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
 			." m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc, s.nom AS soc_name, ".$key." AS tkey, ".$date." AS sort_value"
 			." FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc"
 			." WHERE ".implode(' AND ', $where)." AND ".$key." IN (".implode(',', $keys).") ORDER BY sort_value DESC, m.rowid DESC";
@@ -334,6 +334,8 @@ class InboxSearchSql implements InboxSearchEngine
 			'has_mid' => 1,
 			// Key of the conversation (ignored, watched: lot W4 1.11.0)
 			'tkey' => (string) ($o->thread_key ?? ''),
+			// Junk: legit (known and authenticated) or imitation (1.15.0)
+			'junk_hint' => (string) ($o->junk_hint ?? ''),
 		);
 	}
 }

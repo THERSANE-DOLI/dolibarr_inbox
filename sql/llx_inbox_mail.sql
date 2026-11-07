@@ -41,6 +41,9 @@ CREATE TABLE llx_inbox_mail(
 	keywords varchar(1024) DEFAULT NULL,
 	fk_soc integer DEFAULT NULL,
 	fk_socpeople integer DEFAULT NULL,
+	junk_hint varchar(16) DEFAULT NULL,
+	junk_detail varchar(255) DEFAULT NULL,
+	junk_check smallint DEFAULT 0 NOT NULL,
 	date_index datetime NOT NULL,
 	thread_key varchar(32) DEFAULT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

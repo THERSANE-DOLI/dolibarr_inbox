@@ -90,6 +90,8 @@ function inboxFolderTree($accountId)
 			'unread' => (int) $f->unread,
 			// Mails known to inbox (the synchronisation may stop before the oldest ones): the export says it
 			'indexed' => (int) $f->indexed,
+			// Junk: mails probably legitimate (known sender, authenticated), a counter beside the folder
+			'legit' => $role === 'junk' ? (int) (($legit = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_mail WHERE fk_folder = ".((int) $f->rowid)." AND junk_hint = 'legit'")) ? $legit->n : 0) : 0,
 			'error' => (string) $f->sync_error !== '',
 			// Colour and icon shared by the users of the mailbox ('' = by default; a special folder keeps its icon)
 			'color' => (string) InboxLook::cleanColor((string) $f->color),

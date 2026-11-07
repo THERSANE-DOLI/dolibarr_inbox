@@ -317,6 +317,8 @@
 				+ folderIcon(f, open, 'ibx-tree__icon')
 				+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
 				+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
+				// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
+				+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
 				+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
@@ -2169,7 +2171,10 @@
 
 	// ---------- Threads ignored or watched, newsletters (lot W4 1.11.0, B4, B8) ----------
 	function threadMarks(r) {
-		return (r.watched ? '<span class="ibx-threadmark ibx-threadmark--watch" title="' + th('InboxThreadWatched') + '">' + ic('watch') + '<span class="ibx-sr-only">' + th('InboxThreadWatched') + ' </span></span>' : '')
+		const e = S.folders.get(r.folder);
+		const legit = r.junk_hint === 'legit' && e && e.folder.role === 'junk';
+		return (legit ? '<span class="ibx-threadmark ibx-junklegit" title="' + th('InboxJunkLegitShort') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxJunkLegitShort') + ' </span></span>' : '')
+			+ (r.watched ? '<span class="ibx-threadmark ibx-threadmark--watch" title="' + th('InboxThreadWatched') + '">' + ic('watch') + '<span class="ibx-sr-only">' + th('InboxThreadWatched') + ' </span></span>' : '')
 			+ (r.ignored ? '<span class="ibx-threadmark" title="' + th('InboxThreadIgnored') + '">' + ic('ignore') + '<span class="ibx-sr-only">' + th('InboxThreadIgnored') + ' </span></span>' : '');
 	}
 	/**
@@ -3604,6 +3609,15 @@
 		if (spoofName) {
 			banners += banner('warning', 'spoof', th('InboxNameImitation', spoofName, m.from.email));
 		}
+		// A known sender imitated: red, above everything; a known and authenticated sender in the junk: orange
+		const sc = m.sender_check;
+		if (sc && sc.state === 'imitation') {
+			banners = banner('danger', 'spoof', '<b>' + th('InboxImitationTitle') + '</b> ' + th('InboxImitationText', sc.name, sc.address)
+				+ (sc.detail ? ' <span class="ibx-mono">' + esc(sc.detail) + '</span>' : '')) + banners;
+		} else if (sc && sc.state === 'legit' && m.folder_role === 'junk' && !opts.inline) {
+			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
+		}
 		if (m.unsubscribe && !opts.inline) {
 			// Newsletter (B4): one-click by the server, never the link opened; by mail when the composer comes (W6)
 			const u = m.unsubscribe;
@@ -3698,6 +3712,10 @@
 		const frame = $('.ibx-js-frame', pane);
 		if (frame) {
 			frame.addEventListener('load', () => frameReady(frame, m));
+		}
+		const notJunk = $('.ibx-js-notjunk', pane);
+		if (notJunk) {
+			notJunk.addEventListener('click', () => doJunk([m.id], false));
 		}
 		const unsub = $('.ibx-js-unsubscribe', pane);
 		if (unsub) {

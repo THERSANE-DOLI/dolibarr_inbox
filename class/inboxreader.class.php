@@ -200,12 +200,47 @@ class InboxReader
 			'auth' => $auth,
 			'security' => self::security($raw, $headers, $message),
 			'report' => self::deliveryReport($raw, $headers),
+			'sender_check' => $this->senderCheck($raw),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			'read_mode' => $params->get($user, 'read_mode', (int) $this->row->fk_account),
 			'read_delay' => (int) $params->get($user, 'read_delay', (int) $this->row->fk_account),
 			'can_flag' => true,
 		);
+	}
+
+	/**
+	 * Imitation of a known sender (red alert), or a mail of the junk from a known and authenticated sender (lot W5
+	 * 1.15.0); null when nothing is to say (unknown sender, or no trusted server in the setup)
+	 *
+	 * @param string $raw Raw mail
+	 * @return array{state:string,address:string,name:string,detail:string}|null
+	 */
+	protected function senderCheck($raw)
+	{
+		require_once __DIR__.'/inboxknownsenders.class.php';
+		$end = strpos($raw, "\r\n\r\n");
+		$end = $end === false ? strpos($raw, "\n\n") : $end;
+		$known = new InboxKnownSenders($this->db);
+		$res = $known->check(substr($raw, 0, $end === false ? 65536 : min($end, 262144)));
+		if ($res['state'] === 'unknown' || ($res['state'] === 'legit' && (string) $this->row->folder_role !== 'junk')) {
+			return null;
+		}
+		$s = $res['sender'];
+		$p = $this->db->prefix();
+		$name = '';
+		if (!empty($s['contactid'])) {
+			$o = $this->db->getRow("SELECT c.firstname, c.lastname, s.nom FROM ".$p."socpeople as c LEFT JOIN ".$p."societe as s ON s.rowid = c.fk_soc WHERE c.rowid = ".((int) $s['contactid']));
+			$name = is_object($o) ? trim($o->firstname.' '.$o->lastname).($o->nom ? ' ('.$o->nom.')' : '') : '';
+		} elseif (!empty($s['socid'])) {
+			$o = $this->db->getRow("SELECT nom FROM ".$p."societe WHERE rowid = ".((int) $s['socid']));
+			$name = is_object($o) ? (string) $o->nom : '';
+		} elseif (!empty($s['userid'])) {
+			$o = $this->db->getRow("SELECT firstname, lastname FROM ".$p."user WHERE rowid = ".((int) $s['userid']));
+			$name = is_object($o) ? trim($o->firstname.' '.$o->lastname) : '';
+		}
+
+		return array('state' => $res['state'], 'address' => $res['address'], 'name' => $name !== '' ? $name : $res['address'], 'detail' => $res['detail']);
 	}
 
 	/**

@@ -1067,3 +1067,12 @@ InboxErrorCannotCreate = You cannot create this kind of piece
 InboxErrorCannotAttach = You cannot add documents to this piece
 InboxErrorAttachmentInfected = A virus was found in this file: it is not copied
 InboxJournal_attach = File put in a piece
+
+# Imitation and junk probably legitimate (1.15.0)
+InboxImitationTitle = Probable imitation.
+InboxImitationText = %s (%s) is known to Dolibarr, but this mail is not authenticated: do not answer it, open nothing, check with the sender by another way.
+InboxJunkLegitText = This mail is in the junk, but %s is known to Dolibarr and the mail is authenticated (DKIM, SPF, DMARC): probably not a junk.
+InboxJunkLegitShort = Known sender, authenticated: probably not a junk
+InboxJunkLegitCount = %s mail(s) probably not junk
+InboxAuthServers = Trusted authentication servers
+InboxAuthServersHelp = Name of the receiving servers of the company, as they write it in « Authentication-Results » (several: separated by commas). Without it, inbox says nothing of the authentication of the senders.

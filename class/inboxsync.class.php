@@ -280,6 +280,12 @@ class InboxSync
 			}
 			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
 			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
+			// Junk: a known sender, authenticated, is probably legitimate (lot W5 1.15.0; headers of these mails only)
+			if ((string) $f->role === 'junk') {
+				require_once __DIR__.'/inboxknownsenders.class.php';
+				$known = new InboxKnownSenders($this->db);
+				$known->checkJunk($connector, $folderId, (string) $f->path, $deadline);
+			}
 			$this->stats['deleted'] += $mails->removeMany($folderId, $res['deleted']);
 			$this->stats['folders']++;
 			$after = $mails->folderStats($folderId);

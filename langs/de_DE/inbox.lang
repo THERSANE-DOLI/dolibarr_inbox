@@ -1067,3 +1067,12 @@ InboxErrorCannotCreate = Sie dürfen diese Art von Beleg nicht erstellen
 InboxErrorCannotAttach = Sie dürfen diesem Beleg keine Dokumente hinzufügen
 InboxErrorAttachmentInfected = In dieser Datei wurde ein Virus gefunden: sie wird nicht kopiert
 InboxJournal_attach = Datei in einen Beleg gelegt
+
+# Imitation and junk probably legitimate (1.15.0)
+InboxImitationTitle = Wahrscheinliche Nachahmung.
+InboxImitationText = %s (%s) ist Dolibarr bekannt, aber diese Mail ist nicht authentifiziert: nicht antworten, nichts öffnen, beim Absender auf anderem Weg nachfragen.
+InboxJunkLegitText = Diese Mail liegt im Spam, aber %s ist Dolibarr bekannt und die Mail ist authentifiziert (DKIM, SPF, DMARC): wahrscheinlich kein Spam.
+InboxJunkLegitShort = Bekannter, authentifizierter Absender: wahrscheinlich kein Spam
+InboxJunkLegitCount = %s Mail(s) wahrscheinlich kein Spam
+InboxAuthServers = Vertrauenswürdige Authentifizierungsserver
+InboxAuthServersHelp = Name der Empfangsserver des Unternehmens, wie sie ihn in « Authentication-Results » schreiben (mehrere: durch Kommas getrennt). Ohne ihn sagt inbox nichts über die Authentifizierung der Absender.
