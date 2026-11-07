@@ -62,7 +62,7 @@ switch ($action) {
 		$assignees = $assign->forRows(array($reader->row));
 		$out['assignees'] = $assignees[(int) $reader->row->rowid] ?? array();
 		$out['people'] = (object) $assign->names($assignees);
-		$out['has_message_id'] = (string) $reader->row->message_id !== '';
+		$out['has_message_id'] = true;
 		inboxAjaxReply($out);
 		// no break
 
@@ -90,7 +90,7 @@ switch ($action) {
 					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) $r->from_email, 'from_name' => (string) $r->from_name,
 					'to' => dol_trunc((string) $r->to_text, 300, 'right', 'UTF-8', 1), 'subject' => (string) $r->subject, 'snippet' => (string) $r->snippet,
 					'date' => $date ? (int) $db->jdate($date) : 0, 'seen' => (int) $r->seen, 'answered' => (int) $r->answered, 'flagged' => (int) $r->flagged,
-					'attachments' => (int) $r->has_attachments, 'has_mid' => (string) $r->message_id !== '' ? 1 : 0,
+					'attachments' => (int) $r->has_attachments, 'has_mid' => 1,
 				));
 			}
 			foreach ($byMsg as $v) {
@@ -103,7 +103,7 @@ switch ($action) {
 		// People assigned to each mail of the conversation
 		dol_include_once('/inbox/class/inboxassign.class.php');
 		$assign = new InboxAssign($db);
-		$found = $db->getRows("SELECT rowid, fk_account, message_id, date_mail, from_email FROM ".$db->prefix()."inbox_mail WHERE rowid IN (".implode(',', array_map(function ($m) {
+		$found = $db->getRows("SELECT rowid, fk_account, message_id, date_mail, from_email, subject, size FROM ".$db->prefix()."inbox_mail WHERE rowid IN (".implode(',', array_map(function ($m) {
 			return (int) $m['id'];
 		}, $list)).") LIMIT 500");
 		$assignees = $assign->forRows(is_array($found) ? $found : array());

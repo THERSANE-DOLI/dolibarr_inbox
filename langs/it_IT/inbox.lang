@@ -982,3 +982,88 @@ InboxErrorNoZip = Impossibile creare file zip su questo server (zip di PHP manca
 InboxExportEmpty = Nessuna mail da esportare
 InboxJournal_import = Importato
 InboxJournal_export = Esportato
+
+# Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
+InboxDolibarr = Dolibarr
+InboxPieceNotReadable = non accessibile
+InboxUnlink = Scollega
+InboxUnlinkPiece = Scollega %s
+InboxPiecesCount = %s documento/i
+InboxNotesCount = %s nota/e
+InboxKnownByDomain = (riconosciuto dal dominio dell'indirizzo)
+InboxDolibarrUser = Utente Dolibarr: %s
+InboxSender = Mittente
+InboxSenderUnknown = Sconosciuto a Dolibarr
+InboxPiecesLinked = Documenti
+InboxNoPiece = Nessun documento collegato
+InboxLinkPiece = Collega
+InboxNotes = Note
+InboxNoteEdited = modificata
+InboxNoteEdit = Modifica la nota
+InboxNoteDelete = Elimina la nota
+InboxNoteAdd = Aggiungi la nota
+InboxNotePlaceholder = Scrivi una nota…
+InboxUnlinked = %s scollegato
+InboxNoteDeleteText = La nota viene eliminata per tutti.
+InboxLinkPieceTitle = Collega questa mail a un documento
+InboxSearchPiece = Cerca un documento (rif., terza parte, contatto…)
+InboxLink = Collega
+InboxAlreadyLinked = Già collegato
+InboxNoPieceFound = Nessun documento trovato
+InboxTypeToSearch = Digita un rif., una terza parte o un contatto
+InboxErrorPieceNotReadable = Non puoi leggere questo documento di Dolibarr
+InboxErrorNoteNotFound = Nota non trovata
+InboxErrorNoteNotYours = Solo l'autore o una persona che gestisce la casella può modificare questa nota
+InboxErrorNoteEmpty = La nota è vuota
+
+# Tab Mails of the cards (1.13.0)
+InboxMailsTab = Mail
+InboxMailGoneEverywhere = Mail non più presente sul server
+InboxLastSeenIn = (vista l'ultima volta in %s)
+InboxLinked = collegata
+InboxOpenInInbox = Apri in inbox
+InboxNoMailForPiece = Nessuna mail collegata o scambiata con questi indirizzi nelle caselle che puoi leggere
+InboxNoMailboxReadable = Non hai accesso a nessuna casella di inbox
+
+# Place of the Dolibarr part (1.13.0)
+InboxDolibarrFold = Comprimi la parte Dolibarr
+InboxDolibarrUnfold = Espandi la parte Dolibarr
+InboxDolibarrToTop = Parte Dolibarr sopra la mail
+InboxDolibarrToRight = Parte Dolibarr a destra della mail
+InboxDolibarrPosition = Parte Dolibarr di una mail
+InboxDolibarrPositionHelp = Mittente, documenti collegati e note: a destra del testo della mail (le note si leggono come un filo) o sopra. Automatico: a destra quando il riquadro di lettura è abbastanza largo.
+Inbox_dolibar_position_auto = Automatico
+Inbox_dolibar_position_right = A destra della mail
+Inbox_dolibar_position_top = Sopra la mail
+
+# Notes: cards and the box to write (1.13.0)
+InboxNotesEmpty = Ancora nessuna nota su questa mail.
+InboxNoteHint = Invio per salvare · Maiusc+Invio per andare a capo
+InboxNoteActions = Azioni della nota
+
+# Create from the mail, files to a piece (1.14.0)
+InboxCreatePiece = Crea
+InboxModuleActions = Azioni
+InboxAttachTo = Metti nei documenti di %s
+InboxAttachToOther = Metti nei documenti di un altro documento…
+InboxAttached = %s messo nei documenti
+InboxAttachedUnscanned = %s messo nei documenti (non controllato dall'antivirus)
+InboxCreateTitle = Crea da questa mail
+InboxCreateAttachMail = Metti questa mail (.eml) nei documenti
+InboxCreateHelp = La pagina di creazione di Dolibarr si apre in una nuova scheda, precompilata dalla mail. Il documento salvato lì viene collegato a questa mail.
+InboxCreateOpened = Pagina di creazione aperta in una nuova scheda: il documento salvato sarà collegato a questa mail
+InboxAttachToTitle = Metti « %s » nei documenti di un documento
+InboxAttach = Metti qui
+InboxCreateThirdparty = Terza parte
+InboxCreateContact = Contatto
+InboxCreateProposal = Preventivo
+InboxCreateOrder = Ordine
+InboxCreateSupplierProposal = Richiesta di prezzo al fornitore
+InboxCreateSupplierOrder = Ordine fornitore
+InboxCreateEvent = Evento
+InboxCreateTicket = Ticket
+InboxCreateProject = Progetto
+InboxErrorCannotCreate = Non puoi creare questo tipo di documento
+InboxErrorCannotAttach = Non puoi aggiungere file a questo documento
+InboxErrorAttachmentInfected = È stato trovato un virus in questo file: non viene copiato
+InboxJournal_attach = File messo in un documento

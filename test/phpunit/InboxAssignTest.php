@@ -137,13 +137,14 @@ class InboxAssignTest extends InboxTestCase
 		$this->assertSame('InboxErrorAssignNoAccess', $res['error'], 'a person without access is never assigned');
 		$res = $assign->set($carol, array($m1), array($carol->id), array());
 		$this->assertSame('InboxMailNotFound', $res['error'], 'a mail of a mailbox without access');
+		// A mail without Message-ID: its key is a print of the mail (1.13.0), it is assigned as the others
 		$res = $assign->set($alice, array($none), array($alice->id), array());
-		$this->assertSame('InboxErrorNoMessageId', $res['error']);
+		$this->assertTrue($res['ok'], $res['error']);
 
 		// Journal of the actions of the mailbox
 		$journal = InboxActionLog::listForAccount($this->db, $devis->id, array('action' => 'assign'));
 		$this->assertNotEmpty($journal['lines']);
-		$this->assertStringContainsString('bob', $journal['lines'][0]['detail']);
+		$this->assertStringContainsString('bob', implode(' ', array_column($journal['lines'], 'detail')));
 
 		// Moved to another folder, then copied to another mailbox: the assignment follows (the Message-ID)
 		$archive = $this->folder($devis->id, 'Archives', 'archive');
@@ -161,9 +162,9 @@ class InboxAssignTest extends InboxTestCase
 		$found = $engine->search(array($devis->id), $archive, array('mine' => $alice->id), '', 50);
 		$this->assertSame(array($m1), array_column($found['rows'], 'id'));
 		$found = $engine->search(array($devis->id), 0, array('mine' => $alice->id), '', 50);
-		$this->assertSame(array(), array_column($found['rows'], 'id'), 'archived: out of my mails');
+		$this->assertSame(array($none), array_column($found['rows'], 'id'), 'archived: out of my mails; the mail without Message-ID is found by its print');
 		$found = $engine->search(array($devis->id), 0, array('mine' => $alice->id, 'mine_archived' => true), '', 50);
-		$this->assertSame(array($m1), array_column($found['rows'], 'id'));
+		$this->assertEqualsCanonicalizing(array($m1, $none), array_column($found['rows'], 'id'));
 
 		// Lines of a list decorated, with the names
 		$rows = $engine->search(array($devis->id), $archive, array(), '', 50)['rows'];

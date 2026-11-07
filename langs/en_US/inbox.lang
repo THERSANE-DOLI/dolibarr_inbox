@@ -982,3 +982,88 @@ InboxErrorNoZip = The zip files cannot be made on this server (PHP zip missing)
 InboxExportEmpty = No mail to export
 InboxJournal_import = Imported
 InboxJournal_export = Exported
+
+# Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
+InboxDolibarr = Dolibarr
+InboxPieceNotReadable = not accessible
+InboxUnlink = Unlink
+InboxUnlinkPiece = Unlink %s
+InboxPiecesCount = %s piece(s)
+InboxNotesCount = %s note(s)
+InboxKnownByDomain = (known by the domain of the address)
+InboxDolibarrUser = Dolibarr user: %s
+InboxSender = Sender
+InboxSenderUnknown = Unknown to Dolibarr
+InboxPiecesLinked = Pieces
+InboxNoPiece = No piece linked
+InboxLinkPiece = Link
+InboxNotes = Notes
+InboxNoteEdited = edited
+InboxNoteEdit = Change the note
+InboxNoteDelete = Remove the note
+InboxNoteAdd = Add the note
+InboxNotePlaceholder = Write a note…
+InboxUnlinked = %s unlinked
+InboxNoteDeleteText = The note is removed for everybody.
+InboxLinkPieceTitle = Link this mail to a piece
+InboxSearchPiece = Search a piece (ref., thirdparty, contact…)
+InboxLink = Link
+InboxAlreadyLinked = Already linked
+InboxNoPieceFound = No piece found
+InboxTypeToSearch = Type a ref., a thirdparty or a contact
+InboxErrorPieceNotReadable = You cannot read this piece of Dolibarr
+InboxErrorNoteNotFound = Note not found
+InboxErrorNoteNotYours = Only its author or a person who manages the mailbox may change this note
+InboxErrorNoteEmpty = The note is empty
+
+# Tab Mails of the cards (1.13.0)
+InboxMailsTab = Mails
+InboxMailGoneEverywhere = Mail not found on the server any more
+InboxLastSeenIn = (seen last in %s)
+InboxLinked = linked
+InboxOpenInInbox = Open in inbox
+InboxNoMailForPiece = No mail linked or exchanged with these addresses in the mailboxes you can read
+InboxNoMailboxReadable = You have access to no mailbox of inbox
+
+# Place of the Dolibarr part (1.13.0)
+InboxDolibarrFold = Fold the Dolibarr part
+InboxDolibarrUnfold = Unfold the Dolibarr part
+InboxDolibarrToTop = Dolibarr part above the mail
+InboxDolibarrToRight = Dolibarr part on the right of the mail
+InboxDolibarrPosition = Dolibarr part of a mail
+InboxDolibarrPositionHelp = Sender, pieces linked and notes: on the right of the body of the mail (the notes read as a thread) or above it. Automatic: on the right when the reading pane is wide enough.
+Inbox_dolibar_position_auto = Automatic
+Inbox_dolibar_position_right = On the right of the mail
+Inbox_dolibar_position_top = Above the mail
+
+# Notes: cards and the box to write (1.13.0)
+InboxNotesEmpty = No note on this mail yet.
+InboxNoteHint = Enter to save · Shift+Enter for a new line
+InboxNoteActions = Actions of the note
+
+# Create from the mail, files to a piece (1.14.0)
+InboxCreatePiece = Create
+InboxModuleActions = Actions
+InboxAttachTo = Put in the documents of %s
+InboxAttachToOther = Put in the documents of another piece…
+InboxAttached = %s put in the documents of the piece
+InboxAttachedUnscanned = %s put in the documents of the piece (not checked by the antivirus)
+InboxCreateTitle = Create from this mail
+InboxCreateAttachMail = Put this mail (.eml) in the documents of the piece
+InboxCreateHelp = The page of creation of Dolibarr opens in a new tab, filled from the mail. The piece saved there is linked to this mail.
+InboxCreateOpened = Page of creation opened in a new tab: the piece saved there will be linked to this mail
+InboxAttachToTitle = Put « %s » in the documents of a piece
+InboxAttach = Put it there
+InboxCreateThirdparty = Thirdparty
+InboxCreateContact = Contact
+InboxCreateProposal = Proposal
+InboxCreateOrder = Order
+InboxCreateSupplierProposal = Price request to a supplier
+InboxCreateSupplierOrder = Supplier order
+InboxCreateEvent = Event
+InboxCreateTicket = Ticket
+InboxCreateProject = Project
+InboxErrorCannotCreate = You cannot create this kind of piece
+InboxErrorCannotAttach = You cannot add documents to this piece
+InboxErrorAttachmentInfected = A virus was found in this file: it is not copied
+InboxJournal_attach = File put in a piece

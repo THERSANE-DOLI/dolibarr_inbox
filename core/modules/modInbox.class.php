@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.12.0';
+		$this->version = '1.14.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
@@ -84,7 +84,14 @@ class modInbox extends DolibarrModules
 			$conf->inbox->enabled = 0;
 		}
 
+		// Tab « Mails » of the cards (lot W5 1.13.0): mails linked to the piece, and from / to the addresses of a thirdparty or a contact
 		$this->tabs = array();
+		$cond = 'isModEnabled("inbox") && $user->hasRight("inbox", "webmail", "use") && empty($user->socid)';
+		foreach (array('thirdparty' => 'societe', 'contact' => 'contact', 'propal' => 'propal', 'order' => 'commande', 'invoice' => 'facture', 'supplier_order' => 'order_supplier',
+			'supplier_invoice' => 'invoice_supplier', 'supplier_proposal' => 'supplier_proposal', 'project' => 'project', 'ticket' => 'ticket', 'intervention' => 'fichinter',
+			'delivery' => 'shipping') as $tabType => $element) {
+			$this->tabs[] = array('data' => $tabType.':+inboxmails:InboxMailsTab:inbox@inbox:'.$cond.':/inbox/mails.php?type='.$element.'&id=__ID__');
+		}
 		$this->dictionaries = array();
 		$this->boxes = array();
 

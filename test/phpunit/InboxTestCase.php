@@ -91,7 +91,14 @@ abstract class InboxTestCase extends TestCase
 		$refs = "SELECT rowid FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%'";
 		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_notification WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
-		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%'");
+		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (".$refs.")");
+		$db->query("DELETE FROM ".$p."inbox_note WHERE fk_mailref IN (".$refs.")");
+		// Mails without Message-ID of the tests: their key is a print, the mailref keeps the sender
+		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
+		$db->query("DELETE FROM ".$p."inbox_note WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
+		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
+		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%' OR from_email LIKE '%inbox-test.invalid'");
+		$db->query("DELETE FROM ".$p."societe WHERE nom LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");

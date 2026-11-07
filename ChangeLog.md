@@ -1,5 +1,28 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: create a piece from a mail, files of a mail in the documents of a piece, actions of the other modules :   1.14.0
+  - « Create ▾ » of the Dolibarr part: thirdparty, contact, proposal, order, price request, supplier order, event,
+    ticket, project; the page of creation of Dolibarr opens in a new tab, filled from the mail (name, address, subject,
+    thirdparty recognized); the piece saved there is linked to the mail, and gets the mail (.eml) in its documents when
+    the box is ticked (not ticked by default).
+  - a file of a mail goes in the documents of a piece: menu of the file, or the file dropped on a piece of the Dolibarr
+    part; the antivirus checks it first; the piece is linked to the mail; written in the journal of the mailbox.
+  - other modules add their actions with the hook inboxMailActions (an address inside Dolibarr).
+  - the Dolibarr part: on the right of the body of the mail or above it (Automatic by default, My account); notes as a
+    thread of messages with the picture of their author.
+- NEW: Dolibarr beside each mail: sender known, pieces linked, internal notes, tab « Mails » of the cards :   1.13.0
+  - bandeau under the head of the mail read (of the conversation): thirdparty and contact recognized by the address,
+    else by its domain (never a public mail service), Dolibarr user; pieces linked as pills (link « + Link » with a
+    search, the pieces of the thirdparty first; unlink with undo); internal notes (add, change, remove: their author
+    or a manager of the mailbox); folded or not, kept per user.
+  - a link or a note follows the mail in every move, and is seen from every mailbox where the mail is, by the people
+    who can read it; a piece that one cannot read in Dolibarr shows « not accessible »; a piece removed loses its links.
+  - tab « Mails » on the cards of thirdparties, contacts, proposals, orders, invoices, supplier orders and invoices,
+    supplier proposals, projects, tickets, interventions, shipments: the mails linked and, for a thirdparty or a
+    contact, the mails from and to its addresses, only in the mailboxes the user can read; « Open in inbox ».
+  - mails without Message-ID: a print of the mail is their key (assigned, linked, noted as the others).
+  - other modules: public classes InboxMailRef, InboxLink, InboxNote (origin, no double), triggers INBOX_LINK_CREATE,
+    INBOX_LINK_DELETE, INBOX_NOTE_CREATE, _MODIFY, _DELETE, hooks inboxMailLinks and inboxMailAlerts.
 - NEW: import and export of mails :   1.12.0
   - files dropped on a folder (or « Import mails… » of its menu): .eml files and mbox files (the local folders of
     most mail software), read by slices in the browser and sent by batches that fit the server; progress, « Stop »,

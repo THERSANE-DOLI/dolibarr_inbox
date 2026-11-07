@@ -982,3 +982,88 @@ InboxErrorNoZip = Zip-Dateien können auf diesem Server nicht erstellt werden (P
 InboxExportEmpty = Keine Mail zu exportieren
 InboxJournal_import = Importiert
 InboxJournal_export = Exportiert
+
+# Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
+InboxDolibarr = Dolibarr
+InboxPieceNotReadable = nicht zugänglich
+InboxUnlink = Verknüpfung lösen
+InboxUnlinkPiece = Verknüpfung mit %s lösen
+InboxPiecesCount = %s Beleg(e)
+InboxNotesCount = %s Notiz(en)
+InboxKnownByDomain = (am Domain der Adresse erkannt)
+InboxDolibarrUser = Dolibarr-Benutzer: %s
+InboxSender = Absender
+InboxSenderUnknown = Dolibarr unbekannt
+InboxPiecesLinked = Belege
+InboxNoPiece = Kein Beleg verknüpft
+InboxLinkPiece = Verknüpfen
+InboxNotes = Notizen
+InboxNoteEdited = geändert
+InboxNoteEdit = Notiz ändern
+InboxNoteDelete = Notiz löschen
+InboxNoteAdd = Notiz hinzufügen
+InboxNotePlaceholder = Notiz schreiben…
+InboxUnlinked = Verknüpfung mit %s gelöst
+InboxNoteDeleteText = Die Notiz wird für alle gelöscht.
+InboxLinkPieceTitle = Diese Mail mit einem Beleg verknüpfen
+InboxSearchPiece = Beleg suchen (Ref., Geschäftspartner, Kontakt…)
+InboxLink = Verknüpfen
+InboxAlreadyLinked = Bereits verknüpft
+InboxNoPieceFound = Kein Beleg gefunden
+InboxTypeToSearch = Ref., Geschäftspartner oder Kontakt eingeben
+InboxErrorPieceNotReadable = Sie dürfen diesen Dolibarr-Beleg nicht lesen
+InboxErrorNoteNotFound = Notiz nicht gefunden
+InboxErrorNoteNotYours = Nur der Verfasser oder eine Person, die das Postfach verwaltet, darf diese Notiz ändern
+InboxErrorNoteEmpty = Die Notiz ist leer
+
+# Tab Mails of the cards (1.13.0)
+InboxMailsTab = Mails
+InboxMailGoneEverywhere = Mail nicht mehr auf dem Server
+InboxLastSeenIn = (zuletzt gesehen in %s)
+InboxLinked = verknüpft
+InboxOpenInInbox = In inbox öffnen
+InboxNoMailForPiece = Keine verknüpfte oder mit diesen Adressen ausgetauschte Mail in den Postfächern, die Sie lesen dürfen
+InboxNoMailboxReadable = Sie haben auf kein Postfach von inbox Zugriff
+
+# Place of the Dolibarr part (1.13.0)
+InboxDolibarrFold = Dolibarr-Bereich einklappen
+InboxDolibarrUnfold = Dolibarr-Bereich ausklappen
+InboxDolibarrToTop = Dolibarr-Bereich über der Mail
+InboxDolibarrToRight = Dolibarr-Bereich rechts der Mail
+InboxDolibarrPosition = Dolibarr-Bereich einer Mail
+InboxDolibarrPositionHelp = Absender, verknüpfte Belege und Notizen: rechts vom Text der Mail (die Notizen lesen sich wie ein Verlauf) oder darüber. Automatisch: rechts, wenn der Lesebereich breit genug ist.
+Inbox_dolibar_position_auto = Automatisch
+Inbox_dolibar_position_right = Rechts der Mail
+Inbox_dolibar_position_top = Über der Mail
+
+# Notes: cards and the box to write (1.13.0)
+InboxNotesEmpty = Noch keine Notiz zu dieser Mail.
+InboxNoteHint = Eingabe zum Speichern · Umschalt+Eingabe für eine neue Zeile
+InboxNoteActions = Aktionen der Notiz
+
+# Create from the mail, files to a piece (1.14.0)
+InboxCreatePiece = Erstellen
+InboxModuleActions = Aktionen
+InboxAttachTo = In die Dokumente von %s legen
+InboxAttachToOther = In die Dokumente eines anderen Belegs legen…
+InboxAttached = %s in die Dokumente des Belegs gelegt
+InboxAttachedUnscanned = %s in die Dokumente des Belegs gelegt (nicht vom Virenscanner geprüft)
+InboxCreateTitle = Aus dieser Mail erstellen
+InboxCreateAttachMail = Diese Mail (.eml) in die Dokumente des Belegs legen
+InboxCreateHelp = Die Erstellungsseite von Dolibarr öffnet sich in einem neuen Tab, aus der Mail vorausgefüllt. Der dort gespeicherte Beleg wird mit dieser Mail verknüpft.
+InboxCreateOpened = Erstellungsseite in einem neuen Tab geöffnet: der dort gespeicherte Beleg wird mit dieser Mail verknüpft
+InboxAttachToTitle = „%s“ in die Dokumente eines Belegs legen
+InboxAttach = Hier ablegen
+InboxCreateThirdparty = Geschäftspartner
+InboxCreateContact = Kontakt
+InboxCreateProposal = Angebot
+InboxCreateOrder = Auftrag
+InboxCreateSupplierProposal = Preisanfrage an Lieferanten
+InboxCreateSupplierOrder = Lieferantenbestellung
+InboxCreateEvent = Ereignis
+InboxCreateTicket = Ticket
+InboxCreateProject = Projekt
+InboxErrorCannotCreate = Sie dürfen diese Art von Beleg nicht erstellen
+InboxErrorCannotAttach = Sie dürfen diesem Beleg keine Dokumente hinzufügen
+InboxErrorAttachmentInfected = In dieser Datei wurde ein Virus gefunden: sie wird nicht kopiert
+InboxJournal_attach = Datei in einen Beleg gelegt

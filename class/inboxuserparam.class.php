@@ -89,6 +89,10 @@ class InboxUserParam
 			'tag_colors_adapt' => array('1', 'int:0:1'),
 			// Folders (1.8.0): icons of the folders and mailboxes in their colour, or all grey (plain)
 			'folder_icons' => array('color', array('color', 'plain')),
+			// Bandeau Dolibarr of the reading folded (1.13.0)
+			'dolibar_folded' => array('0', 'int:0:1'),
+			// Place of the bandeau Dolibarr: auto (on the right when the reading pane is wide enough), right, top
+			'dolibar_position' => array('auto', array('auto', 'right', 'top')),
 		);
 	}
 

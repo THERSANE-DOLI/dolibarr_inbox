@@ -114,7 +114,7 @@ class InboxAssign
 			}
 			$mailIds = array_slice(array_values(array_unique($mailIds)), 0, self::MAX);
 		}
-		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.date_mail, m.from_email, m.subject FROM ".$p."inbox_mail as m"
+		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.date_mail, m.from_email, m.subject, m.size FROM ".$p."inbox_mail as m"
 			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 WHERE m.rowid IN (".implode(',', $mailIds).") LIMIT ".(self::MAX + 1));
 		$access = new InboxAccess($this->db);
 		if (!is_array($rows) || count($rows) !== count($mailIds)) {
@@ -134,8 +134,10 @@ class InboxAssign
 				}
 			}
 		}
-		$withId = array_values(array_filter($rows, function ($r) {
-			return (string) $r->message_id !== '';
+		// A key for each mail: its Message-ID, or the print of a mail without one (1.13.0)
+		$keyer = new InboxMailRef($this->db);
+		$withId = array_values(array_filter($rows, function ($r) use ($keyer) {
+			return $keyer->keyOf($r) !== '';
 		}));
 		$out['skipped'] = count($rows) - count($withId);
 		if (!$withId) {
@@ -296,7 +298,7 @@ class InboxAssign
 				$keys[(int) $r['folder']][] = "'".$this->db->escape((string) $r['thread']['key'])."'";
 			}
 		}
-		$sql = "SELECT rowid, fk_account, fk_folder, message_id, date_mail, from_email, thread_key FROM ".$p."inbox_mail WHERE rowid IN (".implode(',', $ids).")";
+		$sql = "SELECT rowid, fk_account, fk_folder, message_id, date_mail, from_email, subject, size, thread_key FROM ".$p."inbox_mail WHERE rowid IN (".implode(',', $ids).")";
 		foreach ($keys as $folder => $k) {
 			$sql .= " OR (fk_folder = ".((int) $folder)." AND thread_key IN (".implode(',', array_unique($k))."))";
 		}

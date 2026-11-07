@@ -243,5 +243,10 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/notification.php', array('action' => 'read'))['code'], 'read without token refused');
 		$open = $this->call('/custom/inbox/ajax/notification.php', array('action' => 'open', 'id' => 99999999, 'token' => $token));
 		$this->assertSame('not_found', $open['json']['problem'], 'the notification of nobody');
+		// Bandeau Dolibarr (1.13.0): token and POST for the writes, a forged mail not found, a forged piece refused
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/dolibarr.php?action=panel&id=99999999')['code']);
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/dolibarr.php', array('action' => 'note', 'id' => (int) $row->rowid, 'text' => 'x'))['code'], 'note without token refused');
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/dolibarr.php?action=link&id='.$row->rowid.'&type=societe&element=1&token='.urlencode($token))['code'], 'link by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/dolibarr.php', array('action' => 'link', 'id' => 99999999, 'type' => 'societe', 'element' => 1, 'token' => $token))['code']);
 	}
 }

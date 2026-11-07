@@ -57,6 +57,25 @@ class InboxMailRef
 	}
 
 	/**
+	 * Key of a mail: its Message-ID, or for a mail without one (some automats), a print of its date, sender, subject
+	 * and size, written « fp:<sha1> » (webmail §5.7 bis). '' when the row lacks what the print needs.
+	 *
+	 * @param object $row Row of the index (message_id; else date_mail, from_email, subject, size)
+	 * @return string
+	 */
+	public function keyOf($row)
+	{
+		if ((string) ($row->message_id ?? '') !== '') {
+			return (string) $row->message_id;
+		}
+		if (!property_exists($row, 'subject') || !property_exists($row, 'size')) {
+			return '';
+		}
+
+		return 'fp:'.sha1($this->printOf($row->date_mail ?? null, $row->from_email ?? '').'|'.trim((string) $row->subject).'|'.((int) $row->size));
+	}
+
+	/**
 	 * Mailrefs of a list of rows of the index, without creating any
 	 *
 	 * @param object[] $rows Rows (rowid, message_id, date_mail, from_email)
@@ -67,9 +86,12 @@ class InboxMailRef
 		global $conf;
 
 		$ids = array();
+		$keys = array();
 		foreach ($rows as $r) {
-			if ((string) $r->message_id !== '') {
-				$ids[(string) $r->message_id] = "'".$this->db->escape((string) $r->message_id)."'";
+			$k = $this->keyOf($r);
+			$keys[(int) $r->rowid] = $k;
+			if ($k !== '') {
+				$ids[$k] = "'".$this->db->escape($k)."'";
 			}
 		}
 		if (!$ids) {
@@ -83,7 +105,7 @@ class InboxMailRef
 		}
 		$out = array();
 		foreach ($rows as $r) {
-			foreach ($refs[(string) $r->message_id] ?? array() as $f) {
+			foreach ($refs[$keys[(int) $r->rowid]] ?? array() as $f) {
 				if ((string) $f->check_print === '' || (string) $f->check_print === $this->printOf($r->date_mail, $r->from_email)) {
 					$out[(int) $r->rowid] = (int) $f->rowid;
 					break;
@@ -105,7 +127,8 @@ class InboxMailRef
 	{
 		global $conf;
 
-		if ((string) $row->message_id === '') {
+		$key = $this->keyOf($row);
+		if ($key === '') {
 			$this->error = 'InboxErrorNoMessageId';
 			return 0;
 		}
@@ -118,16 +141,16 @@ class InboxMailRef
 			return $v === '' ? 'NULL' : "'".$this->db->escape(dol_trunc($v, $len, 'right', 'UTF-8', 1))."'";
 		};
 		$date = (string) $row->date_mail !== '' ? (is_numeric($row->date_mail) ? "'".$this->db->idate((int) $row->date_mail)."'" : "'".$this->db->escape((string) $row->date_mail)."'") : 'NULL';
-		$sql = "INSERT INTO ".$this->db->prefix()."inbox_mailref (entity, message_id, check_print, subject, from_email, date_mail, date_creation) VALUES (".((int) $conf->entity).","
-			." '".$this->db->escape((string) $row->message_id)."', '".$this->printOf($row->date_mail, $row->from_email)."', ".$s($row->subject ?? '').", ".$s($row->from_email ?? '').","
-			." ".$date.", '".$this->db->idate(dol_now())."')";
+		$sql = "INSERT INTO ".$this->db->prefix()."inbox_mailref (entity, message_id, check_print, subject, from_email, date_mail, origin, last_account, date_creation) VALUES (".((int) $conf->entity).","
+			." '".$this->db->escape($key)."', '".$this->printOf($row->date_mail, $row->from_email)."', ".$s($row->subject ?? '').", ".$s($row->from_email ?? '').","
+			." ".$date.", 'inbox', ".((int) ($row->fk_account ?? 0) ?: 'NULL').", '".$this->db->idate(dol_now())."')";
 		if (!$this->db->query($sql)) {
 			$this->error = $this->db->lasterror();
 			return -1;
 		}
 		$id = (int) $this->db->last_insert_id($this->db->prefix().'inbox_mailref');
 		if ($user instanceof User) {
-			$this->trigger($user, (int) $row->fk_account, array('mailref' => $id, 'message_id' => (string) $row->message_id));
+			$this->trigger($user, (int) $row->fk_account, array('mailref' => $id, 'message_id' => $key));
 		}
 
 		return $id;
@@ -162,19 +185,24 @@ class InboxMailRef
 	public function copies($mailrefId)
 	{
 		$p = $this->db->prefix();
-		$ref = $this->db->getRow("SELECT message_id, check_print FROM ".$p."inbox_mailref WHERE rowid = ".((int) $mailrefId));
+		$ref = $this->db->getRow("SELECT message_id, check_print, from_email, date_mail FROM ".$p."inbox_mailref WHERE rowid = ".((int) $mailrefId));
 		if (!is_object($ref) || (string) $ref->message_id === '') {
 			return array();
 		}
-		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.date_mail, m.from_email, f.role FROM ".$p."inbox_mail as m"
-			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 WHERE m.message_id = '".$this->db->escape((string) $ref->message_id)."' LIMIT 500");
+		$fallback = strpos((string) $ref->message_id, 'fp:') === 0;
+		$where = $fallback ? "(m.message_id IS NULL OR m.message_id = '') AND m.from_email = '".$this->db->escape((string) $ref->from_email)."'"
+			.($ref->date_mail ? " AND m.date_mail = '".$this->db->escape((string) $ref->date_mail)."'" : " AND m.date_mail IS NULL")
+			: "m.message_id = '".$this->db->escape((string) $ref->message_id)."'";
+		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.date_mail, m.from_email, m.subject, m.size, f.role, f.path FROM ".$p."inbox_mail as m"
+			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 WHERE ".$where." LIMIT 500");
 		$good = array();
 		$bad = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			if ((string) $ref->check_print !== '' && (string) $ref->check_print !== $this->printOf($r->date_mail, $r->from_email)) {
+			if ($fallback ? $this->keyOf($r) !== (string) $ref->message_id
+				: ((string) $ref->check_print !== '' && (string) $ref->check_print !== $this->printOf($r->date_mail, $r->from_email))) {
 				continue;
 			}
-			$c = array('mail' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'account' => (int) $r->fk_account);
+			$c = array('mail' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'account' => (int) $r->fk_account, 'path' => (string) $r->path);
 			if (in_array((string) $r->role, array('trash', 'junk'), true)) {
 				$bad[] = $c;
 			} elseif ((string) $r->role === 'inbox') {
@@ -185,6 +213,80 @@ class InboxMailRef
 		}
 
 		return array_merge($good, $bad);
+	}
+
+	/**
+	 * Mailref of a Message-ID given by another module (a link or a note made elsewhere), created if missing; the check
+	 * print stays empty (« to complete ») until the index sees the mail
+	 *
+	 * @param string              $messageId Message-ID, with or without < >
+	 * @param array<string,mixed> $data      subject, from_email, date_mail (timestamp), origin, last_account
+	 * @return int Mailref, < 0 if KO
+	 */
+	public function fetchOrCreateByMessageId($messageId, array $data = array())
+	{
+		global $conf;
+
+		$messageId = trim((string) $messageId, " \t<>");
+		if ($messageId === '' || strlen($messageId) > 255) {
+			$this->error = 'Bad Message-ID';
+			return -1;
+		}
+		$p = $this->db->prefix();
+		$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mailref WHERE entity = ".((int) $conf->entity)." AND message_id = '".$this->db->escape($messageId)."' ORDER BY rowid");
+		if (is_object($row)) {
+			return (int) $row->rowid;
+		}
+		$s = function ($v, $len = 255) {
+			$v = (string) $v;
+			return $v === '' ? 'NULL' : "'".$this->db->escape(dol_trunc($v, $len, 'right', 'UTF-8', 1))."'";
+		};
+		$sql = "INSERT INTO ".$p."inbox_mailref (entity, message_id, check_print, subject, from_email, date_mail, origin, last_account, date_creation) VALUES (".((int) $conf->entity).","
+			." '".$this->db->escape($messageId)."', NULL, ".$s($data['subject'] ?? '').", ".$s(strtolower((string) ($data['from_email'] ?? ''))).","
+			." ".(!empty($data['date_mail']) ? "'".$this->db->idate((int) $data['date_mail'])."'" : 'NULL').", ".$s($data['origin'] ?? '', 32).","
+			." ".((int) ($data['last_account'] ?? 0) ?: 'NULL').", '".$this->db->idate(dol_now())."')";
+		if (!$this->db->query($sql)) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		return (int) $this->db->last_insert_id($p.'inbox_mailref');
+	}
+
+	/**
+	 * Best level of a user on the mailboxes where the mail is (none when the mail is in no mailbox the user can read)
+	 *
+	 * @param User $user      User
+	 * @param int  $mailrefId Mailref
+	 * @return string '', read, send or manage
+	 */
+	public function levelOf(User $user, $mailrefId)
+	{
+		require_once __DIR__.'/inboxaccess.class.php';
+		$access = new InboxAccess($this->db);
+		$best = '';
+		foreach ($this->copies((int) $mailrefId) as $c) {
+			$level = $access->getLevel($user, $c['account']);
+			if (InboxAccess::rank($level) > InboxAccess::rank($best)) {
+				$best = $level;
+			}
+		}
+
+		return $best;
+	}
+
+	/**
+	 * Remember where the mail was seen (shown when it is not found any more)
+	 *
+	 * @param int    $mailrefId Mailref
+	 * @param int    $accountId Mailbox
+	 * @param string $folder    Folder path
+	 * @return void
+	 */
+	public function seenAt($mailrefId, $accountId, $folder)
+	{
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET last_account = ".((int) $accountId).", last_folder = '".$this->db->escape(dol_trunc((string) $folder, 250, 'right', 'UTF-8', 1))."'"
+			." WHERE rowid = ".((int) $mailrefId)." AND (last_account IS NULL OR last_account <> ".((int) $accountId)." OR last_folder IS NULL OR last_folder <> '".$this->db->escape((string) $folder)."')");
 	}
 
 	/**

@@ -982,3 +982,88 @@ InboxErrorNoZip = Les fichiers zip ne peuvent pas être faits sur ce serveur (zi
 InboxExportEmpty = Aucun mail à exporter
 InboxJournal_import = Importé
 InboxJournal_export = Exporté
+
+# Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
+InboxDolibarr = Dolibarr
+InboxPieceNotReadable = non accessible
+InboxUnlink = Délier
+InboxUnlinkPiece = Délier %s
+InboxPiecesCount = %s pièce(s)
+InboxNotesCount = %s note(s)
+InboxKnownByDomain = (reconnu par le domaine de l'adresse)
+InboxDolibarrUser = Utilisateur Dolibarr : %s
+InboxSender = Expéditeur
+InboxSenderUnknown = Inconnu de Dolibarr
+InboxPiecesLinked = Pièces
+InboxNoPiece = Aucune pièce liée
+InboxLinkPiece = Lier
+InboxNotes = Notes
+InboxNoteEdited = modifiée
+InboxNoteEdit = Modifier la note
+InboxNoteDelete = Supprimer la note
+InboxNoteAdd = Ajouter la note
+InboxNotePlaceholder = Écrire une note…
+InboxUnlinked = Lien avec %s retiré
+InboxNoteDeleteText = La note est supprimée pour tout le monde.
+InboxLinkPieceTitle = Lier ce mail à une pièce
+InboxSearchPiece = Chercher une pièce (réf., tiers, contact…)
+InboxLink = Lier
+InboxAlreadyLinked = Déjà liée
+InboxNoPieceFound = Aucune pièce trouvée
+InboxTypeToSearch = Tapez une réf., un tiers ou un contact
+InboxErrorPieceNotReadable = Vous ne pouvez pas lire cette pièce de Dolibarr
+InboxErrorNoteNotFound = Note introuvable
+InboxErrorNoteNotYours = Seuls son auteur ou une personne qui gère la boîte peuvent modifier cette note
+InboxErrorNoteEmpty = La note est vide
+
+# Tab Mails of the cards (1.13.0)
+InboxMailsTab = Mails
+InboxMailGoneEverywhere = Mail introuvable sur le serveur
+InboxLastSeenIn = (vu la dernière fois dans %s)
+InboxLinked = lié
+InboxOpenInInbox = Ouvrir dans inbox
+InboxNoMailForPiece = Aucun mail lié ou échangé avec ces adresses dans les boîtes que vous pouvez lire
+InboxNoMailboxReadable = Vous n'avez accès à aucune boîte d'inbox
+
+# Place of the Dolibarr part (1.13.0)
+InboxDolibarrFold = Replier la partie Dolibarr
+InboxDolibarrUnfold = Déplier la partie Dolibarr
+InboxDolibarrToTop = Partie Dolibarr au-dessus du mail
+InboxDolibarrToRight = Partie Dolibarr à droite du mail
+InboxDolibarrPosition = Partie Dolibarr d'un mail
+InboxDolibarrPositionHelp = Expéditeur, pièces liées et notes : à droite du corps du mail (les notes se lisent comme un fil) ou au-dessus. Automatique : à droite quand le volet de lecture est assez large.
+Inbox_dolibar_position_auto = Automatique
+Inbox_dolibar_position_right = À droite du mail
+Inbox_dolibar_position_top = Au-dessus du mail
+
+# Notes: cards and the box to write (1.13.0)
+InboxNotesEmpty = Aucune note sur ce mail pour le moment.
+InboxNoteHint = Entrée pour enregistrer · Maj+Entrée pour aller à la ligne
+InboxNoteActions = Actions de la note
+
+# Create from the mail, files to a piece (1.14.0)
+InboxCreatePiece = Créer
+InboxModuleActions = Actions
+InboxAttachTo = Mettre dans les documents de %s
+InboxAttachToOther = Mettre dans les documents d'une autre pièce…
+InboxAttached = %s mis dans les documents de la pièce
+InboxAttachedUnscanned = %s mis dans les documents de la pièce (non vérifié par l'antivirus)
+InboxCreateTitle = Créer depuis ce mail
+InboxCreateAttachMail = Mettre ce mail (.eml) dans les documents de la pièce
+InboxCreateHelp = La page de création de Dolibarr s'ouvre dans un nouvel onglet, préremplie depuis le mail. La pièce enregistrée là-bas est liée à ce mail.
+InboxCreateOpened = Page de création ouverte dans un nouvel onglet : la pièce enregistrée sera liée à ce mail
+InboxAttachToTitle = Mettre « %s » dans les documents d'une pièce
+InboxAttach = Mettre ici
+InboxCreateThirdparty = Tiers
+InboxCreateContact = Contact
+InboxCreateProposal = Devis
+InboxCreateOrder = Commande
+InboxCreateSupplierProposal = Demande de prix fournisseur
+InboxCreateSupplierOrder = Commande fournisseur
+InboxCreateEvent = Événement
+InboxCreateTicket = Ticket
+InboxCreateProject = Projet
+InboxErrorCannotCreate = Vous ne pouvez pas créer ce type de pièce
+InboxErrorCannotAttach = Vous ne pouvez pas ajouter de documents à cette pièce
+InboxErrorAttachmentInfected = Un virus a été trouvé dans ce fichier : il n'est pas copié
+InboxJournal_attach = Fichier mis dans une pièce

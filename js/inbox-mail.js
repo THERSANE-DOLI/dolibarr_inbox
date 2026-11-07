@@ -2247,6 +2247,484 @@
 		toast(t('InboxUnsubscribed', m.from.name || m.from.email), m.level === 'manage' ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
 	}
 
+	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
+	function dolibarSlot(mailId, thread) {
+		return '<section class="ibx-dolibar ibx-js-dolibar" data-mail="' + mailId + '" data-thread="' + (thread ? 1 : 0) + '" aria-label="' + th('InboxDolibarr') + '"></section>';
+	}
+	/**
+	 * Where the bandeau goes: on the right of the body (a column of the mail, not a pane) or on top. Auto: on the
+	 * right when the reading pane has 60 rem (a mail of 600 px and the column), never on a phone
+	 */
+	function dolibarRight() {
+		const pane = S.el && $('.ibx-pane--read', S.el);
+		if (!pane || isPhone()) {
+			return false;
+		}
+		const pos = params.dolibar_position || 'auto';
+		if (pos !== 'auto') {
+			return pos === 'right';
+		}
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		return pane.clientWidth / rem >= 60;
+	}
+	function placeDolibar() {
+		const pane = S.el && $('.ibx-pane--read', S.el);
+		if (!pane) {
+			return;
+		}
+		const right = dolibarRight();
+		if (pane.dataset.dolibar !== (right ? 'right' : 'top')) {
+			pane.dataset.dolibar = right ? 'right' : 'top';
+			$$('.ibx-js-dolibar', pane).forEach(b => {
+				if (b._data) {
+					paintDolibar(b);
+				}
+			});
+		}
+		// In a conversation the column stays under the head of the thread while the mails scroll
+		const head = $('.ibx-convo > .ibx-readhead', pane);
+		if (head) {
+			head.parentNode.style.setProperty('--ibx-head-h', head.offsetHeight + 'px');
+		}
+	}
+	function setDolibarPosition(pos) {
+		saveParam('dolibar_position', pos);
+		placeDolibar();
+	}
+	async function loadDolibar(box) {
+		if (!box) {
+			return;
+		}
+		box.innerHTML = '<div class="ibx-dolibar__head"><span class="ibx-skeleton" style="width:40%"></span></div>';
+		let res;
+		try {
+			res = await api('dolibarr', 'panel', { id: +box.dataset.mail, thread: +box.dataset.thread });
+		} catch (err) {
+			if (box.isConnected) {
+				box.innerHTML = '<div class="ibx-dolibar__head ibx-muted">' + ic('warning') + ' ' + esc(err.message) + ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-dolretry">' + th('InboxRetry') + '</button></div>';
+				$('.ibx-js-dolretry', box).addEventListener('click', () => loadDolibar(box));
+			}
+			return;
+		}
+		if (!box.isConnected) {
+			return;
+		}
+		box._data = res;
+		paintDolibar(box);
+		if (!box._bound) {
+			box._bound = true;
+			box.addEventListener('click', e => dolibarClick(box, e));
+		}
+	}
+	/** A piece as a pill: icon, ref, thirdparty, status, link to its card; « not accessible » without anything else */
+	function pieceHtml(d, unlink) {
+		const inner = d.readable
+			? '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener" title="' + esc(d.kind + ' ' + (d.ref || '') + (d.status ? ' · ' + d.status : '')) + '">'
+				+ ic(d.icon) + '<b>' + esc(d.ref || '') + '</b>' + (d.label ? ' <span class="ibx-muted">' + esc(d.label) + '</span>' : '') + (d.status ? ' <span class="ibx-piece__status">' + esc(d.status) + '</span>' : '') + '</a>'
+			: '<span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span>';
+		return '<span class="ibx-piece"' + (d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '') + '>' + inner + (unlink ? '<button type="button" class="ibx-piece__x ibx-js-unlink" data-link="' + unlink + '" title="' + th('InboxUnlink') + '" aria-label="' + esc(t('InboxUnlinkPiece', d.ref || d.kind)) + '">' + ic('close') + '</button>' : '') + '</span>';
+	}
+	function linkify(text) {
+		return esc(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>').replace(/\n/g, '<br>');
+	}
+	/**
+	 * Alerts of the other modules (an imitation...) go with the banners of the mail, above its body, never in the
+	 * column: the red one first
+	 */
+	function showDolAlerts(box, alerts) {
+		const reading = box.closest('.ibx-reading');
+		if (!reading) {
+			return;
+		}
+		let holder = $(':scope > .ibx-readbanners', reading);
+		$$('.ibx-js-dolalert', reading).forEach(x => x.remove());
+		if (!alerts.length) {
+			return;
+		}
+		if (!holder) {
+			holder = document.createElement('div');
+			holder.className = 'ibx-readbanners';
+			$(':scope > .ibx-readhead', reading).after(holder);
+		}
+		const sorted = alerts.slice().sort((a, b) => (b.level === 'danger') - (a.level === 'danger'));
+		holder.insertAdjacentHTML('afterbegin', sorted.map(a => banner(a.level, a.level === 'danger' ? 'spoof' : 'warning', esc(a.text)).replace('class="ibx-banner', 'class="ibx-js-dolalert ibx-banner')).join(''));
+	}
+	function paintDolibar(box) {
+		const d = box._data;
+		const folded = params.dolibar_folded === '1';
+		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
+		const summary = [soc ? soc.ref : '', d.links.length + d.extra.length ? t('InboxPiecesCount', d.links.length + d.extra.length) : '', d.notes.length ? t('InboxNotesCount', d.notes.length) : '']
+			.filter(Boolean).join(' · ');
+		showDolAlerts(box, d.alerts);
+		let html = '';
+		const right = dolibarRight();
+		html += '<button type="button" class="ibx-dolibar__head ibx-js-doltoggle" aria-expanded="' + !folded + '" title="' + th(folded ? 'InboxDolibarrUnfold' : 'InboxDolibarrFold') + '">'
+			+ ic(right ? (folded ? 'chevron-left' : 'chevron-right') : (folded ? 'chevron-right' : 'chevron-down')) + ic('dolibarr')
+			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '') + '</button>';
+		if (!folded) {
+			const sender = [];
+			if (d.sender.soc) {
+				sender.push(pieceHtml(d.sender.soc, 0) + (d.sender.by === 'domain' ? ' <span class="ibx-muted">' + th('InboxKnownByDomain') + '</span>' : ''));
+			}
+			if (d.sender.contact) {
+				sender.push(pieceHtml(d.sender.contact, 0));
+			}
+			if (d.sender.user) {
+				sender.push('<span class="ibx-piece"><span class="ibx-piece__link">' + ic('account') + esc(t('InboxDolibarrUser', d.sender.user.name)) + '</span></span>');
+			}
+			const pieces = d.links.map(l => pieceHtml(l, l.link)).concat(d.extra.map(x => pieceHtml(x, 0)));
+			const canWrite = !!d.level;
+			html += '<div class="ibx-dolibar__body">'
+				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
+				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>') + '</span></div>'
+				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
+				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
+				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
+					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
+				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
+					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
+				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
+				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine || d.level === 'manage', d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
+				+ '</div>'
+				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
+				+ '</div></div>';
+		}
+		box.innerHTML = html;
+		hydrateUserPhotos(box);
+		box.classList.toggle('is-folded', folded);
+		const reading = box.closest('.ibx-reading');
+		if (reading) {
+			reading.classList.toggle('is-dolibar-folded', folded);
+		}
+		placeDolibar();
+		// On the right, the notes read as a thread: the last one in view, the field to write under it
+		const thread = $('.ibx-notes', box);
+		if (thread && dolibarRight()) {
+			thread.scrollTop = thread.scrollHeight;
+		}
+		if (!box._typing) {
+			// The field grows with its text (up to 6 lines); the button says when there is nothing to save
+			box._typing = true;
+			box.addEventListener('input', e => {
+				const el = e.target.closest('.ibx-composer__input');
+				if (el) {
+					growComposer(el);
+				}
+			});
+			box.addEventListener('keydown', e => {
+				const el = e.target.closest('.ibx-composer__input');
+				if (el && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+					e.preventDefault();
+					const btn = $('.ibx-composer__send', el.closest('.ibx-composer'));
+					if (btn) {
+						btn.click();
+					}
+				} else if (el && e.key === 'Escape' && el.classList.contains('ibx-js-noteedittext')) {
+					e.preventDefault();
+					paintDolibar(box);
+				}
+			});
+		}
+	}
+	/**
+	 * A note as a text message: the picture of its author on the left (its photo of Dolibarr, else its initials), a
+	 * bubble on the whole width (mine in the accent), « ⋯ » in its corner, author and date under it. The next notes of
+	 * the same author within the hour follow without the picture.
+	 */
+	function noteHtml(n, canChange, prev) {
+		const cont = !!prev && prev.author === n.author && n.date - prev.date < 3600;
+		const who = n.mine ? t('InboxMe') : (n.author_name || '?');
+		return '<article class="ibx-msg' + (n.mine ? ' is-mine' : '') + (cont ? ' is-cont' : '') + '" data-note="' + n.id + '" aria-label="' + esc(who) + '">'
+			+ '<span class="ibx-msg__avatar">' + (cont ? '' : '<span class="ibx-avatar' + (n.photo ? ' ibx-js-userphoto" data-photo="' + esc(n.photo) : '') + '" style="--ibx-avatar-h:' + hue('u' + n.author) + '"'
+				+ ' title="' + esc(n.author_name || '') + '" aria-hidden="true">' + esc(initials(n.author_name || '?', '')) + '</span>') + '</span>'
+			+ '<div class="ibx-msg__main">'
+			+ '<div class="ibx-msg__bubble"><div class="ibx-note__text">' + linkify(n.text) + '</div>'
+			+ (canChange ? '<button type="button" class="ibx-msg__more ibx-js-notemenu" aria-haspopup="menu" title="' + th('InboxNoteActions') + '" aria-label="' + th('InboxNoteActions') + '">' + ic('more') + '</button>' : '')
+			+ '</div>'
+			+ '<div class="ibx-msg__meta">' + (cont ? '' : '<span class="ibx-msg__who">' + esc(who) + '</span>')
+			+ '<time datetime="' + new Date(n.date * 1000).toISOString() + '" title="' + esc(longDate(n.date)) + '">' + esc(longDate(n.date)) + '</time>'
+			+ (n.edited ? '<span>' + th('InboxNoteEdited') + '</span>' : '')
+			+ '</div></div></article>';
+	}
+	/** Photos of the users: loaded aside, shown once there (the initials stay when there is none) */
+	function hydrateUserPhotos(root) {
+		$$('.ibx-js-userphoto:not([data-done])', root).forEach(el => {
+			el.dataset.done = '1';
+			const img = new Image();
+			img.onload = () => {
+				el.style.backgroundImage = 'url("' + img.src + '")';
+				el.classList.add('has-picture');
+			};
+			img.src = el.dataset.photo;
+		});
+	}
+	/** One box to write: the field grows, the send button inside it, a short help under it */
+	function composerHtml(cls, id, value, placeholder, hint) {
+		return '<div class="ibx-composer"><label class="ibx-sr-only" for="' + id + '">' + th('InboxNoteAdd') + '</label>'
+			+ '<textarea class="ibx-composer__input ' + cls + '" id="' + id + '" rows="1" maxlength="10000" placeholder="' + placeholder + '">' + esc(value) + '</textarea>'
+			+ (hint ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-composer__send ibx-js-noteadd"' + (value ? '' : ' aria-disabled="true"') + ' title="' + th('InboxNoteAdd') + '" aria-label="' + th('InboxNoteAdd') + '">' + ic('sent') + '</button>' : '')
+			+ '</div>' + (hint ? '<p class="ibx-composer__hint" id="' + id + '-hint">' + th('InboxNoteHint') + '</p>' : '');
+	}
+	function growComposer(el) {
+		el.style.height = 'auto';
+		el.style.height = Math.min(el.scrollHeight + 2, parseFloat(getComputedStyle(el).lineHeight) * 6 + 16) + 'px';
+		const btn = $('.ibx-composer__send', el.closest('.ibx-composer'));
+		if (btn) {
+			if (el.value.trim()) {
+				btn.removeAttribute('aria-disabled');
+			} else {
+				btn.setAttribute('aria-disabled', 'true');
+			}
+		}
+	}
+	async function noteDelete(box, noteId) {
+		const ok = await confirmBox(t('InboxNoteDelete'), th('InboxNoteDeleteText'), t('InboxNoteDelete'));
+		if (!ok) {
+			return;
+		}
+		try {
+			await post('dolibarr', 'notedelete', { note: noteId });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		loadDolibar(box);
+	}
+	function noteEdit(box, noteEl, note) {
+		const text = $('.ibx-note__text', noteEl);
+		text.innerHTML = composerHtml('ibx-js-noteedittext', 'ibx-noteedit-' + note.id, note.text, '', false)
+			+ '<div class="ibx-note__editbar"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-notecancel">' + th('InboxCancel') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-notesave">' + th('InboxSave') + '</button></div>';
+		const area = $('.ibx-js-noteedittext', text);
+		growComposer(area);
+		area.focus();
+		area.setSelectionRange(area.value.length, area.value.length);
+	}
+	async function dolibarClick(box, e) {
+		const mailId = +box.dataset.mail;
+		if (e.target.closest('.ibx-js-doltoggle')) {
+			saveParam('dolibar_folded', params.dolibar_folded === '1' ? '0' : '1');
+			paintDolibar(box);
+			return;
+		}
+		if (e.target.closest('.ibx-js-linkpiece')) {
+			linkDialog(box);
+			return;
+		}
+		if (e.target.closest('.ibx-js-createpiece')) {
+			createDialog(box);
+			return;
+		}
+		const x = e.target.closest('.ibx-js-unlink');
+		if (x) {
+			const l = box._data.links.find(k => k.link === +x.dataset.link);
+			try {
+				await post('dolibarr', 'unlink', { link: +x.dataset.link });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			await loadDolibar(box);
+			if (l) {
+				toast(t('InboxUnlinked', l.ref || l.kind), { action: t('InboxUndo'), onAction: async () => {
+					await post('dolibarr', 'link', { id: l.mail || mailId, type: l.type, element: l.id });
+					loadDolibar(box);
+				} });
+			}
+			return;
+		}
+		if (e.target.closest('.ibx-js-noteadd')) {
+			const area = $('.ibx-js-newnote', box);
+			const text = area.value.trim();
+			if (!text) {
+				area.focus();
+				return;
+			}
+			// What was typed stays in the field when the save fails
+			try {
+				await post('dolibarr', 'note', { id: mailId, text });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			await loadDolibar(box);
+			return;
+		}
+		const noteEl = e.target.closest('[data-note]');
+		if (!noteEl) {
+			return;
+		}
+		const noteId = +noteEl.dataset.note;
+		const note = box._data.notes.find(n => n.id === noteId);
+		const more = e.target.closest('.ibx-js-notemenu');
+		if (more && note) {
+			menu(more, [
+				{ icon: 'compose', label: t('InboxNoteEdit'), run: () => noteEdit(box, noteEl, note) },
+				{ sep: true },
+				{ icon: 'delete', label: t('InboxNoteDelete'), danger: true, run: () => noteDelete(box, noteId) },
+			]);
+		} else if (e.target.closest('.ibx-js-notecancel')) {
+			paintDolibar(box);
+		} else if (e.target.closest('.ibx-js-notesave')) {
+			try {
+				await post('dolibarr', 'noteedit', { note: noteId, text: $('.ibx-js-noteedittext', noteEl).value });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			loadDolibar(box);
+		}
+	}
+	/** The Dolibarr part of the mail of an element (reading pane, or the conversation) */
+	function dolibarOf(el) {
+		const reading = el && el.closest('.ibx-reading');
+		return reading ? $('.ibx-js-dolibar', reading) : null;
+	}
+	/** A file of the mail in the documents of a piece (antivirus first, by the server) */
+	async function attachToPiece(box, m, a, type, id) {
+		let res;
+		try {
+			res = await post('dolibarr', 'attach', { id: m.id, part: a.part, type, element: id });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		toast(t(res.unscanned ? 'InboxAttachedUnscanned' : 'InboxAttached', res.name));
+		loadDolibar(box);
+	}
+	/**
+	 * « Create ▾ »: the page of creation of Dolibarr opens in a new tab, filled from the mail; the piece saved there is
+	 * linked to the mail (and gets the mail in its documents when the box is ticked)
+	 */
+	function createDialog(box) {
+		const d = box._data;
+		const dlg = dialog({
+			title: t('InboxCreateTitle'),
+			noCancel: false,
+			body: '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
+				+ '<label class="ibx-inline ibx-createattach"><input type="checkbox" class="ibx-js-createattach"> ' + th('InboxCreateAttachMail') + '</label>'
+				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
+			actions: [],
+		});
+		dlg.addEventListener('click', async e => {
+			const b = e.target.closest('.ibx-js-createtype');
+			if (!b) {
+				return;
+			}
+			// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
+			const tab = window.open('about:blank', '_blank');
+			let res;
+			try {
+				res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type: b.dataset.type, attach: $('.ibx-js-createattach', dlg).checked ? 1 : 0,
+					soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+			} catch (err) {
+				if (tab) {
+					tab.close();
+				}
+				toast(err.message, { error: true });
+				return;
+			}
+			if (tab) {
+				tab.opener = null;
+				tab.location.href = res.url;
+			} else {
+				window.open(res.url, '_blank', 'noopener');
+			}
+			dlg.close();
+			toast(t('InboxCreateOpened'));
+			// Back in inbox: the piece created is shown linked
+			window.addEventListener('focus', () => loadDolibar(box), { once: true });
+		});
+	}
+	/** « + Link »: the pieces of the thirdparty recognized first, then searched as you type */
+	function linkDialog(box, opts) {
+		opts = opts || {};
+		const d = box._data;
+		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc.id : 0;
+		const dlg = dialog({
+			title: opts.attach ? t('InboxAttachToTitle', opts.attach.a.name) : t('InboxLinkPieceTitle'),
+			body: '<input type="search" class="ibx-field ibx-js-piecesearch" autocomplete="off" placeholder="' + th('InboxSearchPiece') + '" aria-label="' + th('InboxSearchPiece') + '">'
+				+ '<div class="ibx-picklist ibx-js-piecelist" role="listbox" aria-label="' + th('InboxPiecesLinked') + '"></div>',
+			actions: [{ label: opts.attach ? t('InboxAttach') : t('InboxLink'), primary: true, run: async dl => {
+				const cur = $('[aria-selected="true"]', dl);
+				if (!cur) {
+					return false;
+				}
+				if (opts.attach) {
+					await attachToPiece(box, opts.attach.m, opts.attach.a, cur.dataset.type, +cur.dataset.id);
+					return true;
+				}
+				await post('dolibarr', 'link', { id: +box.dataset.mail, type: cur.dataset.type, element: +cur.dataset.id });
+				loadDolibar(box);
+				return true;
+			} }],
+		});
+		const input = $('.ibx-js-piecesearch', dlg);
+		const list = $('.ibx-js-piecelist', dlg);
+		// To link: the pieces linked already are greyed; to put a file in a piece: every piece may receive it
+		const linked = new Set(opts.attach ? [] : d.links.map(l => l.type + ':' + l.id));
+		let seq = 0;
+		const load = async () => {
+			const mine = ++seq;
+			list.setAttribute('aria-busy', 'true');
+			let res;
+			try {
+				res = await api('dolibarr', 'search', { q: input.value.trim(), soc });
+			} catch (err) {
+				list.innerHTML = '<div class="ibx-muted ibx-picklist__empty">' + esc(err.message) + '</div>';
+				return;
+			}
+			if (mine !== seq) {
+				return;
+			}
+			list.removeAttribute('aria-busy');
+			let first = true;
+			list.innerHTML = res.results.map(x => {
+				const done = linked.has(x.type + ':' + x.id);
+				const sel = !done && first;
+				if (sel) {
+					first = false;
+				}
+				return '<div class="ibx-picklist__item" role="option" data-type="' + esc(x.type) + '" data-id="' + x.id + '"' + (done ? ' aria-disabled="true" title="' + th('InboxAlreadyLinked') + '"' : '') + ' aria-selected="' + sel + '">'
+					+ ic(x.icon) + ' <span class="ibx-ellipsis"><b>' + esc(x.ref) + '</b> ' + (x.label ? '<span class="ibx-muted">' + esc(x.label) + '</span> ' : '') + '<span class="ibx-muted">· ' + esc(x.kind) + '</span></span></div>';
+			}).join('') || '<div class="ibx-muted ibx-picklist__empty">' + th(input.value.trim() || soc ? 'InboxNoPieceFound' : 'InboxTypeToSearch') + '</div>';
+		};
+		let timer = 0;
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(load, 250);
+		});
+		input.addEventListener('keydown', e => {
+			const items = $$('.ibx-picklist__item:not([aria-disabled])', list);
+			const i = items.findIndex(x => x.getAttribute('aria-selected') === 'true');
+			if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
+				e.preventDefault();
+				items.forEach(x => x.setAttribute('aria-selected', 'false'));
+				const n = items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1) + items.length) % items.length];
+				n.setAttribute('aria-selected', 'true');
+				scrollWithin(list, n, 'nearest');
+			} else if (e.key === 'Enter' && i >= 0) {
+				e.preventDefault();
+				$('.ibx-dialog__foot .ibx-btn--primary', dlg).click();
+			}
+		});
+		list.addEventListener('click', e => {
+			const it = e.target.closest('.ibx-picklist__item');
+			if (it && !it.hasAttribute('aria-disabled')) {
+				$$('[aria-selected="true"]', list).forEach(x => x.setAttribute('aria-selected', 'false'));
+				it.setAttribute('aria-selected', 'true');
+			}
+		});
+		list.addEventListener('dblclick', e => {
+			const it = e.target.closest('.ibx-picklist__item');
+			if (it && !it.hasAttribute('aria-disabled')) {
+				$('.ibx-dialog__foot .ibx-btn--primary', dlg).click();
+			}
+		});
+		load();
+		input.focus();
+	}
+
 	// ---------- Bulk bar (from 2 mails) ----------
 	function renderBulkBar() {
 		const bar = $('.ibx-js-bulkbar', S.el);
@@ -2867,6 +3345,7 @@
 			{ id: 'print', icon: 'print', label: t('InboxPrint'), key: 'Ctrl+P', run: () => printMail(m) },
 			{ id: 'zoomin', icon: 'text-size', label: t('InboxZoomMailIn'), run: () => zoomMail(10) },
 			{ id: 'zoomout', icon: 'text-size', label: t('InboxZoomMailOut'), run: () => zoomMail(-10) },
+			{ id: 'dolibarpos', icon: 'dolibarr', label: t(dolibarRight() ? 'InboxDolibarrToTop' : 'InboxDolibarrToRight'), run: () => setDolibarPosition(dolibarRight() ? 'top' : 'right') },
 		);
 		list.forEach(a => {
 			a.own = true;
@@ -3002,6 +3481,7 @@
 			+ ' ' + tagsHtml(row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			+ assignLine([row.id], row.assignees || [], row.has_mid !== 0) + '</div>'
 			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
+			+ dolibarSlot(id, true)
 			+ mails.map(m => '<section class="ibx-convo__item' + (isMine(m) ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
 				+ '<button type="button" class="ibx-convo__line ibx-js-expand" aria-expanded="false">' + (isMine(m) ? '<span class="ibx-avatar ibx-avatar--sm ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>' : avatar(m.from_name, m.from_email, 'ibx-avatar--sm', m.id))
 				+ '<span class="ibx-sr-only">' + th(isMine(m) ? 'InboxSent' : 'InboxReceived') + ' </span>'
@@ -3011,6 +3491,7 @@
 				+ '<div class="ibx-convo__body" hidden></div></section>').join('')
 			+ '</article>';
 		hydrateAvatars(pane);
+		loadDolibar($('.ibx-js-dolibar', pane));
 		$$('.ibx-js-expand', pane).forEach(b => b.addEventListener('click', () => {
 			const item = b.closest('[data-mailblock]');
 			const open = b.getAttribute('aria-expanded') === 'true';
@@ -3097,10 +3578,12 @@
 			+ th(m.security.signed === 'valid' ? 'InboxSigned' : (m.security.signed === 'invalid' ? 'InboxSignatureInvalid' : 'InboxSignedUnchecked')) + '</span>' : '';
 		pane.innerHTML = '<article class="ibx-reading" aria-label="' + esc(m.subject || t('InboxNoSubject')) + '">'
 			+ '<header class="ibx-readhead">' + headHtml(m) + (signed ? '<div class="ibx-readhead__line">' + signed + '</div>' : '') + '</header>'
+			+ dolibarSlot(m.id, false)
 			+ mailBodyHtml(m, {}) + '</article>';
 		bindActions(pane);
 		bindMail(m, pane);
 		hydrateAvatars(pane);
+		loadDolibar($('.ibx-js-dolibar', pane));
 	}
 
 	/**
@@ -3181,7 +3664,7 @@
 	const KIND_ICON = { pdf: 'file-pdf', image: 'file-image', zip: 'file-zip', mail: 'mail', csv: 'file-xls' };
 	function tile(a, i) {
 		const warn = (a.warnings || []).length;
-		return '<div class="ibx-attachment' + (warn ? ' is-warning' : '') + '" data-att="' + i + '">'
+		return '<div class="ibx-attachment' + (warn ? ' is-warning' : '') + '" data-att="' + i + '" draggable="true">'
 			+ '<button type="button" class="ibx-attachment__open ibx-js-attopen" title="' + esc(a.name) + '">'
 			+ ic(KIND_ICON[a.kind] || 'attachment', 'ibx-attachment__icon' + (a.kind === 'pdf' ? ' ibx-attachment__icon--pdf' : (a.kind === 'image' ? ' ibx-attachment__icon--img' : '')))
 			+ '<span class="ibx-attachment__info"><span class="ibx-ellipsis">' + esc(a.name) + '</span><span class="ibx-attachment__size">' + esc(size(a.size))
@@ -4219,11 +4702,13 @@
 		if (!a) {
 			return;
 		}
+		const box = dolibarOf(el);
+		const pieces = box && box._data ? box._data.links.filter(l => l.readable) : [];
 		menu(el, [
 			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
 			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
-			HINT(),
-		], at || rectPoint(el));
+		].concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
+			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }]) : [], [HINT()]), at || rectPoint(el));
 	}
 
 	function addressMenu(email, name, el, at) {
@@ -4515,6 +5000,7 @@
 		if (S.el) {
 			renderTree();
 			loadList(true);
+			placeDolibar();
 		}
 	});
 	I.channel.on(msg => {
@@ -4898,6 +5384,46 @@
 
 	function bindLayout() {
 		const el = S.el;
+		const readPaneEl = $('.ibx-pane--read', el);
+		readPaneEl.addEventListener('dragstart', e => {
+			const tileEl = e.target.closest && e.target.closest('.ibx-attachment[data-att]');
+			const reading = tileEl && tileEl.closest('.ibx-reading');
+			const blockEl = tileEl && tileEl.closest('[data-mailblock]');
+			const m = blockEl ? S.blocks[+blockEl.dataset.mailblock] : S.mail;
+			if (!tileEl || !reading || !m) {
+				return;
+			}
+			S.attDrag = { m, a: m.attachments[+tileEl.dataset.att] };
+			e.dataTransfer.effectAllowed = 'copy';
+			e.dataTransfer.setData('text/plain', S.attDrag.a ? S.attDrag.a.name : '');
+		});
+		readPaneEl.addEventListener('dragend', () => {
+			S.attDrag = null;
+			$$('.ibx-piece.is-droptarget', readPaneEl).forEach(x => x.classList.remove('is-droptarget'));
+		});
+		readPaneEl.addEventListener('dragover', e => {
+			const piece = S.attDrag && e.target.closest('.ibx-piece[data-type]');
+			$$('.ibx-piece.is-droptarget', readPaneEl).forEach(x => x !== piece && x.classList.remove('is-droptarget'));
+			if (piece) {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'copy';
+				piece.classList.add('is-droptarget');
+			}
+		});
+		readPaneEl.addEventListener('drop', e => {
+			const piece = S.attDrag && e.target.closest('.ibx-piece[data-type]');
+			if (!piece) {
+				return;
+			}
+			e.preventDefault();
+			const drag = S.attDrag;
+			S.attDrag = null;
+			piece.classList.remove('is-droptarget');
+			attachToPiece(dolibarOf(piece), drag.m, drag.a, piece.dataset.type, +piece.dataset.id);
+		});
+		if (window.ResizeObserver) {
+			new ResizeObserver(() => placeDolibar()).observe($('.ibx-pane--read', el));
+		}
 		$('.ibx-pane--read', el).addEventListener('click', e => {
 			const line = e.target.closest('.ibx-js-assignline');
 			if (!line) {
@@ -5111,6 +5637,15 @@
 		label: () => t('InboxSpaceMail'),
 		async render(el, route) {
 			const wanted = +(route.parts[0] || 0);
+			// #/mail/<folder>/<mail>: a mail opened from another page (tab « Mails » of a card of Dolibarr)
+			if (wanted && +(route.parts[1] || 0)) {
+				S.goto = { folder: wanted, mail: +route.parts[1] };
+				history.replaceState(null, '', '#/mail/' + wanted);
+				if (S.el === el) {
+					runGoto();
+					return;
+				}
+			}
 			if (S.el === el) {
 				if (wanted && wanted !== S.folderId && S.folders.has(wanted)) {
 					openFolder(wanted, true);

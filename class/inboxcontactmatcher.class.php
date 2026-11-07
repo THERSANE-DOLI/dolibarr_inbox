@@ -73,6 +73,49 @@ class InboxContactMatcher
 		return $out;
 	}
 
+	/** Domains of public mail services: never a thirdparty by its domain (setting INBOX_PUBLIC_DOMAINS adds others) */
+	const PUBLIC_DOMAINS = array('gmail.com', 'googlemail.com', 'outlook.com', 'outlook.fr', 'hotmail.com', 'hotmail.fr', 'live.com', 'live.fr', 'msn.com',
+		'yahoo.com', 'yahoo.fr', 'icloud.com', 'me.com', 'aol.com', 'gmx.com', 'gmx.fr', 'gmx.de', 'web.de', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr',
+		'laposte.net', 'bbox.fr', 'neuf.fr', 'numericable.fr', 'proton.me', 'protonmail.com', 'libero.it', 'virgilio.it', 'tiscali.it', 'alice.it', 't-online.de',
+		'telefonica.net', 'mail.com', 'yandex.com', 'zoho.com');
+
+	/**
+	 * Thirdparty of an address by its domain (lot W5): a thirdparty or a contact of it with an address at this domain,
+	 * or a website on it; never for a public mail service; nothing when several thirdparties share the domain
+	 *
+	 * @param string $email Address
+	 * @return int Thirdparty, 0 when none or not sure
+	 */
+	public function matchDomain($email)
+	{
+		$email = strtolower(trim((string) $email));
+		$at = strrpos($email, '@');
+		if ($at === false) {
+			return 0;
+		}
+		$domain = substr($email, $at + 1);
+		$public = array_merge(self::PUBLIC_DOMAINS, array_filter(array_map('trim', explode(',', strtolower(getDolGlobalString('INBOX_PUBLIC_DOMAINS'))))));
+		if ($domain === '' || in_array($domain, $public, true)) {
+			return 0;
+		}
+		$key = '@'.$domain;
+		if (isset($this->cache[$key])) {
+			return $this->cache[$key]['fk_soc'];
+		}
+		$p = $this->db->prefix();
+		$like = $this->db->escape($this->db->escapeforlike('@'.$domain));
+		$site = $this->db->escape($this->db->escapeforlike($domain));
+		$rows = $this->db->getRows("SELECT DISTINCT s.rowid FROM ".$p."societe as s WHERE s.entity IN (".getEntity('societe').") AND s.status = 1 AND (LOWER(s.email) LIKE '%".$like."'"
+			// The site: this very domain or a subdomain of it (never « myclient.fr » for « client.fr »)
+			." OR LOWER(s.url) IN ('".$site."', 'www.".$site."') OR LOWER(s.url) LIKE '".$site."/%' OR LOWER(s.url) LIKE '%//".$site."' OR LOWER(s.url) LIKE '%//".$site."/%'"
+			." OR LOWER(s.url) LIKE '%.".$site."' OR LOWER(s.url) LIKE '%.".$site."/%'"
+			." OR s.rowid IN (SELECT c.fk_soc FROM ".$p."socpeople as c WHERE c.statut = 1 AND c.fk_soc > 0 AND LOWER(c.email) LIKE '%".$like."' AND c.entity IN (".getEntity('contact')."))) LIMIT 3");
+		$found = is_array($rows) && count($rows) === 1 ? (int) $rows[0]->rowid : 0;
+		$this->cache[$key] = array('fk_soc' => $found, 'fk_socpeople' => 0);
+
+		return $found;
+	}
+
 	/**
 	 * Match again the mails of an address (a contact or a thirdparty was created or got this address)
 	 *

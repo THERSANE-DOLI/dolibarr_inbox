@@ -235,7 +235,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -261,6 +261,9 @@
 				}
 				if (l.action === 'assign' || l.action === 'unassign') {
 					return esc(l.detail);
+				}
+				if (l.action === 'attach') {
+					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
 				}
 				if (l.action === 'import') {
 					return esc(l.to);
@@ -1473,6 +1476,7 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-text_size">' + th('InboxTextSize') + '</label><div class="ibx-inline"><input type="range" min="90" max="150" step="10" data-param="text_size" id="me-text_size" value="' + esc(p.text_size) + '" aria-valuetext="' + esc(p.text_size) + ' %"><output class="ibx-js-ts">' + esc(p.text_size) + ' %</output></div></div>'
 			+ tagColorsRow(data, opt)
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-folder_icons">' + th('InboxFolderIcons') + '</label><div>' + opt('folder_icons', ['color', 'plain'], p.folder_icons) + '<div class="ibx-formrow__help">' + th('InboxFolderIconsHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-dolibar_position">' + th('InboxDolibarrPosition') + '</label><div>' + opt('dolibar_position', ['auto', 'right', 'top'], p.dolibar_position) + '<div class="ibx-formrow__help">' + th('InboxDolibarrPositionHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'

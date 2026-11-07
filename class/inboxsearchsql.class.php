@@ -263,8 +263,11 @@ class InboxSearchSql implements InboxSearchEngine
 			// Assigned by the mailref (the Message-ID): follows the mail in every move
 			global $conf;
 			$p = $this->db->prefix();
-			$where[] = "m.message_id IN (SELECT r.message_id FROM ".$p."inbox_mailref as r INNER JOIN ".$p."inbox_mail_assign as a ON a.fk_mailref = r.rowid"
-				." WHERE a.fk_user = ".((int) $query['mine'])." AND r.entity = ".((int) $conf->entity).")";
+			$where[] = "(m.message_id IN (SELECT r.message_id FROM ".$p."inbox_mailref as r INNER JOIN ".$p."inbox_mail_assign as a ON a.fk_mailref = r.rowid"
+				." WHERE a.fk_user = ".((int) $query['mine'])." AND r.entity = ".((int) $conf->entity).")"
+				// A mail without Message-ID (1.13.0): its key is a print, found by its sender and its date
+				." OR ((m.message_id IS NULL OR m.message_id = '') AND EXISTS (SELECT r2.rowid FROM ".$p."inbox_mailref as r2 INNER JOIN ".$p."inbox_mail_assign as a2 ON a2.fk_mailref = r2.rowid"
+				." WHERE a2.fk_user = ".((int) $query['mine'])." AND r2.entity = ".((int) $conf->entity)." AND r2.message_id LIKE 'fp:%' AND r2.from_email = m.from_email AND r2.date_mail = m.date_mail)))";
 			if ($folderId <= 0 && empty($query['mine_archived'])) {
 				// Handled mails: out of « my mails » (archives, with their subfolders, trash, junk)
 				$where[] = "NOT EXISTS (SELECT fa.rowid FROM ".$p."inbox_folder as fa WHERE fa.fk_account = m.fk_account AND fa.role IN ('archive', 'trash', 'junk')"
@@ -327,7 +330,8 @@ class InboxSearchSql implements InboxSearchEngine
 			'tags' => trim((string) $o->keywords) === '' ? array() : array_values(array_filter(explode(' ', (string) $o->keywords))),
 			'soc' => $o->fk_soc ? array('id' => (int) $o->fk_soc, 'name' => (string) $o->soc_name) : null,
 			// A Message-ID: the key of an assignment (lot W4 1.9.0)
-			'has_mid' => (string) ($o->message_id ?? '') !== '' ? 1 : 0,
+			// Every mail has a key now (Message-ID, or a print without it, 1.13.0): assignable, linkable
+			'has_mid' => 1,
 			// Key of the conversation (ignored, watched: lot W4 1.11.0)
 			'tkey' => (string) ($o->thread_key ?? ''),
 		);
