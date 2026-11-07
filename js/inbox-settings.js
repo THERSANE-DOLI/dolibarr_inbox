@@ -235,7 +235,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -267,6 +267,10 @@
 				}
 				if (l.action === 'import') {
 					return esc(l.to);
+				}
+				if (l.action === 'send') {
+					// Folder of the copy, and the number of recipients (never their addresses)
+					return esc(l.to) + ' · ' + th('InboxJournalRecipients', esc(l.detail));
 				}
 				if (l.action === 'export') {
 					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
@@ -677,7 +681,9 @@
 		}
 		let html = '<p class="ibx-section__help">' + th('InboxIdentitiesHelp') + '</p>';
 		if (!list.length) {
-			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxNoIdentity') + '</div></div>';
+			// No identity: the mailbox sends with its own name and address, without signature (lot W6)
+			const label = account.label && account.label.toLowerCase() !== String(account.email).toLowerCase() ? account.label + ' <' + account.email + '>' : account.email;
+			html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxNoIdentity', label) + '</div></div>';
 		} else {
 			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxIdentityFrom') + '</th><th>' + th('InboxIdentitySignature') + '</th><th></th></tr></thead><tbody>'
 				+ list.map(i => '<tr><td><b>' + esc(i.name || i.email) + '</b> ' + (i.is_default ? '<span class="ibx-badge ibx-badge--accent">' + th('InboxDefault') + '</span>' : '') + (i.status ? '' : ' <span class="ibx-status">' + th('InboxInactive') + '</span>')
@@ -1411,6 +1417,10 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-journal">' + th('InboxJournalKeep') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-journal" data-name="INBOX_ACTION_LOG_MONTHS" value="' + esc(s.INBOX_ACTION_LOG_MONTHS) + '"> ' + th('InboxMonths') + '</div><div class="ibx-formrow__help">' + th('InboxJournalKeepHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-sendmax">' + th('InboxSendMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="100" inputmode="numeric" id="g-sendmax" data-name="INBOX_SEND_MAX_MB" value="' + esc(s.INBOX_SEND_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxSendMaxHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSendAutocopy') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_SEND_AUTOCOPY" aria-checked="' + (s.INBOX_SEND_AUTOCOPY === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxSendAutocopy') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxSendAutocopyHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAvatars') + '</h2><p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
@@ -1478,6 +1488,7 @@
 			+ tagColorsRow(data, opt)
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-folder_icons">' + th('InboxFolderIcons') + '</label><div>' + opt('folder_icons', ['color', 'plain'], p.folder_icons) + '<div class="ibx-formrow__help">' + th('InboxFolderIconsHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-dolibar_position">' + th('InboxDolibarrPosition') + '</label><div>' + opt('dolibar_position', ['auto', 'right', 'top'], p.dolibar_position) + '<div class="ibx-formrow__help">' + th('InboxDolibarrPositionHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_shortcut">' + th('InboxSendShortcut') + '</label><div>' + opt('send_shortcut', ['ctrl_enter', 'off'], p.send_shortcut) + '<div class="ibx-formrow__help">' + th('InboxSendShortcutHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'

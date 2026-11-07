@@ -66,6 +66,22 @@ function inboxPrintJsContext(array $vars)
  * @param User $user Current user
  * @return array<string,mixed>
  */
+function inboxCanSend(User $user)
+{
+	global $db;
+
+	dol_include_once('/inbox/class/inboxaccess.class.php');
+	$access = new InboxAccess($db);
+
+	return count($access->getAccounts($user, InboxAccess::LEVEL_SEND)) > 0;
+}
+
+/**
+ * Values of the JavaScript context of the application
+ *
+ * @param User $user User
+ * @return array<string,string|int|bool>
+ */
 function inboxAppContextVars(User $user)
 {
 	global $conf, $db;
@@ -95,6 +111,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_USER_NAME' => $user->getFullName($GLOBALS['langs']),
 		'INBOX_RIGHT_WEBMAIL' => (bool) $user->hasRight('inbox', 'webmail', 'use'),
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),
+		// Lot W6: the user may write (an active mailbox with the level « send » at least)
+		'INBOX_CAN_SEND' => inboxCanSend($user),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
 		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#1d6a8a'),
 		// Colour blindness declared in the card of the user (tab Interface): flashy, protanopia, deuteranopes, tritanopes

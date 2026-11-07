@@ -91,6 +91,11 @@ class InboxImapConnector extends InboxConnector
 		if (in_array('MOVE', $server, true) || in_array('UIDPLUS', $server, true)) {
 			$caps[] = self::CAP_MOVE;
 		}
+		// Lot W6: sending by the SMTP server of the mailbox, drafts in its folder (APPEND)
+		if ($this->account->getSmtpHost() !== '') {
+			$caps[] = self::CAP_SEND;
+		}
+		$caps[] = self::CAP_DRAFTS;
 
 		return $caps;
 	}
@@ -1355,11 +1360,13 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * SMTP test: EHLO, encryption, AUTH; no mail is sent
+	 * SMTP session opened and authenticated: EHLO, encryption, AUTH. The socket is null when it fails, with the code
+	 * of the failure in $result.
 	 *
-	 * @return array{status:string,code:string,detail:string,extensions:string[]}
+	 * @param array{status:string,code:string,detail:string,extensions:string[]} $result Result (code, extensions)
+	 * @return resource|null
 	 */
-	public function testSmtp()
+	protected function smtpOpen(array &$result)
 	{
 		$account = $this->account;
 		$host = $account->getSmtpHost();
@@ -1367,7 +1374,7 @@ class InboxImapConnector extends InboxConnector
 		$result = array('status' => 'error', 'code' => '', 'detail' => '', 'extensions' => array());
 		if ($host === '') {
 			$result['code'] = 'smtp_no_server';
-			return $result;
+			return null;
 		}
 		$login = $account->getSmtpLogin();
 		if ($account->imap_auth_mode === InboxAccount::AUTH_OAUTH) {
@@ -1377,75 +1384,185 @@ class InboxImapConnector extends InboxConnector
 			// The master user of Dovecot is not a login for the SMTP server
 			$result['status'] = 'warning';
 			$result['code'] = 'smtp_master';
-			return $result;
+			return null;
 		} else {
 			$secret = $account->getSmtpPassword();
 		}
 		if ($secret === '') {
 			$result['code'] = 'smtp_no_password';
-			return $result;
+			return null;
 		}
 		$error = '';
 		$socket = $this->openSocket($host, (int) $account->smtp_port, $encryption, $error);
 		if (!$socket) {
 			$result['code'] = $error === 'certificate' ? 'smtp_certificate' : 'smtp_connect';
 			$result['detail'] = $error === 'certificate' ? '' : $error;
-			return $result;
+			return null;
+		}
+		$greeting = $this->smtpRead($socket);
+		if ($greeting['code'] !== 220) {
+			$result['code'] = 'smtp_greeting';
+			$result['detail'] = implode(' ', $greeting['lines']);
+			fclose($socket);
+			return null;
+		}
+		$ehloName = preg_replace('/[^a-z0-9.\-]/i', '', (string) (gethostname() ?: 'localhost'));
+		$ehlo = $this->smtpCommand($socket, 'EHLO '.$ehloName);
+		if ($encryption === 'tls') {
+			if (!preg_grep('/^250[ -]STARTTLS/i', $ehlo['lines'])) {
+				$result['code'] = 'smtp_no_starttls';
+				fclose($socket);
+				return null;
+			}
+			$start = $this->smtpCommand($socket, 'STARTTLS');
+			if ($start['code'] !== 220 || !$this->startTls($socket)) {
+				$result['code'] = 'smtp_certificate';
+				fclose($socket);
+				return null;
+			}
+			$ehlo = $this->smtpCommand($socket, 'EHLO '.$ehloName);
+		}
+		foreach ($ehlo['lines'] as $line) {
+			$result['extensions'][] = strtoupper(trim(substr($line, 4)));
+		}
+		$authLine = '';
+		foreach ($result['extensions'] as $ext) {
+			if (strpos($ext, 'AUTH ') === 0) {
+				$authLine = $ext;
+			}
+		}
+		if ($account->imap_auth_mode === InboxAccount::AUTH_OAUTH) {
+			$answer = $this->smtpCommand($socket, 'AUTH XOAUTH2 '.base64_encode('user='.$login."\1auth=Bearer ".$secret."\1\1"));
+		} elseif (strpos($authLine, 'PLAIN') !== false) {
+			$answer = $this->smtpCommand($socket, 'AUTH PLAIN '.base64_encode("\0".$login."\0".$secret));
+		} elseif (strpos($authLine, 'LOGIN') !== false) {
+			$this->smtpCommand($socket, 'AUTH LOGIN');
+			$this->smtpCommand($socket, base64_encode($login));
+			$answer = $this->smtpCommand($socket, base64_encode($secret));
+		} else {
+			$result['code'] = 'smtp_no_auth';
+			@fwrite($socket, "QUIT\r\n");
+			fclose($socket);
+			return null;
+		}
+		if ($answer['code'] !== 235) {
+			$result['code'] = 'smtp_auth';
+			@fwrite($socket, "QUIT\r\n");
+			fclose($socket);
+			return null;
+		}
+		$result['status'] = 'ok';
+		$result['code'] = 'smtp_ok';
+
+		return $socket;
+	}
+
+	/**
+	 * SMTP test: EHLO, encryption, AUTH; no mail is sent
+	 *
+	 * @return array{status:string,code:string,detail:string,extensions:string[]}
+	 */
+	public function testSmtp()
+	{
+		$result = array();
+		$socket = $this->smtpOpen($result);
+		if ($socket) {
+			@fwrite($socket, "QUIT\r\n");
+			fclose($socket);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Send a mail by the SMTP server of the mailbox (lot W6 1.16.0). The copy in the sent folder is put by the caller
+	 * (importRaw), as the source kept there has the Bcc that the one sent has not.
+	 *
+	 * @param string                                  $raw      Source to send (no Bcc header)
+	 * @param array{from?:string,recipients?:string[]} $envelope Envelope: sender and every recipient (To, Cc, Bcc)
+	 * @return bool
+	 */
+	public function send($raw, array $envelope = array())
+	{
+		$this->error = '';
+		$this->errorCode = '';
+		$from = (string) ($envelope['from'] ?? '');
+		$recipients = array_values(array_filter((array) ($envelope['recipients'] ?? array()), function ($r) {
+			return is_string($r) && filter_var($r, FILTER_VALIDATE_EMAIL) && !preg_match('/[\r\n<>]/', $r);
+		}));
+		if ((string) $raw === '' || !filter_var($from, FILTER_VALIDATE_EMAIL) || !$recipients) {
+			$this->error = 'Invalid mail';
+			$this->errorCode = 'smtp_invalid';
+			return false;
+		}
+		$result = array();
+		$socket = $this->smtpOpen($result);
+		if (!$socket) {
+			$this->errorCode = $result['code'];
+			$this->error = $result['code'].($result['detail'] !== '' ? ': '.$result['detail'] : '');
+			return false;
 		}
 		try {
-			$greeting = $this->smtpRead($socket);
-			if ($greeting['code'] !== 220) {
-				$result['code'] = 'smtp_greeting';
-				$result['detail'] = implode(' ', $greeting['lines']);
-				return $result;
-			}
-			$ehloName = preg_replace('/[^a-z0-9.\-]/i', '', (string) (gethostname() ?: 'localhost'));
-			$ehlo = $this->smtpCommand($socket, 'EHLO '.$ehloName);
-			if ($encryption === 'tls') {
-				if (!preg_grep('/^250[ -]STARTTLS/i', $ehlo['lines'])) {
-					$result['code'] = 'smtp_no_starttls';
-					return $result;
-				}
-				$start = $this->smtpCommand($socket, 'STARTTLS');
-				if ($start['code'] !== 220 || !$this->startTls($socket)) {
-					$result['code'] = 'smtp_certificate';
-					return $result;
-				}
-				$ehlo = $this->smtpCommand($socket, 'EHLO '.$ehloName);
-			}
-			foreach ($ehlo['lines'] as $line) {
-				$result['extensions'][] = strtoupper(trim(substr($line, 4)));
-			}
-			$authLine = '';
+			$size = strlen($raw);
 			foreach ($result['extensions'] as $ext) {
-				if (strpos($ext, 'AUTH ') === 0) {
-					$authLine = $ext;
+				if (preg_match('/^SIZE (\d+)/', $ext, $m) && (int) $m[1] > 0 && $size > (int) $m[1]) {
+					$this->errorCode = 'smtp_too_big';
+					$this->error = 'smtp_too_big: '.$size.' > '.$m[1];
+					return false;
 				}
 			}
-			if ($account->imap_auth_mode === InboxAccount::AUTH_OAUTH) {
-				$answer = $this->smtpCommand($socket, 'AUTH XOAUTH2 '.base64_encode('user='.$login."\1auth=Bearer ".$secret."\1\1"));
-			} elseif (strpos($authLine, 'PLAIN') !== false) {
-				$answer = $this->smtpCommand($socket, 'AUTH PLAIN '.base64_encode("\0".$login."\0".$secret));
-			} elseif (strpos($authLine, 'LOGIN') !== false) {
-				$this->smtpCommand($socket, 'AUTH LOGIN');
-				$this->smtpCommand($socket, base64_encode($login));
-				$answer = $this->smtpCommand($socket, base64_encode($secret));
-			} else {
-				$result['code'] = 'smtp_no_auth';
-				return $result;
+			$eight = preg_match('/[\x80-\xFF]/', $raw) && in_array('8BITMIME', $result['extensions'], true) ? ' BODY=8BITMIME' : '';
+			$answer = $this->smtpCommand($socket, 'MAIL FROM:<'.$from.'>'.$eight);
+			if ($answer['code'] !== 250) {
+				$this->errorCode = 'smtp_refused';
+				$this->error = 'MAIL FROM: '.implode(' ', $answer['lines']);
+				return false;
 			}
-			if ($answer['code'] !== 235) {
-				$result['code'] = 'smtp_auth';
-				return $result;
+			$refused = array();
+			foreach ($recipients as $r) {
+				$answer = $this->smtpCommand($socket, 'RCPT TO:<'.$r.'>');
+				if ($answer['code'] !== 250 && $answer['code'] !== 251) {
+					$refused[] = $r.' ('.implode(' ', $answer['lines']).')';
+				}
 			}
-			$result['status'] = 'ok';
-			$result['code'] = 'smtp_ok';
-
-			return $result;
+			// One recipient refused: nothing goes (the user corrects the address, the others do not get it twice)
+			if ($refused) {
+				$this->smtpCommand($socket, 'RSET');
+				$this->errorCode = 'smtp_recipient';
+				$this->error = 'RCPT TO: '.implode(', ', $refused);
+				return false;
+			}
+			$answer = $this->smtpCommand($socket, 'DATA');
+			if ($answer['code'] !== 354) {
+				$this->errorCode = 'smtp_refused';
+				$this->error = 'DATA: '.implode(' ', $answer['lines']);
+				return false;
+			}
+			// Lines ended by CRLF, a line starting with a dot doubled (RFC 5321 4.5.2)
+			$data = preg_replace("/\r?\n/", "\r\n", (string) $raw);
+			$data = preg_replace('/^\./m', '..', $data);
+			if (substr($data, -2) !== "\r\n") {
+				$data .= "\r\n";
+			}
+			for ($i = 0, $n = strlen($data); $i < $n; $i += 65536) {
+				if (fwrite($socket, substr($data, $i, 65536)) === false) {
+					$this->errorCode = 'smtp_connect';
+					$this->error = 'Connection lost during the sending';
+					return false;
+				}
+			}
+			$answer = $this->smtpCommand($socket, '.');
+			if ($answer['code'] !== 250) {
+				$this->errorCode = 'smtp_refused';
+				$this->error = 'DATA: '.implode(' ', $answer['lines']);
+				return false;
+			}
 		} finally {
 			@fwrite($socket, "QUIT\r\n");
 			fclose($socket);
 		}
+
+		return true;
 	}
 
 	/**

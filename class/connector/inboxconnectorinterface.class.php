@@ -248,12 +248,14 @@ interface InboxConnectorInterface
 	public function emptyFolder($folder);
 
 	/**
-	 * Send a mail and keep its copy in the sent folder (lot W6)
+	 * Send a mail (lot W6). The copy in the sent folder is put by the caller (importRaw), with the Bcc header that the
+	 * mail sent has not.
 	 *
-	 * @param string $raw RFC 822 source
+	 * @param string                                   $raw      RFC 822 source, without Bcc header
+	 * @param array{from?:string,recipients?:string[]} $envelope Sender and every recipient (To, Cc, Bcc)
 	 * @return bool
 	 */
-	public function send($raw);
+	public function send($raw, array $envelope = array());
 
 	/**
 	 * Save a draft (lot W6)

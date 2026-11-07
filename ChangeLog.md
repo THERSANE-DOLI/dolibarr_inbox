@@ -1,5 +1,27 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: editor of the writing: HTML, colours, tables :   1.16.1
+  - HTML pasted as text (an answer prepared by an AI, a « ```html » block) is put in formatted; Ctrl+Z takes it back.
+  - « HTML source » button: the text as HTML, to read, change or paste HTML; back to the formatted text.
+  - text colour, highlight, alignment, simple tables (borders written in the cells for the mail software).
+  - tables: styles in one click (grid, lines, coloured heading, no border), properties of the table (borders, spacing,
+    width, alignment, shaded rows) and of the cells (background, alignment, borders), column widths by the mouse; all
+    written as inline styles, the only ones the mail software read.
+  - toolbar: flat icons, bigger, a small arrow on what opens a menu; colours: last colour in one click, palette, any
+    colour, recent ones; bar over the selected text; right click in a table: menu of the table.
+  - fields of the writing: the name of the field in the empty line, Cc and Bcc each removable; the window grows from
+    its top and left edges; Ctrl+Enter can be turned off (My account); a mailbox without identity sends with its name.
+- NEW: write and send mails from inbox :   1.16.0
+  - new mail, reply, reply all, reply to the list, forward (in the text or as an attachment), from a floating window
+    (several side by side, reduced at the bottom, full screen on a phone); keys C, R, Shift+R, Ctrl+L, Ctrl+Enter.
+  - identity and signature of the mailbox, the one that got the mail first; recipients proposed from the contacts,
+    thirdparties and users of Dolibarr and the correspondents of the mailboxes; attachments checked by the antivirus.
+  - sent by the server of the mailbox; its exact copy put in Sent, the mail answered marked; nothing in the headers
+    tells who wrote it in a shared mailbox (the journal of the mailbox does).
+  - drafts saved on the mail server while writing (Drafts folder, seen by the other mail software) and reopened.
+  - « is writing an answer » shown to the others reading the same mail of a shared mailbox.
+  - text editor Tiptap (MIT) shipped in the module, loaded at the first writing; the HTML is cleaned by the server.
+  - settings: size of the attachments of a mail, automatic copy of Dolibarr added or not (not by default).
 - NEW: imitation of a known sender, junk probably legitimate :   1.15.0
   - a known sender (active customer or supplier, their contacts, users of Dolibarr) whose mail is not authenticated,
     or whose address is written in the display name over another one: red alert above the mail.

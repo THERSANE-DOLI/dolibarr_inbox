@@ -190,17 +190,25 @@ switch ($action) {
 		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
 		dol_include_once('/inbox/class/inboxuserparam.class.php');
 		$mailId = (int) inboxAjaxParam('mail', 'int');
+		// Lot W6: the mail answered in a writing open in front counts more than the mail read
+		$writing = (int) inboxAjaxParam('writing', 'int');
 		$params = new InboxUserParam($db);
 		$mine = '';
+		if ($writing > 0) {
+			$mailId = $writing;
+		}
 		if ($mailId > 0) {
 			$m = $db->getRow("SELECT m.fk_account, m.message_id, a.type FROM ".$db->prefix()."inbox_mail as m INNER JOIN ".$db->prefix()."inbox_account as a ON a.rowid = m.fk_account WHERE m.rowid = ".$mailId);
 			if (is_object($m) && in_array((int) $m->fk_account, $readable, true) && $m->type === InboxAccount::TYPE_SHARED && (string) $m->message_id !== '') {
-				$mine = (string) json_encode(array('a' => (int) $m->fk_account, 'm' => (string) $m->message_id));
-				$others = $db->getRows("SELECT u.rowid, u.firstname, u.lastname, u.login FROM ".$db->prefix()."inbox_userparam as p INNER JOIN ".$db->prefix()."user as u ON u.rowid = p.fk_user"
-					." WHERE p.param = 'presence' AND p.fk_account = 0 AND p.fk_user <> ".((int) $user->id)." AND p.value = '".$db->escape($mine)."'"
+				$key = (string) json_encode(array('a' => (int) $m->fk_account, 'm' => (string) $m->message_id));
+				$mine = $writing > 0 ? substr($key, 0, -1).',"w":1}' : $key;
+				// The others on the same mail, reading it or writing an answer (same key, « w » added)
+				$like = $db->escape($db->escapeforlike(substr($key, 0, -1)));
+				$others = $db->getRows("SELECT u.rowid, u.firstname, u.lastname, u.login, p.value FROM ".$db->prefix()."inbox_userparam as p INNER JOIN ".$db->prefix()."user as u ON u.rowid = p.fk_user"
+					." WHERE p.param = 'presence' AND p.fk_account = 0 AND p.fk_user <> ".((int) $user->id)." AND (p.value = '".$db->escape($key)."' OR p.value LIKE '".$like."%')"
 					." AND p.tms > '".$db->idate(dol_now() - 60)."' AND u.statut = 1 LIMIT 20");
 				$out['presence'] = array('mail' => $mailId, 'users' => array_map(function ($u) {
-					return array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login);
+					return array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login, 'writing' => strpos((string) $u->value, '"w":1') !== false);
 				}, is_array($others) ? $others : array()));
 			}
 		}

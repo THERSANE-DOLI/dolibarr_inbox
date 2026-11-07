@@ -120,6 +120,48 @@
 	}
 
 	/**
+	 * Send a file (multipart POST, the token added): attachments of a writing (lot W6)
+	 * @param {string} endpoint File of ajax/ without .php
+	 * @param {string} action   Action
+	 * @param {object} fields   Values
+	 * @param {File}   file     File (field « file »)
+	 * @returns {Promise<object>}
+	 */
+	async function upload(endpoint, action, fields, file) {
+		const form = new FormData();
+		form.append('action', action);
+		form.append('token', token);
+		Object.keys(fields || {}).forEach(k => form.append(k, fields[k]));
+		form.append('file', file, file.name);
+		let resp;
+		try {
+			resp = await fetch(ctx('INBOX_AJAX_URL', '') + endpoint + '.php', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' }, body: form });
+		} catch (e) {
+			const err = new Error(t('InboxErrorOffline'));
+			err.status = 0;
+			throw err;
+		}
+		let json = null;
+		try {
+			json = await resp.json();
+		} catch (e) {
+			json = null;
+		}
+		if (resp.status === 401 || (resp.status === 403 && json && json.error === 'bad_token')) {
+			await reconnect(resp.status === 401);
+			return upload(endpoint, action, fields, file);
+		}
+		if (!resp.ok || !json || json.error) {
+			const err = new Error((json && json.error) || t('InboxErrorServer', resp.status));
+			err.status = resp.status;
+			err.code = (json && json.code) || '';
+			err.data = json || {};
+			throw err;
+		}
+		return json;
+	}
+
+	/**
 	 * Reconnection after the session expired: dialog, the login page of Dolibarr in a window, then a new token.
 	 * One dialog for all the calls waiting; the other tabs are told.
 	 */
@@ -446,7 +488,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,

@@ -93,6 +93,11 @@ class InboxUserParam
 			'dolibar_folded' => array('0', 'int:0:1'),
 			// Place of the bandeau Dolibarr: auto (on the right when the reading pane is wide enough), right, top
 			'dolibar_position' => array('auto', array('auto', 'right', 'top')),
+			// Writing (1.16.0): Ctrl+Enter sends (or nothing), size of the writing windows
+			'send_shortcut' => array('ctrl_enter', array('ctrl_enter', 'off')),
+			'compose_size' => array('', 'json'),
+			// Colours of the writing (1.16.1): last colour of the text and of the highlight, recent ones
+			'compose_colors' => array('', 'json'),
 		);
 	}
 

@@ -3334,9 +3334,25 @@
 
 	// ---------- Registry of actions (one definition: buttons, menu, keyboard; hook inbox:mail:actions) ----------
 	function actions(m) {
-		const list = [
-			{ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) },
-		];
+		const list = [];
+		// Lot W6: writing. A draft is edited; the other mails are answered or forwarded from any mailbox where the
+		// user may send (the identity of the mailbox that got the mail chosen first, by the server)
+		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
+		if (m.folder_role === 'drafts') {
+			list.push({ id: 'editdraft', icon: 'compose', label: t('InboxEditDraft'), button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'draft', mail: m.id }) });
+		} else {
+			const listPost = (m.headers || []).some(h => String(h[0]).toLowerCase() === 'list-post' && /mailto:/i.test(h[1]));
+			list.push(
+				{ id: 'reply', icon: 'reply', label: t('InboxReply'), key: 'R', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'reply', mail: m.id }) },
+				{ id: 'replyall', icon: 'reply-all', label: t('InboxReplyAll'), key: 'Maj+R', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'replyall', mail: m.id }) },
+				{ id: 'forward', icon: 'forward', label: t('InboxForward'), key: 'Ctrl+L', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'forward', mail: m.id }) },
+			);
+			if (listPost) {
+				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'replylist', mail: m.id }) });
+			}
+			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'forward_attach', mail: m.id }) });
+		}
+		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
 		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
@@ -5030,6 +5046,12 @@
 			resume(false);
 		}
 	});
+	// A mail sent: the list (its Sent folder, Drafts) asked again now
+	Dolibarr.on('inbox:compose:sent', () => {
+		if (S.el) {
+			setTimeout(() => poll(), 500);
+		}
+	});
 	Dolibarr.on('inbox:app:leader', () => {
 		// This tab is the leader now (the previous one was closed): it takes the synchronisation over
 		if (S.el) {
@@ -5054,7 +5076,7 @@
 			if (S.folderId && !I.isLeader()) {
 				requestSync(S.folderId, false);
 			}
-			const st = await api('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0 });
+			const st = await api('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0, writing: I.composeWriting ? I.composeWriting() : 0 });
 			showPresence(st.presence);
 			if (st.notif) {
 				Dolibarr.executeHook('inbox:notif:state', st.notif);
@@ -5114,8 +5136,13 @@
 			box.setAttribute('role', 'status');
 			head.appendChild(box);
 		}
+		// « is writing an answer » first (lot W6): two people should not answer the same mail
+		const writers = users.filter(u => u.writing);
+		const readers = users.filter(u => !u.writing);
 		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => avatar(u.name, 'u' + u.id, 'ibx-avatar--xs')).join('') + '</span> '
-			+ esc(users.length === 1 ? t('InboxPresenceOne', users[0].name) : t('InboxPresenceMany', users.map(u => u.name).join(', ')));
+			+ esc([writers.length ? (writers.length === 1 ? t('InboxPresenceWritingOne', writers[0].name) : t('InboxPresenceWritingMany', writers.map(u => u.name).join(', '))) : '',
+				readers.length ? (readers.length === 1 ? t('InboxPresenceOne', readers[0].name) : t('InboxPresenceMany', readers.map(u => u.name).join(', '))) : ''].filter(Boolean).join(' · '));
+		box.classList.toggle('ibx-presence--writing', writers.length > 0);
 	}
 
 	// ---------- Keyboard (interface §11, read only keys of lot W3) ----------
@@ -5165,10 +5192,28 @@
 			selectAll();
 			return;
 		}
+		if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L') && !e.shiftKey && !inField(e)) {
+			const id = writeTarget();
+			if (id) {
+				e.preventDefault();
+				I.compose({ mode: 'forward', mail: id });
+			}
+			return;
+		}
 		if (e.ctrlKey || e.metaKey || e.altKey || inField(e)) {
 			return;
 		}
 		const key = e.key;
+		if ((key === 'r' || key === 'R') && writeTarget()) {
+			e.preventDefault();
+			I.compose({ mode: e.shiftKey ? 'replyall' : 'reply', mail: writeTarget() });
+			return;
+		}
+		if ((key === 'c' || key === 'C') && !e.shiftKey) {
+			e.preventDefault();
+			newMail();
+			return;
+		}
 		if (key === 'F9') {
 			e.preventDefault();
 			toggleFolders();
@@ -5258,8 +5303,34 @@
 		}
 	}
 
+	/** Mail answered by the keys: the one read, else the one under the cursor of the list */
+	function writeTarget() {
+		if (!I.ctx('INBOX_CAN_SEND', false) || !I.compose) {
+			return 0;
+		}
+		if (S.mail && S.mail.folder_role !== 'drafts') {
+			return S.mail.id;
+		}
+		const r = S.anchor ? rowOf(S.anchor) : null;
+		const e = r ? S.folders.get(r.folder) : null;
+		return r && !(e && e.folder.role === 'drafts') ? r.id : 0;
+	}
+	/** New mail, from the mailbox of the folder open (its default identity) */
+	function newMail() {
+		if (!I.compose) {
+			return;
+		}
+		if (!I.ctx('INBOX_CAN_SEND', false)) {
+			toast(t('InboxComposeNoIdentity'), { error: true });
+			return;
+		}
+		const f = currentFolder();
+		I.compose({ mode: 'new', account: f ? f.account.id : 0 });
+	}
+
 	function keysHelp() {
 		const rows = [
+			['C', 'InboxNewMail'], ['R', 'InboxReply'], ['Maj+R', 'InboxReplyAll'], ['Ctrl+L', 'InboxForward'], ['Ctrl+Entrée', 'InboxComposeSend'],
 			['↑ ↓', 'InboxKeyNav'], ['N', 'InboxKeyNextUnread'], ['M', 'InboxKeyRead'], ['S', 'InboxFlag'], [t('InboxKeySpace'), 'InboxKeyAssign'], ['W', 'InboxWatchThread'], ['K', 'InboxIgnoreThread'], ['Maj+N', 'InboxKeyBell'], ['A', 'InboxArchive'], ['Maj+M', 'InboxMoveToMenu'], ['J / Maj+J', 'InboxKeyJunk'],
 			['Suppr', 'InboxDelete'], ['1 … 9', 'InboxKeyTags'], ['0', 'InboxRemoveAllTags'], ['Ctrl+Maj+K', 'InboxKeySearch'], ['F9', 'InboxKeyFolders'],
 			['Pg. suiv. / Pg. préc.', 'InboxKeyScroll'], ['Ctrl + / - / 0', 'InboxKeyTextSize'], ['Ctrl+U', 'InboxViewSource'], ['Ctrl+A', 'InboxKeySelectAll'], [t('InboxKeyCtrlSpace'), 'InboxKeyToggleSelect'], ['?', 'InboxKeyHelp'], ['Échap', 'InboxKeyEscape'],
@@ -5366,7 +5437,8 @@
 	function layout() {
 		return '<div class="ibx-mailapp" data-folders="open" data-mobile="list">'
 			+ '<section class="ibx-pane ibx-pane--folders" aria-label="' + th('InboxFolders') + '">'
-			+ '<div class="ibx-pane__head"><span class="ibx-pane__title">' + th('InboxSpaceMail') + '</span></div>'
+			+ '<div class="ibx-pane__head"><span class="ibx-pane__title">' + th('InboxSpaceMail') + '</span><span class="ibx-spacer"></span>'
+			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-compose" title="' + th('InboxNewMail') + ' (C)">' + ic('compose') + ' ' + th('InboxNewMail') + '</button>' : '') + '</div>'
 			+ '<div class="ibx-toolbar ibx-js-folderfilterbox" hidden><label class="ibx-search">' + ic('filter') + '<input type="search" class="ibx-field ibx-js-folderfilter" placeholder="' + th('InboxFilterFolders') + '" aria-label="' + th('InboxFilterFolders') + '" autocomplete="off"></label></div>'
 			+ '<div class="ibx-pane__body"><ul class="ibx-tree" aria-busy="true"><li><span class="ibx-skeleton"></span></li><li><span class="ibx-skeleton" style="width:70%"></span></li><li><span class="ibx-skeleton" style="width:50%"></span></li></ul></div></section>'
 			+ '<div class="ibx-splitter" data-split="1" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '"></div>'
@@ -5397,11 +5469,14 @@
 			+ '<section class="ibx-pane ibx-pane--read" aria-label="' + th('InboxReadingPane') + '">'
 			+ '<div class="ibx-pane__head ibx-mobileonly"><button type="button" class="ibx-btn ibx-btn--icon ibx-js-back" data-to="list" aria-label="' + th('InboxBackToList') + '">' + ic('chevron-left') + '</button></div>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
+			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')
 			+ '</div>';
 	}
 
 	function bindLayout() {
 		const el = S.el;
+		$$('.ibx-js-compose', el).forEach(b => b.addEventListener('click', () => newMail()));
+
 		const readPaneEl = $('.ibx-pane--read', el);
 		readPaneEl.addEventListener('dragstart', e => {
 			const tileEl = e.target.closest && e.target.closest('.ibx-attachment[data-att]');

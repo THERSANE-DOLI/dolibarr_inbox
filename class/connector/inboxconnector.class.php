@@ -271,10 +271,11 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
-	 * @param string $raw Source
+	 * @param string                                   $raw      Source
+	 * @param array{from?:string,recipients?:string[]} $envelope Envelope
 	 * @return bool
 	 */
-	public function send($raw)
+	public function send($raw, array $envelope = array())
 	{
 		$this->unsupported('send');
 		return false;

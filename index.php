@@ -78,6 +78,8 @@ $asset = function ($path) use ($version) {
 	$file = __DIR__.$path;
 	return dol_buildpath('/inbox'.$path, 1).'?v='.$version.(is_file($file) ? '-'.filemtime($file) : '');
 };
+// Editor of the writing (lot W6): loaded only when a writing opens
+$vars['INBOX_EDITOR_URL'] = $asset('/js/vendor/tiptap/tiptap.min.js');
 $title = $langs->trans('InboxAppName').($vars['INBOX_COMPANY'] !== '' ? ' '.$vars['INBOX_COMPANY'] : '');
 $theme = in_array($params['theme'], array('light', 'dark', 'contrast'), true) ? $params['theme'] : '';
 $accent = preg_match('/^#[0-9a-f]{6}$/i', (string) $vars['INBOX_ACCENT']) ? $vars['INBOX_ACCENT'] : '#1d6a8a';
@@ -106,6 +108,8 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-colors.js').'" de
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-mail.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-notify.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-editor.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" defer></script>'."\n";
 print '</head>'."\n";
 print '<body>'."\n";
 // Empty shell: the rail and the spaces are built by inbox.js (nothing works without JavaScript, said plainly)

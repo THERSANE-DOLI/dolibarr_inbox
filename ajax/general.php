@@ -45,6 +45,9 @@ function inboxGeneralSettings()
 		'INBOX_ACTION_LOG_MONTHS' => array('default' => '12', 'check' => 'int:0:120'),
 		// Lot W5 1.15.0: receiving servers whose Authentication-Results are trusted (imitation, junk probably legitimate)
 		'INBOX_AUTH_SERVERS' => array('default' => '', 'check' => 'hosts'),
+		// Lot W6 1.16.0: size of the attachments of a mail, copy of Dolibarr (MAIN_MAIL_AUTOCOPY_TO) added or not
+		'INBOX_SEND_MAX_MB' => array('default' => '20', 'check' => 'int:1:100'),
+		'INBOX_SEND_AUTOCOPY' => array('default' => '0', 'check' => 'int:0:1'),
 		// Pictures of the correspondents (1.5.0): sources looked for by the server
 		'INBOX_AVATAR_DOLIBARR' => array('default' => '1', 'check' => 'int:0:1'),
 		'INBOX_AVATAR_BIMI' => array('default' => '1', 'check' => 'int:0:1'),

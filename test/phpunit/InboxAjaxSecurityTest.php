@@ -248,5 +248,10 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/dolibarr.php', array('action' => 'note', 'id' => (int) $row->rowid, 'text' => 'x'))['code'], 'note without token refused');
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/dolibarr.php?action=link&id='.$row->rowid.'&type=societe&element=1&token='.urlencode($token))['code'], 'link by GET refused');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/dolibarr.php', array('action' => 'link', 'id' => 99999999, 'type' => 'societe', 'element' => 1, 'token' => $token))['code']);
+		// Writing (1.16.0): token and POST always, a forged writing or mail not found, a mail of a mailbox without access too
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'open', 'mode' => 'new'))['code'], 'open without token refused');
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/compose.php?action=send&compose=0123456789abcdef0123456789abcdef&token='.urlencode($token))['code'], 'send by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'send', 'compose' => '0123456789abcdef0123456789abcdef', 'to' => 'x@inbox-test.invalid', 'token' => $token))['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'save', 'compose' => '../../etc', 'token' => $token))['code'], 'a path is not a writing');
 	}
 }

@@ -23,3 +23,4 @@
 # Analysis documents (local only)
 /analyses
 .phpunit.result.cache
+/dev/tiptap/node_modules

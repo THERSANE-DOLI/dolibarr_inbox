@@ -517,6 +517,9 @@ class Inbox
 		// Notifications of the bell (INBOX_NOTIFICATION_DAYS)
 		require_once __DIR__.'/inboxnotification.class.php';
 		InboxNotification::purge($this->db);
+		// Writings left open (lot W6): their temporary folder
+		require_once __DIR__.'/inboxcomposer.class.php';
+		InboxComposer::purge();
 
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)
