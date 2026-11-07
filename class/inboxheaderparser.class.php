@@ -175,7 +175,10 @@ class InboxHeaderParser
 		if (is_array($part[0])) {
 			// Multipart: sub parts, then the subtype and the extensions
 			foreach ($part as $sub) {
-				if (is_array($sub) && isset($sub[0]) && (is_array($sub[0]) || is_string($sub[0])) && count($sub) >= 7 && self::hasAttachments($sub, $depth + 1)) {
+				// A sub part: a multipart (its own sub parts first, extension data optional) or a part (7 fields at least);
+				// the other lists (parameters, disposition, language) are left out
+				$isPart = is_array($sub) && isset($sub[0]) && (is_array($sub[0]) || (is_string($sub[0]) && count($sub) >= 7));
+				if ($isPart && self::hasAttachments($sub, $depth + 1)) {
 					return true;
 				}
 			}

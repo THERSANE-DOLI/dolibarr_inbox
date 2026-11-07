@@ -22,6 +22,7 @@
  */
 
 dol_include_once('/inbox/class/inboxsync.class.php');
+dol_include_once('/inbox/class/connector/inboximapresponse.class.php');
 
 /**
  * Tests of InboxSync, InboxFolder, InboxMail, InboxContactMatcher
@@ -263,5 +264,73 @@ class InboxSyncTest extends InboxTestCase
 		$inline = array(array('text', 'html', array('charset', 'utf-8'), 'NIL', 'NIL', '7bit', '10', '1', 'NIL', 'NIL', 'NIL', 'NIL'),
 			array('image', 'png', array('name', 'logo.png'), '<logo>', 'NIL', 'base64', '100', 'NIL', array('inline', array('filename', 'logo.png')), 'NIL', 'NIL'), 'related');
 		$this->assertFalse(InboxHeaderParser::hasAttachments($inline), 'picture of the body is not an attachment');
+	}
+
+	/**
+	 * 1.7.1: BODYSTRUCTURE of a mail of Exchange as Dovecot writes it (parts glued « NIL)( »): the attachment is seen;
+	 * literals, sections with spaces and NIL decoded; the response read line by line through the connection
+	 *
+	 * @return void
+	 */
+	public function testImapResponseDecoder()
+	{
+		$bs = '(((("text" "plain" ("charset" "utf-8") NIL NIL "base64" 624 8 NIL NIL NIL NIL)("text" "html" ("charset" "utf-8") NIL NIL "base64" 9608 124 NIL NIL NIL NIL) "alternative" ("boundary" "_000_") NIL NIL NIL)'
+			.'("image" "png" ("name" "image.png") "<27be70d8>" "image.png" "base64" 22346 NIL ("inline" ("filename" "image.png" "size" "16329")) NIL NIL) "related" ("boundary" "_005_" "type" "multipart/alternative") NIL NIL NIL)'
+			.'("application" "pdf" ("name" "ACME CF2699-02134.pdf") NIL "ACME CF2699-02134.pdf" "base64" 139034 NIL ("attachment" ("filename" "ACME CF2699-02134.pdf" "size" "101599")) NIL NIL) "mixed" ("boundary" "_006_") NIL ("fr-FR") NIL)';
+		$header = "Subject: a (b) \"c\"\r\nFrom: x@y.invalid\r\n\r\n";
+		$raw = '7 FETCH (UID 7884 FLAGS (\\Seen $label5) RFC822.SIZE 183964 BODYSTRUCTURE '.$bs.' BODY[HEADER.FIELDS (FROM SUBJECT)] {'.strlen($header)."}\r\n".$header.")\r\n";
+		$t = InboxImapResponse::decode($raw);
+		$this->assertSame(array('7', 'FETCH'), array_slice($t, 0, 2));
+		$items = $t[2];
+		$this->assertSame(array('UID', '7884', 'FLAGS', array('\\Seen', '$label5'), 'RFC822.SIZE', '183964', 'BODYSTRUCTURE'), array_slice($items, 0, 7));
+		$this->assertCount(3 + 4, $items[7], 'mixed: related, pdf, subtype and 4 extension fields');
+		$this->assertSame('pdf', $items[7][1][1]);
+		$this->assertNull($items[7][1][3], 'NIL is null');
+		$this->assertSame('BODY[HEADER.FIELDS (FROM SUBJECT)]', $items[8]);
+		$this->assertSame($header, $items[9], 'literal kept byte for byte');
+		$this->assertTrue(InboxHeaderParser::hasAttachments($items[7]));
+		$this->assertSame(1, InboxHeaderParser::parse($header, $items[7])['has_attachments']);
+		// Only the inline picture: no attachment; a multipart without extension data is still walked
+		$this->assertFalse(InboxHeaderParser::hasAttachments($items[7][0]));
+		$this->assertTrue(InboxHeaderParser::hasAttachments(InboxImapResponse::decode('(("text" "plain" NIL NIL NIL "7bit" 1 1)("application" "zip" ("name" "a.zip") NIL NIL "base64" 10) "mixed")')[0]));
+		$this->assertSame(array('a"b\\c'), InboxImapResponse::decode('"a\\"b\\\\c"'), 'quoted string escapes');
+
+		// Read through the connection: literal over several lines and the rest of the line after it, tagged end
+		$conn = new class ("* ".$raw."* 8 FETCH (UID 9 BODYSTRUCTURE (\"text\" \"plain\" NIL NIL NIL \"7bit\" 1 1))\r\nTAG3 OK Fetch completed.\r\n") {
+			/** @var string[] */
+			private $lines;
+			/** @param string $s Stream */
+			public function __construct($s)
+			{
+				preg_match_all('/[^\n]*\n/', $s, $m);
+				$this->lines = $m[0];
+			}
+			/** @return string */
+			public function nextLine()
+			{
+				return (string) array_shift($this->lines);
+			}
+		};
+		$res = InboxImapResponse::read($conn, 'TAG3');
+		$this->assertCount(2, $res);
+		$this->assertSame($header, $res[0][2][9]);
+		$this->assertSame(array('UID', '9', 'BODYSTRUCTURE'), array_slice($res[1][2], 0, 3));
+		$no = new class ("TAG4 NO [NONEXISTENT] Unknown\r\n") {
+			/** @var string */
+			private $s;
+			/** @param string $s Stream */
+			public function __construct($s)
+			{
+				$this->s = $s;
+			}
+			/** @return string */
+			public function nextLine()
+			{
+				$l = $this->s;
+				$this->s = '';
+				return $l;
+			}
+		};
+		$this->assertNull(InboxImapResponse::read($no, 'TAG4'));
 	}
 }

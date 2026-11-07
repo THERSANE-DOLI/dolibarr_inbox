@@ -228,6 +228,32 @@ class InboxMail
 	}
 
 	/**
+	 * Attachments of mails read again from their structure (repair of 1.7.1)
+	 *
+	 * @param int               $folderId Folder
+	 * @param array<string,int> $flags    remote_id => 1 / 0
+	 * @return int                        Rows changed
+	 */
+	public function setAttachments($folderId, array $flags)
+	{
+		$n = 0;
+		foreach (array(0, 1) as $value) {
+			$ids = array_keys(array_filter($flags, function ($v) use ($value) {
+				return (int) $v === $value;
+			}));
+			foreach (array_chunk($ids, 500) as $chunk) {
+				$sql = "UPDATE ".$this->db->prefix()."inbox_mail SET has_attachments = ".$value." WHERE fk_folder = ".((int) $folderId);
+				$sql .= " AND has_attachments <> ".$value." AND remote_id IN ('".implode("','", array_map(array($this->db, 'escape'), $chunk))."')";
+				if ($this->db->query($sql)) {
+					$n += (int) $this->db->affected_rows(true);
+				}
+			}
+		}
+
+		return $n;
+	}
+
+	/**
 	 * Identifiers of the mails of a folder in the index
 	 *
 	 * @param int $folderId Folder

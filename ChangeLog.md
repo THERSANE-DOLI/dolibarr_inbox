@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: attachments not seen in the list for most mails (the ones of Outlook / Exchange above all) :   1.7.1
+  - the structure of the mails is decoded by inbox: the sub parts written « NIL)( » were merged, the attachment was
+    lost; the mails indexed before are read again once, the most recent first, by the synchronisation.
 - NEW: tags readable by the colour blind people :   1.7.0
   - border per tag (none, solid, dashes, dots, double), drawn around the badge in the colour of the text: a mark
     that does not rely on the colour; none by default.

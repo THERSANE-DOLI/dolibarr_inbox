@@ -25,6 +25,7 @@ require_once __DIR__.'/inboxconnector.class.php';
 require_once dirname(__DIR__).'/inboxoauth.class.php';
 require_once dirname(__DIR__).'/inboxmimeparser.class.php';
 require_once dirname(__DIR__).'/inboxheaderparser.class.php';
+require_once __DIR__.'/inboximapresponse.class.php';
 
 /**
  * IMAP connector, through the Webklex php-imap library shipped with Dolibarr (2.7.2, same from Dolibarr 18 to 24).
@@ -1572,7 +1573,8 @@ class InboxImapConnector extends InboxConnector
 		$preview = in_array('PREVIEW', $this->serverCapabilities, true) ? ' PREVIEW' : '';
 		foreach (array_chunk($uids, self::FETCH_CHUNK) as $chunk) {
 			$set = implode(',', array_map('intval', $chunk));
-			$response = $this->client->getConnection()->requestAndResponse('UID FETCH', array($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.')])'));
+			// Decoded by inbox: Webklex merges the sub parts of a BODYSTRUCTURE written « NIL)( » (attachments not seen)
+			$response = $this->fetchDecoded($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.')])');
 			foreach ($this->fetchItems($response) as $item) {
 				if (empty($item['UID'])) {
 					continue;
@@ -1585,6 +1587,63 @@ class InboxImapConnector extends InboxConnector
 				$mail['snippet'] = isset($item['PREVIEW']) && is_string($item['PREVIEW']) ? InboxHeaderParser::bound($item['PREVIEW'], 200) : '';
 				$out[] = $mail + self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
 			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * UID FETCH sent by Webklex, response read and decoded by InboxImapResponse
+	 *
+	 * @param string $set   UID set
+	 * @param string $items Items asked, in parentheses
+	 * @return array<int,array<int,mixed>>|null Untagged responses, null if refused
+	 */
+	protected function fetchDecoded($set, $items)
+	{
+		$conn = $this->client->getConnection();
+		$tag = null;
+		$conn->sendRequest('UID FETCH', array($set, $items), $tag);
+
+		return InboxImapResponse::read($conn, (string) $tag);
+	}
+
+	/**
+	 * Attachments of indexed mails read again from their structure (repair of the index of 1.7.1), read only
+	 *
+	 * @param string $folder    Folder path
+	 * @param string[] $remoteIds "uidvalidity:uid" of the index
+	 * @return array<string,int>|null remote_id => 1 / 0 (mails gone or of another uidvalidity left out), null if KO
+	 */
+	public function attachmentFlags($folder, array $remoteIds)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			return null;
+		}
+		$out = array();
+		try {
+			if (!$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$uids = array();
+			foreach ($remoteIds as $rid) {
+				if (preg_match('/^(\d+):(\d+)$/', (string) $rid, $m) && (int) $m[1] === $this->examinedValidity) {
+					$uids[] = (int) $m[2];
+				}
+			}
+			foreach (array_chunk($uids, self::FETCH_CHUNK) as $chunk) {
+				$response = $this->fetchDecoded(implode(',', $chunk), '(UID BODYSTRUCTURE)');
+				foreach ($this->fetchItems($response) as $item) {
+					if (!empty($item['UID']) && isset($item['BODYSTRUCTURE']) && is_array($item['BODYSTRUCTURE'])) {
+						$out[$this->examinedValidity.':'.((int) $item['UID'])] = InboxHeaderParser::hasAttachments($item['BODYSTRUCTURE']) ? 1 : 0;
+					}
+				}
+			}
+		} catch (Throwable $e) {
+			$this->error = $e->getMessage();
+			return null;
 		}
 
 		return $out;

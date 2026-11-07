@@ -45,6 +45,9 @@ class InboxSync
 	/** Mails read per call of the connector */
 	const CHUNK = 500;
 
+	/** Mails whose structure is read again per call (repair of the attachments, 1.7.1) */
+	const REPAIR_CHUNK = 1000;
+
 	/** Waits after errors in a row: 5 min, 15 min, then every hour */
 	const RETRY = array(300, 900, 3600);
 
@@ -285,6 +288,7 @@ class InboxSync
 				$firstSyncLeft = true;
 			}
 		}
+		$this->repairAttachments($connector, $rows, $mails, $folders, $deadline);
 		$connector->disconnect();
 		// Mails indexed before the conversations (1.5.0): keys given within the time left
 		if (microtime(true) < $deadline - 1) {
@@ -299,6 +303,55 @@ class InboxSync
 		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
 
 		return 1;
+	}
+
+	/**
+	 * Attachments of the mails indexed before 1.7.1 read again from their structure (the decoder of Webklex merged the
+	 * sub parts written « NIL)( », most attachments were not seen), the most recent first, within the time left
+	 *
+	 * @param InboxConnectorInterface $connector Connected
+	 * @param array<int,object>        $rows      Folders followed
+	 * @param InboxMail                $mails     Helper
+	 * @param InboxFolder              $folders   Helper
+	 * @param float                    $deadline  Microtime limit
+	 * @return void
+	 */
+	protected function repairAttachments($connector, array $rows, InboxMail $mails, InboxFolder $folders, $deadline)
+	{
+		if (!method_exists($connector, 'attachmentFlags')) {
+			return;
+		}
+		foreach ($rows as $f) {
+			$below = (int) ($f->att_repair ?? -1);
+			if ($below === -1) {
+				continue;
+			}
+			$byUid = array();
+			foreach ($mails->remoteIds((int) $f->rowid) as $rid) {
+				$uid = (int) substr($rid, (int) strpos($rid, ':') + 1);
+				if ($below === 0 || $uid < $below) {
+					$byUid[$uid] = $rid;
+				}
+			}
+			krsort($byUid);
+			while (microtime(true) < $deadline - 2) {
+				if (!$byUid) {
+					$folders->setAttRepair((int) $f->rowid, -1);
+					break;
+				}
+				$take = array_slice($byUid, 0, self::REPAIR_CHUNK, true);
+				$flags = $connector->attachmentFlags((string) $f->path, array_values($take));
+				if ($flags === null) {
+					break;
+				}
+				$mails->setAttachments((int) $f->rowid, $flags);
+				$byUid = array_slice($byUid, count($take), null, true);
+				$folders->setAttRepair((int) $f->rowid, $byUid ? min(array_keys($take)) : -1);
+				if (!$byUid) {
+					break;
+				}
+			}
+		}
 	}
 
 	/**

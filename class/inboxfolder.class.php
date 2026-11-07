@@ -153,6 +153,18 @@ class InboxFolder
 	}
 
 	/**
+	 * Progress of the repair of the attachments (1.7.1)
+	 *
+	 * @param int $folderId Folder
+	 * @param int $value    -1 done, > 0 done for the UIDs from this one up
+	 * @return void
+	 */
+	public function setAttRepair($folderId, $value)
+	{
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET att_repair = ".((int) $value)." WHERE rowid = ".((int) $folderId));
+	}
+
+	/**
 	 * Follow or not a folder (tab Synchro)
 	 *
 	 * @param int  $accountId Mailbox

@@ -32,6 +32,7 @@ CREATE TABLE llx_inbox_folder(
 	indexed integer DEFAULT 0 NOT NULL,
 	oldest_indexed datetime DEFAULT NULL,
 	first_sync_done smallint DEFAULT 0 NOT NULL,
+	att_repair integer DEFAULT 0 NOT NULL,
 	date_sync datetime DEFAULT NULL,
 	sync_error text DEFAULT NULL,
 	status smallint DEFAULT 1 NOT NULL,
