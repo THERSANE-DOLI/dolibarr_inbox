@@ -41,7 +41,10 @@ require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 class InboxComposer
 {
 	/** @var string[] */
-	const MODES = array('new', 'reply', 'replyall', 'replylist', 'forward', 'forward_attach', 'draft');
+	const MODES = array('new', 'reply', 'replyall', 'replylist', 'forward', 'forward_attach', 'draft', 'editnew');
+
+	/** @var int Documents of a piece listed at most */
+	const MAX_DOCUMENTS = 100;
 
 	/** @var int Days a writing left open is kept in the temporary folder */
 	const KEEP_DAYS = 7;
@@ -287,6 +290,30 @@ class InboxComposer
 			foreach ($message->getFileAttachments() as $a) {
 				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
 			}
+		} elseif ($mode === 'editnew') {
+			// « Edit as new » (B19): the recipients, subject, text and files of the mail, in a new writing
+			$headers = InboxReader::headers($raw);
+			$out['to'] = $message->to;
+			$out['cc'] = $message->cc;
+			foreach ($headers as $pair) {
+				if (strcasecmp($pair[0], 'Bcc') === 0) {
+					$out['bcc'] = InboxMailBuilder::parseAddresses((string) $pair[1]);
+				}
+			}
+			$out['subject'] = (string) $message->subject;
+			$parts = self::splitDraft($message->bodyHtml !== '' ? $message->bodyHtml : nl2br(dol_escape_htmltag($message->bodyText)));
+			$out['html'] = $parts['body'];
+			foreach ($message->getFileAttachments() as $a) {
+				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
+			}
+			// The identity that wrote it, when it is one of the user
+			$fromEmail = strtolower((string) ($message->from['email'] ?? ''));
+			foreach ($identities as $i) {
+				if ($i['account'] === $sourceAccount && strtolower($i['email']) === $fromEmail) {
+					$identityId = $i['id'];
+					break;
+				}
+			}
 		} elseif ($mode !== 'new') {
 			$row = $reader->row;
 			$state['source'] = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'folder' => (string) $row->folder_path,
@@ -339,8 +366,10 @@ class InboxComposer
 				$identityId = $identities[0]['id'];
 			}
 		}
-		// Pieces linked to the mail answered: the sending may be recorded on them (lot W6 1.17.0)
-		$state['pieces'] = $this->piecesOf($user, $state['source'] ?? null);
+		// Pieces linked to the mail answered: the sending may be recorded on them (lot W6 1.17.0); their templates and
+		// their documents are offered (1.18.0)
+		$state['linked'] = $this->linkedOf($user, $state['source'] ?? null);
+		$state['pieces'] = $this->piecesOf($user, $state['linked']);
 		self::writeState($dir, $state);
 		$this->hold($token);
 		$langs->loadLangs(array('inbox@inbox'));
@@ -377,6 +406,7 @@ class InboxComposer
 		$out['draft'] = !empty($state['draft']) ? 1 : 0;
 		$out['max_size'] = self::maxBytes();
 		$out['pieces'] = array_values((array) ($state['pieces'] ?? array()));
+		$out['linked'] = array_values((array) ($state['linked'] ?? array()));
 		$out['send_delay'] = self::delayFor($user);
 
 		return $out;
@@ -400,15 +430,15 @@ class InboxComposer
 	}
 
 	/**
-	 * Pieces linked to a mail (through its Message-ID) that the user may read and write, and record a sending on
+	 * Pieces linked to a mail (through its Message-ID) that the user may read, the newest first
 	 *
 	 * @param User                     $user   User
 	 * @param array<string,mixed>|null $source Mail answered
 	 * @return array<int,array{type:string,id:int,ref:string,kind:string,icon:string}>
 	 */
-	public function piecesOf(User $user, $source)
+	public function linkedOf(User $user, $source)
 	{
-		if (!$source || (string) ($source['message_id'] ?? '') === '' || !$user->hasRight('agenda', 'myactions', 'create')) {
+		if (!$source || (string) ($source['message_id'] ?? '') === '') {
 			return array();
 		}
 		require_once __DIR__.'/inboxlink.class.php';
@@ -421,18 +451,392 @@ class InboxComposer
 		$links = new InboxLink($this->db);
 		$elements = new InboxElements($this->db);
 		$out = array();
-		foreach ($links->listFor(array((int) $ref->rowid)) as $l) {
+		foreach (array_reverse($links->listFor(array((int) $ref->rowid))) as $l) {
 			$type = (string) $l['type'];
-			if (!InboxElements::canWriteType($user, $type)) {
+			if (!InboxElements::enabled($type) || $type === 'action') {
 				continue;
 			}
 			$d = $elements->describe($user, $type, (int) $l['element']);
 			if ($d && !empty($d['readable'])) {
 				$out[] = array('type' => $type, 'id' => (int) $l['element'], 'ref' => (string) ($d['ref'] ?? ''), 'kind' => (string) $d['kind'], 'icon' => (string) $d['icon']);
 			}
+			if (count($out) >= 20) {
+				break;
+			}
 		}
 
-		return array_slice($out, 0, 20);
+		return $out;
+	}
+
+	/**
+	 * Linked pieces the user may also write, and record a sending on (an event of the agenda)
+	 *
+	 * @param User                           $user   User
+	 * @param array<int,array<string,mixed>> $linked Readable linked pieces (linkedOf())
+	 * @return array<int,array{type:string,id:int,ref:string,kind:string,icon:string}>
+	 */
+	public function piecesOf(User $user, array $linked)
+	{
+		if (!$user->hasRight('agenda', 'myactions', 'create')) {
+			return array();
+		}
+
+		return array_values(array_filter($linked, function ($pc) use ($user) {
+			return InboxElements::canWriteType($user, (string) $pc['type']);
+		}));
+	}
+
+	/**
+	 * Identity chosen in a writing (one of the user)
+	 *
+	 * @param User $user       User
+	 * @param int  $identityId Identity
+	 * @return array<string,mixed>|null
+	 */
+	public function identityOf(User $user, $identityId)
+	{
+		foreach ($this->identities($user) as $i) {
+			if ($i['id'] === (int) $identityId) {
+				return $i;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Context of the variables of a template in a writing
+	 *
+	 * @param User                $user       User
+	 * @param array<string,mixed> $state      State of the writing
+	 * @param array<string,mixed> $identity   Identity chosen
+	 * @param string              $piece      Piece « type:id » whose variables are used ('' none)
+	 * @param string              $to         First recipient
+	 * @return array<string,mixed>|null Null when the piece is not one of the linked pieces
+	 */
+	protected function varContext(User $user, array $state, array $identity, $piece, $to)
+	{
+		$pc = null;
+		if ((string) $piece !== '') {
+			foreach ((array) ($state['linked'] ?? array()) as $l) {
+				if ($l['type'].':'.$l['id'] === (string) $piece) {
+					$pc = array('type' => (string) $l['type'], 'id' => (int) $l['id']);
+				}
+			}
+			if (!$pc) {
+				return null;
+			}
+		}
+
+		return array('piece' => $pc, 'to' => (string) $to, 'identity' => $identity, 'mailbox' => (string) $identity['email'], 'source' => $state['source'] ?? null);
+	}
+
+	/**
+	 * Templates offered in a writing, for the mailbox of the identity chosen
+	 *
+	 * @param User   $user       User
+	 * @param string $token      Writing
+	 * @param int    $identityId Identity chosen
+	 * @return array<int,array<string,mixed>>|null
+	 */
+	public function templates(User $user, $token, $identityId)
+	{
+		$dir = $this->held($user, $token);
+		$identity = $this->identityOf($user, $identityId);
+		if ($dir === null || !$identity) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		require_once __DIR__.'/inboxtemplates.class.php';
+		$templates = new InboxTemplates($this->db);
+
+		return $templates->offered($user, (int) $identity['account'], (array) ($state['linked'] ?? array()));
+	}
+
+	/**
+	 * A template put in a writing: its subject, its body with the variables of the piece chosen and of the first
+	 * recipient; the main document of the piece attached when the template asks it
+	 *
+	 * @param User   $user       User
+	 * @param string $token      Writing
+	 * @param int    $id         Template
+	 * @param int    $identityId Identity chosen
+	 * @param string $piece      Piece « type:id » ('' none)
+	 * @param string $to         First recipient
+	 * @return array<string,mixed>|null
+	 */
+	public function applyTemplate(User $user, $token, $id, $identityId, $piece, $to)
+	{
+		$dir = $this->held($user, $token);
+		$identity = $this->identityOf($user, $identityId);
+		if ($dir === null || !$identity) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		$ctx = $this->varContext($user, $state, $identity, $piece, $to);
+		if ($ctx === null) {
+			return $this->fail('not_found', 'Piece not linked');
+		}
+		require_once __DIR__.'/inboxtemplates.class.php';
+		$templates = new InboxTemplates($this->db);
+		$t = $templates->usable($user, (int) $id, (int) $identity['account'], $ctx['piece'] ? $ctx['piece']['type'] : '');
+		if (!$t) {
+			return $this->fail('not_found', 'Template not usable');
+		}
+		$ctx['lang'] = (string) $t->lang;
+		$values = $templates->values($user, $ctx);
+		$out = $templates->render($t, $values);
+		$out['values'] = $values;
+		$out['piece'] = (string) $piece;
+		$out['lang'] = (string) $t->lang;
+		$out['attached'] = null;
+		// « Attach the main document » of the template: the PDF of the piece, as its card would send it
+		if ($out['joinfiles'] && $ctx['piece']) {
+			$doc = $this->mainDocument($user, $ctx['piece']['type'], $ctx['piece']['id']);
+			if ($doc !== '' && !in_array($doc, array_column((array) $state['attachments'], 'name'), true)) {
+				$out['attached'] = $this->attachDocument($user, $token, $ctx['piece']['type'].':'.$ctx['piece']['id'], $doc);
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Values of the variables again (the recipient or the piece changed)
+	 *
+	 * @param User   $user       User
+	 * @param string $token      Writing
+	 * @param int    $identityId Identity chosen
+	 * @param string $piece      Piece « type:id » ('' none)
+	 * @param string $to         First recipient
+	 * @param string $lang       Language of the template
+	 * @return array<string,string>|null
+	 */
+	public function templateValues(User $user, $token, $identityId, $piece, $to, $lang = '')
+	{
+		$dir = $this->held($user, $token);
+		$identity = $this->identityOf($user, $identityId);
+		if ($dir === null || !$identity) {
+			return $this->fail('not_found');
+		}
+		$ctx = $this->varContext($user, self::readState($dir), $identity, $piece, $to);
+		if ($ctx === null) {
+			return $this->fail('not_found', 'Piece not linked');
+		}
+		$ctx['lang'] = preg_match('/^[a-z]{2}_[A-Z]{2}$/', (string) $lang) ? (string) $lang : '';
+		require_once __DIR__.'/inboxtemplates.class.php';
+		$templates = new InboxTemplates($this->db);
+
+		return $templates->values($user, $ctx);
+	}
+
+	/**
+	 * Folder of the documents of a linked piece the user may read
+	 *
+	 * @param User   $user  User
+	 * @param string $type  Type
+	 * @param int    $id    Piece
+	 * @return array{0:string,1:object}|null
+	 */
+	protected function documentsDirOf(User $user, $type, $id)
+	{
+		require_once __DIR__.'/inboxcreate.class.php';
+		if (!InboxElements::canRead($user, (string) $type, (int) $id)) {
+			return null;
+		}
+		$object = fetchObjectByElement((int) $id, (string) $type);
+		if (!is_object($object) || empty($object->id)) {
+			return null;
+		}
+		$create = new InboxCreate($this->db);
+		$dir = $create->documentsDir((string) $type, $object);
+
+		return $dir !== '' ? array($dir, $object) : null;
+	}
+
+	/**
+	 * Main document of a piece: the PDF named after its reference, when it was generated
+	 *
+	 * @param User   $user User
+	 * @param string $type Type
+	 * @param int    $id   Piece
+	 * @return string File name, '' when none
+	 */
+	protected function mainDocument(User $user, $type, $id)
+	{
+		$found = $this->documentsDirOf($user, $type, $id);
+		if (!$found) {
+			return '';
+		}
+		$name = dol_sanitizeFileName((string) ($found[1]->ref ?? '')).'.pdf';
+
+		return $name !== '.pdf' && is_file($found[0].'/'.$name) ? $name : '';
+	}
+
+	/**
+	 * Documents of the pieces linked to the mail answered, to attach them (B: attachments from Dolibarr)
+	 *
+	 * @param User   $user  User
+	 * @param string $token Writing
+	 * @return array<int,array<string,mixed>>|null Pieces: type, id, ref, kind, icon, files (name, size, date)
+	 */
+	public function documents(User $user, $token)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		$out = array();
+		foreach ((array) ($state['linked'] ?? array()) as $pc) {
+			$found = $this->documentsDirOf($user, (string) $pc['type'], (int) $pc['id']);
+			if (!$found || !is_dir($found[0])) {
+				continue;
+			}
+			$files = array();
+			foreach (dol_dir_list($found[0], 'files', 0, '', array('\.meta$', '\.png$', '^\.'), 'date', SORT_DESC) as $f) {
+				$files[] = array('name' => (string) $f['name'], 'size' => (int) $f['size'], 'date' => (int) $f['date']);
+				if (count($files) >= self::MAX_DOCUMENTS) {
+					break;
+				}
+			}
+			if ($files) {
+				$out[] = $pc + array('files' => $files, 'main' => dol_sanitizeFileName((string) ($found[1]->ref ?? '')).'.pdf');
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A document of a linked piece attached to the writing
+	 *
+	 * @param User   $user  User
+	 * @param string $token Writing
+	 * @param string $piece Piece « type:id », one of the linked pieces
+	 * @param string $name  File name in its documents
+	 * @return array{id:string,name:string,size:int,mime:string,scan:string}|null
+	 */
+	public function attachDocument(User $user, $token, $piece, $name)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		$pc = null;
+		foreach ((array) ($state['linked'] ?? array()) as $l) {
+			if ($l['type'].':'.$l['id'] === (string) $piece) {
+				$pc = $l;
+			}
+		}
+		$name = basename((string) $name);
+		$found = $pc ? $this->documentsDirOf($user, (string) $pc['type'], (int) $pc['id']) : null;
+		if (!$found || $name === '' || $name[0] === '.' || !is_file($found[0].'/'.$name)) {
+			return $this->fail('not_found');
+		}
+		$path = $found[0].'/'.$name;
+		$size = (int) filesize($path);
+		$total = array_sum(array_column((array) $state['attachments'], 'size'));
+		if ($total + $size > self::maxBytes()) {
+			return $this->fail('too_big');
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		$att = $this->keepFile($dir, $state, $name, (string) file_get_contents($path), dol_mimetype($name));
+		if ($att['scan'] === InboxAttachmentScan::INFECTED) {
+			@unlink($dir.'/att-'.$att['id']);
+			return $this->fail('infected', $name);
+		}
+		self::writeState($dir, $state);
+
+		return $att;
+	}
+
+	/**
+	 * Redirect a mail (B19): the very mail sent again to other recipients, its sender and its text unchanged, with
+	 * Resent-* headers; sent at once by the server of its mailbox, never copied in Sent
+	 *
+	 * @param User     $user   User
+	 * @param int      $mailId Mail
+	 * @param string[] $to     Recipients
+	 * @return array{sent:int,recipients:int}|null
+	 */
+	public function redirect(User $user, $mailId, $to)
+	{
+		$this->error = '';
+		$this->errorCode = '';
+		$this->bad = array();
+		$reader = new InboxReader($this->db);
+		if ((int) $mailId <= 0 || !$reader->load($user, (int) $mailId)) {
+			return $this->fail('not_found');
+		}
+		$account = $reader->account;
+		$access = new InboxAccess($this->db);
+		if (!in_array($access->getLevel($user, (int) $account->id), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			return $this->fail('no_send');
+		}
+		$bad = array();
+		$list = InboxMailBuilder::parseAddresses($to, $bad);
+		if ($bad) {
+			$this->bad = $bad;
+			return $this->fail('bad_address', implode(', ', $bad));
+		}
+		if (!$list) {
+			return $this->fail('no_recipient');
+		}
+		if (count($list) > 50) {
+			return $this->fail('error', 'Too many recipients');
+		}
+		if (getDolGlobalString('MAIN_DISABLE_ALL_MAILS')) {
+			return $this->fail('mails_disabled');
+		}
+		$raw = $reader->raw($user);
+		if ($raw === null) {
+			return $this->fail('not_found');
+		}
+		// Sender of the redirection: the identity of the user in this mailbox (default first), else the mailbox
+		$from = array('email' => (string) $account->email, 'name' => (string) $account->label);
+		foreach ($this->identities($user) as $i) {
+			if ($i['account'] === (int) $account->id && ($from['email'] === (string) $account->email || $i['default'])) {
+				$from = array('email' => (string) $i['email'], 'name' => (string) $i['name']);
+			}
+		}
+		$fold = function ($name, $value) {
+			return $name.': '.preg_replace('/[\r\n]+/', ' ', $value)."\r\n";
+		};
+		$addr = function ($a) {
+			return $a['name'] !== '' ? '"'.addcslashes(InboxMimeParser::clean($a['name']), '"\\').'" <'.$a['email'].'>' : $a['email'];
+		};
+		$head = $fold('Resent-From', $addr($from))
+			.$fold('Resent-To', implode(', ', array_map($addr, $list)))
+			.$fold('Resent-Date', date('r', dol_now()))
+			.$fold('Resent-Message-ID', '<'.InboxMailBuilder::newMessageId($from['email']).'>');
+		// The header of a mail ends at the first empty line; Bcc never goes out
+		$split = preg_split('/(\r?\n\r?\n)/', (string) $raw, 2, PREG_SPLIT_DELIM_CAPTURE);
+		$raw = preg_replace('/^Bcc:.*(\r?\n[ \t].*)*(\r?\n|$)/mi', '', $split[0]).($split[1] ?? '').($split[2] ?? '');
+		$error = '';
+		$connector = InboxConnectorFactory::forAccount($this->db, $account, $error);
+		if (!$connector) {
+			return $this->fail('error', $error);
+		}
+		if (!$connector->can(InboxConnectorInterface::CAP_SEND)) {
+			$connector->disconnect();
+			return $this->fail('smtp_no_server');
+		}
+		$ok = $connector->send($head.$raw, array('from' => $from['email'], 'recipients' => array_column($list, 'email')));
+		if (!$ok) {
+			$code = method_exists($connector, 'getErrorCode') ? (string) $connector->getErrorCode() : '';
+			$this->error = $connector->getError();
+			$this->errorCode = $code !== '' ? $code : 'smtp_refused';
+			$connector->disconnect();
+			return null;
+		}
+		$connector->disconnect();
+		InboxActionLog::add($this->db, $user, (int) $account->id, 'redirect', array((object) array('message_id' => (string) $reader->row->message_id, 'subject' => (string) $reader->row->subject)),
+			(string) $reader->row->folder_path, '', 0, implode(', ', array_column($list, 'email')));
+
+		return array('sent' => 1, 'recipients' => count($list));
 	}
 
 	/**
@@ -455,7 +859,7 @@ class InboxComposer
 			return InboxMailBuilder::parseAddresses($v);
 		};
 		$out = array('to' => $list($typed['to'] ?? array()), 'cc' => $list($typed['cc'] ?? array()), 'bcc' => $list($typed['bcc'] ?? array()),
-			'subject' => (string) ($typed['subject'] ?? ''), 'html' => InboxMailBuilder::cleanHtml((string) ($typed['html'] ?? '')), 'receipt' => (int) !empty($typed['receipt']),
+			'subject' => (string) ($typed['subject'] ?? ''), 'html' => InboxMailBuilder::cleanHtml((string) ($typed['html'] ?? ''), true), 'receipt' => (int) !empty($typed['receipt']),
 			'signature_off' => empty($typed['signature']) ? 1 : 0, 'quote_off' => empty($typed['quote']) ? 1 : 0);
 
 		return $this->view($user, $token, $dir, $state, $out, (int) ($typed['identity'] ?? 0), $this->identities($user));
@@ -649,7 +1053,7 @@ class InboxComposer
 	protected static function splitDraft($html)
 	{
 		$html = preg_replace('#^.*<body\b[^>]*>|</body>.*$#is', '', (string) $html);
-		$clean = InboxMailBuilder::cleanHtml($html);
+		$clean = InboxMailBuilder::cleanHtml($html, true);
 		$out = array('body' => $clean, 'signature' => '', 'quote' => '');
 		$doc = new DOMDocument();
 		$previous = libxml_use_internal_errors(true);
@@ -830,7 +1234,7 @@ class InboxComposer
 		if (strlen($html) > InboxMimeParser::MAX_HTML_LENGTH) {
 			return $this->fail('too_big');
 		}
-		$html = InboxMailBuilder::cleanHtml($html);
+		$html = InboxMailBuilder::cleanHtml($html, (bool) $draft);
 		if (!empty($data['signature']) && trim($identity['signature']) !== '') {
 			$html .= '<div class="inbox-signature">-- <br>'.InboxMailBuilder::cleanHtml($identity['signature']).'</div>';
 		}
@@ -838,6 +1242,7 @@ class InboxComposer
 			$html .= '<br>'.(string) file_get_contents($dir.'/quote.html');
 		}
 		$b->html = $html;
+		$b->keepVars = (bool) $draft;
 		$b->receipt = !empty($data['receipt']);
 		$source = $state['source'] ?? null;
 		if ($source && in_array($source['mode'], array('reply', 'replyall', 'replylist', 'forward', 'forward_attach'), true)) {

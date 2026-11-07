@@ -257,5 +257,12 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/compose.php?action=dispatch&id=1&token='.urlencode($token))['code'], 'send now by GET refused');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'dispatch', 'id' => 99999999, 'token' => $token))['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'cancel', 'id' => 99999999, 'token' => $token))['code']);
+		// Templates, documents, redirect (1.18.0): a forged writing, document, mail or template not found
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'attachdoc', 'compose' => '0123456789abcdef0123456789abcdef', 'piece' => 'societe:1', 'name' => '../../conf/conf.php', 'token' => $token))['code']);
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/compose.php?action=redirect&mail='.$row->rowid.'&to=x@inbox-test.invalid&token='.urlencode($token))['code'], 'redirect by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/compose.php', array('action' => 'redirect', 'mail' => 99999999, 'to' => 'x@inbox-test.invalid', 'token' => $token))['code']);
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/template.php', array('action' => 'save', 'label' => 'ZzTpl x'))['code'], 'save without token refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/template.php?action=list&id=99999999')['code'], 'tab of a mailbox not managed');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/template.php?action=get&template=99999999')['code']);
 	}
 }

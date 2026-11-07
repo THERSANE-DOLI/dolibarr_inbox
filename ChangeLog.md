@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: mail templates, documents of the linked pieces, redirect, edit as new :   1.18.0
+  - templates in the writing: those of the mailbox (tab Templates of a mailbox, or « Save as a template ») and those
+    of Dolibarr for the pieces linked to the mail answered (proposal, order, invoice...), with their variables.
+  - variables shown as chips that follow the recipient and the piece chosen (« Variables of »); orange when without
+    value, listed before sending; the mail sent holds their text only; also in Setup > Emails > Templates.
+  - documents of the linked pieces attached in one click; « Attach the main document » of a template followed.
+  - redirect a mail as it is to other recipients; edit a mail as a new one; a picture pasted goes in the text.
+  - mailto: links of a mail open a new mail in inbox; My account: open the mailto: links of the browser in inbox.
 - NEW: queue of the sending, sending later, checks before sending, record on the piece :   1.17.0
   - a mail leaves after a delay (10 s by default, setup and My account): « Sending in 8 s · Undo · Send now »;
     undo gives the writing back as it was; a closed tab does not stop it (scheduled job every minute).

@@ -45,6 +45,9 @@ class InboxMailBuilder
 	const ATTRIBUTES = array('href', 'src', 'alt', 'title', 'style', 'width', 'height', 'align', 'valign', 'colspan', 'rowspan',
 		'cellpadding', 'cellspacing', 'border', 'bgcolor', 'color', 'face', 'size', 'dir', 'lang', 'type', 'start', 'cite');
 
+	/** @var bool Keep the variables of a template in the body (a draft) */
+	public $keepVars = false;
+
 	/** @var array{email:string,name:string} */
 	public $from = array('email' => '', 'name' => '');
 	/** @var array<int,array{email:string,name:string}> */
@@ -162,10 +165,12 @@ class InboxMailBuilder
 	 * HTML written in inbox (editor, quote, signature) cleaned for sending: allow list of tags and attributes, links
 	 * http / mailto only, pictures data: / cid: / https only, no script, no event, no url() in the styles but https
 	 *
-	 * @param string $html HTML
+	 * @param string $html     HTML
+	 * @param bool   $keepVars Keep the variables of a template (span data-inbox-var): drafts, templates; sent mails
+	 *                         hold their text only
 	 * @return string Fragment (inside of a body)
 	 */
-	public static function cleanHtml($html)
+	public static function cleanHtml($html, $keepVars = false)
 	{
 		$html = (string) $html;
 		if (trim($html) === '') {
@@ -180,7 +185,7 @@ class InboxMailBuilder
 		if (!$body) {
 			return '';
 		}
-		self::cleanNode($body);
+		self::cleanNode($body, (bool) $keepVars);
 		$out = '';
 		foreach ($body->childNodes as $child) {
 			$out .= $doc->saveHTML($child);
@@ -190,10 +195,11 @@ class InboxMailBuilder
 	}
 
 	/**
-	 * @param DOMNode $node Node whose children are cleaned
+	 * @param DOMNode $node     Node whose children are cleaned
+	 * @param bool    $keepVars Keep the variables of a template
 	 * @return void
 	 */
-	protected static function cleanNode(DOMNode $node)
+	protected static function cleanNode(DOMNode $node, $keepVars = false)
 	{
 		foreach (iterator_to_array($node->childNodes) as $child) {
 			if ($child instanceof DOMComment || $child instanceof DOMProcessingInstruction) {
@@ -210,7 +216,7 @@ class InboxMailBuilder
 			}
 			if (!in_array($tag, self::TAGS, true)) {
 				// Unknown tag: its content is kept, the tag goes
-				self::cleanNode($child);
+				self::cleanNode($child, $keepVars);
 				while ($child->firstChild) {
 					$node->insertBefore($child->firstChild, $child);
 				}
@@ -225,7 +231,9 @@ class InboxMailBuilder
 				$name = strtolower($attr->name);
 				$value = trim($attr->value);
 				$keep = in_array($name, self::ATTRIBUTES, true);
-				if ($name === 'class') {
+				if ($name === 'data-inbox-var') {
+					$keep = $keepVars && $tag === 'span' && preg_match('/^[A-Z0-9_]{1,64}$/', $value);
+				} elseif ($name === 'class') {
 					// Only the marks of inbox (a draft reopened finds its quote and signature again)
 					$keep = in_array($value, array('inbox-quote', 'inbox-signature'), true);
 				} elseif ($keep && $name === 'href') {
@@ -250,7 +258,7 @@ class InboxMailBuilder
 			} elseif (($tag === 'td' || $tag === 'th') && stripos($child->getAttribute('style'), 'border') === false) {
 				$child->setAttribute('style', trim($child->getAttribute('style').';border:1px solid #d0d5dd;padding:4px 8px;vertical-align:top', '; '));
 			}
-			self::cleanNode($child);
+			self::cleanNode($child, $keepVars);
 		}
 	}
 
@@ -305,7 +313,7 @@ class InboxMailBuilder
 		}
 		$messageId = $this->messageId !== '' ? $this->messageId : self::newMessageId($this->from['email']);
 		$this->messageId = $messageId;
-		$html = self::cleanHtml($this->html);
+		$html = self::cleanHtml($this->html, $this->keepVars);
 		try {
 			$message = new Swift_Message();
 			$message->setCharset('utf-8');

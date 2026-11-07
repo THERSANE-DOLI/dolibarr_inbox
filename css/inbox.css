@@ -1540,3 +1540,23 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 	.ibx-sendbar__subject { display: none; }
 }
 .ibx-text-danger { color: var(--ibx-danger); font-weight: 600; }
+
+/* Templates (lot W6 1.18.0): a variable is a chip, its value inside; orange and its key shown when it has no value */
+.ibx-var { display: inline-block; padding: 0 0.3em; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 35%, transparent); cursor: pointer; }
+.ibx-var.is-empty { background: var(--ibx-warning-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-warning) 60%, transparent); color: var(--ibx-warning-text, #8a5a00); }
+.ibx-var.is-empty::before { content: attr(data-inbox-var); font-family: ui-monospace, monospace; font-size: 0.85em; }
+.ibx-var.ProseMirror-selectednode { outline: 2px solid var(--ibx-focus); outline-offset: 1px; }
+.ibx-compose__vars { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-compose__vars select { max-width: 18rem; }
+/* Documents of the linked pieces */
+.ibx-docs { display: flex; flex-direction: column; gap: var(--ibx-s3); max-height: 60vh; overflow: auto; }
+.ibx-docs__piece { margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-docs__piece legend { display: flex; align-items: center; gap: var(--ibx-s1); padding: 0 var(--ibx-s1); font-weight: 600; }
+.ibx-docs__file { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; }
+.ibx-docs__file .ibx-ellipsis { flex: 1; min-width: 0; }
+/* Editor of a template */
+.ibx-tpledit__boxes { display: flex; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); margin-top: var(--ibx-s2); }
+.ibx-tpledit__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: var(--ibx-s1); border: 1px solid var(--ibx-border); border-bottom: 0; border-radius: var(--ibx-radius) var(--ibx-radius) 0 0; background: var(--ibx-bg-sunken); }
+.ibx-tpledit__tools select { margin-left: auto; max-width: 16rem; }
+.ibx-tpledit__editor { min-height: 12rem; max-height: 50vh; overflow: auto; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: 0 0 var(--ibx-radius) var(--ibx-radius); background: var(--ibx-bg); }
+.ibx-tpledit__editor .ibx-editor__content { min-height: 10rem; outline: none; }

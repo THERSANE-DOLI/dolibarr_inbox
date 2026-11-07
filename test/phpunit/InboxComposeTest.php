@@ -370,6 +370,163 @@ class InboxComposeTest extends InboxImapTestCase
 	}
 
 	/**
+	 * Templates (1.18.0): offered by mailbox, variables of the recipient as chips, sent as text; rights
+	 *
+	 * @return void
+	 */
+	public function testTemplates()
+	{
+		$a = $this->ready();
+		if ($this->mailpit('/api/v1/messages', 'DELETE') === null) {
+			$this->markTestSkipped('Mailpit not started (dev/dovecot/run.sh)');
+		}
+		dol_include_once('/inbox/class/inboxtemplates.class.php');
+		$identity = $this->identity($a);
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_tpl', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$socid = (int) $this->db->last_insert_id($p.'societe');
+		$this->db->query("INSERT INTO ".$p."socpeople (entity, fk_soc, lastname, firstname, email, statut, datec, fk_user_creat) VALUES (1, ".$socid.", 'inboxtest_Dupont', 'Jean', 'jean@client-tpl.invalid', 1, '".$this->db->idate(dol_now())."', ".((int) $this->admin->id).")");
+		$tpl = new InboxTemplates($this->db);
+
+		// Saved in the format of Dolibarr (__KEY__), given back to the editor as chips
+		$id = $tpl->save($this->admin, array('label' => 'ZzTpl hello', 'subject' => 'ZzCompose __CONTACT_FIRSTNAME__', 'accounts' => array((int) $a->id),
+			'html' => '<p>Bonjour <span data-inbox-var="CONTACT_FIRSTNAME"></span> de __THIRDPARTY_NAME__<script>x</script></p>'));
+		$this->assertGreaterThan(0, $id, $tpl->errorCode.' '.$tpl->error);
+		$content = (string) $this->db->getRow("SELECT content FROM ".$p."c_email_templates WHERE rowid = ".$id)->content;
+		$this->assertStringContainsString('Bonjour __CONTACT_FIRSTNAME__ de __THIRDPARTY_NAME__', $content);
+		$this->assertStringNotContainsString('script', $content);
+		$this->assertStringContainsString('data-inbox-var="THIRDPARTY_NAME"', $tpl->get($this->admin, $id)['html']);
+		$other = $tpl->save($this->admin, array('label' => 'ZzTpl elsewhere', 'subject' => 'x', 'html' => '<p>x</p>', 'accounts' => array(999999)));
+		$this->assertGreaterThan(0, $other);
+
+		// Offered in the mailbox it is attached to only; values of the first recipient
+		$c = new InboxComposer($this->db);
+		$open = $c->open($this->admin, 'new', 0, (int) $a->id);
+		$groups = $c->templates($this->admin, $open['token'], $identity);
+		$ids = array_column($groups[0]['templates'], 'id');
+		$this->assertContains($id, $ids);
+		$this->assertNotContains($other, $ids, 'a template of another mailbox is not offered');
+		$res = $c->applyTemplate($this->admin, $open['token'], $id, $identity, '', 'jean@client-tpl.invalid');
+		$this->assertNotNull($res, $c->errorCode.' '.$c->error);
+		$this->assertSame('ZzCompose Jean', $res['subject']);
+		$this->assertStringContainsString('data-inbox-var="CONTACT_FIRSTNAME">Jean</span>', $res['html']);
+		$this->assertStringContainsString('>inboxtest_tpl</span>', $res['html'], 'thirdparty of the contact');
+		$values = $c->templateValues($this->admin, $open['token'], $identity, '', 'nobody@elsewhere-tpl.invalid');
+		$this->assertSame('', $values['CONTACT_FIRSTNAME'], 'unknown recipient: no value');
+		$this->assertNull($c->applyTemplate($this->admin, $open['token'], $other, $identity, '', ''), 'not usable here');
+		$this->assertNull($c->applyTemplate($this->admin, $open['token'], $id, $identity, 'societe:'.$socid, ''), 'a piece not linked to the mail');
+
+		// Sent: the chips are text only
+		$sent = $c->send($this->admin, $open['token'], array('identity' => $identity, 'to' => 'jean@client-tpl.invalid', 'subject' => $res['subject'], 'html' => $res['html']));
+		$this->assertNotNull($sent, $c->errorCode.' '.$c->error);
+		$list = json_decode((string) $this->mailpit('/api/v1/messages'), true);
+		$raw = quoted_printable_decode((string) $this->mailpit('/api/v1/message/'.$list['messages'][0]['ID'].'/raw'));
+		$this->assertStringContainsString('Bonjour <span>Jean</span>', $raw);
+		$this->assertStringNotContainsString('data-inbox-var', $raw);
+		// A draft keeps them
+		$this->assertStringContainsString('data-inbox-var="REF"', InboxMailBuilder::cleanHtml('<span data-inbox-var="REF">x</span>', true));
+		$this->assertStringNotContainsString('data-inbox-var', InboxMailBuilder::cleanHtml('<span data-inbox-var="REF">x</span>'));
+
+		// Rights: a shared template of a mailbox needs to manage it; one's own always
+		$writer = $this->user('tplwriter');
+		$access = new InboxAccess($this->db);
+		$access->grant($this->admin, $a->id, $writer->id, 0, InboxAccess::LEVEL_SEND);
+		InboxAccess::clearCache();
+		$this->assertSame(0, $tpl->save($writer, array('label' => 'ZzTpl shared', 'html' => '<p>x</p>', 'accounts' => array((int) $a->id))));
+		$this->assertSame('no_right', $tpl->errorCode);
+		$this->assertSame(0, $tpl->save($writer, array('id' => $id, 'label' => 'ZzTpl changed', 'html' => '<p>x</p>', 'private' => 1)));
+		$mine = $tpl->save($writer, array('label' => 'ZzTpl mine', 'html' => '<p>x</p>', 'private' => 1));
+		$this->assertGreaterThan(0, $mine);
+		$this->assertNotContains($mine, array_column($tpl->listForAccount($this->admin, (int) $a->id), 'id'), 'a private template is seen by its owner only');
+		$this->assertFalse($tpl->delete($writer, $id));
+		$this->assertTrue($tpl->delete($this->admin, $id));
+	}
+
+	/**
+	 * Templates and documents of the pieces linked to the mail answered (1.18.0)
+	 *
+	 * @return void
+	 */
+	public function testPieceTemplatesAndDocuments()
+	{
+		global $conf;
+
+		$a = $this->ready();
+		dol_include_once('/inbox/class/inboxlink.class.php');
+		dol_include_once('/inbox/class/inboxmailref.class.php');
+		$identity = $this->identity($a);
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_piece', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$socid = (int) $this->db->last_insert_id($p.'societe');
+		$this->db->query("INSERT INTO ".$p."c_email_templates (entity, type_template, label, private, active, enabled, topic, content, joinfiles) VALUES (1, 'thirdparty', 'ZzTpl soc', 0, 1, '1', 'Pour __THIRDPARTY_NAME__', 'Client __THIRDPARTY_NAME__', 0)");
+		$tplId = (int) $this->db->last_insert_id($p.'c_email_templates');
+		$refs = new InboxMailRef($this->db);
+		$links = new InboxLink($this->db);
+		$links->link($refs->fetchOrCreateByMessageId('m3'.self::MARK), 'societe', $socid, $this->admin);
+		$m3 = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE message_id = 'm3".self::MARK."'");
+		$c = new InboxComposer($this->db);
+		$open = $c->open($this->admin, 'reply', (int) $m3->rowid);
+		$this->assertSame('societe:'.$socid, $open['linked'][0]['type'].':'.$open['linked'][0]['id']);
+		$groups = $c->templates($this->admin, $open['token'], $identity);
+		$soc = array_values(array_filter($groups, function ($g) {
+			return $g['type'] === 'societe';
+		}));
+		$this->assertContains($tplId, array_column($soc[0]['templates'], 'id'), 'templates of the type of the piece');
+		$res = $c->applyTemplate($this->admin, $open['token'], $tplId, $identity, 'societe:'.$socid, '');
+		$this->assertNotNull($res, $c->errorCode.' '.$c->error);
+		$this->assertSame('Pour inboxtest_piece', $res['subject']);
+		$this->assertStringContainsString('>inboxtest_piece</span>', $res['html']);
+
+		// Documents of the piece: listed, attached; nothing outside its folder
+		$dir = $conf->societe->multidir_output[1].'/'.$socid;
+		dol_mkdir($dir);
+		file_put_contents($dir.'/offre.pdf', '%PDF-1.4 test');
+		$docs = $c->documents($this->admin, $open['token']);
+		$this->assertSame('offre.pdf', $docs[0]['files'][0]['name']);
+		$att = $c->attachDocument($this->admin, $open['token'], 'societe:'.$socid, 'offre.pdf');
+		$this->assertNotNull($att, $c->errorCode.' '.$c->error);
+		$this->assertSame(13, $att['size']);
+		$this->assertNull($c->attachDocument($this->admin, $open['token'], 'societe:'.$socid, '../../conf.php'));
+		$this->assertNull($c->attachDocument($this->admin, $open['token'], 'societe:1', 'offre.pdf'), 'a piece not linked');
+		dol_delete_dir_recursive($dir);
+		$this->db->query("DELETE FROM ".$p."inbox_link WHERE element_type = 'societe' AND fk_element = ".$socid);
+	}
+
+	/**
+	 * Edit as new and redirect (B19, 1.18.0)
+	 *
+	 * @return void
+	 */
+	public function testEditAsNewAndRedirect()
+	{
+		$a = $this->ready();
+		if ($this->mailpit('/api/v1/messages', 'DELETE') === null) {
+			$this->markTestSkipped('Mailpit not started (dev/dovecot/run.sh)');
+		}
+		$this->identity($a);
+		$p = $this->db->prefix();
+		$m1 = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE message_id = 'm1".self::MARK."'");
+		$c = new InboxComposer($this->db);
+		$open = $c->open($this->admin, 'editnew', (int) $m1->rowid);
+		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
+		$this->assertSame('ZzAct m1', $open['subject']);
+		$this->assertStringContainsString('Corps m1', $open['html']);
+		$this->assertNull($open['source'], 'a new mail, not an answer');
+
+		$res = $c->redirect($this->admin, (int) $m1->rowid, 'autre@inbox-test.invalid');
+		$this->assertNotNull($res, $c->errorCode.' '.$c->error);
+		$list = json_decode((string) $this->mailpit('/api/v1/messages'), true);
+		$this->assertSame(1, (int) $list['total']);
+		$this->assertContains('autre@inbox-test.invalid', array_column((array) $list['messages'][0]['Bcc'], 'Address'), 'envelope: the new recipient only');
+		$raw = (string) $this->mailpit('/api/v1/message/'.$list['messages'][0]['ID'].'/raw');
+		$this->assertMatchesRegularExpression('/^Resent-To: autre@inbox-test\.invalid/m', $raw);
+		$this->assertStringContainsString('Message-ID: <m1'.self::MARK.'>', $raw, 'the very mail');
+		$this->assertTrue(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_action_log WHERE action = 'redirect' AND fk_account = ".((int) $a->id))));
+		$this->assertNull($c->redirect($this->admin, (int) $m1->rowid, 'pas une adresse'));
+		$this->assertSame('bad_address', $c->errorCode);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testRights()

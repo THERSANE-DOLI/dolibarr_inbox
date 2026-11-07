@@ -537,6 +537,16 @@
 	}
 	/** Attachment announced but none attached; many recipients that see each other. True: send. */
 	async function guards(w, d) {
+		// Variables of a template still without value: listed, sending possible after confirmation
+		const empty = Array.from(new Set((w.editor.variables ? w.editor.variables() : []).filter(v => v.value === '').map(v => v.key)
+			.concat((d.subject.match(/__([A-Z0-9_]+)__/g) || []).map(x => x.slice(2, -2)))));
+		if (empty.length) {
+			const ok = await confirmDialog({ title: t('InboxVarsEmptyTitle', empty.length), text: t('InboxVarsEmptyText', empty.join(', ')), confirm: t('InboxComposeSendAnyway') });
+			if (!ok) {
+				w.editor.focus();
+				return false;
+			}
+		}
 		const words = String(t('InboxAttachWords')).toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
 		const text = (w.sourceMode ? ($('.ibx-compose__source', w.dlg).value || '').replace(/<[^>]+>/g, ' ') : (w.editor.getText ? w.editor.getText() : '')).toLowerCase();
 		if (!w.attachments.length && words.some(x => text.includes(x))) {
@@ -849,6 +859,12 @@
 	Dolibarr.on('inbox:folder:open', ctx => outboxBar(ctx));
 	// After a reload: the mails still in their delay get their bar back
 	Dolibarr.on('inbox:app:ready', async () => {
+		// A mailto: link given to inbox by the browser (index.php?mailto=..., see My account): written here
+		const mt = new URLSearchParams(location.search).get('mailto');
+		if (mt && I.ctx('INBOX_CAN_SEND', false)) {
+			history.replaceState(null, '', location.pathname + location.hash);
+			I.composeMailto(/^mailto:/i.test(mt) ? mt : 'mailto:' + mt);
+		}
 		try {
 			const items = (await post('compose', 'outbox', {})).items || [];
 			items.filter(it => it.status === 0 && !it.scheduled).forEach(it => sendBar({ queued: it.id, send_at: it.send_at, subject: it.subject }));
@@ -1320,8 +1336,199 @@
 				w.changed();
 			} },
 			{ label: t('InboxComposeSaveNow'), icon: 'drafts', run: () => save(w, true) },
+			{ label: t('InboxTemplateSaveAs'), icon: 'template', run: () => saveAsTemplate(w) },
 			{ label: t('InboxComposeDiscard'), icon: 'delete', danger: true, run: () => discard(w) },
 		]);
+	}
+
+	// ---------- Templates (lot W6 1.18.0): those of the mailbox, those of the linked pieces ----------
+	function firstTo(w) {
+		const to = w.to.get();
+		return to.length ? to[0].email : '';
+	}
+	async function templateMenu(w, anchor) {
+		const identity = +$('.ibx-js-from', w.dlg).value;
+		if (!w.templates || w.templates.identity !== identity) {
+			try {
+				w.templates = { identity, groups: (await post('compose', 'templates', { compose: w.token, identity })).groups };
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+		}
+		const items = [];
+		w.templates.groups.forEach(g => {
+			if (!g.templates.length) {
+				return;
+			}
+			items.push({ header: g.type === 'inbox_send' ? t('InboxTemplatesOfMailbox') : t('InboxTemplatesOfPiece', g.kind) });
+			g.templates.forEach(tp => items.push({ label: tp.label + (tp.lang ? ' (' + tp.lang.slice(0, 2) + ')' : ''), icon: tp.private ? 'user-circle' : 'template', run: () => useTemplate(w, g, tp) }));
+		});
+		if (!items.length) {
+			items.push({ note: t('InboxTemplatesNone') });
+		}
+		items.push({ sep: true }, { label: t('InboxTemplateSaveAs'), icon: 'plus', run: () => saveAsTemplate(w) });
+		popMenu(anchor, items);
+	}
+	async function useTemplate(w, g, tp) {
+		// The variables of a piece: the only one of the type, else the newest (« Variables of » lets choose)
+		const piece = g.pieces.length ? g.pieces[0].type + ':' + g.pieces[0].id : '';
+		let res;
+		try {
+			res = await post('compose', 'template', { compose: w.token, id: tp.id, identity: +$('.ibx-js-from', w.dlg).value, piece, to: firstTo(w) });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		if (w.sourceMode) {
+			toggleSource(w);
+		}
+		if (w.editor.isEmpty()) {
+			w.editor.setHtml(res.html);
+		} else {
+			w.editor.insertHtml(res.html);
+		}
+		const subj = $('.ibx-js-subject', w.dlg);
+		const old = subj.value.trim();
+		if (res.subject && (old === '' || (w.tpl && old === w.tpl.subject))) {
+			subj.value = res.subject;
+			subj.closest('.ibx-cfield').toggleAttribute('data-filled', true);
+			$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
+		}
+		w.tpl = { id: res.id, lang: res.lang, piece: res.piece, pieces: g.pieces, kind: g.kind, subjectRaw: res.subject_raw, subject: subj.value, to: firstTo(w), identity: +$('.ibx-js-from', w.dlg).value };
+		if (res.attached) {
+			w.attachments.push(res.attached);
+			paintAttachments(w);
+		}
+		paintVars(w);
+		w.changed();
+		w.editor.focus();
+	}
+	/** Subject of the template with values: the keys known replaced, the others kept (warned at the sending) */
+	function fillSubject(raw, values) {
+		return String(raw || '').replace(/__([A-Z0-9_]+)__/g, (m, k) => (k === 'CHECK_READ' ? '' : (Object.prototype.hasOwnProperty.call(values, k) ? String(values[k]).replace(/<[^>]*>/g, '').trim() : m)));
+	}
+	/** « Variables of: PR2611-0042 ▾ »: shown when the template takes the variables of a piece among several */
+	function paintVars(w) {
+		const box = $('.ibx-js-vars', w.dlg);
+		const tpl = w.tpl;
+		if (!tpl || !w.editor.variables || !w.editor.variables().length || tpl.pieces.length < 2) {
+			box.hidden = true;
+			box.innerHTML = '';
+			return;
+		}
+		box.hidden = false;
+		box.innerHTML = ic('variable') + '<label for="' + w.id + '-vars">' + th('InboxVarsOf') + '</label>'
+			+ '<select class="ibx-field ibx-field--medium ibx-js-varpiece" id="' + w.id + '-vars">' + tpl.pieces.map(pc => '<option value="' + esc(pc.type + ':' + pc.id) + '"' + (pc.type + ':' + pc.id === tpl.piece ? ' selected' : '') + '>' + esc(pc.kind + ' ' + pc.ref) + '</option>').join('') + '</select>';
+		$('.ibx-js-varpiece', box).addEventListener('change', e => {
+			tpl.piece = e.target.value;
+			varsFollow(w, true);
+		});
+	}
+	/** The chips follow the first recipient, the piece chosen and the identity (asked again only when one changed) */
+	function varsFollow(w, force) {
+		const tpl = w.tpl;
+		if (!tpl || !w.editor || !w.editor.variables) {
+			return;
+		}
+		const to = firstTo(w);
+		const identity = +$('.ibx-js-from', w.dlg).value;
+		if (!force && to === tpl.to && identity === tpl.identity) {
+			return;
+		}
+		tpl.to = to;
+		tpl.identity = identity;
+		clearTimeout(w.varsTimer);
+		w.varsTimer = setTimeout(async () => {
+			let values;
+			try {
+				values = (await post('compose', 'values', { compose: w.token, identity, piece: tpl.piece, to, lang: tpl.lang })).values;
+			} catch (err) {
+				return;
+			}
+			w.editor.setVariableValues(values);
+			const subj = $('.ibx-js-subject', w.dlg);
+			if (subj.value === tpl.subject && tpl.subjectRaw) {
+				subj.value = tpl.subject = fillSubject(tpl.subjectRaw, values);
+				$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
+			}
+		}, 300);
+	}
+	/** The writing kept as a template: mine, or shared in the mailbox of the identity (managers) */
+	function saveAsTemplate(w) {
+		const subject = $('.ibx-js-subject', w.dlg).value;
+		const body = '<form class="ibx-form" novalidate>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="' + w.id + '-tplname">' + th('InboxTemplateLabel') + '</label><div><input class="ibx-field" id="' + w.id + '-tplname" name="label" required maxlength="180" autocomplete="off" value="' + esc(subject) + '"></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxTemplateFor') + '</span><div class="ibx-seg" role="radiogroup">'
+			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="1" checked><span>' + th('InboxTemplateMine') + '</span></label>'
+			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="0"><span>' + th('InboxTemplateShared', identityOf(w).mailbox || identityOf(w).email) + '</span></label></div></div>'
+			+ '<p class="ibx-formrow__help">' + th('InboxTemplateSaveHelp') + '</p></form>';
+		dialog({
+			title: t('InboxTemplateSaveAs'),
+			body,
+			actions: [{ label: t('InboxSave'), primary: true, run: async dd => {
+				const f = $('form', dd);
+				const label = f.elements.label.value.trim();
+				if (!label) {
+					f.elements.label.focus();
+					return false;
+				}
+				const priv = f.querySelector('[name="private"]:checked').value === '1';
+				try {
+					await post('template', 'save', { label, subject, html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(), private: priv ? 1 : 0, accounts: priv ? [] : [identityOf(w).account] });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				w.templates = null;
+				toast(t('InboxTemplateSaved', label));
+			} }],
+		});
+	}
+
+	// ---------- Documents of the linked pieces (lot W6 1.18.0) ----------
+	async function documentsDialog(w) {
+		let pieces;
+		try {
+			pieces = (await post('compose', 'documents', { compose: w.token })).pieces;
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		if (!pieces.length) {
+			toast(t('InboxComposeNoDocs'));
+			return;
+		}
+		const have = new Set(w.attachments.map(a => a.name));
+		const body = '<div class="ibx-docs">' + pieces.map(pc => '<fieldset class="ibx-docs__piece"><legend>' + ic(pc.icon) + ' ' + esc(pc.kind + ' ' + pc.ref) + '</legend>'
+			+ pc.files.map(f => '<label class="ibx-check ibx-docs__file"><input type="checkbox" data-piece="' + esc(pc.type + ':' + pc.id) + '" value="' + esc(f.name) + '"' + (have.has(f.name) ? ' disabled' : '') + '> '
+				+ '<span class="ibx-ellipsis">' + esc(f.name) + '</span>' + (f.name === pc.main ? ' <span class="ibx-badge ibx-badge--accent">' + th('InboxComposeMainDoc') + '</span>' : '')
+				+ '<span class="ibx-muted">' + esc(size(f.size)) + '</span></label>').join('') + '</fieldset>').join('') + '</div>';
+		dialog({
+			title: t('InboxComposeAttachDocs'),
+			wide: true,
+			body,
+			actions: [{ label: t('InboxComposeAttachThem'), primary: true, run: async dd => {
+				const picked = $$('input[data-piece]:checked', dd);
+				if (!picked.length) {
+					return false;
+				}
+				for (const c of picked) {
+					const tmp = { id: 'p' + (++seq), name: c.value, size: 0, pending: true };
+					w.attachments.push(tmp);
+					paintAttachments(w);
+					try {
+						const res = await post('compose', 'attachdoc', { compose: w.token, piece: c.dataset.piece, name: c.value });
+						Object.assign(tmp, res.attachment, { pending: false });
+					} catch (err) {
+						w.attachments.splice(w.attachments.indexOf(tmp), 1);
+						toast(c.value + ' : ' + err.message, { error: true });
+					}
+					paintAttachments(w);
+				}
+				w.changed();
+			} }],
+		});
 	}
 
 	/**
@@ -1427,6 +1634,7 @@
 			+ '<div class="ibx-compose__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '" aria-controls="' + w.id + '-editor">'
 			+ TOOLS.map(toolButton).join('')
 			+ '</div>'
+			+ '<div class="ibx-compose__vars ibx-js-vars" role="group" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
 			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
@@ -1443,6 +1651,8 @@
 			+ '<span class="ibx-sendsplit"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-sendsplit__arrow ibx-js-sendlater" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSendLater') + '" aria-label="' + th('InboxSendLater') + '">' + ic('chevron-down') + '</button></span>'
 			+ '<label class="ibx-btn ibx-btn--icon" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
+			+ ((d.linked || []).length ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-docs" title="' + th('InboxComposeAttachDocs') + '" aria-label="' + th('InboxComposeAttachDocs') + '">' + ic('document') + '</button>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-templates" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxTemplates') + '" aria-label="' + th('InboxTemplates') + '">' + ic('template') + '</button>'
 			+ '<span class="ibx-compose__status ibx-js-status" role="status" aria-live="polite"></span>'
 			+ '<span class="ibx-spacer"></span>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-cmore" aria-haspopup="menu" aria-expanded="false" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>'
@@ -1459,6 +1669,7 @@
 			w.dirty = true;
 			clearTimeout(w.saveTimer);
 			w.saveTimer = setTimeout(() => save(w), SAVE_MS);
+			varsFollow(w);
 		};
 		dlg.addEventListener('pointerdown', () => front(w));
 		$('.ibx-js-subject', dlg).addEventListener('input', e => {
@@ -1470,6 +1681,9 @@
 			paintSignature(w);
 			paintBoxWarning(w);
 			w.changed();
+			// The templates offered follow the mailbox of the identity; the variables its name and address
+			w.templates = null;
+			varsFollow(w, true);
 		});
 		dlg.addEventListener('click', e => {
 			const show = e.target.closest('.ibx-js-showrow');
@@ -1608,6 +1822,11 @@
 		$('.ibx-js-sendlater', dlg).addEventListener('click', e => laterMenu(w, e.currentTarget));
 		$('.ibx-js-cdiscard', dlg).addEventListener('click', () => discard(w));
 		$('.ibx-js-cmore', dlg).addEventListener('click', e => moreMenu(w, e.currentTarget));
+		$('.ibx-js-templates', dlg).addEventListener('click', e => templateMenu(w, e.currentTarget));
+		const docs = $('.ibx-js-docs', dlg);
+		if (docs) {
+			docs.addEventListener('click', () => documentsDialog(w));
+		}
 		$('.ibx-js-cclose', dlg).addEventListener('click', () => close(w));
 		$('.ibx-js-cmin', dlg).addEventListener('click', () => minimize(w));
 		$('.ibx-js-cmax', dlg).addEventListener('click', () => {
@@ -1728,8 +1947,16 @@
 		if (o.cc) {
 			d.cc = d.cc.concat(parseList(o.cc));
 		}
+		if (o.bcc) {
+			d.bcc = d.bcc.concat(parseList(o.bcc));
+		}
 		if (o.subject && !d.subject) {
 			d.subject = o.subject;
+		}
+		if (o.html && !d.html) {
+			d.html = o.html;
+		} else if (o.body && !d.html) {
+			d.html = String(o.body).split(/\r?\n/).map(l => '<p>' + esc(l) + '</p>').join('');
 		}
 		const w = { id: 'ibx-cw' + (++seq), token: d.compose || d.token, mode: d.mode || mode, source: o.mail || (d.source ? d.source.mail : 0), data: d, attachments: (d.attachments || []).slice(),
 			quote: !!d.quote && !d.quote_off, signature: !d.signature_off, receipt: !!d.receipt, dirty: !!o.restore, saved: !!d.draft };
@@ -1757,13 +1984,26 @@
 			$('.ibx-js-quoteon', dlg).hidden = false;
 		}
 		try {
-			w.editor = await I.editors.create($('.ibx-js-editor', dlg), { html: d.html || '', placeholder: t('InboxComposePlaceholder'), label: t('InboxComposeBody') });
+			w.editor = await I.editors.create($('.ibx-js-editor', dlg), { html: d.html || '', placeholder: t('InboxComposePlaceholder'), label: t('InboxComposeBody'), varToText: true });
 		} catch (e) {
 			status(w, t('InboxComposeEditorFailed'), true);
 			w.editor = { getHtml: () => '', isEmpty: () => true, destroy() {}, focus() {}, exec() {}, isActive: () => false, on() {} };
 		}
 		paintColorButtons(w);
 		paintTableButton(w);
+		// A draft with variables of a template: they follow the recipient again (piece: the newest linked one)
+		if (w.editor.variables && w.editor.variables().length) {
+			const linked = d.linked || [];
+			w.tpl = { id: 0, lang: '', piece: linked.length ? linked[0].type + ':' + linked[0].id : '', pieces: linked, kind: '', subjectRaw: '', subject: null, to: firstTo(w), identity: +$('.ibx-js-from', dlg).value };
+			paintVars(w);
+		}
+		if (w.editor.on) {
+			w.editor.on('notice', n => {
+				if (n && n.code === 'picture_too_big') {
+					toast(t('InboxComposePictureTooBig', n.name || '', '5 MB'), { error: true });
+				}
+			});
+		}
 		const edBox = $('.ibx-js-editor', dlg);
 		edBox.addEventListener('contextmenu', e => {
 			// Shift: the menu of the browser, always (interface §6 bis); outside a table too (spelling)
@@ -1802,7 +2042,7 @@
 			}
 		});
 		// The cursor where the user writes: the first empty field, else the text
-		if (!d.to.length && mode !== 'draft') {
+		if (!d.to.length && mode !== 'draft' && mode !== 'editnew') {
 			w.to.focus();
 		} else {
 			w.editor.focus('start');
@@ -1826,6 +2066,27 @@
 	window.addEventListener('resize', () => place());
 
 	I.compose = compose;
+	/**
+	 * A mailto: link (RFC 6068) written in inbox: to, cc, bcc, subject, body
+	 * @param {string} href
+	 * @returns {Promise<object|null>}
+	 */
+	I.composeMailto = href => {
+		const m = String(href || '').match(/^mailto:([^?]*)(?:\?(.*))?$/i);
+		if (!m) {
+			return Promise.resolve(null);
+		}
+		const o = { mode: 'new', to: decodeURIComponent(m[1] || '') };
+		new URLSearchParams(m[2] || '').forEach((v, k) => {
+			k = k.toLowerCase();
+			if (k === 'to') {
+				o.to = (o.to ? o.to + ',' : '') + v;
+			} else if (['cc', 'bcc', 'subject', 'body'].includes(k)) {
+				o[k] = v;
+			}
+		});
+		return compose(o);
+	};
 	/** Mail answered in the writing in front (presence « is writing an answer », lot W3 call of state) */
 	I.composeWriting = () => {
 		const w = writings.find(x => x.dlg.classList.contains('is-front') && x.source && x.mode !== 'draft' && !x.closed);

@@ -187,6 +187,7 @@
 		{ id: 'server', key: 'InboxTabServer', admin: true },
 		{ id: 'folders', key: 'InboxTabFolders', admin: true },
 		{ id: 'identities', key: 'InboxTabIdentities', admin: false },
+		{ id: 'templates', key: 'InboxTabTemplates', admin: false },
 		{ id: 'access', key: 'InboxTabAccess', admin: true },
 		{ id: 'tags', key: 'InboxTabTags', admin: false },
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
@@ -230,12 +231,12 @@
 			bindStatusSwitch(main, account, tab);
 		}
 		const box = $('.ibx-js-tab', main);
-		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, access: tabAccess, tags: tabTags, sync: tabSync, journal: tabJournal };
+		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, sync: tabSync, journal: tabJournal };
 		fns[tab](box, account, main);
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -784,6 +785,195 @@
 					$('[name="email"]', parent).value = r.email;
 				}
 			} }],
+		});
+	}
+
+	// ----- Tab Templates (lot W6 1.18.0): mail templates offered in the writings of this mailbox -----
+	async function tabTemplates(box, account) {
+		box.innerHTML = skeleton(3);
+		let data;
+		try {
+			data = await api('template', 'list', { id: account.id });
+		} catch (err) {
+			box.replaceChildren(errorBox(err, () => tabTemplates(box, account)));
+			return;
+		}
+		const names = {};
+		data.accounts.forEach(a => {
+			names[a.id] = a.label;
+		});
+		const forWho = tp => tp.private ? th('InboxTemplateMine') : (!tp.accounts.length ? th('InboxTemplateAllMailboxes') : esc(tp.accounts.map(id => names[id] || ('#' + id)).join(', ')));
+		let html = '<p class="ibx-section__help">' + th('InboxTemplatesHelp') + '</p>';
+		if (!data.templates.length) {
+			html += '<div class="ibx-empty">' + ic('template') + '<p>' + th('InboxTemplatesEmpty') + '</p></div>';
+		} else {
+			html += '<table class="ibx-table ibx-js-tpls"><thead><tr><th></th><th>' + th('InboxTemplateLabel') + '</th><th>' + th('InboxTemplateFor') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
+				+ data.templates.map((tp, n) => '<tr class="' + (tp.editable ? 'ibx-dragrow' : '') + '" draggable="' + !!tp.editable + '" data-tpl="' + tp.id + '">'
+					+ '<td>' + (tp.editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
+					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + esc(tp.subject) + '</div></td>'
+					+ '<td class="ibx-muted">' + forWho(tp) + '</td>'
+					+ '<td>' + (tp.active ? th('InboxAccountStatusActive') : '<span class="ibx-status">' + th('InboxInactive') + '</span>') + '</td>'
+					+ '<td class="ibx-table__actions">' + (tp.editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
+						+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="1" title="' + th('InboxMoveDown') + '" aria-label="' + th('InboxMoveDown') + '"' + (n === data.templates.length - 1 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-down') + '</button>'
+						+ '<button type="button" class="ibx-btn ibx-btn--sm" data-edit="' + tp.id + '">' + th('InboxEdit') + '</button> '
+						+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-del="' + tp.id + '" title="' + th('InboxDelete') + '" aria-label="' + th('InboxDelete') + '">' + ic('delete') + '</button>' : '') + '</td></tr>').join('')
+				+ '</tbody></table>';
+		}
+		html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-add">' + ic('plus') + ' ' + th('InboxTemplateNew') + '</button>'
+			+ (data.core_url ? '<span class="ibx-formfoot__spacer"></span><a class="ibx-btn ibx-btn--ghost" href="' + esc(data.core_url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxTemplatesInDolibarr') + '</a>' : '') + '</div>';
+		box.innerHTML = html;
+		const reload = () => tabTemplates(box, account);
+		$('.ibx-js-add', box).addEventListener('click', () => templateDialog(account, data, null, reload));
+		const order = () => $$('[data-tpl]', box).map(tr => +tr.dataset.tpl);
+		const saveOrder = async ids => {
+			try {
+				await post('template', 'order', { ids });
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			reload();
+		};
+		box.onclick = async e => {
+			const ed = e.target.closest('[data-edit]');
+			if (ed) {
+				templateDialog(account, data, +ed.dataset.edit, reload);
+				return;
+			}
+			const mv = e.target.closest('[data-move]');
+			if (mv && mv.getAttribute('aria-disabled') !== 'true') {
+				const ids = order();
+				const i = ids.indexOf(+mv.closest('[data-tpl]').dataset.tpl);
+				const j = i + (+mv.dataset.move);
+				[ids[i], ids[j]] = [ids[j], ids[i]];
+				saveOrder(ids);
+				return;
+			}
+			const del = e.target.closest('[data-del]');
+			if (del) {
+				const tp = data.templates.find(x => x.id === +del.dataset.del);
+				const ok = await confirmDialog({ title: t('InboxTemplateDeleteTitle', tp.label), text: t('InboxTemplateDeleteText'), confirm: t('InboxDelete'), danger: true });
+				if (ok) {
+					try {
+						await post('template', 'delete', { template: tp.id });
+						reload();
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+				}
+			}
+		};
+		// Drag and drop of the rows (with the up / down buttons for the keyboard and the phone)
+		let dragged = null;
+		box.ondragstart = e => {
+			dragged = e.target.closest('[data-tpl]');
+			if (dragged) {
+				dragged.classList.add('is-dragging');
+			}
+		};
+		box.ondragover = e => {
+			const over = e.target.closest('[data-tpl]');
+			if (!dragged || !over || over === dragged) {
+				return;
+			}
+			e.preventDefault();
+			const rect = over.getBoundingClientRect();
+			over.parentNode.insertBefore(dragged, e.clientY < rect.top + rect.height / 2 ? over : over.nextSibling);
+		};
+		box.ondragend = () => {
+			if (dragged) {
+				dragged.classList.remove('is-dragging');
+				dragged = null;
+				saveOrder(order());
+			}
+		};
+	}
+
+	/**
+	 * Editor of a template: name, for whom (me, mailboxes, every mailbox), subject, text with its variables (chips)
+	 * @param {object} account Mailbox of the tab
+	 * @param {object} list    Answer of template/list (accounts the user manages, admin)
+	 * @param {number|null} id Template, null for a new one
+	 * @param {Function} done
+	 */
+	async function templateDialog(account, list, id, done) {
+		let tp = { id: 0, label: '', subject: '', html: '', private: 0, active: 1, accounts: [account.id] };
+		let keys;
+		try {
+			const r = id ? await api('template', 'get', { template: id }) : await api('template', 'keys', {});
+			keys = r.keys;
+			if (id) {
+				tp = r.template;
+			}
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const who = tp.private ? 'me' : (tp.accounts.length ? 'boxes' : 'all');
+		const opt = (v, label, disabled) => '<label class="ibx-seg__opt"><input type="radio" name="who" value="' + v + '"' + (who === v ? ' checked' : '') + (disabled ? ' disabled' : '') + '><span>' + label + '</span></label>';
+		const tools = [['bold', 'fmt-bold', 'InboxFmtBold'], ['italic', 'fmt-italic', 'InboxFmtItalic'], ['underline', 'fmt-underline', 'InboxFmtUnderline'], ['bulletList', 'fmt-bullets', 'InboxFmtBullets'], ['orderedList', 'fmt-numbers', 'InboxFmtNumbers']];
+		const body = '<form class="ibx-form ibx-tpledit" novalidate>'
+			+ field('label', t('InboxTemplateLabel'), tp.label, { required: true, autocomplete: 'off' })
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxTemplateFor') + '</span><div><div class="ibx-seg" role="radiogroup" aria-label="' + th('InboxTemplateFor') + '">'
+			+ opt('me', th('InboxTemplateMine')) + opt('boxes', th('InboxTemplateSomeMailboxes')) + opt('all', th('InboxTemplateAllMailboxes'), !list.admin) + '</div>'
+			+ '<div class="ibx-tpledit__boxes ibx-js-boxes"' + (who === 'boxes' ? '' : ' hidden') + '>' + list.accounts.map(a => '<label class="ibx-check"><input type="checkbox" name="acc" value="' + a.id + '"' + (tp.accounts.includes(a.id) ? ' checked' : '') + '> ' + esc(a.label) + '</label>').join('') + '</div></div></div>'
+			+ field('subject', t('InboxSubject'), tp.subject, { autocomplete: 'off', help: t('InboxTemplateSubjectHelp') })
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="ibx-tpl-body-label">' + th('InboxTemplateBody') + '</span><div>'
+			+ '<div class="ibx-tpledit__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '">' + tools.map(x => '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '">' + ic(x[1], 'ibx-tbtn__icon') + '</button>').join('')
+			+ '<label class="ibx-sr-only" for="ibx-tpl-var">' + th('InboxVarInsert') + '</label><select class="ibx-field ibx-field--medium ibx-js-var" id="ibx-tpl-var"><option value="">' + th('InboxVarInsert') + '</option>' + keys.map(k => '<option value="' + esc(k) + '">' + esc(k) + '</option>').join('') + '</select></div>'
+			+ '<div class="ibx-tpledit__editor ibx-js-tpleditor" aria-labelledby="ibx-tpl-body-label"></div>'
+			+ '<div class="ibx-formrow__help">' + th('InboxTemplateBodyHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxOptions') + '</span><div><label class="ibx-check"><input type="checkbox" name="active"' + (tp.active ? ' checked' : '') + '> ' + th('InboxTemplateActive') + '</label></div></div>'
+			+ '</form>';
+		let editor = null;
+		const dlg = dialog({
+			title: id ? t('InboxTemplateEdit') : t('InboxTemplateNew'),
+			wide: true,
+			body,
+			actions: [{ label: t('InboxSave'), primary: true, run: async d => {
+				const f = $('form', d);
+				const label = f.elements.label.value.trim();
+				if (!label) {
+					f.elements.label.focus();
+					return false;
+				}
+				const w = f.querySelector('[name="who"]:checked').value;
+				const accounts = w === 'boxes' ? $$('[name="acc"]:checked', f).map(c => +c.value) : [];
+				if (w === 'boxes' && !accounts.length) {
+					toast(t('InboxTemplateNeedMailbox'), { error: true });
+					return false;
+				}
+				try {
+					await post('template', 'save', { template: tp.id, label, subject: f.elements.subject.value, html: editor ? editor.getHtml() : tp.html, private: w === 'me' ? 1 : 0, accounts, active: f.elements.active.checked ? 1 : 0 });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxSaved'));
+				done();
+			} }],
+		});
+		dlg.addEventListener('close', () => editor && editor.destroy());
+		$$('[name="who"]', dlg).forEach(rb => rb.addEventListener('change', () => {
+			$('.ibx-js-boxes', dlg).hidden = rb.value !== 'boxes' || !rb.checked;
+		}));
+		try {
+			editor = await I.editors.create($('.ibx-js-tpleditor', dlg), { html: tp.html, placeholder: t('InboxTemplateBodyPlaceholder'), label: t('InboxTemplateBody') });
+		} catch (err) {
+			toast(t('InboxComposeEditorFailed'), { error: true });
+			return;
+		}
+		$('.ibx-tpledit__tools', dlg).addEventListener('click', e => {
+			const b = e.target.closest('[data-cmd]');
+			if (b) {
+				editor.exec(b.dataset.cmd);
+			}
+		});
+		$('.ibx-js-var', dlg).addEventListener('change', e => {
+			if (e.target.value) {
+				editor.insertVariable(e.target.value, '');
+				e.target.value = '';
+				editor.focus();
+			}
 		});
 	}
 
@@ -1490,6 +1680,8 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-dolibar_position">' + th('InboxDolibarrPosition') + '</label><div>' + opt('dolibar_position', ['auto', 'right', 'top'], p.dolibar_position) + '<div class="ibx-formrow__help">' + th('InboxDolibarrPositionHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_delay">' + th('InboxSendDelayMine') + '</label><div>' + opt('send_delay', ['-1', '0', '5', '10', '20', '30', '60'], String(p.send_delay)) + '<div class="ibx-formrow__help">' + th('InboxSendDelayMineHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_shortcut">' + th('InboxSendShortcut') + '</label><div>' + opt('send_shortcut', ['ctrl_enter', 'off'], p.send_shortcut) + '<div class="ibx-formrow__help">' + th('InboxSendShortcutHelp') + '</div></div></div>'
+			// mailto: links of the browser opened in inbox (lot W6 1.18.0): asked by the browser, per computer
+			+ (I.ctx('INBOX_CAN_SEND', false) && window.isSecureContext && navigator.registerProtocolHandler ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMailtoLinks') + '</span><div><button type="button" class="ibx-btn ibx-js-mailto">' + ic('mail') + ' ' + th('InboxMailtoRegister') + '</button><div class="ibx-formrow__help">' + th('InboxMailtoHelp') + '</div></div></div>' : '')
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'
@@ -1498,6 +1690,17 @@
 				+ (k === 'swipe_right' ? '<div class="ibx-formrow__help">' + th('InboxSwipeHelp') + '</div>' : '') + '</div></div>').join('')
 			+ '</div></section></div>';
 		main.innerHTML = html;
+		const mailto = $('.ibx-js-mailto', main);
+		if (mailto) {
+			mailto.addEventListener('click', () => {
+				try {
+					navigator.registerProtocolHandler('mailto', location.origin + location.pathname + '?mailto=%s');
+					toast(t('InboxMailtoAsked'));
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			});
+		}
 		$$('[data-param]', main).forEach(f => {
 			const evt = f.type === 'range' ? 'change' : 'change';
 			if (f.type === 'range') {

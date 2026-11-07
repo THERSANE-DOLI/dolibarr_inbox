@@ -3332,6 +3332,32 @@
 		});
 	}
 
+	/** Redirect (B19): the mail goes as it is (its sender, its text, its files) to the addresses typed */
+	function redirectDialog(m) {
+		const body = '<form class="ibx-form" novalidate><p class="ibx-section__help">' + th('InboxRedirectHelp') + '</p>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-redirect-to">' + th('InboxTo') + '</label><div><input class="ibx-field" id="ibx-redirect-to" name="to" type="email" multiple inputmode="email" autocomplete="email" required></div></div></form>';
+		dialog({
+			title: t('InboxRedirectTitle', m.subject || t('InboxNoSubject')),
+			body,
+			actions: [{ label: t('InboxRedirectSend'), primary: true, run: async d => {
+				const input = $('[name="to"]', d);
+				const to = input.value.split(/[,;\s]+/).map(x => x.trim()).filter(Boolean);
+				if (!to.length || !input.checkValidity()) {
+					input.focus();
+					toast(t('InboxComposeNoRecipient'), { error: true });
+					return false;
+				}
+				try {
+					await post('compose', 'redirect', { mail: m.id, to });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxRedirected', to.join(', ')));
+			} }],
+		});
+	}
+
 	// ---------- Registry of actions (one definition: buttons, menu, keyboard; hook inbox:mail:actions) ----------
 	function actions(m) {
 		const list = [];
@@ -3351,7 +3377,10 @@
 				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'replylist', mail: m.id }) });
 			}
 			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'forward_attach', mail: m.id }) });
+			// B19 (lot W6 1.18.0): the very mail sent again to someone else; a mail written again as a new one
+			list.push({ id: 'redirect', icon: 'redirect', label: t('InboxRedirect'), disabled: !!noSend, reason: noSend, run: () => redirectDialog(m) });
 		}
+		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'editnew', mail: m.id }) });
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
 		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
@@ -3837,6 +3866,11 @@
 			}
 			const href = a.getAttribute('href') || '';
 			if (/^mailto:/i.test(href)) {
+				// Written in inbox when the user may send, else the mail software of the computer
+				if (I.ctx('INBOX_CAN_SEND', false) && I.composeMailto) {
+					e.preventDefault();
+					I.composeMailto(href);
+				}
 				return;
 			}
 			const shown = (a.textContent || '').trim();

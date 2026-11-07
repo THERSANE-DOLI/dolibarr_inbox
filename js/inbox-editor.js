@@ -65,7 +65,7 @@
 	register('tiptap', async function () {
 		const T = await loadTiptap();
 		let editor = null;
-		const listeners = { change: [], focus: [], blur: [] };
+		const listeners = { change: [], focus: [], blur: [], notice: [] };
 		const fire = (ev, arg) => listeners[ev].forEach(fn => fn(arg));
 		const chain = () => editor.chain().focus();
 		const COMMANDS = {
@@ -254,6 +254,51 @@
 			c.run();
 		};
 
+		/**
+		 * Variable of a template (lot W6 1.18.0): a chip, its value inside (empty: the key shown by the style, nothing
+		 * written), read back from span[data-inbox-var]; the mail sent holds its text only (cleaned by the server)
+		 */
+		const varNode = T.Node.create({
+			name: 'inboxVar',
+			group: 'inline',
+			inline: true,
+			atom: true,
+			selectable: true,
+			addAttributes() {
+				return {
+					key: { default: '', parseHTML: el => el.getAttribute('data-inbox-var') || '', renderHTML: a => ({ 'data-inbox-var': a.key }) },
+					value: { default: '', parseHTML: el => el.textContent || '', renderHTML: () => ({}) },
+				};
+			},
+			parseHTML() {
+				return [{ tag: 'span[data-inbox-var]' }];
+			},
+			renderHTML({ node, HTMLAttributes }) {
+				return ['span', T.mergeAttributes(HTMLAttributes, { class: 'ibx-var' + (node.attrs.value === '' ? ' is-empty' : '') }), node.attrs.value];
+			},
+			renderText({ node }) {
+				return node.attrs.value;
+			},
+		});
+		/** Pictures pasted (a screenshot): put in the text, as data: (parts of the mail at the sending, B21) */
+		const MAX_PICTURE = 5 * 1048576;
+		const pastePictures = ev => {
+			const files = Array.from((ev.clipboardData && ev.clipboardData.files) || []).filter(f => /^image\/(png|jpeg|gif|webp)$/.test(f.type));
+			if (!files.length) {
+				return false;
+			}
+			files.forEach(f => {
+				if (f.size > MAX_PICTURE) {
+					fire('notice', { code: 'picture_too_big', name: f.name });
+					return;
+				}
+				const fr = new FileReader();
+				fr.onload = () => editor && editor.chain().focus().setImage({ src: String(fr.result), alt: '' }).run();
+				fr.readAsDataURL(f);
+			});
+			return true;
+		};
+
 		/** Text of the clipboard that is HTML source (not a rich copy): put in formatted */
 		const htmlSource = ev => {
 			const dt = ev.clipboardData;
@@ -296,15 +341,27 @@
 						T.TableRow,
 						cellExt(T.TableCell),
 						cellExt(T.TableHeader),
+						varNode,
 					],
 					editorProps: {
 						handlePaste: (view, ev) => {
+							if (pastePictures(ev)) {
+								return true;
+							}
 							const html = htmlSource(ev);
 							if (!html) {
 								return false;
 							}
 							editor.chain().focus().insertContent(html).run();
 							return true;
+						},
+						// A click on a chip with a value makes it text: it will not follow the recipient any more
+						handleClickOn: (view, pos, node) => {
+							if (o.varToText && node.type.name === 'inboxVar' && node.attrs.value !== '') {
+								editor.chain().focus().insertContentAt({ from: pos, to: pos + node.nodeSize }, node.attrs.value).run();
+								return true;
+							}
+							return false;
 						},
 						attributes: { class: 'ibx-editor__content', role: 'textbox', 'aria-multiline': 'true', 'aria-label': o.label || '', spellcheck: 'true' },
 					},
@@ -333,6 +390,41 @@
 				if (editor) {
 					chain().insertContent(html).run();
 				}
+			},
+			/** A variable of a template put at the cursor */
+			insertVariable(key, value) {
+				if (editor) {
+					chain().insertContent({ type: 'inboxVar', attrs: { key: String(key), value: String(value || '') } }).run();
+				}
+			},
+			/** Values of the variables (key => text): every chip of these keys follows */
+			setVariableValues(map) {
+				if (!editor) {
+					return;
+				}
+				const tr = editor.state.tr;
+				let changed = false;
+				editor.state.doc.descendants((node, pos) => {
+					if (node.type.name === 'inboxVar' && Object.prototype.hasOwnProperty.call(map, node.attrs.key) && map[node.attrs.key] !== node.attrs.value) {
+						tr.setNodeMarkup(pos, undefined, Object.assign({}, node.attrs, { value: String(map[node.attrs.key]) }));
+						changed = true;
+					}
+				});
+				if (changed) {
+					editor.view.dispatch(tr);
+				}
+			},
+			/** Variables in the text: [{key, value}] */
+			variables() {
+				const out = [];
+				if (editor) {
+					editor.state.doc.descendants(node => {
+						if (node.type.name === 'inboxVar') {
+							out.push({ key: node.attrs.key, value: node.attrs.value });
+						}
+					});
+				}
+				return out;
 			},
 			getText() {
 				return editor ? editor.getText() : '';
@@ -410,7 +502,7 @@
 			},
 			tableStyle, tableInfo, tableProps, cellInfo, cellProps,
 			getCapabilities() {
-				return { tables: true, images: true, headings: true, colors: true, align: true };
+				return { tables: true, images: true, headings: true, colors: true, align: true, variables: true };
 			},
 		};
 	});

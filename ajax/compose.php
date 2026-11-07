@@ -147,6 +147,54 @@ switch ($action) {
 		}
 		inboxAjaxReply($res);
 		break;
+	case 'templates':
+		// Templates of the mailbox of the identity and of the linked pieces (1.18.0)
+		$res = $composer->templates($user, $token, (int) inboxAjaxParam('identity', 'int'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply(array('groups' => $res));
+		break;
+	case 'template':
+		$res = $composer->applyTemplate($user, $token, (int) inboxAjaxParam('id', 'int'), (int) inboxAjaxParam('identity', 'int'), (string) inboxAjaxParam('piece', 'alphanohtml'),
+			(string) inboxAjaxParam('to', 'alphanohtml'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
+	case 'values':
+		$res = $composer->templateValues($user, $token, (int) inboxAjaxParam('identity', 'int'), (string) inboxAjaxParam('piece', 'alphanohtml'), (string) inboxAjaxParam('to', 'alphanohtml'),
+			(string) inboxAjaxParam('lang', 'aZ09'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply(array('values' => $res));
+		break;
+	case 'documents':
+		// Documents of the linked pieces, to attach them (1.18.0)
+		$res = $composer->documents($user, $token);
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply(array('pieces' => $res));
+		break;
+	case 'attachdoc':
+		$res = $composer->attachDocument($user, $token, (string) inboxAjaxParam('piece', 'alphanohtml'), (string) inboxAjaxParam('name', 'none'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply(array('attachment' => $res));
+		break;
+	case 'redirect':
+		// Redirect a mail (B19): sent at once, as it is, to other recipients
+		$to = inboxAjaxParam('to', 'none');
+		$res = $composer->redirect($user, (int) inboxAjaxParam('mail', 'int'), is_array($to) ? $to : (string) $to);
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
 	case 'close':
 		if (!$composer->close($user, $token, (int) inboxAjaxParam('discard', 'int') === 1)) {
 			inboxComposeFail($composer);

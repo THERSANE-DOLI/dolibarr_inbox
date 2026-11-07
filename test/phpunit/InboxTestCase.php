@@ -83,7 +83,7 @@ abstract class InboxTestCase extends TestCase
 		$rows = $db->getRows("SELECT rowid FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid' LIMIT 10000");
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $r->rowid).")");
-			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification') as $t) {
+			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification', 'inbox_template_account') as $t) {
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}
@@ -101,6 +101,10 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_note WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
 		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
 		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%' OR from_email LIKE '%inbox-test.invalid'");
+		// Templates (1.18.0): named ZzTpl, contacts of the tests
+		$db->query("DELETE FROM ".$p."inbox_template_account WHERE fk_template IN (SELECT rowid FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%')");
+		$db->query("DELETE FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%'");
+		$db->query("DELETE FROM ".$p."socpeople WHERE lastname LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."societe WHERE nom LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");

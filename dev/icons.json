@@ -208,7 +208,11 @@
 		"table-style-none": ["border-none", "outline"],
 		"table-style-header": ["layout-navbar", "outline"],
 		"table-props": ["table-options", "outline"],
-		"cell-props": ["box-padding", "outline"]
+		"cell-props": ["box-padding", "outline"],
+		"redirect": ["mail-forward", "outline"],
+		"edit-new": ["copy-plus", "outline"],
+		"document": ["file-text", "outline"],
+		"variable": ["braces", "outline"]
 	},
 	"_choices": "Icons offered for a mailbox or a folder (lot 1.8.0, analyse-interface §4 bis), chosen by John on 2026-11-07 with dev/bin/icon-picker.html; account (at sign) is the default of a mailbox",
 	"choices": [

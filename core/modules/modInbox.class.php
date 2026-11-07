@@ -51,12 +51,13 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.17.0';
+		$this->version = '1.18.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-inbox';
 
 		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
-		$this->module_parts = array('triggers' => 1);
+		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0)
+		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates'), 'entity' => '0'));
 		// Raw mails kept for a while (never served by document.php: no read right at the root of the module)
 		$this->dirs = array('/inbox/raw');
 		$this->config_page_url = array("setup.php@inbox");
