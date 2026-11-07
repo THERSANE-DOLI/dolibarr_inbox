@@ -41,7 +41,8 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 	}
 
 	/**
-	 * A contact or a thirdparty created, changed or deleted: the mails of its address (old and new) are matched again
+	 * A contact or a thirdparty created, changed or deleted: the mails of its address (old and new) are matched again.
+	 * A user or a group deleted: what inbox kept for it is removed (settings, accesses, images allowed)
 	 *
 	 * @param string    $action Code
 	 * @param Object    $object Object
@@ -52,7 +53,13 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 	 */
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
-		if (!isModEnabled('inbox') || !in_array($action, array('CONTACT_CREATE', 'CONTACT_MODIFY', 'CONTACT_DELETE', 'COMPANY_CREATE', 'COMPANY_MODIFY', 'COMPANY_DELETE'), true)) {
+		if (!isModEnabled('inbox')) {
+			return 0;
+		}
+		if ($action === 'USER_DELETE' || $action === 'USERGROUP_DELETE') {
+			return $this->forget($action === 'USER_DELETE' ? 'fk_user' : 'fk_usergroup', (int) $object->id);
+		}
+		if (!in_array($action, array('CONTACT_CREATE', 'CONTACT_MODIFY', 'CONTACT_DELETE', 'COMPANY_CREATE', 'COMPANY_MODIFY', 'COMPANY_DELETE'), true)) {
 			return 0;
 		}
 		dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
@@ -66,6 +73,30 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 		}
 		foreach (array_unique(array_map('strtolower', $emails)) as $email) {
 			$matcher->refreshAddress($email);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Rows of inbox pointing to a user or a group deleted. The journals keep the id on purpose (history); a personal
+	 * mailbox stays, without owner, for the admin to decide
+	 *
+	 * @param string $column fk_user or fk_usergroup
+	 * @param int    $id     User or group
+	 * @return int 0, -1 on error
+	 */
+	protected function forget($column, $id)
+	{
+		if ($id <= 0) {
+			return 0;
+		}
+		$tables = $column === 'fk_user' ? array('inbox_userparam', 'inbox_account_access', 'inbox_image_allow') : array('inbox_account_access');
+		foreach ($tables as $table) {
+			if (!$this->db->query("DELETE FROM ".$this->db->prefix().$table." WHERE ".$column." = ".((int) $id))) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
 		}
 
 		return 0;

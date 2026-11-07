@@ -37,6 +37,15 @@
 	--ibx-info: var(--ibx-accent);
 	--ibx-info-soft: var(--ibx-accent-soft);
 
+	/* Icons of the folders by role (analyse-interface §4 bis): 3:1 at least on --ibx-bg-pane */
+	--ibx-folder-inbox: var(--ibx-accent);
+	--ibx-folder-drafts: #7b4fb3;
+	--ibx-folder-sent: #2f855a;
+	--ibx-folder-archive: #8a5a2b;
+	--ibx-folder-junk: #c0392b;
+	--ibx-folder-trash: #5f6b70;
+	--ibx-folder-other: #a86d00;
+
 	/* Thunderbird tags */
 	--ibx-tag-1: #d63a3a;
 	--ibx-tag-2: #e07b00;
@@ -95,6 +104,12 @@
 		--ibx-warning-soft: #352b14;
 		--ibx-success: #5cc28c;
 		--ibx-success-soft: #173026;
+		--ibx-folder-drafts: #b292e0;
+		--ibx-folder-sent: #5cc28c;
+		--ibx-folder-archive: #d1a26e;
+		--ibx-folder-junk: #ef6f62;
+		--ibx-folder-trash: #a1b0b6;
+		--ibx-folder-other: #e3b04b;
 		--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 	}
 }
@@ -117,6 +132,12 @@
 	--ibx-warning-soft: #352b14;
 	--ibx-success: #5cc28c;
 	--ibx-success-soft: #173026;
+	--ibx-folder-drafts: #b292e0;
+	--ibx-folder-sent: #5cc28c;
+	--ibx-folder-archive: #d1a26e;
+	--ibx-folder-junk: #ef6f62;
+	--ibx-folder-trash: #a1b0b6;
+	--ibx-folder-other: #e3b04b;
 	--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 }
 
@@ -316,6 +337,16 @@ html.ibx-html, html.ibx-html body { height: 100%; margin: 0; background: var(--i
 /* Selected states are declared after :hover on purpose: a selected item keeps its colours when hovered */
 .ibx-tree__twisty { width: 0.875rem; flex: none; text-align: center; color: var(--ibx-text-faint); font-size: 0.625rem; background: none; border: 0; cursor: pointer; padding: 0; }
 .ibx-tree__icon { width: 1rem; height: 1rem; flex: none; color: var(--ibx-text-muted); }
+/* Colour of a folder or mailbox icon: --ibx-ficon-l / -d set on the icon (light / dark variant, kept readable on the
+   pane), picked by the theme through a variable only, so that the rules on the colour (drop target) still win */
+.ibx-ficon { --ibx-ficon: var(--ibx-ficon-l, var(--ibx-text-muted)); color: var(--ibx-ficon); }
+.ibx-tree__row--account .ibx-tree__icon.ibx-ficon { color: var(--ibx-ficon); }
+.ibx-tree__row.is-droptarget .ibx-tree__icon.ibx-ficon { color: inherit; }
+:root[data-ibx-theme="dark"] .ibx-ficon { --ibx-ficon: var(--ibx-ficon-d, var(--ibx-text-muted)); }
+@media (prefers-color-scheme: dark) {
+	:root:not([data-ibx-theme="light"]):not([data-ibx-theme="contrast"]) .ibx-ficon { --ibx-ficon: var(--ibx-ficon-d, var(--ibx-text-muted)); }
+}
+:root[data-ibx-theme="contrast"] .ibx-ficon { --ibx-ficon: var(--ibx-text-muted); }
 .ibx-tree__twisty .ibx-icon { width: 0.75rem; height: 0.75rem; }
 .ibx-tree__label { flex: 1; }
 .ibx-tree__row--account { margin-top: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); }
@@ -1018,3 +1049,28 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 /* Row of a new tag, under the list: each field under its column */
 .ibx-tagadd td { border-bottom: 0; padding-top: var(--ibx-s3); }
 .ibx-tagadd .ibx-table__actions { white-space: nowrap; }
+
+/* ===== Colour and icon of a folder or a mailbox (1.8.0, analyse-interface §4 bis) ===== */
+.ibx-look__preview { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); margin-bottom: var(--ibx-s3); background: var(--ibx-bg-pane); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-look__preview .ibx-icon { width: 1.25rem; height: 1.25rem; }
+.ibx-look__set { border: 0; margin: 0 0 var(--ibx-s3); padding: 0; }
+.ibx-look__set legend { font-weight: 600; margin-bottom: var(--ibx-s2); }
+.ibx-look__swatches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
+.ibx-look__swatch { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--ibx-border-strong); cursor: pointer; padding: 0; }
+.ibx-look__swatch--default { background: linear-gradient(135deg, var(--ibx-bg) 45%, var(--ibx-text-muted) 45%, var(--ibx-text-muted) 55%, var(--ibx-bg) 55%); }
+.ibx-look__swatch[aria-pressed="true"], .ibx-look__icon[aria-pressed="true"] { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-look__pale { min-height: 1.5em; }
+.ibx-look__pale.is-off { visibility: hidden; }
+.ibx-look__other { display: inline-flex; align-items: center; gap: var(--ibx-s2); margin-left: var(--ibx-s2); }
+.ibx-look__set .ibx-js-lookq { width: 100%; max-width: 20rem; margin-bottom: var(--ibx-s2); }
+.ibx-look__icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.5rem, 1fr)); gap: var(--ibx-s1); max-height: 14rem; overflow: auto; padding: 0.25rem; }
+.ibx-look__icon { display: grid; place-items: center; height: 2.5rem; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg); color: var(--ibx-text); cursor: pointer; }
+.ibx-look__icon:hover { background: var(--ibx-bg-hover); }
+.ibx-look__icon .ibx-icon { width: 1.25rem; height: 1.25rem; }
+@media (pointer: coarse) {
+	.ibx-look__swatch { width: 2.75rem; height: 2.75rem; }
+	.ibx-look__icon { height: 2.75rem; }
+}
+@media (forced-colors: active) {
+	.ibx-look__swatch { forced-color-adjust: none; }
+}

@@ -18,10 +18,15 @@
 /**
  * Build img/inbox-icons.svg (SVG sprite of the interface) from dev/icons.json and the Tabler files kept in
  * dev/tabler/<style>/<name>.svg (Tabler Icons, MIT license, version pinned in icons.json). Nothing is downloaded: to
- * add an icon, put its file of the same Tabler version in dev/tabler, add its usage name in icons.json, run again.
+ * add an icon, add its usage name in icons.json and run again. A file missing from dev/tabler is copied from the full
+ * package when it is there (dev/bin/tabler-<version>, ignored by git, see --picker), else put it there by hand.
  * Also builds the icons of the installable application (img/app-*.png) when ImageMagick is there.
  *
- * Usage (command line, developer only): php dev/build-icons.php
+ * Usage (command line, developer only):
+ *   php dev/build-icons.php          build the sprite and the application icons
+ *   php dev/build-icons.php --picker build dev/bin/icon-picker.html: every icon of the full package, to choose the
+ *                                    ones to add (needs the package of the npm @tabler/icons of the same version,
+ *                                    folders icons/ and file icons.json, in dev/bin/tabler-<version>)
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -35,6 +40,12 @@ if (!is_array($conf) || empty($conf['icons'])) {
 	fwrite(STDERR, "dev/icons.json not readable\n");
 	exit(1);
 }
+$package = $root.'/dev/bin/tabler-'.$conf['_version'];
+
+if (in_array('--picker', $argv, true)) {
+	exit(buildPicker($root, $package, $conf));
+}
+
 $symbols = array();
 $missing = array();
 foreach ($conf['icons'] as $usage => $def) {
@@ -44,6 +55,10 @@ foreach ($conf['icons'] as $usage => $def) {
 		continue;
 	}
 	$file = $root.'/dev/tabler/'.$style.'/'.$name.'.svg';
+	if (!is_readable($file) && is_readable($package.'/icons/'.$style.'/'.$name.'.svg')) {
+		copy($package.'/icons/'.$style.'/'.$name.'.svg', $file);
+		echo 'copied from the package: '.$style.'/'.$name.".svg\n";
+	}
 	if (!is_readable($file)) {
 		$missing[] = $usage.' ('.$style.'/'.$name.'.svg missing)';
 		continue;
@@ -71,6 +86,13 @@ $out = '<svg xmlns="http://www.w3.org/2000/svg" style="display:none">'."\n"
 	.implode("\n", $symbols)."\n</svg>\n";
 file_put_contents($root.'/img/inbox-icons.svg', $out);
 echo 'symbols: '.count($symbols)."\n";
+// Icons offered for a mailbox or a folder (usage names, all in the sprite): read by the server to check a choice and
+// given to the page
+$choices = array_values(array_filter(isset($conf['choices']) ? (array) $conf['choices'] : array(), function ($u) use ($conf) {
+	return isset($conf['icons'][$u]);
+}));
+file_put_contents($root.'/img/inbox-icon-choices.json', json_encode($choices)."\n");
+echo 'choices: '.count($choices)."\n";
 echo 'missing: '.($missing ? implode(', ', $missing) : 'none')."\n";
 
 // Icons of the installable application: white envelope on the accent colour (square for maskable, the safe zone
@@ -99,3 +121,57 @@ foreach (array(192, 512) as $size) {
 shell_exec(escapeshellcmd($convert).' -background none -density 600 '.escapeshellarg($tmp).' -resize 512x512 '.escapeshellarg($root.'/img/app-maskable-512.png'));
 unlink($tmp);
 echo "application icons: img/app-192.png, img/app-512.png, img/app-maskable-512.png\n";
+
+/**
+ * Inner drawing of a Tabler file (without the root <svg> nor the invisible frame)
+ *
+ * @param string $svg Content of the file
+ * @return string
+ */
+function iconInner($svg)
+{
+	$inner = preg_replace('/^.*?<svg\b[^>]*>|<\/svg>\s*$/s', '', $svg);
+	$inner = preg_replace('/<path stroke="none" d="M0 0h24v24H0z" fill="none"\s*\/>/', '', $inner);
+
+	return trim(preg_replace('/\s+/', ' ', $inner));
+}
+
+/**
+ * Developer page to choose icons: dev/bin/icon-picker.html (ignored by git, opened from the disk)
+ *
+ * @param string              $root    Root of the module
+ * @param string              $package Full Tabler package
+ * @param array<string,mixed> $conf    dev/icons.json
+ * @return int Exit code
+ */
+function buildPicker($root, $package, $conf)
+{
+	$meta = json_decode((string) @file_get_contents($package.'/icons.json'), true);
+	if (!is_array($meta) || !is_dir($package.'/icons/outline')) {
+		fwrite(STDERR, "Full Tabler package missing: put the npm @tabler/icons ".$conf['_version']." (icons/, icons.json) in ".$package."\n");
+		return 1;
+	}
+	$icons = array();
+	foreach (array('outline' => 'o', 'filled' => 'f') as $style => $key) {
+		foreach (glob($package.'/icons/'.$style.'/*.svg') as $file) {
+			$name = basename($file, '.svg');
+			if (!isset($icons[$name])) {
+				$m = isset($meta[$name]) ? $meta[$name] : array();
+				$icons[$name] = array('c' => isset($m['category']) ? (string) $m['category'] : '', 't' => isset($m['tags']) ? implode(' ', array_map('strval', (array) $m['tags'])) : '');
+			}
+			$icons[$name][$key] = iconInner((string) file_get_contents($file));
+		}
+	}
+	ksort($icons);
+	$used = array();
+	foreach ($conf['icons'] as $usage => $def) {
+		$used[$def[0].'|'.$def[1]][] = $usage;
+	}
+	$data = json_encode(array('version' => $conf['_version'], 'icons' => $icons, 'used' => $used), JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP);
+	$html = (string) file_get_contents(__DIR__.'/icon-picker.tpl.html');
+	$html = str_replace('/*DATA*/null', $data, $html);
+	file_put_contents($root.'/dev/bin/icon-picker.html', $html);
+	echo 'icons: '.count($icons).', page: '.$root."/dev/bin/icon-picker.html\n";
+
+	return 0;
+}

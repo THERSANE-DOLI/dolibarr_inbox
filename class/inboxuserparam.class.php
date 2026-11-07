@@ -87,6 +87,8 @@ class InboxUserParam
 			// Colour blindness (1.7.0): colours of the tags adapted to the vision declared in the card of the user
 			// (Dolibarr option MAIN_OPTIMIZEFORCOLORBLIND), 0 = the colours configured
 			'tag_colors_adapt' => array('1', 'int:0:1'),
+			// Folders (1.8.0): icons of the folders and mailboxes in their colour, or all grey (plain)
+			'folder_icons' => array('color', array('color', 'plain')),
 		);
 	}
 

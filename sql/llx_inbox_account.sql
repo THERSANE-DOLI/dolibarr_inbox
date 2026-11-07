@@ -44,6 +44,8 @@ CREATE TABLE llx_inbox_account(
 	sync_max_days integer DEFAULT 0,
 	sync_max_mails integer DEFAULT 0,
 	tags_mode varchar(8) DEFAULT 'global' NOT NULL,
+	color varchar(7) DEFAULT NULL,
+	icon varchar(48) DEFAULT NULL,
 	status smallint DEFAULT 0 NOT NULL,
 	date_last_test datetime DEFAULT NULL,
 	last_test_result varchar(16) DEFAULT NULL,

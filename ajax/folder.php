@@ -27,9 +27,10 @@ dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxtag.class.php');
 dol_include_once('/inbox/class/inboxnewmarks.class.php');
+dol_include_once('/inbox/class/inboxlook.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(false);
+inboxAjaxStart(in_array($action, array('look', 'lookreset'), true));
 
 /**
  * Tree of the folders of a mailbox: parent by the readable label (the common prefix « INBOX. » is not a level),
@@ -88,6 +89,9 @@ function inboxFolderTree($accountId)
 			'total' => (int) $f->total,
 			'unread' => (int) $f->unread,
 			'error' => (string) $f->sync_error !== '',
+			// Colour and icon shared by the users of the mailbox ('' = by default; a special folder keeps its icon)
+			'color' => (string) InboxLook::cleanColor((string) $f->color),
+			'icon' => $role === '' ? (string) InboxLook::cleanIcon((string) $f->icon) : '',
 		);
 	}
 	usort($out, function ($a, $b) {
@@ -119,6 +123,8 @@ switch ($action) {
 				'label' => (string) $account->label,
 				'personal' => $account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner === (int) $user->id,
 				'level' => (string) $account->access_level,
+				'color' => (string) InboxLook::cleanColor((string) $account->color),
+				'icon' => (string) InboxLook::cleanIcon((string) $account->icon),
 				'state' => (string) $account->sync_state,
 				'error' => in_array((string) $account->sync_state, array('auth_failed', 'unreachable', 'error'), true) ? (string) $account->sync_error : '',
 				'retry_at' => $account->sync_retry_at ? (int) $account->sync_retry_at : null,
@@ -138,7 +144,34 @@ switch ($action) {
 		usort($list, function ($a, $b) {
 			return (int) $b['personal'] <=> (int) $a['personal'] ?: strcasecmp($a['label'] ?: $a['email'], $b['label'] ?: $b['email']);
 		});
-		inboxAjaxReply(array('accounts' => $list, 'admin' => (bool) $user->hasRight('inbox', 'account', 'admin')));
+		inboxAjaxReply(array('accounts' => $list, 'admin' => (bool) $user->hasRight('inbox', 'account', 'admin'), 'icons' => InboxLook::choices()));
+		// no break
+
+	case 'look':
+		// Colour and icon of a folder (folder > 0) or of the mailbox, by a user who manages the mailbox
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$look = new InboxLook($db);
+		$folderId = (int) inboxAjaxParam('folder', 'int');
+		if ($folderId > 0) {
+			$res = $look->setFolder((int) $account->id, $folderId, (string) inboxAjaxParam('color', 'alphanohtml'), (string) inboxAjaxParam('icon', 'aZ09'), (int) inboxAjaxParam('subfolders', 'int') === 1);
+		} else {
+			$res = $look->setAccount((int) $account->id, (string) inboxAjaxParam('color', 'alphanohtml'), (string) inboxAjaxParam('icon', 'aZ09'));
+		}
+		if ($res < 0) {
+			inboxAjaxError($langs->transnoentities($look->error), 422);
+		}
+		inboxAjaxReply(array('changed' => $res));
+		// no break
+
+	case 'lookreset':
+		// Default colours and icons for all the folders of the mailbox
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$look = new InboxLook($db);
+		$res = $look->resetFolders((int) $account->id);
+		if ($res < 0) {
+			inboxAjaxError($langs->transnoentities($look->error), 422);
+		}
+		inboxAjaxReply(array('changed' => $res));
 		// no break
 
 	default:

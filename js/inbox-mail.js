@@ -181,6 +181,34 @@
 	function folderName(f) {
 		return f.role && ROLE_KEY[f.role] && !f.parent && f.primary !== false ? t(ROLE_KEY[f.role]) : f.name;
 	}
+	/**
+	 * Icon of a folder or a mailbox in its colour (analyse-interface §4 bis): colour of the role or chosen for the
+	 * mailbox (shared by its users), kept readable on the pane in light and dark theme; « sober » icons (My account) =
+	 * no colour
+	 */
+	function lookIcon(usage, color, cls) {
+		const svg = ic(usage, cls);
+		if (params.folder_icons === 'plain' || !color) {
+			return svg;
+		}
+		const C = Dolibarr.tools.inboxColors;
+		let style;
+		if (color.indexOf('var(--ibx-folder-') === 0) {
+			style = '--ibx-ficon-l:' + color + ';--ibx-ficon-d:' + color;
+		} else if (C.isColor(color)) {
+			style = '--ibx-ficon-l:' + C.readable(color, 'light') + ';--ibx-ficon-d:' + C.readable(color, 'dark');
+		} else {
+			return svg;
+		}
+		return svg.replace('<svg class="ibx-icon', '<svg style="' + style + '" class="ibx-ficon ibx-icon');
+	}
+	/** Icon of a folder: the one of its role, else the one chosen, else open / closed; the years of Archives look like it */
+	function folderIcon(f, open, cls) {
+		const parent = f.parent ? S.folders.get(f.parent) : null;
+		const role = ROLE_ICON[f.role] ? f.role : (parent && parent.folder.role === 'archive' && !f.icon ? 'archive' : '');
+		const icon = ROLE_ICON[f.role] || f.icon || (open ? 'folder-open' : 'folder');
+		return lookIcon(icon, f.color || 'var(--ibx-folder-' + (role || 'other') + ')', cls);
+	}
 	function accountName(a) {
 		return a.label && a.label !== a.email ? a.label : a.email;
 	}
@@ -198,6 +226,14 @@
 		});
 		S.folders.clear();
 		S.accounts.forEach(a => a.folders.forEach(f => S.folders.set(f.id, { folder: f, account: a })));
+		S.icons = res.icons || [];
+		// Folded state of the folders and mailboxes that are gone: forgotten (the setting does not grow)
+		const known = new Set(S.accounts.map(a => 'a' + a.id).concat(Array.from(S.folders.keys(), id => 'f' + id)));
+		const stale = Array.from(S.collapsed).filter(k => !known.has(k));
+		if (stale.length && S.accounts.length) {
+			stale.forEach(k => S.collapsed.delete(k));
+			saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+		}
 		adaptTags();
 	}
 
@@ -241,7 +277,7 @@
 			const progress = a.state === 'first_sync' && a.progress && a.progress.total ? Math.min(99, Math.floor(100 * a.progress.indexed / a.progress.total)) : -1;
 			html += '<li role="treeitem" aria-expanded="' + open + '" aria-level="1"><div class="ibx-tree__row ibx-tree__row--account' + (inError ? ' has-error' : '') + '" style="--ibx-depth:0" data-account="' + a.id + '">'
 				+ '<button type="button" class="ibx-tree__twisty" data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '" tabindex="-1">' + ic(open ? 'chevron-down' : 'chevron-right') + '</button>'
-				+ ic(inError ? 'warning' : 'account', 'ibx-tree__icon')
+				+ (inError ? ic('warning', 'ibx-tree__icon') : lookIcon(a.icon || 'account', a.color, 'ibx-tree__icon'))
 				+ '<span class="ibx-tree__label ibx-ellipsis" title="' + esc(a.email) + '">' + esc(accountName(a)) + '</span>'
 				+ (!open && unread ? '<span class="ibx-count">' + unread + '</span>' : '')
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
@@ -269,13 +305,13 @@
 				return;
 			}
 			const open = sub && (!S.collapsed.has(key) || needle !== '');
-			const icon = ROLE_ICON[f.role] || 'folder';
 			const selected = f.id === S.folderId && S.scope === 'folder';
 			html += '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
 				+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
 				+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '">'
 				+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
-				+ ic(icon, 'ibx-tree__icon')
+				// An ordinary folder unfolded on its subfolders is drawn open
+				+ folderIcon(f, open, 'ibx-tree__icon')
 				+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
 				+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
 				+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
@@ -1796,7 +1832,7 @@
 					lastAcc = o.account.id;
 				}
 				html += '<div class="ibx-picklist__item" role="option" data-id="' + o.id + '"' + (o.ok ? '' : ' aria-disabled="true"') + ' aria-selected="' + (o.ok && first) + '" style="--ibx-depth:' + (o.folder.depth || 0) + '">'
-					+ ic(ROLE_ICON[o.folder.role] || 'folder') + ' <span class="ibx-ellipsis">' + esc(folderName(o.folder)) + '</span></div>';
+					+ folderIcon(o.folder, false) + ' <span class="ibx-ellipsis">' + esc(folderName(o.folder)) + '</span></div>';
 				if (o.ok && first) {
 					first = false;
 				}
@@ -3232,10 +3268,114 @@
 		];
 		if (e.account.level === 'manage' || S.admin) {
 			items.push({ sep: true });
+			// A special folder keeps its icon: only its colour is offered
+			items.push({ icon: 'catalogue', label: t(ROLE_ICON[e.folder.role] ? 'InboxLookEditColor' : 'InboxLookEdit'), run: () => lookDialog(e.account, e.folder) });
 			items.push({ icon: 'settings', label: t('InboxAccountSettings'), run: () => I.go('#/settings/accounts/' + e.account.id) });
 		}
 		items.push(HINT());
 		menu(el || S.el, items, at || rectPoint(el));
+	}
+
+	function accountMenu(accountId, at) {
+		const a = S.accounts.find(x => x.id === accountId);
+		if (!a || !(a.level === 'manage' || S.admin)) {
+			return;
+		}
+		const el = $('.ibx-tree__row--account[data-account="' + accountId + '"]', S.el);
+		const custom = a.folders.filter(f => f.color || f.icon).length;
+		const items = [
+			{ icon: 'catalogue', label: t('InboxLookEdit'), run: () => lookDialog(a, null) },
+			{ icon: 'folders-show', label: t('InboxLookResetFolders', custom), disabled: !custom, reason: custom ? '' : t('InboxLookNoCustom'), run: async () => {
+				try {
+					await post('folder', 'lookreset', { id: a.id });
+					toast(t('InboxLookResetDone'));
+					refreshTree();
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			} },
+			{ sep: true },
+			{ icon: 'settings', label: t('InboxAccountSettings'), run: () => I.go('#/settings/accounts/' + a.id) },
+			HINT(),
+		];
+		menu(el || S.el, items, at || rectPoint(el));
+	}
+
+	// Colours offered for a mailbox or a folder: the ones of the roles, then the missing ones of Okabe-Ito
+	const LOOK_COLORS = [['blue', '#1d6a8a'], ['violet', '#7b4fb3'], ['green', '#2f855a'], ['brown', '#8a5a2b'], ['red', '#c0392b'], ['grey', '#5f6b70'],
+		['amber', '#a86d00'], ['orange', '#e69f00'], ['sky', '#56b4e9'], ['pink', '#cc79a7'], ['yellow', '#f0e442'], ['black', '#000000']];
+
+	/**
+	 * Colour and icon of a mailbox (folder null) or of a folder, shared by the users of the mailbox (analyse-interface
+	 * §4 bis). A special folder only changes its colour.
+	 */
+	function lookDialog(account, folder) {
+		const C = Dolibarr.tools.inboxColors;
+		const withIcon = !folder || !ROLE_ICON[folder.role];
+		const hasSubs = !!folder && account.folders.some(f => f.parent === folder.id);
+		const cur = { color: (folder ? folder.color : account.color) || '', icon: (folder ? folder.icon : account.icon) || '' };
+		const name = folder ? folderName(folder) : accountName(account);
+		const base = folder ? 'folder' : 'account';
+		const preview = () => (folder ? folderIcon(Object.assign({}, folder, { color: cur.color, icon: cur.icon }), false) : lookIcon(cur.icon || 'account', cur.color, ''));
+		const body = '<div class="ibx-look__preview" aria-hidden="true"><span class="ibx-js-lookprev"></span> <b>' + esc(name) + '</b></div>'
+			+ '<fieldset class="ibx-look__set"><legend>' + th('InboxColor') + '</legend><div class="ibx-look__swatches">'
+			+ '<button type="button" class="ibx-look__swatch ibx-look__swatch--default" data-color="" title="' + th('InboxLookDefault') + '"><span class="ibx-sr-only">' + th('InboxLookDefault') + '</span></button>'
+			+ LOOK_COLORS.map(([k, c]) => '<button type="button" class="ibx-look__swatch" data-color="' + c + '" style="background:' + c + '" title="' + th('InboxColor_' + k) + '"><span class="ibx-sr-only">' + th('InboxColor_' + k) + '</span></button>').join('')
+			+ '<label class="ibx-look__other">' + th('InboxLookOther') + ' <input type="color" class="ibx-color ibx-js-lookother" value="' + esc(cur.color || '#1d6a8a') + '"></label>'
+			+ '</div><p class="ibx-formrow__help ibx-look__pale ibx-js-lookpale">' + th('InboxLookPale') + '</p></fieldset>'
+			+ (withIcon ? '<fieldset class="ibx-look__set"><legend>' + th('InboxIcon') + '</legend>'
+				+ '<input type="search" class="ibx-field ibx-js-lookq" placeholder="' + th('InboxLookIconSearch') + '" aria-label="' + th('InboxLookIconSearch') + '" autocomplete="off">'
+				+ '<div class="ibx-look__icons">'
+				+ '<button type="button" class="ibx-look__icon" data-icon="" title="' + th('InboxLookDefault') + '">' + ic(base) + '<span class="ibx-sr-only">' + th('InboxLookDefault') + '</span></button>'
+				+ (S.icons || []).filter(u => u !== base).map(u => '<button type="button" class="ibx-look__icon" data-icon="' + esc(u) + '" title="' + esc(u) + '">' + ic(u) + '<span class="ibx-sr-only">' + esc(u) + '</span></button>').join('')
+				+ '</div></fieldset>' : '<p class="ibx-formrow__help">' + th('InboxLookSpecialIcon') + '</p>')
+			+ (hasSubs ? '<label class="ibx-inline"><input type="checkbox" class="ibx-js-looksubs"> ' + th('InboxLookSubfolders') + '</label>' : '');
+		const d = dialog({
+			title: t(withIcon ? 'InboxLookTitle' : 'InboxLookTitleColor', name),
+			wide: withIcon,
+			body,
+			actions: [{ label: t('InboxApply'), primary: true, run: async dlg => {
+				const subs = $('.ibx-js-looksubs', dlg);
+				await post('folder', 'look', { id: account.id, folder: folder ? folder.id : 0, color: cur.color, icon: withIcon ? cur.icon : '', subfolders: subs && subs.checked ? 1 : 0 });
+				toast(t('InboxLookSaved'));
+				refreshTree();
+				return true;
+			} }],
+		});
+		const paint = () => {
+			$('.ibx-js-lookprev', d).innerHTML = preview();
+			$$('[data-color]', d).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.color === cur.color)));
+			$$('[data-icon]', d).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.icon === cur.icon)));
+			// The line keeps its place when hidden: the dialog must not move while the colour picker of the browser is
+			// open on « Other colour » (it closes when its field moves)
+			$('.ibx-js-lookpale', d).classList.toggle('is-off', !cur.color || (C.readable(cur.color, 'light') === cur.color && C.readable(cur.color, 'dark') === cur.color));
+		};
+		d.addEventListener('click', e => {
+			const sw = e.target.closest('[data-color]');
+			const b = e.target.closest('[data-icon]');
+			if (sw) {
+				cur.color = sw.dataset.color;
+			} else if (b) {
+				cur.icon = b.dataset.icon;
+			} else {
+				return;
+			}
+			paint();
+		});
+		$('.ibx-js-lookother', d).addEventListener('input', e => {
+			cur.color = e.target.value.toLowerCase();
+			paint();
+		});
+		const q = $('.ibx-js-lookq', d);
+		if (q) {
+			q.addEventListener('input', () => {
+				const v = q.value.trim().toLowerCase();
+				$$('[data-icon]', d).forEach(b => {
+					b.hidden = v !== '' && b.dataset.icon !== '' && !b.dataset.icon.includes(v);
+				});
+			});
+		}
+		paint();
 	}
 
 	function attachmentMenu(m, index, el, at) {
@@ -3297,6 +3437,11 @@
 		const folder = target.closest('[data-folder]');
 		if (folder && S.el.contains(folder)) {
 			return at => folderMenu(+folder.dataset.folder, at);
+		}
+		const box = target.closest('.ibx-tree__row--account[data-account]');
+		if (box && S.el.contains(box)) {
+			const a = S.accounts.find(x => x.id === +box.dataset.account);
+			return a && (a.level === 'manage' || S.admin) ? at => accountMenu(a.id, at) : null;
 		}
 		const tileEl = target.closest('[data-att]');
 		if (tileEl && S.el.contains(tileEl)) {
@@ -3532,6 +3677,7 @@
 		Object.assign(params, p || {});
 		adaptTags();
 		if (S.el) {
+			renderTree();
 			loadList(true);
 		}
 	});

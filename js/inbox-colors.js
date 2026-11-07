@@ -186,6 +186,42 @@
 		return (L + 0.05) / 0.05 > 1.05 / (L + 0.05);
 	}
 
+	/** WCAG contrast ratio of two #RRGGBB colours */
+	function contrast(c1, c2) {
+		const lum = hex => {
+			const [r, g, b] = hexLin(hex);
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const a = lum(c1);
+		const b = lum(c2);
+		return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+	}
+
+	// Background of the folders pane (--ibx-bg-pane), light and dark theme
+	const PANE = { light: '#f6f8f9', dark: '#1b2328' };
+
+	/**
+	 * A colour chosen for an icon, kept readable (3:1, WCAG 1.4.11) on the pane: mixed with black (light theme) or
+	 * white (dark theme) until it is
+	 *
+	 * @param {string} hex   #RRGGBB
+	 * @param {string} theme light or dark
+	 * @return {string} #RRGGBB
+	 */
+	function readable(hex, theme) {
+		if (!isColor(hex)) {
+			return '';
+		}
+		const bg = PANE[theme] || PANE.light;
+		const to = theme === 'dark' ? 255 : 0;
+		const rgb = [1, 3, 5].map(i => parseInt(hex.substr(i, 2), 16));
+		let out = hex;
+		for (let k = 1; k <= 20 && contrast(out, bg) < 3; k++) {
+			out = '#' + rgb.map(v => Math.round(v + (to - v) * k / 20).toString(16).padStart(2, '0')).join('');
+		}
+		return out;
+	}
+
 	/**
 	 * HTML of a tag badge
 	 *
@@ -200,5 +236,5 @@
 		return '<span class="ibx-tag' + border + (darkText(c) ? ' ibx-tag--dark' : '') + '"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + '>' + esc(tag.label) + '</span>';
 	}
 
-	Dolibarr.defineTool('inboxColors', { THRESHOLD, PALETTES, BORDERS, VISIONS, SETTING_VISIONS, distance, risks, adapt, userVisions, darkText, badge, isColor });
+	Dolibarr.defineTool('inboxColors', { THRESHOLD, PALETTES, BORDERS, VISIONS, SETTING_VISIONS, PANE, distance, risks, adapt, userVisions, darkText, badge, isColor, contrast, readable });
 })();

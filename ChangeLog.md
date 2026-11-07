@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: colour and icon of the folders and mailboxes :   1.8.0
+  - icons of the folders in the colour of their role (inbox, drafts, sent, archives, junk, trash, other folders),
+    readable on the light and dark themes; an ordinary folder unfolded is drawn open.
+  - right click on a folder or a mailbox > « Colour and icon… »: 12 colours or any other, kept readable on both
+    themes, an icon among about 80 for a mailbox or an ordinary folder (a special folder keeps its own), also for the
+    subfolders; shared by all the users of the mailbox, changed by the people who manage it.
+  - « My account »: icons of the folders in colour or sober (all grey); high contrast mode without colours.
+  - a user or a group deleted in Dolibarr: its settings, accesses and images allowed in inbox are removed; the folded
+    state of the folders gone is forgotten.
 - FIX: attachments not seen in the list for most mails (the ones of Outlook / Exchange above all) :   1.7.1
   - the structure of the mails is decoded by inbox: the sub parts written « NIL)( » were merged, the attachment was
     lost; the mails indexed before are read again once, the most recent first, by the synchronisation.

@@ -93,6 +93,7 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_tag WHERE fk_account = 0 AND keyword LIKE 'zz_test%'");
 		$db->query("DELETE FROM ".$p."usergroup_user WHERE fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_userparam WHERE fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
+		$db->query("DELETE FROM ".$p."inbox_image_allow WHERE fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."user WHERE login LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."usergroup WHERE nom LIKE 'inboxtest_%'");
 	}

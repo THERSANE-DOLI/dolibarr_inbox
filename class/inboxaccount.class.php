@@ -97,6 +97,8 @@ class InboxAccount extends CommonObject
 		'sync_max_days' => array('type' => 'integer', 'label' => 'InboxSyncMaxDays', 'enabled' => 1, 'position' => 150, 'notnull' => 0, 'default' => '0', 'visible' => 0),
 		'sync_max_mails' => array('type' => 'integer', 'label' => 'InboxSyncMaxMails', 'enabled' => 1, 'position' => 151, 'notnull' => 0, 'default' => '0', 'visible' => 0),
 		'tags_mode' => array('type' => 'varchar(8)', 'label' => 'InboxTagsMode', 'enabled' => 1, 'position' => 160, 'notnull' => 1, 'default' => 'global', 'visible' => 0),
+		'color' => array('type' => 'varchar(7)', 'label' => 'InboxColor', 'enabled' => 1, 'position' => 161, 'notnull' => 0, 'visible' => 0),
+		'icon' => array('type' => 'varchar(48)', 'label' => 'InboxIcon', 'enabled' => 1, 'position' => 162, 'notnull' => 0, 'visible' => 0),
 		'status' => array('type' => 'integer', 'label' => 'Status', 'enabled' => 1, 'position' => 500, 'notnull' => 1, 'default' => '0', 'visible' => 1, 'arrayofkeyval' => array(0 => 'Draft', 1 => 'Enabled', 9 => 'Disabled')),
 		'date_last_test' => array('type' => 'datetime', 'label' => 'InboxDateLastTest', 'enabled' => 1, 'position' => 510, 'notnull' => 0, 'visible' => 0),
 		'last_test_result' => array('type' => 'varchar(16)', 'label' => 'InboxLastTestResult', 'enabled' => 1, 'position' => 511, 'notnull' => 0, 'visible' => 0),
@@ -164,6 +166,10 @@ class InboxAccount extends CommonObject
 	public $sync_max_mails = 0;
 	/** @var string global|own */
 	public $tags_mode = 'global';
+	/** @var string|null Colour of the mailbox (#rrggbb), shared by its users, null = by default */
+	public $color;
+	/** @var string|null Icon of the mailbox (usage name of img/inbox-icon-choices.json), null = the at sign */
+	public $icon;
 	/** @var int */
 	public $status = self::STATUS_DRAFT;
 	/** @var int|string|null */

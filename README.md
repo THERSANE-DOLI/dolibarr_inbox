@@ -28,6 +28,9 @@ General, My account. The reading of the mails comes with the next lots.
 
 - Icons: `dev/icons.json` (usage name => Tabler icon) and `dev/tabler/` (Tabler Icons 3.50.0, MIT license, see
   `dev/tabler/LICENSE`); `php dev/build-icons.php` builds `img/inbox-icons.svg` and the icons of the application.
+  To choose new icons: put the npm package `@tabler/icons` of the same version (folders `icons/`, file `icons.json`)
+  in `dev/bin/tabler-3.50.0` (ignored by git), run `php dev/build-icons.php --picker` and open
+  `dev/bin/icon-picker.html`; the files of the icons added to `icons.json` are copied from the package at the build.
 - Local test mail server: `dev/dovecot/run.sh` (Docker, IMAP 127.0.0.1:10143, Sieve 14190, SMTP submission 10587,
   test values only) then `python3 dev/dovecot/seed.py`.
 - Tests: `INBOX_DOLIBARR_HTDOCS=/path/htdocs DOLI_TEST_DB=<test database> ~/bin/phpunit -c test/phpunit/phpunit.xml`,
