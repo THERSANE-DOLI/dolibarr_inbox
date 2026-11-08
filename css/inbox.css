@@ -768,7 +768,13 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-tree__row:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
 .ibx-tree__note { padding: 0 var(--ibx-s2) var(--ibx-s1) 2.25rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
 .ibx-tree__row--account .ibx-btn--icon { margin-left: auto; color: var(--ibx-warning); }
-.ibx-searchinfo { padding: 0 var(--ibx-s3) var(--ibx-s1); font-size: var(--ibx-fs-xs); display: flex; flex-wrap: wrap; gap: var(--ibx-s1); align-items: center; }
+.ibx-searchinfo { padding: 0 var(--ibx-s3) var(--ibx-s1); font-size: var(--ibx-fs-xs); display: flex; flex-wrap: nowrap; gap: var(--ibx-s1); align-items: center; container-type: inline-size; }
+/* One line: the scope and the pills give way (cut with « … », full text in the tooltip), never the buttons */
+.ibx-searchinfo > .ibx-js-scopehint, .ibx-searchinfo > .ibx-js-pills { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ibx-searchinfo > .ibx-btn { flex: none; white-space: nowrap; }
+.ibx-searchinfo .ibx-js-vsave { gap: var(--ibx-s1); }
+@container (max-width: 26rem) { .ibx-searchinfo__word { display: none; } }
+.ibx-sx__clear[hidden] { display: none; }
 
 /* Search field opening into a panel (lot W7 1.19.0): the field becomes the top of a card, the panel unrolls under it
    and may be wider than the list */
@@ -1982,4 +1988,18 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-boxpick__item[aria-current="true"] { font-weight: 600; background: var(--ibx-accent-softer); }
 .ibx-boxpick__item .ibx-ellipsis { flex: 1; min-width: 0; }
 @media (pointer: coarse) { .ibx-boxpick__btn, .ibx-boxpick__item { min-height: 2.75rem; } }
+/* Virtual views (1.31.0) */
+.ibx-vview__shared { flex: none; display: inline-flex; color: var(--ibx-text-muted); }
+.ibx-vview__shared .ibx-icon { width: 0.875rem; height: 0.875rem; }
+.ibx-vviewform__icons, .ibx-vviewform__colors { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); }
+.ibx-vviewform__icons [aria-pressed="true"] { color: var(--ibx-accent); border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
+.ibx-vviewform__swatch { width: 1.75rem; height: 1.75rem; border-radius: 50%; border: 1px solid var(--ibx-border-strong); background: var(--ibx-bg); cursor: pointer; }
+.ibx-vviewform__swatch[data-color=""] { background: repeating-linear-gradient(45deg, var(--ibx-bg), var(--ibx-bg) 3px, var(--ibx-bg-sunken) 3px, var(--ibx-bg-sunken) 6px); }
+.ibx-vviewform__swatch[aria-pressed="true"] { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-vviewform__boxes { display: grid; gap: var(--ibx-s1); margin-top: var(--ibx-s1); }
+.ibx-vviewform__boxes[hidden] { display: none; }
+.ibx-vviewform__shares { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); margin-top: var(--ibx-s1); }
+.ibx-vviewform__shares:empty { display: none; }
+.ibx-vviewform__edit { display: flex; flex-wrap: wrap; gap: var(--ibx-s3); margin-top: var(--ibx-s2); }
+.ibx-vviewform__boxes + .ibx-vviewform__edit, div > .ibx-vviewform__edit:first-child { margin-top: 0; }
 

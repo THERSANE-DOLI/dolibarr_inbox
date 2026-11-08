@@ -233,6 +233,14 @@ switch ($action) {
 			}
 			$scope = 'all';
 			$folderId = 0;
+		} elseif ($scope === 'all' && is_array(inboxAjaxParam('accounts', 'none'))) {
+			// A virtual view on some mailboxes (1.31.0): those of them the user reads, nothing else
+			$accounts = array_values(array_intersect($readable, array_map('intval', inboxAjaxParam('accounts', 'none'))));
+			if (!$accounts) {
+				inboxAjaxReply(array('rows' => array(), 'next' => '', 'total' => 0, 'threads' => false, 'people' => (object) array(), 'stamp' => '',
+					'query' => array(), 'fulltext' => array('ready' => array(), 'error' => false, 'relevance' => false), 'crops' => (object) array()));
+			}
+			$folderId = 0;
 		} elseif ($scope !== 'all') {
 			$folder = inboxListFolder($folderId, $readable);
 			$accounts = array((int) $folder->fk_account);
@@ -243,6 +251,10 @@ switch ($action) {
 			$folderId = 0;
 		}
 		$query = inboxListQuery();
+		if ((int) inboxAjaxParam('vcount', 'int') === 1) {
+			// Counter of a virtual view (1.31.0): the unread as the unified view counts them
+			$query['not_roles'] = INBOX_LIST_VIEWS['unread']['not_roles'];
+		}
 		if ($view !== '') {
 			$query = array_merge($query, INBOX_LIST_VIEWS[$view]);
 			if (!empty($query['mine'])) {

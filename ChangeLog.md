@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: virtual views, kept searches shared with users and groups :   1.31.0
+  - « Save as a view » beside a search: name, icon, colour, every mailbox or some, optional unread counter. The view
+    sits in the « Views » section and replays its words, pills, filters, thirdparty, tag and period.
+  - Shared with users and groups: each one only sees the mails of the mailboxes he reads. The author chooses whether
+    the others only use it or may change it too; sharing and removal stay with the author.
+  - Right click on a view: open, edit, copy into my views, hide (shown again from the section menu), remove.
+  - A view changed by the search shows « changed » and « Update the view ».
+  - A cross in the search field clears the whole search (words, pills, filters), as « Clear the search » and Escape;
+    the line under the field stays on one line (the scope is cut, « Save as a view » keeps its icon on a narrow list).
+
 - NEW: one mailbox at a time in the panel of the folders :   1.30.0
   - My account > Mailboxes in the panel: automatic (every mailbox on a large screen, one at a time on a phone), every
     mailbox, or one at a time.

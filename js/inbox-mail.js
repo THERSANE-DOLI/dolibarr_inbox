@@ -40,6 +40,11 @@
 		scope: 'folder',
 		// Unified view open (1.29.0): inbox, unread, flagged, mine, sent, drafts ('' = a folder); scope is then « view »
 		view: '',
+		// Virtual views (1.31.0): the list, the one open, its mailboxes, the counters asked
+		vviews: [],
+		vview: 0,
+		vAccounts: [],
+		vcounts: {},
 		// One mailbox at a time (1.30.0): the mailbox shown, the list of the mailboxes open under the selector
 		box: 0,
 		pickOpen: false,
@@ -239,6 +244,12 @@
 	}
 
 	async function loadTree() {
+		// The virtual views with the tree (never blocking it)
+		api('view', 'list').then(r => {
+			S.vviews = r.views || [];
+			renderTree();
+			refreshVcounts();
+		}).catch(() => {});
 		const res = await api('folder', 'tree');
 		S.accounts = res.accounts || [];
 		S.admin = !!res.admin;
@@ -431,7 +442,8 @@
 	function viewsHtml() {
 		const shown = viewsShown();
 		const list = VIEWS.filter(([k]) => shown.includes(k));
-		if (!list.length) {
+		const virtual = S.vviews.filter(v => !v.hidden);
+		if (!list.length && !virtual.length) {
 			return '';
 		}
 		const open = !S.collapsed.has('views');
@@ -446,7 +458,310 @@
 					+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic(icon, 'ibx-tree__icon ibx-tree__icon--view')
 					+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_' + k) + '</span>'
 					+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
-			}).join('') + '</ul>' : '') + '</li>';
+			}).join('') + virtual.map(vviewRowHtml).join('') + '</ul>' : '') + '</li>';
+	}
+
+	// ---------- Virtual views (1.31.0, analyse-navigation-vues.md §4, §8) ----------
+	const VVIEW_ICONS = ['folder-heart', 'target', 'star', 'tag', 'bell', 'urgent', 'briefcase', 'coin-euro', 'truck', 'building-factory-2', 'folder-user', 'folder-bolt', 'crown', 'diamond'];
+	const VVIEW_COLORS = ['', '#2a78d6', '#0f766e', '#15803d', '#a16207', '#c2410c', '#b91c1c', '#be185d', '#7e22ce', '#475569'];
+	function vviewRowHtml(v) {
+		const sel = S.vview === v.id;
+		const n = v.show_count ? (S.vcounts[v.id] || 0) : 0;
+		const shared = !v.mine ? '<span class="ibx-vview__shared" title="' + esc(t('InboxViewSharedBy', v.owner)) + '">' + ic('multi') + '<span class="ibx-sr-only"> ' + esc(t('InboxViewSharedBy', v.owner)) + '</span></span>'
+			: (v.shares && v.shares.length ? '<span class="ibx-vview__shared" title="' + esc(t('InboxViewSharedWith', v.shares.map(s => s.name).join(', '))) + '">' + ic('multi') + '</span>' : '');
+		return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-vview="' + v.id + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
+			+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + lookIcon(v.icon || 'folder-heart', v.color || '', 'ibx-tree__icon')
+			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(v.label) + '</span>' + shared
+			+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
+	}
+	/** The words, pills, filters, thirdparty, tag and period of the search shown: what a view keeps */
+	function currentSearch() {
+		return { q: S.q, chips: S.chips.map(c => ({ op: c.op, v: c.v, label: c.label })), filters: { unread: !!S.filters.unread, flagged: !!S.filters.flagged, attachment: !!S.filters.attachment, mine: !!S.filters.mine },
+			soc: S.soc ? { id: S.soc.id, name: S.soc.name } : null, tag: S.tag || '', period: S.period || '' };
+	}
+	function sameSearch(a, b) {
+		const norm = s => JSON.stringify([s.q || '', (s.chips || []).map(c => c.op + ':' + c.v), s.filters || {}, s.soc ? s.soc.id : 0, s.tag || '', s.period || '']);
+		return norm(a) === norm(b);
+	}
+	/** Pills and period written as the search writes them (sxExtra), from a kept search */
+	function extraOf(s) {
+		const out = (s.chips || []).map(c => c.op + ':"' + String(c.v).replace(/"/g, '') + '"');
+		if (s.period) {
+			const d = new Date();
+			d.setHours(0, 0, 0, 0);
+			d.setDate(d.getDate() - ({ today: 0, d7: 7, d30: 30, d365: 365 }[s.period] || 0));
+			out.push('after:' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+		}
+		return out.join(' ');
+	}
+	/** Unread of the views that show a counter: their search with the unread only, one mail asked (the total counts) */
+	async function refreshVcounts() {
+		clearTimeout(S.vcountTimer);
+		const asked = S.vviews.filter(v => v.show_count && !v.hidden);
+		for (const v of asked) {
+			const q = { scope: 'all', q: v.search.q, sort: 'date:desc', cursor: '', limit: 1, threads: 0, unread: 1, vcount: 1 };
+			['flagged', 'attachment', 'mine'].forEach(k => {
+				if (v.search.filters[k]) {
+					q[k] = 1;
+				}
+			});
+			const qx = extraOf(v.search);
+			if (qx) {
+				q.qx = qx;
+			}
+			if (v.search.soc) {
+				q.soc = v.search.soc.id;
+			}
+			if (v.search.tag) {
+				q.tag = v.search.tag;
+			}
+			if (v.accounts.length) {
+				q.accounts = v.accounts;
+			}
+			try {
+				S.vcounts[v.id] = (await api('list', 'page', q, { method: 'POST' })).total || 0;
+			} catch (e) {
+				// Kept as it was
+			}
+		}
+		if (asked.length) {
+			renderTree();
+		}
+		S.vcountTimer = setTimeout(refreshVcounts, 120000);
+	}
+	/** The search of the view applied (words, pills, filters...) on its mailboxes, every one the user reads */
+	async function openVview(id, keepRoute) {
+		const v = S.vviews.find(x => x.id === id);
+		if (!v) {
+			return;
+		}
+		if (S.folderId) {
+			leaveFolder(false);
+		}
+		const s = v.search;
+		S.q = s.q || '';
+		$('.ibx-js-search', S.el).value = S.q;
+		S.chips = (s.chips || []).map(c => ({ op: c.op, v: c.v, label: c.label || c.v }));
+		Object.keys(S.filters).forEach(k => {
+			S.filters[k] = !!(s.filters && s.filters[k]);
+		});
+		S.soc = s.soc;
+		S.tag = s.tag || '';
+		S.period = s.period || '';
+		S.view = '';
+		S.scope = 'all';
+		S.vview = id;
+		S.vAccounts = v.accounts || [];
+		if (S.deep) {
+			stopDeep(true);
+		}
+		S.selected.clear();
+		S.anchor = 0;
+		S.stamp = '';
+		$$('[data-folder], [data-view], [data-vview]', S.el).forEach(r => {
+			const on = +r.dataset.vview === id;
+			r.setAttribute('aria-selected', on ? 'true' : 'false');
+			r.setAttribute('tabindex', on ? '0' : '-1');
+		});
+		if (!keepRoute) {
+			history.replaceState(null, '', '#/mail/vview/' + id);
+		}
+		S.mobile('list');
+		showNothing();
+		renderFilters();
+		sxRenderChips();
+		renderListHead();
+		await loadList();
+	}
+	/** Out of a virtual view: its search goes too (it was the view, not a search of the user) */
+	function leaveVview() {
+		if (!S.vview) {
+			return;
+		}
+		S.vview = 0;
+		S.vAccounts = [];
+		S.q = '';
+		$('.ibx-js-search', S.el).value = '';
+		S.chips = [];
+		Object.keys(S.filters).forEach(k => {
+			S.filters[k] = false;
+		});
+		S.soc = null;
+		S.tag = '';
+		S.period = '';
+		renderFilters();
+		sxRenderChips();
+		$$('[data-vview]', S.el).forEach(r => {
+			r.setAttribute('aria-selected', 'false');
+			r.setAttribute('tabindex', '-1');
+		});
+	}
+	/** Menu of a virtual view: open, change, copy, hide or remove; the hidden ones shown again from the section */
+	function vviewMenu(anchor, id, at) {
+		const v = S.vviews.find(x => x.id === id);
+		if (!v) {
+			return;
+		}
+		const items = [{ header: v.label }, { icon: 'mail-opened', label: t('InboxOpen'), run: () => openVview(id) }];
+		if (v.editable) {
+			items.push({ icon: 'rename', label: t('InboxViewEdit'), run: () => vviewDialog(v, false) });
+		}
+		if (!v.mine) {
+			items.push({ icon: 'copy', label: t('InboxViewCopy'), run: () => vviewCall('copy', { id }, t('InboxViewCopied')) });
+			items.push({ icon: 'folders-hide', label: t('InboxViewHide'), run: () => vviewCall('hide', { id, hide: 1 }, '') });
+		} else {
+			items.push({ sep: true }, { icon: 'delete', label: t('InboxViewDelete'), danger: true, run: async () => {
+				if (await I.confirmDialog({ title: t('InboxViewDeleteTitle', v.label), text: v.shares && v.shares.length ? t('InboxViewDeleteShared') : t('InboxViewDeleteText'), confirm: t('InboxViewDelete'), danger: true })) {
+					vviewCall('delete', { id }, t('InboxViewDeleted'));
+				}
+			} });
+		}
+		menu(anchor, items, at);
+	}
+	async function vviewCall(action, data, done) {
+		try {
+			const r = await post('view', action, data);
+			S.vviews = r.views || S.vviews;
+			if (action === 'delete' || (action === 'hide' && data.hide)) {
+				if (S.vview === data.id) {
+					const e = currentFolder();
+					leaveVview();
+					if (e) {
+						openFolder(e.folder.id);
+					}
+				}
+			}
+			renderTree();
+			refreshVcounts();
+			if (done) {
+				toast(done);
+			}
+			return r;
+		} catch (err) {
+			toast(err.message, { error: true });
+			return null;
+		}
+	}
+	/**
+	 * Keep the search shown as a view, or change a view: name, icon, colour, mailboxes, counter; for its author the
+	 * sharing (users and groups) and whether the others may change it too
+	 * @param {object|null} v View, null for a new one
+	 * @param {boolean} withSearch Take the search shown (a new view, « Update the view »)
+	 */
+	function vviewDialog(v, withSearch) {
+		const own = !v || v.mine;
+		const cur = v || { label: '', icon: 'folder-heart', color: '', accounts: [], show_count: 0, shared_edit: 0, shares: [] };
+		let shares = (cur.shares || []).slice();
+		let icon = cur.icon || 'folder-heart';
+		let color = cur.color || '';
+		const changed = v && !sameSearch(v.search, currentSearch()) && S.vview === v.id;
+		const body = '<form class="ibx-form ibx-vviewform" novalidate>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="vv-label">' + th('InboxViewName') + '</label><div><input class="ibx-field" id="vv-label" name="label" maxlength="128" required autocomplete="off" value="' + esc(cur.label) + '"></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewIcon') + '</span><div class="ibx-vviewform__icons" role="radiogroup" aria-label="' + th('InboxViewIcon') + '">'
+			+ VVIEW_ICONS.map(i => '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm" data-icon="' + i + '" aria-pressed="' + (i === icon) + '" aria-label="' + esc(i) + '">' + ic(i) + '</button>').join('') + '</div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewColor') + '</span><div class="ibx-vviewform__colors" role="radiogroup" aria-label="' + th('InboxViewColor') + '">'
+			+ VVIEW_COLORS.map(c => '<button type="button" class="ibx-vviewform__swatch" data-color="' + c + '" aria-pressed="' + (c === color) + '" aria-label="' + esc(c || t('InboxViewNoColor')) + '"' + (c ? ' style="background:' + c + '"' : '') + '></button>').join('') + '</div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewBoxes') + '</span><div>'
+			+ '<div class="ibx-vviewform__edit"><label class="ibx-radio"><input type="radio" name="boxes" value="all"' + (cur.accounts.length ? '' : ' checked') + '> ' + th('InboxViewBoxesAll') + '</label> '
+			+ '<label class="ibx-radio"><input type="radio" name="boxes" value="some"' + (cur.accounts.length ? ' checked' : '') + '> ' + th('InboxViewBoxesSome') + '</label></div>'
+			+ '<div class="ibx-vviewform__boxes"' + (cur.accounts.length ? '' : ' hidden') + '>' + S.accounts.map(a => '<label class="ibx-check"><input type="checkbox" name="acc" value="' + a.id + '"' + (cur.accounts.includes(a.id) ? ' checked' : '') + '> ' + esc(accountName(a)) + '</label>').join('') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewCounter') + '</span><div><label class="ibx-check"><input type="checkbox" name="show_count"' + (cur.show_count ? ' checked' : '') + '> ' + th('InboxViewCounterLabel') + '</label></div></div>'
+			+ (own ? '<div class="ibx-formrow"><label class="ibx-formrow__label" for="vv-share">' + th('InboxViewShare') + '</label><div>'
+				+ '<input class="ibx-field" id="vv-share" list="vv-share-list" autocomplete="off" placeholder="' + th('InboxSearchUserOrGroup') + '"><datalist id="vv-share-list"></datalist>'
+				+ '<div class="ibx-vviewform__shares ibx-js-vvshares"></div>'
+				+ '<div class="ibx-formrow__help">' + th('InboxViewShareHelp') + '</div>'
+				+ '<div class="ibx-vviewform__edit"><label class="ibx-radio"><input type="radio" name="shared_edit" value="0"' + (cur.shared_edit ? '' : ' checked') + '> ' + th('InboxViewOthersUse') + '</label> '
+				+ '<label class="ibx-radio"><input type="radio" name="shared_edit" value="1"' + (cur.shared_edit ? ' checked' : '') + '> ' + th('InboxViewOthersEdit') + '</label></div></div></div>'
+				: '<p class="ibx-formrow__help">' + th('InboxViewSharedBy', cur.owner || '') + '</p>')
+			+ (changed ? '<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div><label class="ibx-check"><input type="checkbox" name="take" checked> ' + th('InboxViewTakeSearch') + '</label></div></div>' : '')
+			+ '</form>';
+		const d = dialog({
+			wide: true,
+			title: v ? t('InboxViewEditTitle', v.label) : t('InboxViewNew'),
+			body,
+			actions: [{ label: t('InboxSave'), primary: true, run: async dd => {
+				const f = $('form', dd);
+				const label = f.elements.label.value.trim();
+				if (!label) {
+					f.elements.label.focus();
+					return false;
+				}
+				const some = f.querySelector('[name="boxes"]:checked').value === 'some';
+				const accounts = some ? $$('[name="acc"]:checked', f).map(c => +c.value) : [];
+				if (some && !accounts.length) {
+					toast(t('InboxViewNeedBox'), { error: true });
+					return false;
+				}
+				const take = !v || withSearch || (f.elements.take && f.elements.take.checked);
+				const data = { id: v ? v.id : 0, label, icon, color, accounts, show_count: f.elements.show_count.checked ? 1 : 0, search: take ? currentSearch() : v.search };
+				if (own) {
+					data.shares = shares.map(s => ({ kind: s.kind, id: s.id }));
+					data.shared_edit = +((f.querySelector('[name="shared_edit"]:checked') || {}).value || 0);
+				}
+				const r = await vviewCall('save', data, t('InboxViewSaved'));
+				if (!r) {
+					return false;
+				}
+				openVview(r.id);
+				return true;
+			} }],
+		});
+		const form = $('form', d);
+		form.addEventListener('click', e => {
+			const b = e.target.closest('[data-icon]');
+			if (b) {
+				icon = b.dataset.icon;
+				$$('[data-icon]', form).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+			}
+			const c = e.target.closest('[data-color]');
+			if (c) {
+				color = c.dataset.color;
+				$$('[data-color]', form).forEach(x => x.setAttribute('aria-pressed', String(x === c)));
+			}
+			const x = e.target.closest('[data-unshare]');
+			if (x) {
+				shares = shares.filter(s => s.kind + s.id !== x.dataset.unshare);
+				paintShares();
+			}
+		});
+		$$('[name="boxes"]', form).forEach(r => r.addEventListener('change', () => {
+			$('.ibx-vviewform__boxes', form).hidden = form.querySelector('[name="boxes"]:checked').value !== 'some';
+		}));
+		function paintShares() {
+			const box = $('.ibx-js-vvshares', form);
+			if (box) {
+				box.innerHTML = shares.map(s => '<span class="ibx-chip">' + ic(s.kind === 'group' ? 'multi' : 'user-circle') + ' ' + esc(s.name)
+					+ ' <button type="button" class="ibx-chip__x" data-unshare="' + s.kind + s.id + '" aria-label="' + esc(t('InboxViewUnshare', s.name)) + '">' + ic('close') + '</button></span>').join(' ');
+			}
+		}
+		paintShares();
+		// People and groups searched as typed (the search of the accesses); a name chosen goes in the list
+		const input = $('#vv-share', form);
+		if (input) {
+			const found = new Map();
+			let timer = 0;
+			input.addEventListener('input', () => {
+				const hit = found.get(input.value);
+				if (hit) {
+					if (!shares.some(s => s.kind === hit.kind && s.id === hit.id)) {
+						shares.push(hit);
+						paintShares();
+					}
+					input.value = '';
+					return;
+				}
+				clearTimeout(timer);
+				timer = setTimeout(async () => {
+					try {
+						const res = (await api('view', 'people', { q: input.value })).results || [];
+						res.forEach(x => found.set(x.name + (x.kind === 'group' ? ' (' + t('InboxGroup') + ')' : ''), { kind: x.kind, id: x.id, name: x.name }));
+						$('#vv-share-list', form).innerHTML = res.map(x => '<option value="' + esc(x.name + (x.kind === 'group' ? ' (' + t('InboxGroup') + ')' : '')) + '"></option>').join('');
+					} catch (err) {
+						// The field stays usable with what it has
+					}
+				}, 200);
+			});
+		}
 	}
 	/** A view shown or hidden; the view open and hidden: back to the last folder */
 	function setViewShown(k, on) {
@@ -476,7 +791,9 @@
 			{ icon: 'folders-hide', label: t('InboxViewHide'), run: () => setViewShown(key, false) },
 			{ sep: true },
 		] : [];
+		const hiddenShared = S.vviews.filter(v => v.hidden);
 		menu(anchor, own.concat([{ header: t('InboxViewsChoose') }], VIEWS.map(([k, icon]) => ({ icon, label: t('InboxView_' + k), checked: shown.includes(k), run: () => setViewShown(k, !shown.includes(k)) })),
+			hiddenShared.length ? [{ header: t('InboxViewsHiddenShared') }].concat(hiddenShared.map(v => ({ icon: v.icon || 'folder-heart', label: t('InboxViewShowAgain', v.label), run: () => vviewCall('hide', { id: v.id, hide: 0 }, '') }))) : [],
 			[{ sep: true }, { icon: 'settings', label: t('InboxViewsMailboxes'), run: () => I.go('#/settings/me/unified') }]), at);
 	}
 	/** A unified view: every mailbox read (not left out), the folders of its role; each mail in its own mailbox */
@@ -487,6 +804,7 @@
 		if (S.folderId) {
 			leaveFolder(false);
 		}
+		leaveVview();
 		S.view = key;
 		S.scope = 'view';
 		if (S.deep) {
@@ -635,6 +953,11 @@
 				openView(vrow.dataset.view);
 				return;
 			}
+			const vvrow = e.target.closest('[data-vview]');
+			if (vvrow) {
+				openVview(+vvrow.dataset.vview);
+				return;
+			}
 			const row = e.target.closest('[data-folder]');
 			if (row && !row.classList.contains('is-disabled')) {
 				openFolder(+row.dataset.folder);
@@ -654,16 +977,20 @@
 		});
 		// Arrows in the tree (role tree): up / down between visible folders, left / right fold
 		pane.addEventListener('keydown', e => {
-			const row = e.target.closest('[data-folder], [data-view]');
+			const row = e.target.closest('[data-folder], [data-view], [data-vview]');
 			if (!row) {
 				return;
 			}
-			if (row.dataset.view && (e.key === 'Enter' || e.key === ' ')) {
-				openView(row.dataset.view);
+			if ((row.dataset.view || row.dataset.vview) && (e.key === 'Enter' || e.key === ' ')) {
+				if (row.dataset.view) {
+					openView(row.dataset.view);
+				} else {
+					openVview(+row.dataset.vview);
+				}
 				e.preventDefault();
 				return;
 			}
-			const rows = $$('[data-folder], [data-view]', pane);
+			const rows = $$('[data-folder], [data-view], [data-vview]', pane);
 			const i = rows.indexOf(row);
 			let target = null;
 			if (e.key === 'ArrowDown') {
@@ -736,6 +1063,9 @@
 		const q = { folder: S.folderId, scope: S.scope, q: S.q, sort: params.list_sort || 'date:desc', cursor: cursor || '', limit: 200, threads: params.conversation === '0' ? 0 : 1 };
 		if (S.scope === 'view') {
 			q.view = S.view;
+		}
+		if (S.vview && S.vAccounts.length) {
+			q.accounts = S.vAccounts;
 		}
 		Object.keys(S.filters).forEach(k => {
 			if (S.filters[k]) {
@@ -1429,6 +1759,14 @@
 	}
 
 	function clearFilters() {
+		if (S.vview) {
+			const e = currentFolder();
+			leaveVview();
+			if (e) {
+				openFolder(e.folder.id);
+				return;
+			}
+		}
 		S.q = '';
 		S.scope = 'folder';
 		Object.keys(S.filters).forEach(k => {
@@ -1455,6 +1793,10 @@
 			name = t('InboxAllBoxes');
 		} else if (S.scope === 'view') {
 			name = t('InboxView_' + S.view);
+		}
+		const vv = S.vview ? S.vviews.find(x => x.id === S.vview) : null;
+		if (vv) {
+			name = vv.label + (sameSearch(vv.search, currentSearch()) ? '' : ' · ' + t('InboxViewModified'));
 		}
 		title.innerHTML = esc(name) + ' <span class="ibx-muted">· ' + th('InboxMailsCount', (S.total || 0).toLocaleString(locale())) + '</span>';
 		$('.ibx-js-view', S.el).innerHTML = ic(params.view === 'table' ? 'view-cards' : 'view-table');
@@ -1484,7 +1826,26 @@
 		box.innerHTML = pills.map(p => '<span class="ibx-badge">' + esc(p) + '</span>').join(' ');
 		box.hidden = !pills.length || S.q === '';
 		$('.ibx-js-sxclear', S.el).hidden = !hasFilter();
+		sxClearIn();
+		// Keep the search as a view; in a view changed by the search: update it (who may change it)
+		const vsave = $('.ibx-js-vsave', S.el);
+		const vv = S.vview ? S.vviews.find(x => x.id === S.vview) : null;
+		const update = vv && vv.editable && !sameSearch(vv.search, currentSearch());
+		vsave.hidden = !(update || (!vv && hasFilter() && S.scope !== 'view'));
+		$('.ibx-js-vsavelabel', vsave).textContent = t(update ? 'InboxViewUpdate' : 'InboxViewSaveAs');
+		// The word goes on a narrow list: the button keeps its name for the tooltip and the screen readers
+		vsave.title = t(update ? 'InboxViewUpdate' : 'InboxViewSaveAs');
+		const hint = $('.ibx-js-scopehint', S.el);
+		hint.title = hint.textContent;
 		$('.ibx-searchinfo', S.el).hidden = box.hidden && $('.ibx-js-scopehint', S.el).textContent === '' && !hasFilter();
+	}
+
+	/** The cross in the search field: shown as soon as something is searched, typed or kept (pills, filters...) */
+	function sxClearIn() {
+		const b = $('.ibx-js-sxclearin', S.el);
+		if (b) {
+			b.hidden = !($('.ibx-js-search', S.el).value || hasFilter());
+		}
 	}
 
 	function renderFilters() {
@@ -2386,6 +2747,20 @@
 			}
 		});
 		$('.ibx-js-sxclear', el).addEventListener('click', clearFilters);
+		// The cross of the field: the same as « Clear the search » (and Escape), the cursor back in the field
+		$('.ibx-js-sxclearin', el).addEventListener('click', e => {
+			e.stopPropagation();
+			if (hasFilter()) {
+				clearFilters();
+			} else {
+				input.value = '';
+				S.sx.text = '';
+				sxRenderChips();
+			}
+			sxClearIn();
+			input.focus();
+		});
+		input.addEventListener('input', sxClearIn);
 	}
 
 	// ---------- Selection ----------
@@ -6340,6 +6715,10 @@
 			const pa = S.accounts.find(x => x.id === +(picked.dataset.boxpick || picked.dataset.account));
 			return pa && (pa.level === 'manage' || S.admin) ? at => accountMenu(pa.id, at) : null;
 		}
+		const vv = target.closest('[data-vview]');
+		if (vv && S.el.contains(vv)) {
+			return at => vviewMenu(vv, +vv.dataset.vview, at);
+		}
 		// The unified views (1.29.0): the same menu as « ⋯ », with the view right clicked first
 		const view = target.closest('[data-view]');
 		if (view && S.el.contains(view)) {
@@ -6457,6 +6836,7 @@
 			saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
 			renderTree();
 		}
+		leaveVview();
 		S.scope = 'folder';
 		S.view = '';
 		$$('[data-view]', S.el).forEach(r => {
@@ -7034,9 +7414,11 @@
 			+ '<span class="ibx-sx__pills ibx-js-sxpills"></span>'
 			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'
 			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd ibx-js-sxkbd">Ctrl+Maj+K</kbd>'
+			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__clear ibx-js-sxclearin" aria-label="' + th('InboxClearSearch') + '" title="' + th('InboxClearSearch') + '" hidden>' + ic('close') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__close ibx-js-sxclose" aria-label="' + th('InboxSxClose') + '" title="' + th('InboxSxClose') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-sx__panel ibx-js-sxpanel" id="ibx-sxpanel" hidden></div></div></div></div>'
 			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span> <span class="ibx-js-pills" hidden></span><span class="ibx-spacer"></span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-vsave" hidden>' + ic('folder-heart') + '<span class="ibx-searchinfo__word ibx-js-vsavelabel"></span></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-sxclear" hidden>' + th('InboxClearSearch') + '</button></div>'
 			+ '<div class="ibx-sx-deepbar ibx-js-deepbar" role="status" hidden></div>'
 			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
@@ -7265,7 +7647,8 @@
 		label: () => t('InboxSpaceMail'),
 		async render(el, route) {
 			const wantedView = route.parts[0] === 'view' ? String(route.parts[1] || '') : '';
-			const wanted = wantedView ? 0 : +(route.parts[0] || 0);
+			const wantedVview = route.parts[0] === 'vview' ? +(route.parts[1] || 0) : 0;
+			const wanted = wantedView || wantedVview ? 0 : +(route.parts[0] || 0);
 			// #/mail/<folder>/<mail>: a mail opened from another page (tab « Mails » of a card of Dolibarr)
 			if (wanted && +(route.parts[1] || 0)) {
 				S.goto = { folder: wanted, mail: +route.parts[1] };
@@ -7307,6 +7690,18 @@
 			}
 			if (S.goto && await runGoto()) {
 				// Opened from a notification of the bell
+			} else if (wantedVview) {
+				// A virtual view as start: once the views are known
+				S.folderId = start;
+				api('view', 'list').then(r => {
+					S.vviews = r.views || [];
+					renderTree();
+					if (S.vviews.some(v => v.id === wantedVview)) {
+						openVview(wantedVview, true);
+					} else if (start) {
+						openFolder(start);
+					}
+				}).catch(() => start && openFolder(start));
 			} else if (wantedView && VIEWS.some(([k]) => k === wantedView)) {
 				// A unified view as start (its address kept); the first folder known for the actions of the page
 				S.folderId = start;
@@ -7324,6 +7719,10 @@
 				renderList();
 				// « Automatic »: one mailbox at a time on a narrow screen, all of them on a large one
 				renderTree();
+			});
+			$('.ibx-js-vsave', el).addEventListener('click', () => {
+				const vv = S.vview ? S.vviews.find(x => x.id === S.vview) : null;
+				vviewDialog(vv && vv.editable ? vv : null, true);
 			});
 			document.addEventListener('click', e => {
 				if (S.pickOpen && !(e.target.closest && e.target.closest('.ibx-boxpick__wrap'))) {

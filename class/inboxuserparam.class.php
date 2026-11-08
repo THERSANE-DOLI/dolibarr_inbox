@@ -120,6 +120,8 @@ class InboxUserParam
 			'tree_mode' => array('auto', array('auto', 'all', 'single')),
 			'tree_box' => array('0', 'int:0:2147483647'),
 			'unified_exclude' => array('[]', 'json'),
+			// Virtual views (1.31.0): the views shared with the user that he hides
+			'views_hidden' => array('[]', 'json'),
 		);
 	}
 
