@@ -1624,3 +1624,4 @@ InboxSxLooking = Ricerca degli indirizzi...
 InboxSxMailsCount = %s mail
 InboxSxNoAddress = Nessun indirizzo noto contiene « %s »: Invio la cerca così come digitata.
 InboxSxOpsToggle = Operatori
+InboxUserCard = Scheda Dolibarr

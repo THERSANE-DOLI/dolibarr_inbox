@@ -207,10 +207,80 @@ class InboxReader
 			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
 			'invite' => $this->inviteView($user, $message),
 			'receipt' => InboxReceipt::view($this, $headers, $params->get($user, 'mdn_mode')),
+			// Users of Dolibarr among the addresses of the mail: their name, photo and card in the head of the mail
+			'people' => (object) $this->people($user, array_merge(array($message->fromEmail), array_column($message->to, 'email'), array_column($message->cc, 'email'))),
 			'read_mode' => $params->get($user, 'read_mode', (int) $this->row->fk_account),
 			'read_delay' => (int) $params->get($user, 'read_delay', (int) $this->row->fk_account),
 			'can_flag' => true,
 		);
+	}
+
+	/**
+	 * Users of Dolibarr (active, internal) behind addresses of the mail
+	 *
+	 * @param User     $user   User reading
+	 * @param string[] $emails Addresses
+	 * @return array<string,array<string,mixed>> Address (lower case) => id, name, job, email, phone, mobile, photo, url
+	 */
+	public function people(User $user, array $emails)
+	{
+		$emails = array_values(array_unique(array_filter(array_map(function ($e) {
+			return strtolower(trim((string) $e));
+		}, $emails), function ($e) {
+			return $e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL);
+		})));
+		if (!$emails) {
+			return array();
+		}
+		$in = implode(',', array_map(function ($e) {
+			return "'".$this->db->escape($e)."'";
+		}, array_slice($emails, 0, 200)));
+		$rows = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, email, job, office_phone, user_mobile, photo FROM ".$this->db->prefix()."user"
+			." WHERE LOWER(email) IN (".$in.") AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") ORDER BY rowid LIMIT 200");
+		$canCard = $user->hasRight('user', 'user', 'lire') || !empty($user->admin);
+		$out = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$email = strtolower((string) $r->email);
+			if (isset($out[$email])) {
+				continue;
+			}
+			$name = trim($r->firstname.' '.$r->lastname);
+			$out[$email] = array(
+				'id' => (int) $r->rowid,
+				'name' => $name !== '' ? $name : (string) $r->login,
+				'job' => (string) $r->job,
+				'email' => $email,
+				'phone' => (string) $r->office_phone,
+				'mobile' => (string) $r->user_mobile,
+				'photo' => self::userPhotoUrl((int) $r->rowid, (string) $r->photo, (int) $r->entity),
+				'url' => $canCard || (int) $r->rowid === (int) $user->id ? DOL_URL_ROOT.'/user/card.php?id='.((int) $r->rowid) : '',
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Address of the small photo of a user ('' when none): the same file the cards of Dolibarr show
+	 *
+	 * @param int    $userId User
+	 * @param string $photo  File name of the photo
+	 * @param int    $entity Entity of the user
+	 * @return string
+	 */
+	public static function userPhotoUrl($userId, $photo, $entity)
+	{
+		global $db;
+
+		if ($userId <= 0 || $photo === '' || !dolIsAllowedForPreview($photo)) {
+			return '';
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
+		$u = new User($db);
+		$u->id = $userId;
+		$file = get_exdir(0, 0, 0, 0, $u, 'user').'photos/'.getImageFileNameForSize($photo, '_small');
+
+		return DOL_URL_ROOT.'/viewimage.php?modulepart=userphoto&entity='.((int) $entity ?: 1).'&file='.urlencode($file);
 	}
 
 	/**

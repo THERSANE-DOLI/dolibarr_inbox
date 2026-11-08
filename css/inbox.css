@@ -1720,3 +1720,16 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 /* Link of the foot of the search panel that unfolds the operators */
 .ibx-sx__opsbtn { margin-left: auto; display: inline-flex; align-items: center; gap: 0.125rem; padding: 0; font: inherit; color: var(--ibx-text-muted); background: none; border: 0; cursor: pointer; }
 .ibx-sx__opsbtn:hover, .ibx-sx__opsbtn[aria-expanded="true"] { color: var(--ibx-accent); }
+/* User of Dolibarr named in the head of a mail (1.22.0): photo and name, card on hover */
+.ibx-addr--user { display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; }
+.ibx-addr--user .ibx-avatar--xs { border: 0; }
+.ibx-usercard { position: fixed; z-index: 70; display: flex; gap: var(--ibx-s3); width: 20rem; max-width: calc(100vw - 1rem); padding: var(--ibx-s3);
+	font-family: var(--ibx-font); font-size: var(--ibx-fs-md); color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border);
+	border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); }
+.ibx-usercard *, .ibx-usercard { box-sizing: border-box; }
+.ibx-usercard__avatar { flex: none; width: 3rem; height: 3rem; font-size: var(--ibx-fs-lg); }
+.ibx-usercard__main { flex: 1; min-width: 0; display: grid; gap: 0.125rem; }
+.ibx-usercard__name { font-weight: 600; font-size: var(--ibx-fs-lg); }
+.ibx-usercard__line { display: flex; align-items: center; gap: var(--ibx-s1); color: var(--ibx-text-muted); overflow-wrap: anywhere; }
+.ibx-usercard__line a { color: var(--ibx-accent); }
+.ibx-usercard__acts { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); margin-top: var(--ibx-s2); }

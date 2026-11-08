@@ -1624,3 +1624,4 @@ InboxSxLooking = Looking for the addresses...
 InboxSxMailsCount = %s mail(s)
 InboxSxNoAddress = No known address holds « %s »: Enter searches it as typed.
 InboxSxOpsToggle = Operators
+InboxUserCard = Card in Dolibarr

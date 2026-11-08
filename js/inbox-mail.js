@@ -165,6 +165,8 @@
 	 */
 	const avatarCache = new Map();
 	function hydrateAvatars(root) {
+		// Photos of the users of Dolibarr named in the head of a mail
+		hydrateUserPhotos(root);
 		$$('[data-avatar]:not([data-done])', root).forEach(el => {
 			el.dataset.done = '1';
 			const key = el.dataset.email + (el.dataset.reading ? ':r' : '');
@@ -2317,11 +2319,144 @@
 		});
 	}
 
-	function addressHtml(a) {
+	/** Name worth showing beside an address: none when it only repeats the address (« x@y <x@y> ») */
+	function nameOf(a) {
+		const n = String((a && a.name) || '').replace(/^["'\s]+|["'\s]+$/g, '');
+		return n && n.toLowerCase() !== String(a.email || '').toLowerCase() ? n : '';
+	}
+	/** Users of Dolibarr met in the mails read (address => card), for the card shown on hover */
+	const peopleCache = new Map();
+	function personOf(email, people) {
+		const key = String(email || '').toLowerCase();
+		const p = people && people[key];
+		if (p) {
+			peopleCache.set(key, p);
+		}
+		return p || null;
+	}
+	function userAvatar(p, cls) {
+		return '<span class="ibx-avatar ' + (cls || 'ibx-avatar--xs') + (p.photo ? ' ibx-js-userphoto" data-photo="' + esc(p.photo) : '') + '" style="--ibx-avatar-h:' + hue('u' + p.id) + '" aria-hidden="true">'
+			+ esc(initials(p.name, p.email)) + '</span>';
+	}
+
+	function addressHtml(a, people) {
 		if (!a) {
 			return '';
 		}
-		return '<span class="ibx-addr" data-email="' + esc(a.email) + '" data-name="' + esc(a.name || '') + '" title="' + esc(a.email) + '">' + esc(a.name || a.email) + (a.name ? ' <span class="ibx-muted">&lt;' + esc(a.email) + '&gt;</span>' : '') + '</span>';
+		const p = personOf(a.email, people);
+		if (p) {
+			// A user of Dolibarr: his photo and his name, the card on hover
+			return '<span class="ibx-addr ibx-addr--user" data-email="' + esc(a.email) + '" data-name="' + esc(p.name) + '" data-user="' + esc(p.email) + '" aria-haspopup="dialog">'
+				+ userAvatar(p) + esc(p.name) + '</span>';
+		}
+		const name = nameOf(a);
+		return '<span class="ibx-addr" data-email="' + esc(a.email) + '" data-name="' + esc(name) + '" title="' + esc(a.email) + '">' + esc(name || a.email) + (name ? ' <span class="ibx-muted">&lt;' + esc(a.email) + '&gt;</span>' : '') + '</span>';
+	}
+
+	// ---------- Card of a user of Dolibarr (hover or focus of his name, tap on a phone) ----------
+	const UC = { el: null, timer: 0, for: null };
+	function userCardHtml(p) {
+		const line = (icon, html) => '<div class="ibx-usercard__line">' + ic(icon) + '<span>' + html + '</span></div>';
+		return userAvatar(p, 'ibx-usercard__avatar') + '<div class="ibx-usercard__main"><div class="ibx-usercard__name">' + esc(p.name) + '</div>'
+			+ (p.job ? '<div class="ibx-muted">' + esc(p.job) + '</div>' : '')
+			+ line('mail', esc(p.email))
+			+ (p.phone ? line('contact-card', '<a href="tel:' + esc(p.phone.replace(/[^\d+]/g, '')) + '">' + esc(p.phone) + '</a>') : '')
+			+ (p.mobile ? line('contact-card', '<a href="tel:' + esc(p.mobile.replace(/[^\d+]/g, '')) + '">' + esc(p.mobile) + '</a>') : '')
+			+ '<div class="ibx-usercard__acts">'
+			+ (p.url ? '<a class="ibx-btn ibx-btn--sm" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxUserCard') + '</a>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-ucsearch">' + ic('search') + ' ' + th('InboxMailsOf', p.name) + '</button></div></div>';
+	}
+	function userCardHide() {
+		clearTimeout(UC.timer);
+		if (UC.el) {
+			UC.el.remove();
+			UC.el = null;
+			if (UC.for) {
+				UC.for.setAttribute('aria-expanded', 'false');
+			}
+			UC.for = null;
+		}
+	}
+	function userCardShow(anchor) {
+		const p = peopleCache.get(String(anchor.dataset.user || '').toLowerCase());
+		if (!p || UC.for === anchor) {
+			return;
+		}
+		userCardHide();
+		const el = document.createElement('div');
+		el.className = 'ibx-usercard';
+		el.setAttribute('role', 'dialog');
+		el.setAttribute('aria-label', p.name);
+		el.innerHTML = userCardHtml(p);
+		document.body.appendChild(el);
+		hydrateUserPhotos(el);
+		const r = anchor.getBoundingClientRect();
+		const w = el.offsetWidth;
+		el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+		el.style.top = (r.bottom + el.offsetHeight + 12 > window.innerHeight ? Math.max(8, r.top - el.offsetHeight - 6) : r.bottom + 6) + 'px';
+		el.addEventListener('mouseenter', () => clearTimeout(UC.timer));
+		el.addEventListener('mouseleave', () => {
+			UC.timer = setTimeout(userCardHide, 200);
+		});
+		$('.ibx-js-ucsearch', el).addEventListener('click', () => {
+			userCardHide();
+			searchFrom(p.email);
+		});
+		el.addEventListener('keydown', e => {
+			if (e.key === 'Escape') {
+				const back = UC.for;
+				userCardHide();
+				if (back) {
+					back.focus();
+				}
+			}
+		});
+		UC.el = el;
+		UC.for = anchor;
+		anchor.setAttribute('aria-expanded', 'true');
+	}
+	function bindUserCards(root) {
+		root.addEventListener('mouseover', e => {
+			const a = e.target.closest('.ibx-addr--user');
+			if (a && root.contains(a)) {
+				clearTimeout(UC.timer);
+				UC.timer = setTimeout(() => userCardShow(a), 350);
+			}
+		});
+		root.addEventListener('mouseout', e => {
+			const a = e.target.closest('.ibx-addr--user');
+			if (a && !(e.relatedTarget && a.contains(e.relatedTarget))) {
+				clearTimeout(UC.timer);
+				UC.timer = setTimeout(userCardHide, 200);
+			}
+		});
+		root.addEventListener('focusin', e => {
+			const a = e.target.closest('.ibx-addr--user');
+			if (a) {
+				userCardShow(a);
+			}
+		});
+		root.addEventListener('click', e => {
+			const a = e.target.closest('.ibx-addr--user');
+			if (a) {
+				// A tap on a phone (no hover): the card, a second tap closes it
+				if (UC.for === a) {
+					userCardHide();
+				} else {
+					userCardShow(a);
+				}
+			}
+		});
+		document.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && UC.el) {
+				userCardHide();
+			}
+		});
+		document.addEventListener('pointerdown', e => {
+			if (UC.el && !UC.el.contains(e.target) && !(UC.for && UC.for.contains(e.target))) {
+				userCardHide();
+			}
+		}, true);
 	}
 
 	function headHtml(m, partial, inThread) {
@@ -2329,13 +2464,18 @@
 		// In a conversation the mailbox is written once, in the head of the conversation
 		const box = inThread ? '' : (e ? e.account.email : (m.mailbox || ''));
 		const recipients = (m.to || []).concat(m.cc || []);
-		const toLine = recipients.length ? th('InboxForShort') + ' ' + recipients.slice(0, 6).map(addressHtml).join(', ') + (recipients.length > 6 ? ' ' + th('InboxAndMore', recipients.length - 6) : '') : '';
+		const toLine = recipients.length ? th('InboxForShort') + ' ' + recipients.slice(0, 6).map(a => addressHtml(a, m.people)).join(', ') + (recipients.length > 6 ? ' ' + th('InboxAndMore', recipients.length - 6) : '') : '';
 		// A mail sent by the mailbox: « Me » with the address of the mailbox in small
 		const mine = m.id && isMine({ folder: m.folder, role: m.folder_role, from: m.from });
-		return '<div class="ibx-readhead__top">' + (mine ? '<span class="ibx-avatar ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>' : avatar(m.from.name, m.from.email, '', m.id, !partial || inThread))
-			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr" data-email="' + esc(m.from.email) + '" data-name="' + esc(m.from.name || '') + '">'
+		// The sender: a user of Dolibarr with his photo, name and card; else the name only when it is not the address again
+		const fromUser = mine ? null : personOf(m.from.email, m.people);
+		const fromName = fromUser ? fromUser.name : nameOf(m.from);
+		return '<div class="ibx-readhead__top">' + (mine ? '<span class="ibx-avatar ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>'
+			: (fromUser && fromUser.photo ? userAvatar(fromUser, '') : avatar(fromName, m.from.email, '', m.id, !partial || inThread)))
+			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr' + (fromUser ? ' ibx-addr--user' : '') + '" data-email="' + esc(m.from.email) + '" data-name="' + esc(fromName) + '"'
+			+ (fromUser ? ' data-user="' + esc(fromUser.email) + '" aria-haspopup="dialog"' : '') + '>'
 			+ (mine ? esc(t('InboxMe')) + ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>'
-				: esc(m.from.name || m.from.email || t('InboxNoSender')) + (m.from.name ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')) + '</div>'
+				: esc(fromName || m.from.email || t('InboxNoSender')) + (fromName ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')) + '</div>'
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
@@ -6511,6 +6651,7 @@
 		bindTree();
 		bindSplitters();
 		bindContextMenus();
+		bindUserCards(S.el);
 		bindBulkBar();
 		bindDragDrop();
 		bindSwipes();

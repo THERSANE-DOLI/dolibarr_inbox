@@ -1624,3 +1624,4 @@ InboxSxLooking = Recherche des adresses...
 InboxSxMailsCount = %s mail(s)
 InboxSxNoAddress = Aucune adresse connue ne contient « %s » : Entrée la cherche telle quelle.
 InboxSxOpsToggle = Opérateurs
+InboxUserCard = Fiche Dolibarr
