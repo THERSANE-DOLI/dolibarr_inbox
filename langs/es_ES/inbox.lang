@@ -1787,3 +1787,19 @@ InboxRulesPanelEmpty = Cree la primera con « Nueva regla », o desde un correo:
 InboxRulesPanelForMail = Correo leído: %s
 InboxRulesPanelNoMatch = Ninguna regla afecta al correo leído.
 InboxRuleMatchesMail = Afecta a este correo
+
+# Security fixes (audit 2026-11-08, 1.23.1)
+InboxErrorAuthModeAdmin = Solo un administrador de Dolibarr puede elegir el usuario maestro u OAuth, o cambiar el servidor de un buzón así.
+InboxErrorOAuthService = Este servicio OAuth no está configurado en Dolibarr.
+InboxErrorPasswordAgain = El servidor ha cambiado: escriba de nuevo la contraseña del buzón.
+InboxErrorSmtpPasswordAgain = El servidor de envío ha cambiado: escriba de nuevo su contraseña.
+InboxPasswordAgain = A escribir de nuevo
+InboxMasterHost = Servidor del usuario maestro
+InboxMasterHostHelp = El único servidor al que se envía la contraseña maestra (por ejemplo mail.example.com). Sin él, no se usa el usuario maestro.
+InboxMeiliKeyAgain = La dirección ha cambiado: escriba de nuevo la clave maestra.
+InboxJournalNeedManage = El diario nombra los correos: requiere el nivel « gestionar » en este buzón.
+InboxErrorLinkNotYours = Solo su autor, o un usuario que puede enviar desde el buzón, quita este vínculo.
+InboxErrorHostNotAllowed = El servidor %s no está permitido por la configuración.
+InboxPrintFailed = No se pudo imprimir el correo.
+InboxNotifAccessSelf = %s se ha dado un acceso a un buzón
+InboxNotifType_access_self = Acceso a un buzón dado a sí mismo

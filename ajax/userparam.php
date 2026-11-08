@@ -54,6 +54,10 @@ switch ($action) {
 		// no break
 
 	case 'set':
+		// The presence is written by the call of state of the Mail space only (audit INBX-028)
+		if ((string) inboxAjaxParam('param', 'aZ09') === 'presence') {
+			inboxAjaxError('Unknown param', 400);
+		}
 		if ($params->set($user, (string) inboxAjaxParam('param', 'aZ09'), (string) inboxAjaxParam('value', 'none'), $accountId) < 0) {
 			inboxAjaxError($langs->transnoentities($params->error), 422);
 		}

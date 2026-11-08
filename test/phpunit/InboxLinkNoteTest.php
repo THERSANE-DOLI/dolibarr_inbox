@@ -116,7 +116,9 @@ class InboxLinkNoteTest extends InboxTestCase
 		$n2 = $notes->add($ref, 'Note de l admin', $this->admin);
 		$this->assertSame(-1, $notes->update($n2, 'x', $alice));
 		$this->assertSame('InboxErrorNoteNotYours', $notes->error);
-		$this->assertSame(1, $notes->delete($n1, $this->admin), 'a manager of the mailbox');
+		// A note follows the mail; its author only changes or removes it, a manager of the mailbox too (audit INBX-006)
+		$this->assertSame(-1, $notes->delete($n1, $this->admin), 'a manager of the mailbox is not its author');
+		$this->assertSame(1, $notes->delete($n1, $alice));
 		$this->assertSame(-1, $notes->add($ref, '   ', $alice));
 
 		// The mail copied to another mailbox: one mailref, links and notes seen from there by who can read it

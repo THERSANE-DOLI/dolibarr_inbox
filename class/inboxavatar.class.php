@@ -79,7 +79,7 @@ class InboxAvatar
 		}
 		$hash = sha1($email);
 		$sources = array();
-		if ($bimi && getDolGlobalString('INBOX_AVATAR_BIMI', '1') === '1') {
+		if ($bimi && getDolGlobalString('INBOX_AVATAR_BIMI', '0') === '1') {
 			$sources[] = 'bimi';
 		}
 		if (getDolGlobalString('INBOX_AVATAR_GRAVATAR', '0') === '1') {
@@ -212,7 +212,8 @@ class InboxAvatar
 	protected function fetch($url)
 	{
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
-		$res = getURLContent($url, 'GET', '', 1, array(), array('https'), 0, -1, 3, 4);
+		// IPv4 only: the check of the private and local addresses of the core resolves IPv4 only (audit INBX-009)
+		$res = getURLContent($url, 'GET', '', 1, array(), array('https'), 0, -1, 3, 4, array(CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4));
 		if (!is_array($res) || (int) ($res['http_code'] ?? 0) !== 200 || !isset($res['content']) || strlen((string) $res['content']) > self::MAX_BYTES) {
 			return null;
 		}

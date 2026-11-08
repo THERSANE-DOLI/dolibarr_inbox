@@ -173,13 +173,16 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->needDovecot();
 		dol_include_once('/inbox/class/inboxsync.class.php');
 		$token = $this->login();
-		foreach (array('/custom/inbox/ajax/list.php?action=page&folder=99999999', '/custom/inbox/ajax/list.php?action=state&folder=99999999',
+		foreach (array('/custom/inbox/ajax/list.php?action=page&folder=99999999',
 			'/custom/inbox/ajax/mail.php?action=open&id=99999999', '/custom/inbox/ajax/attachment.php?mode=check&id=99999999&part=0') as $path) {
 			$this->assertSame(404, $this->call($path)['code'], 'forged identifier: '.$path);
 		}
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id=99999999')['code']);
-		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=pump&folder=99999999')['code'], 'relay: forged folder');
-		$pump = $this->call('/custom/inbox/ajax/list.php?action=pump');
+		// State and relay write (presence, synchronisation): POST and token (audit INBX-017)
+		$this->assertSame(405, $this->call('/custom/inbox/ajax/list.php?action=state&folder=0')['code'], 'state by GET refused');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'state', 'folder' => 99999999, 'token' => $token))['code'], 'forged identifier: state');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'pump', 'folder' => 99999999, 'token' => $token))['code'], 'relay: forged folder');
+		$pump = $this->call('/custom/inbox/ajax/list.php', array('action' => 'pump', 'token' => $token));
 		$this->assertSame(200, $pump['code'], $pump['body']);
 		$this->assertArrayHasKey('cron', $pump['json'], 'relay: says whether the scheduled job runs');
 

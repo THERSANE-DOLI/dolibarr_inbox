@@ -1787,3 +1787,19 @@ InboxRulesPanelEmpty = Erstellen Sie die erste mit « Neue Regel », oder aus ei
 InboxRulesPanelForMail = Gelesene E-Mail: %s
 InboxRulesPanelNoMatch = Keine Regel betrifft die gelesene E-Mail.
 InboxRuleMatchesMail = Betrifft diese E-Mail
+
+# Security fixes (audit 2026-11-08, 1.23.1)
+InboxErrorAuthModeAdmin = Nur ein Administrator von Dolibarr kann den Master-Benutzer oder OAuth wählen oder den Server eines solchen Postfachs ändern.
+InboxErrorOAuthService = Dieser OAuth-Dienst ist in Dolibarr nicht eingerichtet.
+InboxErrorPasswordAgain = Der Server hat sich geändert: geben Sie das Passwort des Postfachs erneut ein.
+InboxErrorSmtpPasswordAgain = Der Versandserver hat sich geändert: geben Sie sein Passwort erneut ein.
+InboxPasswordAgain = Erneut eingeben
+InboxMasterHost = Server des Master-Benutzers
+InboxMasterHostHelp = Der einzige Server, an den das Master-Passwort gesendet wird (zum Beispiel mail.example.com). Ohne ihn wird der Master-Benutzer nicht verwendet.
+InboxMeiliKeyAgain = Die Adresse hat sich geändert: geben Sie den Master-Schlüssel erneut ein.
+InboxJournalNeedManage = Das Journal nennt die E-Mails: es erfordert die Stufe « verwalten » für dieses Postfach.
+InboxErrorLinkNotYours = Nur sein Autor oder ein Benutzer, der aus dem Postfach senden darf, entfernt diese Verknüpfung.
+InboxErrorHostNotAllowed = Der Server %s ist durch die Einrichtung nicht erlaubt.
+InboxPrintFailed = Die E-Mail konnte nicht gedruckt werden.
+InboxNotifAccessSelf = %s hat sich selbst Zugriff auf ein Postfach gegeben
+InboxNotifType_access_self = Selbst gegebener Zugriff auf ein Postfach

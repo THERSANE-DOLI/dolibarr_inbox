@@ -36,7 +36,7 @@ class InboxNotification
 	const MERGE_DELAY = 60;
 
 	/** Types of inbox, listed in Settings > Notifications; the types of other modules follow the defaults */
-	const TYPES = array('assign', 'send_failed', 'box_error', 'rule_redirect');
+	const TYPES = array('assign', 'send_failed', 'box_error', 'rule_redirect', 'access_self');
 
 	/** A notification still unread after this time (s) goes in the summary by mail */
 	const MAIL_AFTER = 900;
@@ -163,8 +163,14 @@ class InboxNotification
 			." WHERE n.entity = ".((int) $conf->entity)." AND n.fk_user = ".((int) $user->id).($before > 0 ? " AND n.rowid < ".((int) $before) : '')
 			." ORDER BY n.rowid DESC LIMIT ".($limit + 1));
 		$items = array();
+		// A notification about a mailbox the user cannot read any more: still listed, without its subject (audit INBX-018)
+		$access = new InboxAccess($this->db);
+		$levels = $access->getLevels($user);
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$payload = json_decode((string) $r->payload, true);
+			if ((int) $r->fk_account > 0 && !isset($levels[(int) $r->fk_account]) && is_array($payload)) {
+				$payload['subject'] = '';
+			}
 			$actor = trim($r->firstname.' '.$r->lastname);
 			$items[] = array(
 				'id' => (int) $r->rowid,
@@ -523,6 +529,9 @@ class InboxNotification
 		}
 		if ($n['type'] === 'box_error') {
 			return $langs->transnoentities('InboxNotifBoxError');
+		}
+		if ($n['type'] === 'access_self') {
+			return $langs->transnoentities('InboxNotifAccessSelf', $n['actor'] ? $n['actor']['name'] : '');
 		}
 		if ($n['type'] === 'rule_redirect') {
 			return $langs->transnoentities('InboxNotifRuleRedirect', $n['actor'] ? $n['actor']['name'] : '');

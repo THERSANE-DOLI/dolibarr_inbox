@@ -88,12 +88,17 @@ class InboxRules
 	// ---------- Script ----------
 
 	/**
-	 * @param string $s Text
+	 * @param string $s        Text
+	 * @param bool   $keepVars Keep the variables ${...} (only the subject of the out of office, built by inbox)
 	 * @return string Quoted string of Sieve
 	 */
-	public static function q($s)
+	public static function q($s, $keepVars = false)
 	{
 		$s = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', str_replace(array("\r\n", "\r"), "\n", (string) $s));
+		// With the extension « variables », ${...} would be replaced in every string: never in the values typed (audit INBX-014)
+		if (!$keepVars) {
+			$s = str_replace('${', '$ {', $s);
+		}
 
 		return '"'.str_replace(array('\\', '"', "\n"), array('\\\\', '\\"', "\r\n"), $s).'"';
 	}
@@ -185,7 +190,7 @@ class InboxRules
 				$subject .= ' : ${insubject}';
 			}
 			$body .= 'if allof('.implode(', ', $cond).") {\r\n\tvacation :days ".max(1, min(30, (int) $away['days']))
-				.($away['addr'] ? ' :addresses '.self::ql(array_values($away['addr'])) : '').' :subject '.self::q($subject).' '.self::q($text).";\r\n}\r\n";
+				.($away['addr'] ? ' :addresses '.self::ql(array_values($away['addr'])) : '').' :subject '.self::q($subject, true).' '.self::q($text).";\r\n}\r\n";
 		}
 		foreach ($rules as $r) {
 			$body .= '# rule: '.str_replace(array("\r", "\n"), ' ', (string) $r['name']).(empty($r['on']) ? ' (off)' : '')."\r\n";

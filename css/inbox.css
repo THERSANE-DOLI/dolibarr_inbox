@@ -44,7 +44,7 @@
 	--ibx-folder-archive: #8a5a2b;
 	--ibx-folder-junk: #c0392b;
 	--ibx-folder-trash: #65656c;
-	--ibx-folder-other: #a86d00;
+	--ibx-folder-other: #e9bc0e;
 
 	/* Thunderbird tags */
 	--ibx-tag-1: #d63a3a;
@@ -109,7 +109,7 @@
 		--ibx-folder-archive: #d1a26e;
 		--ibx-folder-junk: #ef6f62;
 		--ibx-folder-trash: #a5a5ad;
-		--ibx-folder-other: #e3b04b;
+		--ibx-folder-other: #f0c430;
 		--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 	}
 }
@@ -137,7 +137,7 @@
 	--ibx-folder-archive: #d1a26e;
 	--ibx-folder-junk: #ef6f62;
 	--ibx-folder-trash: #a5a5ad;
-	--ibx-folder-other: #e3b04b;
+	--ibx-folder-other: #f0c430;
 	--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 }
 
@@ -164,7 +164,7 @@
 /* ===== 2 bis. Icon (Tabler sprite inbox-icons.svg, usage names in icons.json) ===== */
 /* Size follows the text (1em, so the text zoom), colour follows the text (currentColor: themes, high contrast,
    forced colors). Outline symbols carry stroke attributes, filled ones fill="currentColor". */
-.ibx-icon { display: inline-block; flex: none; width: 1em; height: 1em; vertical-align: -0.14em; overflow: visible; stroke-width: 2; }
+.ibx-icon { display: inline-block; flex: none; width: 1em; height: 1em; vertical-align: -0.14em; overflow: visible; stroke-width: 2; fill: none; }
 /* Large icons drawn thinner: the stroke grows with the size, 2 looked heavy at 2 rem and more */
 .ibx-attachment__icon, .ibx-empty__icon, .ibx-viewer .ibx-empty__icon { stroke-width: 1.25; }
 .ibx-icon--lg { width: 1.5em; height: 1.5em; }
@@ -340,6 +340,8 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 /* Selected states are declared after :hover on purpose: a selected item keeps its colours when hovered */
 .ibx-tree__twisty { width: 0.875rem; flex: none; text-align: center; color: var(--ibx-text-faint); font-size: 0.625rem; background: none; border: 0; cursor: pointer; padding: 0; }
 .ibx-tree__icon { width: 1rem; height: 1rem; flex: none; color: var(--ibx-text-muted); }
+/* Icons of the folders and mailboxes: the inside tinted with their colour (30 %), the outline in full */
+.ibx-tree__icon { fill: currentColor; fill-opacity: .2; stroke-width: 1.6; }
 /* Colour of a folder or mailbox icon: --ibx-ficon-l / -d set on the icon (light / dark variant, kept readable on the
    pane), picked by the theme through a variable only, so that the rules on the colour (drop target) still win */
 .ibx-ficon { --ibx-ficon: var(--ibx-ficon-l, var(--ibx-text-muted)); color: var(--ibx-ficon); }

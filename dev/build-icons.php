@@ -72,7 +72,8 @@ foreach ($conf['icons'] as $usage => $def) {
 	// by the CSS (.ibx-icon), so that the large icons (attachments, empty states) can be drawn thinner
 	$attrs = array();
 	foreach (array('viewBox', 'fill', 'stroke', 'stroke-linecap', 'stroke-linejoin') as $a) {
-		if (preg_match('/\b'.$a.'="([^"]*)"/', $m[1], $v)) {
+		// fill="none" of the outline icons is given by the CSS (.ibx-icon), so that a place can tint their inside
+		if (preg_match('/\b'.$a.'="([^"]*)"/', $m[1], $v) && !($a === 'fill' && $v[1] === 'none')) {
 			$attrs[] = $a.'="'.$v[1].'"';
 		}
 	}

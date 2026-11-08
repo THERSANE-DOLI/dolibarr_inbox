@@ -30,6 +30,12 @@ if ($action === 'journal') {
 	// Journal of a mailbox: its managers only (lot W4 §4.2)
 	inboxAjaxStart(false);
 	$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+	// The journal names the mails (subjects, Message-ID): the level « manage » on the mailbox itself, the right to
+	// manage the mailboxes does not give it (audit INBX-004)
+	$access = new InboxAccess($db);
+	if (!$access->check($user, (int) $account->id, InboxAccess::LEVEL_MANAGE)) {
+		inboxAjaxError($langs->transnoentities('InboxJournalNeedManage'), 403);
+	}
 	$filters = array(
 		'user' => (int) inboxAjaxParam('user', 'int'),
 		'action' => (string) inboxAjaxParam('what', 'aZ09'),
@@ -64,7 +70,14 @@ if ($action !== 'run' || !in_array($what, array('seen', 'flag', 'tag', 'move', '
 // An undo: its own writes are not journaled, the lines it cancels are marked
 $undoOf = inboxAjaxParam('undo_of', 'none');
 $undoOf = array_filter(array_map('intval', is_array($undoOf) ? $undoOf : array()));
-if (inboxAjaxHas('undo_of')) {
+// Not journaled only when it undoes lines of the journal of this user, of the last 10 minutes (an undo sent by
+// batches gives the same lines each time): no action can hide itself from the journal (audit INBX-016)
+if ($undoOf) {
+	$mine = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_action_log WHERE rowid IN (".implode(',', $undoOf).")"
+		." AND fk_user = ".((int) $user->id)." AND date_action > '".$db->idate(dol_now() - 600)."'");
+	if (!is_object($mine) || (int) $mine->n !== count(array_unique($undoOf))) {
+		inboxAjaxError('Bad undo', 400);
+	}
 	InboxActionLog::$paused = true;
 }
 

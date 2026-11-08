@@ -142,7 +142,9 @@ class InboxThreadMarkTest extends InboxImapTestCase
 		$this->assertSame('InboxErrorUnsubscribeNotSigned', $reader->unsubscribe($this->admin, $raw."\r\nBody\r\n"));
 		$signed = "Authentication-Results: mx.invalid; dkim=pass header.d=list.invalid\r\n".$raw."\r\nBody\r\n";
 		$this->assertSame('InboxErrorUnsubscribeFailed', $reader->unsubscribe($this->admin, $signed));
-		$this->assertStringContainsString('external url', strtolower($reader->error), 'refused before any call');
+		// Refused before any call; nothing of the network said back (audit INBX-009)
+		$this->assertMatchesRegularExpression('/^(HTTP \d+|no answer)$/', $reader->error);
+		$this->assertStringNotContainsString('127.0.0.1', $reader->error);
 		$alice = $this->user('alice');
 		(new InboxAccess($this->db))->grant($this->admin, $a->id, $alice->id, 0, 'read');
 		InboxAccess::clearCache();

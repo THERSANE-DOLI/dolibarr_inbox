@@ -47,7 +47,7 @@ function inboxDolibarrFail($key)
 	global $langs;
 
 	$codes = array('InboxMailNotFound' => 404, 'InboxErrorPieceNotReadable' => 403, 'InboxErrorNoteNotFound' => 404, 'InboxErrorNoteNotYours' => 403,
-		'InboxErrorNoteEmpty' => 422, 'InboxErrorNoMessageId' => 422, 'Bad parameters' => 400, 'InboxErrorCannotCreate' => 403, 'InboxErrorCannotAttach' => 403,
+		'InboxErrorNoteEmpty' => 422, 'InboxErrorLinkNotYours' => 403, 'InboxErrorNoMessageId' => 422, 'Bad parameters' => 400, 'InboxErrorCannotCreate' => 403, 'InboxErrorCannotAttach' => 403,
 		'InboxErrorAttachmentInfected' => 422);
 	inboxAjaxReply(array('error' => preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key) : $key, 'code' => $key), $codes[$key] ?? 500);
 }

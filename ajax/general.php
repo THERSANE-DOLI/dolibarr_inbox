@@ -54,7 +54,8 @@ function inboxGeneralSettings()
 		'INBOX_SEND_AUTOCOPY' => array('default' => '0', 'check' => 'int:0:1'),
 		// Pictures of the correspondents (1.5.0): sources looked for by the server
 		'INBOX_AVATAR_DOLIBARR' => array('default' => '1', 'check' => 'int:0:1'),
-		'INBOX_AVATAR_BIMI' => array('default' => '1', 'check' => 'int:0:1'),
+		// Off by default (audit INBX-008): when on, the server asks the domain of the sender at the opening of a mail
+		'INBOX_AVATAR_BIMI' => array('default' => '0', 'check' => 'int:0:1'),
 		'INBOX_AVATAR_GRAVATAR' => array('default' => '0', 'check' => 'int:0:1'),
 	);
 }

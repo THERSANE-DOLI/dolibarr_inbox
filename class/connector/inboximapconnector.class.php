@@ -217,7 +217,11 @@ class InboxImapConnector extends InboxConnector
 			return $token;
 		}
 		if ($account->imap_auth_mode === InboxAccount::AUTH_MASTER) {
-			if (getDolGlobalString('INBOX_MASTER_USER') === '') {
+			// The master password opens every mailbox of the mail server: only to the server named with it in the
+			// setup (audit INBX-002)
+			$masterHost = strtolower(trim(getDolGlobalString('INBOX_MASTER_HOST')));
+			if (getDolGlobalString('INBOX_MASTER_USER') === '' || $masterHost === '' || strtolower(trim((string) $account->imap_host)) !== $masterHost) {
+				$this->error = 'Master user: not allowed for this server';
 				return '';
 			}
 			return (string) dolDecrypt(getDolGlobalString('INBOX_MASTER_PASSWORD'));
@@ -1657,8 +1661,9 @@ class InboxImapConnector extends InboxConnector
 				$this->error = 'DATA: '.implode(' ', $answer['lines']);
 				return false;
 			}
-			// Lines ended by CRLF, a line starting with a dot doubled (RFC 5321 4.5.2)
-			$data = preg_replace("/\r?\n/", "\r\n", (string) $raw);
+			// Lines ended by CRLF, a lone CR too (audit INBX-013: « CR . CR LF » is never an end of data), a line
+			// starting with a dot doubled (RFC 5321 4.5.2)
+			$data = preg_replace("/\r\n|\r|\n/", "\r\n", (string) $raw);
 			$data = preg_replace('/^\./m', '..', $data);
 			if (substr($data, -2) !== "\r\n") {
 				$data .= "\r\n";

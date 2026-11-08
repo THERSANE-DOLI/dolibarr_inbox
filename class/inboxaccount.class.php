@@ -213,12 +213,72 @@ class InboxAccount extends CommonObject
 	const SERVER_FIELDS = array('imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert',
 		'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_same_credentials', 'smtp_login', 'sieve_port');
 
+	/** @var string[] Where the IMAP password goes: a change of one of them asks the password again (audit INBX-002) */
+	const IMAP_SECRET_FIELDS = array('imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login');
+
+	/** @var string[] Same for the SMTP password (and the IMAP one when the SMTP server uses the same credentials) */
+	const SMTP_SECRET_FIELDS = array('smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_login', 'smtp_same_credentials');
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
 	public function __construct(DoliDB $db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * A stored secret only goes to the server it was typed for (audit INBX-002). Called after the values of a form
+	 * are put on the mailbox, before a test or a save.
+	 * - another server, port, encryption, login or mode: the stored password is not used, it must be typed again;
+	 * - master user and OAuth (secrets of the whole mail server, or of the company): chosen, and their server
+	 *   changed, by the administrator of Dolibarr only; the OAuth service must be one configured in Dolibarr.
+	 *
+	 * @param InboxAccount|null $old           Mailbox as stored (null: new mailbox)
+	 * @param bool              $typedImap     A new IMAP password was typed
+	 * @param bool              $typedSmtp     A new SMTP password was typed
+	 * @param bool              $dolibarrAdmin The user is an administrator of Dolibarr
+	 * @return string Key of the error, '' if allowed
+	 */
+	public function guardSecrets($old, $typedImap, $typedSmtp, $dolibarrAdmin)
+	{
+		$moved = function (array $fields) use ($old) {
+			foreach ($fields as $f) {
+				if ((string) $old->$f !== (string) $this->$f) {
+					return true;
+				}
+			}
+			return false;
+		};
+		// Checking the certificate turned off: a man in the middle could read the password
+		$certOff = $old && !empty($old->imap_validate_cert) && empty($this->imap_validate_cert);
+		$special = in_array((string) $this->imap_auth_mode, array(self::AUTH_MASTER, self::AUTH_OAUTH), true);
+		if ($special && !$dolibarrAdmin) {
+			if (!$old || (string) $old->imap_auth_mode !== (string) $this->imap_auth_mode || $certOff
+				|| $moved(array('imap_host', 'imap_port', 'imap_encryption', 'oauth_service', 'email')) || $moved(self::SMTP_SECRET_FIELDS)) {
+				return 'InboxErrorAuthModeAdmin';
+			}
+		}
+		if ((string) $this->imap_auth_mode === self::AUTH_OAUTH) {
+			require_once __DIR__.'/inboxoauth.class.php';
+			if (!array_key_exists((string) $this->oauth_service, InboxOAuth::listServices())) {
+				return 'InboxErrorOAuthService';
+			}
+		}
+		if (!$old) {
+			return '';
+		}
+		$imapMoved = $moved(self::IMAP_SECRET_FIELDS) || $certOff;
+		$smtpMoved = $moved(self::SMTP_SECRET_FIELDS) || $certOff;
+		if ((string) $this->imap_auth_mode === self::AUTH_LOGIN && !$typedImap && !empty($this->imap_password)
+			&& ($imapMoved || ($smtpMoved && !empty($this->smtp_same_credentials)))) {
+			return 'InboxErrorPasswordAgain';
+		}
+		if ($smtpMoved && empty($this->smtp_same_credentials) && !$typedSmtp && !empty($this->smtp_password)) {
+			return 'InboxErrorSmtpPasswordAgain';
+		}
+
+		return '';
 	}
 
 	/**

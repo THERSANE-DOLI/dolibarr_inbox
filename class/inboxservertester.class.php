@@ -45,6 +45,33 @@ class InboxServerTester
 		$this->db = $db;
 	}
 
+	/** @var bool Answers of the servers (greeting, network errors) in the messages: off for a host of the private
+	 * network tested by someone who is not administrator of Dolibarr (audit INBX-010: no probe of the network) */
+	public $withDetail = true;
+
+	/**
+	 * Hosts allowed for the mailboxes (hidden setting INBOX_ALLOWED_HOSTS: « mail.example.com, .example.org »), all
+	 * when empty
+	 *
+	 * @param string $host Host
+	 * @return bool
+	 */
+	public static function hostAllowed($host)
+	{
+		$list = array_filter(array_map('trim', explode(',', strtolower(getDolGlobalString('INBOX_ALLOWED_HOSTS')))));
+		$host = strtolower(trim((string) $host, " []"));
+		if (!$list || $host === '') {
+			return true;
+		}
+		foreach ($list as $h) {
+			if ($host === ltrim($h, '.') || ($h[0] === '.' && substr($host, -strlen($h)) === $h)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	/**
 	 * Run the test
 	 *
@@ -235,7 +262,7 @@ class InboxServerTester
 			return $langs->transnoentities($key, $detail);
 		}
 		$text = $langs->transnoentities($key, $host, $port);
-		if ($detail !== '' && in_array($code, array('smtp_connect', 'smtp_greeting', 'sieve_connect'), true)) {
+		if ($this->withDetail && $detail !== '' && in_array($code, array('smtp_connect', 'smtp_greeting', 'sieve_connect'), true)) {
 			$text .= ' ('.dol_trunc($detail, 200).')';
 		}
 

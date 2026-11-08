@@ -26,6 +26,12 @@
  * connector need the local test Dovecot (dev/dovecot/run.sh then dev/dovecot/seed.py), else they are skipped.
  */
 
+// From the command line only, never from the web (audit INBX-024)
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 $testDatabases = array('dolibarr_develop_vanillia', 'dolibarr_v24', 'dolibarr_v18', 'dolibarr_demo');
 $wanted = (string) getenv('DOLI_TEST_DB');
 if (!in_array($wanted, $testDatabases, true)) {

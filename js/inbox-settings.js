@@ -591,8 +591,33 @@
 			$('[data-field="smtp_login"]', form).hidden = !!v.smtp_same_credentials;
 			$('[data-field="smtp_password"]', form).hidden = !!v.smtp_same_credentials;
 		};
+		// A password kept is only used for the same server (audit INBX-002): a change of server, port, encryption,
+		// login or mode asks it again, said before the test or the save
+		const secretFields = { imap: ['imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert'],
+			smtp: ['smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_login', 'smtp_same_credentials', 'imap_validate_cert'] };
+		const initial = account ? formValues(form) : null;
+		const askAgain = () => {
+			if (!initial) {
+				return;
+			}
+			const v = formValues(form);
+			const moved = list => list.some(k => String(v[k] ?? '') !== String(initial[k] ?? ''));
+			const sides = [['imap', a.has_imap_password, moved(secretFields.imap) || (!!v.smtp_same_credentials && moved(secretFields.smtp))],
+				['smtp', a.has_smtp_password, !v.smtp_same_credentials && moved(secretFields.smtp)]];
+			sides.forEach(([side, kept, again]) => {
+				const input = form[side + '_password'];
+				if (!input || !kept) {
+					return;
+				}
+				input.placeholder = again ? t('InboxPasswordAgain') : t('InboxPasswordKept');
+				input.required = again;
+				input.closest('.ibx-formrow').classList.toggle('is-invalid', again && input.value === '');
+			});
+		};
+		form.addEventListener('input', askAgain);
 		form.addEventListener('change', e => {
 			sync();
+			askAgain();
 			// Usual port of the encryption chosen, only when the port was the usual one of the other choice
 			if (e.target.name === 'imap_encryption') {
 				const p = form.imap_port;
@@ -1919,6 +1944,13 @@
 			+ '</div>';
 		const result = $('.ibx-js-ftresult', sec);
 		const values = () => ({ url: $('#ft-url', sec).value.trim(), key: $('#ft-key', sec).value, prefix: $('#ft-prefix', sec).value.trim() });
+		// The key kept is only used for the address it was kept with (audit INBX-003): another address asks it again
+		if (s.has_key && !on) {
+			$('#ft-url', sec).addEventListener('input', () => {
+				const again = $('#ft-url', sec).value.trim().replace(/\/+$/, '').toLowerCase() !== String(s.url || '').replace(/\/+$/, '').toLowerCase();
+				$('#ft-key', sec).placeholder = again ? t('InboxPasswordAgain') : t('InboxMeiliKeyKept');
+			});
+		}
 		const showResult = (ok, text) => {
 			result.innerHTML = '<div class="ibx-notice ibx-notice--' + (ok ? 'success' : 'error') + '">' + ic(ok ? 'check' : 'warning') + '<div class="ibx-notice__text">' + esc(text) + '</div></div>';
 		};
@@ -2127,7 +2159,7 @@
 		const chan = (type, c) => (channels[type] && channels[type][c] !== undefined ? +channels[type][c] === 1 : c === 'b');
 		const sw = (attrs, on, label) => '<button type="button" class="ibx-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '" ' + attrs + '></button>';
 		const newMail = m => (m.params.new_mail_notify === 'auto' ? !!m.personal : m.params.new_mail_notify === '1');
-		const types = ['assign', 'send_failed', 'box_error', 'rule_redirect'];
+		const types = ['assign', 'send_failed', 'box_error', 'rule_redirect', 'access_self'];
 		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavNotifications') + '</h1></div>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionBrowserNotif') + '</h2><div class="ibx-js-browser"></div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionNotifTypes') + '</h2><p class="ibx-section__help">' + th('InboxNotifTypesHelp') + '</p>'

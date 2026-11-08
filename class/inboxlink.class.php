@@ -109,14 +109,20 @@ class InboxLink
 	public function unlink($linkId, $user = null, $notrigger = false)
 	{
 		$p = $this->db->prefix();
-		$l = $this->db->getRow("SELECT rowid, fk_mailref, element_type, fk_element, origin FROM ".$p."inbox_link WHERE rowid = ".((int) $linkId));
+		$l = $this->db->getRow("SELECT rowid, fk_mailref, element_type, fk_element, origin, fk_user_creat FROM ".$p."inbox_link WHERE rowid = ".((int) $linkId));
 		if (!is_object($l)) {
 			return 0;
 		}
 		if ($user instanceof User) {
 			$refs = new InboxMailRef($this->db);
-			if ($refs->levelOf($user, (int) $l->fk_mailref) === '') {
+			$level = $refs->levelOf($user, (int) $l->fk_mailref);
+			if ($level === '') {
 				$this->error = 'InboxMailNotFound';
+				return -1;
+			}
+			// Reading a copy is not enough to undo the work of others: its author, or the level « send » (audit INBX-006)
+			if ((int) $l->fk_user_creat !== (int) $user->id && !in_array($level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+				$this->error = 'InboxErrorLinkNotYours';
 				return -1;
 			}
 		}

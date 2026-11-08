@@ -150,7 +150,8 @@ $refs = new InboxMailRef($db);
 $gone = array();
 if ($page === 0) {
 	foreach ($refRows as $refId => $r) {
-		if (!$refs->copies($refId)) {
+		// Its subject only to who could read its last mailbox (audit INBX-018)
+		if (!$refs->copies($refId) && in_array((int) $r->last_account, $readable, true)) {
 			$gone[] = $r;
 		}
 	}

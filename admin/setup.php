@@ -123,6 +123,7 @@ if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 // Master user of the mail server (Dovecot): password encrypted, never shown again; an empty field keeps it
 if ($action == 'updatemaster' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 	$masterUser = trim(GETPOST('INBOX_MASTER_USER', 'alphanohtml'));
+	$masterHost = strtolower(trim(GETPOST('INBOX_MASTER_HOST', 'alphanohtml')));
 	$separator = trim(GETPOST('INBOX_MASTER_SEPARATOR', 'alphanohtml'));
 	$password = GETPOST('INBOX_MASTER_PASSWORD', 'none');
 	if ($separator === '' || strlen($separator) > 2 || preg_match('/[\s"\']/', $separator)) {
@@ -131,6 +132,8 @@ if ($action == 'updatemaster' && $_SERVER['REQUEST_METHOD'] == 'POST') {
 		setEventMessages($langs->trans('InboxErrorMasterUserSeparator', $separator), null, 'errors');
 	} else {
 		dolibarr_set_const($db, 'INBOX_MASTER_USER', $masterUser, 'chaine', 0, '', $conf->entity);
+		// The only server the master password is sent to (audit INBX-002)
+		dolibarr_set_const($db, 'INBOX_MASTER_HOST', preg_replace('/[^a-z0-9.\-:\[\]]/', '', $masterHost), 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'INBOX_MASTER_SEPARATOR', $separator, 'chaine', 0, '', $conf->entity);
 		if ($masterUser === '') {
 			dolibarr_del_const($db, 'INBOX_MASTER_PASSWORD', $conf->entity);
@@ -224,6 +227,7 @@ print '<input type="hidden" name="action" value="updatemaster">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
 print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('InboxMasterUserName').'</td><td><input type="text" class="minwidth200" name="INBOX_MASTER_USER" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_USER')).'" autocomplete="off"></td></tr>';
+print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans('InboxMasterHost'), $langs->trans('InboxMasterHostHelp')).'</td><td><input type="text" class="minwidth200" name="INBOX_MASTER_HOST" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_HOST')).'" autocomplete="off" placeholder="mail.example.com"></td></tr>';
 print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans('InboxMasterSeparator'), $langs->trans('InboxMasterSeparatorHelp')).'</td><td><input type="text" class="maxwidth50" maxlength="2" name="INBOX_MASTER_SEPARATOR" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_SEPARATOR', '*')).'"></td></tr>';
 print '<tr class="oddeven"><td>'.$langs->trans('Password').'</td><td><input type="password" class="minwidth200" name="INBOX_MASTER_PASSWORD" value="" autocomplete="new-password" placeholder="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_PASSWORD') !== '' ? $langs->trans('InboxPasswordKept') : '').'"></td></tr>';
 print '</table>';

@@ -1787,3 +1787,19 @@ InboxRulesPanelEmpty = Crea la prima con « Nuova regola », o da una mail: menu
 InboxRulesPanelForMail = Mail letta: %s
 InboxRulesPanelNoMatch = Nessuna regola riguarda la mail letta.
 InboxRuleMatchesMail = Riguarda questa mail
+
+# Security fixes (audit 2026-11-08, 1.23.1)
+InboxErrorAuthModeAdmin = Solo un amministratore di Dolibarr può scegliere l'utente master o OAuth, o cambiare il server di una tale casella.
+InboxErrorOAuthService = Questo servizio OAuth non è configurato in Dolibarr.
+InboxErrorPasswordAgain = Il server è cambiato: digita di nuovo la password della casella.
+InboxErrorSmtpPasswordAgain = Il server di invio è cambiato: digita di nuovo la sua password.
+InboxPasswordAgain = Da digitare di nuovo
+InboxMasterHost = Server dell'utente master
+InboxMasterHostHelp = L'unico server a cui viene inviata la password master (per esempio mail.example.com). Senza, l'utente master non è usato.
+InboxMeiliKeyAgain = L'indirizzo è cambiato: digita di nuovo la chiave master.
+InboxJournalNeedManage = Il registro nomina le mail: richiede il livello « gestire » su questa casella.
+InboxErrorLinkNotYours = Solo il suo autore, o un utente che può inviare dalla casella, rimuove questo collegamento.
+InboxErrorHostNotAllowed = Il server %s non è autorizzato dalla configurazione.
+InboxPrintFailed = Impossibile stampare la mail.
+InboxNotifAccessSelf = %s si è dato un accesso a una casella
+InboxNotifType_access_self = Accesso a una casella dato a se stessi

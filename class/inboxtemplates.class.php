@@ -31,6 +31,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 require_once __DIR__.'/inboxelements.class.php';
 require_once __DIR__.'/inboxmailbuilder.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
+require_once __DIR__.'/inboxaccess.class.php';
 
 /**
  * Mail templates of inbox and of the linked pieces
@@ -506,6 +507,13 @@ class InboxTemplates
 			return $this->fail('not_found');
 		}
 		$accounts = $this->accountsOf((int) $t->rowid);
+		// A template of given mailboxes: read by their users only, or who manages the mailboxes (audit INBX-019)
+		if ($accounts && !$user->hasRight('inbox', 'account', 'admin')) {
+			$access = new InboxAccess($this->db);
+			if (!array_intersect($accounts, array_keys($access->getLevels($user)))) {
+				return $this->fail('not_found');
+			}
+		}
 
 		return array('id' => (int) $t->rowid, 'label' => (string) $t->label, 'subject' => (string) $t->topic, 'html' => self::toEditor((string) $t->content, null), 'lang' => (string) $t->lang,
 			'private' => (int) $t->private, 'active' => (int) $t->active, 'accounts' => $accounts, 'editable' => $this->canChange($user, (int) $t->private, (int) $t->fk_user, $accounts) ? 1 : 0);

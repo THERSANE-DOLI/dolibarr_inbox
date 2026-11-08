@@ -1,5 +1,23 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-08 :   1.23.1
+  - a received mail could run a script through « Print »: comments and raw text elements removed from the mails, no
+    tag in their CSS, printing from a hidden frame with the protections of the reading; links: web addresses only.
+  - a stored password, the master password or an OAuth token could be sent to another server from the test of a
+    mailbox: a change of server, port, encryption or login asks the password again; master user and OAuth chosen by
+    the administrator of Dolibarr, the master password only sent to its server (new setting); same for the key of
+    Meilisearch.
+  - journal of a mailbox: the level « manage » on it; drafts taken back or removed: the level « send »; notes and
+    links: changed by their author (a note still follows the mail in every copy); an identity checked again when a
+    mail leaves; the journal cannot be paused by another action.
+  - BIMI off by default, only for a mail checked by the receiving server of the setup; IPv4 only for the calls to
+    an address given by a mail; answers of the private network not shown to who is not administrator; optional list
+    of the servers allowed (INBOX_ALLOWED_HOSTS).
+  - forged Outlook .msg bounded; cache of the mails checked against the mail; lone CR normalised before sending;
+    ${...} neutralised in the Sieve rules; quote of a writing without remote pictures; mailto: without bcc; calls of
+    state and synchronisation in POST with the token; subjects hidden after the loss of an access; templates of a
+    mailbox for its users; third parties of the suggestions with the right to read them; tests and dev never served
+    by the web server; no company name in the public manifest; a self-given access is told to the administrators.
 - NEW: rules and out of office on the mail server (Sieve) :   1.23.0
   - tab Rules of a mailbox (managers): rules run by the server when a mail arrives, even inbox closed; conditions on
     From, To, Cc, Subject, List-Id or a header; move, copy, tag, mark read, star, trash, forward (copy kept).

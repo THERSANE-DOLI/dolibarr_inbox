@@ -58,7 +58,6 @@ if (!$res) {
 
 $langs->loadLangs(array('inbox@inbox'));
 
-$company = getDolGlobalString('MAIN_INFO_SOCIETE_NOM');
 $accent = getDolGlobalString('INBOX_ACCENT', '#8a2b6e');
 if (!preg_match('/^#[0-9a-f]{6}$/i', $accent)) {
 	$accent = '#8a2b6e';
@@ -66,7 +65,8 @@ if (!preg_match('/^#[0-9a-f]{6}$/i', $accent)) {
 $scope = dol_buildpath('/inbox/', 1);
 $manifest = array(
 	'id' => $scope,
-	'name' => $langs->transnoentitiesnoconv('InboxAppName').($company !== '' ? ' '.$company : ''),
+	// Public file (asked by the browser without the session): no name of the company in it (audit INBX-025)
+	'name' => $langs->transnoentitiesnoconv('InboxAppName'),
 	'short_name' => $langs->transnoentitiesnoconv('InboxAppName'),
 	'start_url' => dol_buildpath('/inbox/index.php', 1),
 	'scope' => $scope,

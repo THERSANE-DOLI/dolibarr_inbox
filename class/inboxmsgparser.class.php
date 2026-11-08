@@ -91,6 +91,16 @@ class InboxMsgParser
 	/** @var string Encoding of the 8 bits strings of the mail */
 	protected $codepage = 'Windows-1252';
 
+	/** Attachments and recipients read at most in one file (audit INBX-011: a forged file is not read for ever) */
+	const MAX_ATTACHMENTS = 500;
+	const MAX_RECIPIENTS = 1000;
+
+	/** @var int Bytes the attachments may take, all together: 3 times the size of the file (they cannot be larger in an honest one) */
+	protected $budget = 0;
+
+	/** @var int Attachments read so far */
+	protected $attachmentsRead = 0;
+
 	/**
 	 * @param string $content Content of the .msg file
 	 * @param int    $depth   Level of a mail attached to a mail, 0 for the mail itself
@@ -106,6 +116,7 @@ class InboxMsgParser
 		}
 		$parser = new self();
 		$parser->cfb = $cfb;
+		$parser->budget = 3 * strlen((string) $content);
 		$children = $cfb->children($cfb->root());
 		if (!isset($children['__properties_version1.0'])) {
 			self::$error = 'Not an Outlook mail';
@@ -201,9 +212,13 @@ class InboxMsgParser
 		$to = array();
 		$cc = array();
 		ksort($children);
+		$read = 0;
 		foreach ($children as $name => $index) {
 			if (strpos($name, '__recip_version1.0_#') !== 0 || !$this->cfb->isStorage($index)) {
 				continue;
+			}
+			if (++$read > self::MAX_RECIPIENTS) {
+				break;
 			}
 			$recipient = $this->cfb->children($index);
 			$fixed = $this->fixedProperties($recipient, 8);
@@ -243,6 +258,9 @@ class InboxMsgParser
 			if (strpos($name, '__attach_version1.0_#') !== 0 || !$this->cfb->isStorage($index)) {
 				continue;
 			}
+			if (++$this->attachmentsRead > self::MAX_ATTACHMENTS || $this->budget <= 0) {
+				break;
+			}
 			$attachment = $this->cfb->children($index);
 			$fixed = $this->fixedProperties($attachment, 8);
 			$fileName = $this->string($attachment, self::PR_ATTACH_LONG_FILENAME);
@@ -270,6 +288,11 @@ class InboxMsgParser
 			$content = $this->binary($attachment, self::PR_ATTACH_DATA);
 			if ($content === '' || strlen($content) > InboxMimeParser::MAX_ATTACHMENT_SIZE) {
 				continue;
+			}
+			// Streams shared by several entries copy the same bytes again: a budget for the whole file
+			$this->budget -= strlen($content);
+			if ($this->budget < 0) {
+				break;
 			}
 			$mime = $this->string($attachment, self::PR_ATTACH_MIME_TAG);
 			$cid = trim($this->string($attachment, self::PR_ATTACH_CONTENT_ID), " <>\t");

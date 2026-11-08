@@ -106,6 +106,24 @@ if ($part !== '' && $part !== 'main') {
 	$intro .= '</table><hr style="border:0;border-top:1px solid #ddd;margin:0 0 12px">';
 }
 
+// Print (audit INBX-001): the head of the mail written here, escaped, above the body; the same protections as the
+// reading (the page prints itself from a hidden frame, never copied elsewhere)
+if (GETPOSTINT('print') === 1 && $intro === '') {
+	$rows = array(
+		array($langs->transnoentities('InboxFrom'), trim($message->fromName.' <'.$message->fromEmail.'>')),
+		array($langs->transnoentities('InboxTo'), implode(', ', array_map(function ($a) {
+			return trim($a['name'].' <'.$a['email'].'>');
+		}, array_merge($message->to, $message->cc)))),
+		array($langs->transnoentities('InboxDate'), $message->date ? dol_print_date($message->date, 'dayhour', 'tzuserrel') : ''),
+		array($langs->transnoentities('InboxSubject'), $message->subject),
+	);
+	$intro = '<table style="border-collapse:collapse;margin:0 0 12px;font:13px Arial,sans-serif;color:#222">';
+	foreach ($rows as $r) {
+		$intro .= '<tr><th style="text-align:left;padding:1px 12px 1px 0;font-weight:600;vertical-align:top">'.dol_escape_htmltag($r[0]).'</th><td>'.dol_escape_htmltag($r[1]).'</td></tr>';
+	}
+	$intro .= '</table><hr style="border:0;border-top:1px solid #999;margin:0 0 12px">';
+}
+
 $images = GETPOSTINT('images') === 1;
 if ($message->bodyHtml !== '') {
 	// Pictures of the mail (cid:) as data URIs, 5 MB at most

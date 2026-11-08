@@ -209,7 +209,9 @@ class InboxNote
 				$this->error = 'InboxErrorNoteNotFound';
 				return null;
 			}
-			if ((int) $n->fk_user_author !== (int) $user->id && $level !== InboxAccess::LEVEL_MANAGE) {
+			// A note follows the mail in every copy (decided): read by all who see a copy, changed by its author only
+			// (audit INBX-006)
+			if ((int) $n->fk_user_author !== (int) $user->id) {
 				$this->error = 'InboxErrorNoteNotYours';
 				return null;
 			}

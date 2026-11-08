@@ -251,6 +251,11 @@ class InboxComposer
 				dol_delete_dir_recursive($dir);
 				return $this->fail('not_found', 'Not a draft');
 			}
+			// Taking a draft back replaces it, then removes it: the level « send » on its mailbox (audit INBX-005)
+			if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('no_send');
+			}
 			$state['draft'] = array('account' => (int) $reader->row->fk_account, 'folder' => (string) $reader->row->folder_path, 'remote_id' => (string) $reader->row->remote_id, 'mail' => (int) $reader->row->rowid);
 			$headers = InboxReader::headers($raw);
 			$h = function ($name) use ($headers) {
@@ -1326,7 +1331,7 @@ class InboxComposer
 		$previous = $state['draft'] ?? null;
 		$state['draft'] = array('account' => (int) $account->id, 'folder' => (string) $roles['drafts'], 'remote_id' => (string) $id, 'mail' => 0);
 		self::writeState($dir, $state);
-		$this->removeDraft($previous, $connector, (int) $account->id);
+		$this->removeDraft($previous, $connector, (int) $account->id, $user);
 		$connector->disconnect();
 
 		return array('saved' => dol_now());
@@ -1338,12 +1343,19 @@ class InboxComposer
 	 * @param array<string,mixed>|null     $draft     Draft (account, folder, remote_id, mail)
 	 * @param InboxConnectorInterface|null $connector Connector of the mailbox of the new draft
 	 * @param int                          $accountId Its mailbox
+	 * @param User|null                    $user      User: the level « send » on the mailbox of the draft is checked again
 	 * @return void
 	 */
-	public function removeDraft($draft, $connector, $accountId)
+	public function removeDraft($draft, $connector, $accountId, $user = null)
 	{
 		if (!$draft || (string) ($draft['remote_id'] ?? '') === '') {
 			return;
+		}
+		if ($user instanceof User) {
+			$access = new InboxAccess($this->db);
+			if (!in_array($access->getLevel($user, (int) $draft['account']), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+				return;
+			}
 		}
 		$own = null;
 		if ((int) $draft['account'] !== $accountId || !$connector) {
@@ -1386,7 +1398,7 @@ class InboxComposer
 		}
 		$state = self::readState($dir);
 		if ($removeDraft && !empty($state['draft'])) {
-			$this->removeDraft($state['draft'], null, 0);
+			$this->removeDraft($state['draft'], null, 0, $user);
 		}
 		dol_delete_dir_recursive($dir);
 		unset($_SESSION['inbox_compose'][$token]);

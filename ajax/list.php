@@ -27,7 +27,8 @@ dol_include_once('/inbox/class/inboxtextsearch.class.php');
 dol_include_once('/inbox/class/inboxfulltext.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(false);
+// The calls that write (presence, synchronisation, results of a search in the text) need POST and the token (audit INBX-017)
+inboxAjaxStart(in_array($action, array('state', 'pump', 'refresh', 'content'), true));
 $access = new InboxAccess($db);
 $readable = array_keys(array_filter($access->getLevels($user), function ($level) {
 	return InboxAccess::rank($level) >= InboxAccess::rank(InboxAccess::LEVEL_READ);
@@ -328,7 +329,11 @@ switch ($action) {
 				}
 				inboxAjaxReply($out);
 			}
-			$rows = $db->getRows("SELECT s.rowid, s.nom FROM ".$db->prefix()."societe as s WHERE s.entity IN (".getEntity('societe').") AND s.nom LIKE ".$like
+			// Third parties only with the right to read them, and only those of a sales representative when he sees
+			// only his own (audit INBX-020)
+			$socRight = isModEnabled('societe') && $user->hasRight('societe', 'lire');
+			$restrict = $socRight && !$user->hasRight('societe', 'client', 'voir') ? " AND EXISTS (SELECT sc.rowid FROM ".$db->prefix()."societe_commerciaux as sc WHERE sc.fk_soc = s.rowid AND sc.fk_user = ".((int) $user->id).")" : '';
+			$rows = !$socRight ? array() : $db->getRows("SELECT s.rowid, s.nom FROM ".$db->prefix()."societe as s WHERE s.entity IN (".getEntity('societe').") AND s.nom LIKE ".$like.$restrict
 				." AND EXISTS (SELECT m.rowid FROM ".$db->prefix()."inbox_mail as m WHERE m.fk_soc = s.rowid AND m.fk_account IN (".$in."))"
 				." ORDER BY s.nom LIMIT 3");
 			foreach (is_array($rows) ? $rows : array() as $r) {

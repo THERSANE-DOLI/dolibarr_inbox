@@ -39,9 +39,11 @@ $bimi = false;
 if (GETPOSTINT('reading') === 1 && (string) $reader->row->message_id !== '') {
 	$inbox = new Inbox($db);
 	$raw = $inbox->cachedRaw($reader->account->email, (string) $reader->row->message_id);
-	if ($raw !== null) {
+	// The cache only when it is this very mail (audit INBX-012: a Message-ID may be copied by a sender)
+	if ($raw !== null && ((int) $reader->row->size <= 0 || strlen($raw) === (int) $reader->row->size)) {
 		$auth = InboxReader::authResults(InboxReader::headers($raw));
-		$bimi = $auth['dmarc'] === 'pass' && !$auth['fail'];
+		// The logo of a brand only when our own server checked the mail (audit INBX-022)
+		$bimi = $auth['trusted'] && $auth['dmarc'] === 'pass' && !$auth['fail'];
 	}
 }
 $avatar = new InboxAvatar($db);

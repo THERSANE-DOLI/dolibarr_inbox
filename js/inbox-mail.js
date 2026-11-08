@@ -469,7 +469,7 @@
 					const inbox = a.folders.find(f => f.role === 'inbox') || a.folders[0];
 					if (inbox) {
 						try {
-							await api('list', 'refresh', { folder: inbox.id, retry: 1 });
+							await post('list', 'refresh', { folder: inbox.id, retry: 1 });
 						} catch (err) {
 							toast(err.message, { error: true });
 						}
@@ -1869,7 +1869,7 @@
 			const name = accountById(id) ? accountName(accountById(id)) : String(id);
 			try {
 				const q = listQuery('');
-				const res = await api('list', 'content', { account: id, scope: S.scope, folder: S.folderId, q: q.q, qx: q.qx || '' }, { method: 'POST' });
+				const res = await post('list', 'content', { account: id, scope: S.scope, folder: S.folderId, q: q.q, qx: q.qx || '' });
 				if (res.unsupported) {
 					deep.unsupported.push(name);
 				} else if (!res.complete) {
@@ -3500,7 +3500,7 @@
 				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
 					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
-				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine || d.level === 'manage', d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
+				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine, d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
 				+ '</div>'
 				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
 				+ '</div></div>';
@@ -5001,6 +5001,11 @@
 				}
 				return;
 			}
+			// Only web addresses leave the mail (never javascript:, data:, file:...: audit INBX-001)
+			if (!/^(https?:\/\/|tel:|#)/i.test(href)) {
+				e.preventDefault();
+				return;
+			}
 			const shown = (a.textContent || '').trim();
 			const real = hostOf(href);
 			const claimed = hostOf(/^[a-z]+:\/\//i.test(shown) ? shown : (/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(shown) ? 'http://' + shown : ''));
@@ -5069,31 +5074,36 @@
 		});
 	}
 
+	/**
+	 * Print a mail: its body loaded again by body.php (print mode: head of the mail written by the server) in a hidden
+	 * frame with the same protections as the reading (CSP without script, remote pictures as chosen, sandbox), never
+	 * copied into a window of the application (audit INBX-001, INBX-007)
+	 */
 	function printMail(m) {
+		const old = $('.ibx-js-printframe');
+		if (old) {
+			old.remove();
+		}
 		const frame = $('.ibx-js-frame', mailRoot(m));
-		const w = window.open('', '_blank');
-		if (!w) {
-			toast(t('InboxPopupBlocked'), { error: true });
-			return;
-		}
-		let body = '';
-		try {
-			body = frame && frame.contentDocument ? frame.contentDocument.documentElement.outerHTML : '';
-		} catch (e) {
-			body = '';
-		}
-		const head = '<div style="font:13px Arial,sans-serif;border-bottom:1px solid #999;margin:0 0 12px;padding:0 0 8px">'
-			+ '<div><b>' + th('InboxFrom') + '</b> ' + esc((m.from.name ? m.from.name + ' ' : '') + '<' + m.from.email + '>') + '</div>'
-			+ '<div><b>' + th('InboxTo') + '</b> ' + esc((m.to || []).map(a => a.email).join(', ')) + '</div>'
-			+ '<div><b>' + th('InboxDate') + '</b> ' + esc(longDate(m.date)) + '</div>'
-			+ '<div><b>' + th('InboxSubject') + '</b> ' + esc(m.subject) + '</div></div>';
-		w.document.open();
-		w.document.write(body.replace(/<body([^>]*)>/i, '<body$1>' + head) || head);
-		w.document.close();
-		w.focus();
-		setTimeout(() => {
-			w.print();
-		}, 300);
+		const images = !!(frame && /[?&]images=1/.test(frame.getAttribute('src') || ''));
+		const f = document.createElement('iframe');
+		f.className = 'ibx-js-printframe';
+		f.setAttribute('sandbox', 'allow-same-origin allow-modals');
+		f.setAttribute('referrerpolicy', 'no-referrer');
+		f.setAttribute('aria-hidden', 'true');
+		f.tabIndex = -1;
+		f.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:600px;border:0';
+		f.addEventListener('load', () => {
+			try {
+				f.contentWindow.focus();
+				f.contentWindow.print();
+			} catch (e) {
+				toast(t('InboxPrintFailed'), { error: true });
+			}
+			setTimeout(() => f.remove(), 60000);
+		}, { once: true });
+		f.src = bodyUrl(m, images) + '&print=1';
+		document.body.appendChild(f);
 	}
 
 	function download(url) {
@@ -6179,7 +6189,7 @@
 		let next = 20000;
 		const folder = relay.queue.length ? relay.queue.shift() : (S.folderId || 0);
 		try {
-			const r = await api('list', 'pump', { folder });
+			const r = await post('list', 'pump', { folder });
 			relay.cron = !!r.cron;
 			const changed = r.stats && (r.stats.new || r.stats.changed || r.stats.deleted);
 			if (changed || (r.done || []).some(x => x !== 'folder')) {
@@ -6245,7 +6255,7 @@
 			if (S.folderId && !I.isLeader()) {
 				requestSync(S.folderId, false);
 			}
-			const st = await api('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0, writing: I.composeWriting ? I.composeWriting() : 0 });
+			const st = await post('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0, writing: I.composeWriting ? I.composeWriting() : 0 });
 			showPresence(st.presence);
 			if (st.notif) {
 				Dolibarr.executeHook('inbox:notif:state', st.notif);

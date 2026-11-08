@@ -43,9 +43,32 @@ switch ($action) {
 
 	case 'grant':
 		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'), true);
+		$before = $access->getLevel($user, (int) $account->id);
 		$result = $access->grant($user, (int) $account->id, (int) inboxAjaxParam('fk_user', 'int'), (int) inboxAjaxParam('fk_usergroup', 'int'), (string) inboxAjaxParam('level', 'aZ09'));
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($access->error), 422);
+		}
+		// Who manages the mailboxes and gives himself an access (directly or by a group): the owner of the mailbox and
+		// the administrators of Dolibarr are told (audit INBX-026: managing never gives the reading silently)
+		InboxAccess::clearCache();
+		$after = $access->getLevel($user, (int) $account->id);
+		if ($result > 0 && InboxAccess::rank($after) > InboxAccess::rank($before)) {
+			dol_include_once('/inbox/class/inboxnotification.class.php');
+			$notify = new InboxNotification($db);
+			$told = array();
+			if ($account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner > 0) {
+				$told[] = (int) $account->fk_user_owner;
+			}
+			$admins = $db->getRows("SELECT rowid FROM ".$db->prefix()."user WHERE admin = 1 AND statut = 1 AND entity IN (0, ".((int) $conf->entity).") LIMIT 50");
+			foreach (is_array($admins) ? $admins : array() as $a) {
+				$told[] = (int) $a->rowid;
+			}
+			foreach (array_unique($told) as $uid) {
+				if ($uid !== (int) $user->id) {
+					$notify->add($uid, 'access_self', array('account' => (int) $account->id, 'actor' => (int) $user->id, 'url' => '#/settings/accounts/'.((int) $account->id).'/access',
+						'payload' => array('subject' => (string) ($account->label ?: $account->email), 'level' => $after)));
+				}
+			}
 		}
 		inboxAjaxReply(array('changed' => $result > 0, 'accesses' => $access->listForAccount((int) $account->id)));
 		// no break

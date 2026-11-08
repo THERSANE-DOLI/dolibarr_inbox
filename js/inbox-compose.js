@@ -87,8 +87,11 @@
 		});
 		return out;
 	}
-	function srcdoc(html) {
-		return '<!doctype html><html><head><meta charset="utf-8"><style>html{color-scheme:light}body{margin:8px;font:13px/1.45 Arial,Helvetica,sans-serif;color:#333;background:#fff;overflow-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:0 0 0 .8ex;border-left:2px solid #ccc;padding-left:1ex}</style></head><body>' + html + '</body></html>';
+	function srcdoc(html, own) {
+		// The quote holds the mail answered: same rules as the reading, no script, no remote picture (audit INBX-021);
+		// a signature of the company (own) may show its remote logo
+		const csp = own ? '' : '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; font-src data:">';
+		return '<!doctype html><html><head><meta charset="utf-8">' + csp + '<style>html{color-scheme:light}body{margin:8px;font:13px/1.45 Arial,Helvetica,sans-serif;color:#333;background:#fff;overflow-wrap:break-word}img{max-width:100%;height:auto}blockquote{margin:0 0 0 .8ex;border-left:2px solid #ccc;padding-left:1ex}</style></head><body>' + html + '</body></html>';
 	}
 
 	// ---------- Recipients field: chips + proposals (contacts, thirdparties, users, correspondents) ----------
@@ -276,7 +279,7 @@
 		box.hidden = !sig.trim() || !w.signature;
 		$('.ibx-js-sigadd', w.dlg).hidden = !sig.trim() || w.signature;
 		if (!box.hidden) {
-			$('iframe', box).srcdoc = srcdoc('-- <br>' + sig);
+			$('iframe', box).srcdoc = srcdoc('-- <br>' + sig, true);
 		}
 	}
 	function paintAttachments(w) {
@@ -2081,7 +2084,8 @@
 			k = k.toLowerCase();
 			if (k === 'to') {
 				o.to = (o.to ? o.to + ',' : '') + v;
-			} else if (['cc', 'bcc', 'subject', 'body'].includes(k)) {
+			} else if (['cc', 'subject', 'body'].includes(k)) {
+				// No « bcc »: a link never adds a hidden recipient (audit INBX-029)
 				o[k] = v;
 			}
 		});

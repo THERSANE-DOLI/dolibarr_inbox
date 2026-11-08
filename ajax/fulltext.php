@@ -31,15 +31,25 @@ inboxAjaxStart(in_array($action, array('test', 'enable', 'disable', 'account_set
 inboxAjaxNeedAdmin();
 
 /**
- * Master key: the one typed, else the one kept
+ * Master key: the one typed, else the one kept, but only for the address it was kept with (audit INBX-003: the key
+ * opens every index, it never goes to another address)
  *
+ * @param string $url Address of the call
  * @return string
  */
-function inboxFulltextMasterKey()
+function inboxFulltextMasterKey($url)
 {
-	$typed = (string) inboxAjaxParam('key', 'none');
+	global $langs;
 
-	return $typed !== '' ? $typed : (string) dolDecrypt(getDolGlobalString('INBOX_MEILI_KEY'));
+	$typed = (string) inboxAjaxParam('key', 'none');
+	if ($typed !== '') {
+		return $typed;
+	}
+	$kept = getDolGlobalString('INBOX_MEILI_KEY');
+	if ($kept !== '' && rtrim(strtolower(trim((string) $url)), '/') === rtrim(strtolower(trim(getDolGlobalString('INBOX_MEILI_URL'))), '/')) {
+		return (string) dolDecrypt($kept);
+	}
+	inboxAjaxError($langs->transnoentities('InboxMeiliKeyAgain'), 422, array('key' => 1));
 }
 
 switch ($action) {
@@ -59,11 +69,17 @@ switch ($action) {
 		if (!InboxMeili::validUrl($url)) {
 			inboxAjaxError($langs->transnoentities('InboxMeiliBadUrl'), 422, array('url' => 1));
 		}
-		$client = new InboxMeili($url, inboxFulltextMasterKey());
+		dol_include_once('/inbox/class/inboxservertester.class.php');
+		if (!InboxServerTester::hostAllowed((string) parse_url($url, PHP_URL_HOST))) {
+			inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', (string) parse_url($url, PHP_URL_HOST)), 422, array('url' => 1));
+		}
+		$client = new InboxMeili($url, inboxFulltextMasterKey($url));
 		$client->timeout = 5;
 		$version = $client->version();
 		if ($version === '') {
-			inboxAjaxReply(array('ok' => false, 'error' => $langs->transnoentities('InboxMeiliNoAnswer', $client->error), 'local' => InboxMeili::isLocal($url)));
+			// No answer of the private network said to who is not administrator of Dolibarr (audit INBX-010)
+			$said = !empty($user->admin) || !InboxMeili::isLocal($url) ? $client->error : '';
+			inboxAjaxReply(array('ok' => false, 'error' => $langs->transnoentities('InboxMeiliNoAnswer', $said), 'local' => InboxMeili::isLocal($url)));
 		}
 		// Only the master key may create the key of inbox
 		$master = $client->call('GET', '/keys?limit=1') !== null;
@@ -84,7 +100,7 @@ switch ($action) {
 		if (InboxFulltext::enabled()) {
 			inboxAjaxError($langs->transnoentities('InboxMeiliAlreadyOn'), 409);
 		}
-		$master = new InboxMeili($url, inboxFulltextMasterKey());
+		$master = new InboxMeili($url, inboxFulltextMasterKey($url));
 		$key = $master->createKey($prefix, 'inbox '.$prefix);
 		if (!$key) {
 			inboxAjaxError($langs->transnoentities('InboxMeiliNoKey', $master->error), 422, array('key' => 1));

@@ -112,9 +112,12 @@ class InboxReader
 		$inbox = new Inbox($this->db);
 		$messageId = (string) $this->row->message_id;
 		$raw = $messageId !== '' ? $inbox->cachedRaw($this->account->email, $messageId) : null;
-		if ($raw !== null) {
+		// The cache is found by the Message-ID, that a sender may copy: served only when it is this mail (its size
+		// on the server), else read again from the server (audit INBX-012)
+		if ($raw !== null && ((int) $this->row->size <= 0 || strlen($raw) === (int) $this->row->size)) {
 			return $raw;
 		}
+		$raw = null;
 		$error = '';
 		$connector = InboxConnectorFactory::forAccount($this->db, $this->account, $error);
 		if (!$connector) {
@@ -522,12 +525,15 @@ class InboxReader
 			return 'InboxErrorUnsubscribeNotSigned';
 		}
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
-		$res = getURLContent($info['https'], 'POST', 'List-Unsubscribe=One-Click', 0, array('Content-Type: application/x-www-form-urlencoded'), array('https'), 0, -1, 5, 15);
+		// IPv4 only: the check of the private and local addresses of the core resolves IPv4 only, an IPv6 address would
+		// pass it (audit INBX-009)
+		$res = getURLContent($info['https'], 'POST', 'List-Unsubscribe=One-Click', 0, array('Content-Type: application/x-www-form-urlencoded'), array('https'), 0, -1, 5, 15,
+			array(CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4));
 		$code = (int) ($res['http_code'] ?? 0);
 		if ($code < 200 || $code >= 300) {
 			dol_syslog(__METHOD__.' '.$code.' '.($res['curl_error_msg'] ?? '').' '.dol_trunc((string) ($res['content'] ?? ''), 200), LOG_WARNING);
-			// An address refused before any call (local or private network) comes with its reason
-			$this->error = !empty($res['curl_error_msg']) ? (string) $res['curl_error_msg'] : 'HTTP '.$code;
+			// No text of the network said (it would tell what answers inside): the code only (audit INBX-009)
+			$this->error = $code > 0 ? 'HTTP '.$code : 'no answer';
 			return 'InboxErrorUnsubscribeFailed';
 		}
 		InboxActionLog::add($this->db, $user, (int) $this->row->fk_account, 'unsubscribe', array($this->row), (string) $this->row->folder_path, '', 0,
@@ -557,12 +563,33 @@ class InboxReader
 	 * the one of our server; the lower ones may be forged by the sender)
 	 *
 	 * @param array<int,array{0:string,1:string}> $headers Headers
-	 * @return array{spf:string,dkim:string,dmarc:string,fail:bool}
+	 * @return array{spf:string,dkim:string,dmarc:string,fail:bool,trusted:bool} trusted: written by one of the receiving
+	 *         servers of the setup (INBOX_AUTH_SERVERS), not by the sender (audit INBX-022)
 	 */
 	public static function authResults(array $headers)
 	{
-		$value = self::headerValue($headers, 'Authentication-Results');
-		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false);
+		require_once __DIR__.'/inboxknownsenders.class.php';
+		$servers = InboxKnownSenders::trustedServers();
+		$value = '';
+		$trusted = false;
+		foreach ($headers as $h) {
+			if (strcasecmp($h[0], 'Authentication-Results') !== 0) {
+				continue;
+			}
+			if (!$servers) {
+				// No server declared: the topmost one, never « trusted »
+				$value = $h[1];
+				break;
+			}
+			// The one of our server, named by its authserv-id; the others may come from the sender
+			$id = strtolower(trim((string) preg_replace('/\s+\d+\s*$/', '', (string) strtok($h[1], ';'))));
+			if (in_array($id, $servers, true)) {
+				$value = $h[1];
+				$trusted = true;
+				break;
+			}
+		}
+		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false, 'trusted' => $trusted);
 		foreach (array('spf', 'dkim', 'dmarc') as $k) {
 			if (preg_match('/\b'.$k.'=([a-z]+)/i', $value, $m)) {
 				$out[$k] = strtolower($m[1]);

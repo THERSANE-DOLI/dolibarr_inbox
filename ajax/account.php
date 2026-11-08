@@ -39,6 +39,7 @@ $isAdmin = $user->hasRight('inbox', 'account', 'admin');
  */
 function inboxAccountFromInput(InboxAccount $account)
 {
+	$typed = array('imap' => false, 'smtp' => false);
 	// Only the fields sent are changed: a field not sent keeps its value (or the default of a new mailbox)
 	foreach (array('email', 'label', 'type', 'imap_host', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'smtp_host', 'smtp_encryption', 'smtp_login') as $field) {
 		$value = inboxAjaxHas($field) ? inboxAjaxParam($field) : null;
@@ -63,10 +64,41 @@ function inboxAccountFromInput(InboxAccount $account)
 	$imapPassword = (string) inboxAjaxParam('imap_password', 'none');
 	if ($imapPassword !== '') {
 		$account->setImapPassword($imapPassword);
+		$typed['imap'] = true;
 	}
 	$smtpPassword = (string) inboxAjaxParam('smtp_password', 'none');
 	if ($smtpPassword !== '') {
 		$account->setSmtpPassword($smtpPassword);
+		$typed['smtp'] = true;
+	}
+
+	return $typed;
+}
+
+/**
+ * The form put on the mailbox, then the guard of the secrets (audit INBX-002): a stored password never goes to
+ * another server than the one it was typed for
+ *
+ * @param InboxAccount $account Mailbox (stored, or new)
+ * @return void
+ */
+function inboxAccountApplyForm(InboxAccount $account)
+{
+	global $langs, $user;
+
+	$old = $account->id > 0 ? clone $account : null;
+	$typed = inboxAccountFromInput($account);
+	// Servers allowed by the setup, if any (audit INBX-010)
+	dol_include_once('/inbox/class/inboxservertester.class.php');
+	foreach (array($account->imap_host, $account->smtp_host) as $host) {
+		if (!InboxServerTester::hostAllowed((string) $host)) {
+			inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', (string) $host), 422, array('imap_host' => 1));
+		}
+	}
+	$error = $account->guardSecrets($old, $typed['imap'], $typed['smtp'], !empty($user->admin));
+	if ($error !== '') {
+		$field = $error === 'InboxErrorSmtpPasswordAgain' ? 'smtp_password' : ($error === 'InboxErrorPasswordAgain' ? 'imap_password' : 'imap_auth_mode');
+		inboxAjaxError($langs->transnoentities($error), 422, array($field => $langs->transnoentities($error)));
 	}
 }
 
@@ -143,7 +175,7 @@ switch ($action) {
 		if ($id > 0) {
 			$account = inboxAjaxManagedAccount($id, true);
 		}
-		inboxAccountFromInput($account);
+		inboxAccountApplyForm($account);
 		$result = $id > 0 ? $account->update($user) : $account->create($user);
 		if ($result <= 0) {
 			inboxAjaxError(inboxAjaxTransErrors($account->errors ? $account->errors : array($account->error)), 422);
@@ -159,9 +191,13 @@ switch ($action) {
 		if ($id > 0) {
 			$account = inboxAjaxManagedAccount($id, true);
 		}
-		// Values of the form, not saved; an empty password field keeps the stored password of the mailbox
-		inboxAccountFromInput($account);
+		// Values of the form, not saved; an empty password field keeps the stored password of the mailbox, as long as
+		// the server is the same one (INBX-002)
+		inboxAccountApplyForm($account);
 		$tester = new InboxServerTester($db);
+		// A host of the private network: its answers are not shown to who is not administrator of Dolibarr (INBX-010)
+		dol_include_once('/inbox/class/inboxmeili.class.php');
+		$tester->withDetail = !empty($user->admin) || !InboxMeili::isLocal('imap://'.trim((string) $account->imap_host, '[]'));
 		$saved = $id > 0 && inboxAjaxParam('save', 'int');
 		$result = $saved ? $tester->runAndSave($account, $user) : $tester->run($account);
 		inboxAjaxReply(array('test' => $result));

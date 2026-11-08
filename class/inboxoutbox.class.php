@@ -209,6 +209,19 @@ class InboxOutbox
 		$raw = (string) @file_get_contents(self::file($id, 'raw'));
 		$wire = (string) @file_get_contents(self::file($id, 'wire'));
 		$actions = json_decode((string) $row->actions, true) ?: array();
+		// The identity may have changed during the delay too: still active, of this mailbox, with this address (audit
+		// INBX-015); a mailbox without identity sends with its own address (identity « -mailbox »)
+		$identityId = (int) ($actions['identity'] ?? $row->fk_identity);
+		$from = strtolower((string) ($actions['from'] ?? ''));
+		if ($identityId > 0) {
+			$ident = $this->db->getRow("SELECT email FROM ".$this->db->prefix()."inbox_identity WHERE rowid = ".$identityId." AND fk_account = ".((int) $account->id)." AND status = 1");
+			$identityOk = is_object($ident) && strtolower((string) $ident->email) === $from;
+		} else {
+			$identityOk = $from === strtolower((string) $account->email);
+		}
+		if (!$identityOk) {
+			return $this->failed($row, 'no_send', 'Identity of the mail not active any more', $direct);
+		}
 		if ($raw === '' || $wire === '') {
 			return $this->failed($row, 'error', 'Source of the mail missing', $direct);
 		}
@@ -244,7 +257,7 @@ class InboxOutbox
 			$composer->markAnswered($author, $source, (int) $account->id === (int) $source['account'] ? $connector : null);
 		}
 		if (!empty($actions['draft'])) {
-			$composer->removeDraft($actions['draft'], $connector, (int) $account->id);
+			$composer->removeDraft($actions['draft'], $connector, (int) $account->id, $author);
 		}
 		$connector->disconnect();
 		$subject = (string) $row->subject;

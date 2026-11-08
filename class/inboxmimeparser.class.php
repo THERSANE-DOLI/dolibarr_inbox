@@ -47,7 +47,9 @@ class InboxMimeParser
 
 	/** Elements removed with their content: scripts, frames, forms, documents inside the document */
 	const HTML_DROP = array('script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'form', 'input', 'button', 'select',
-		'textarea', 'link', 'meta', 'base', 'svg', 'math', 'template', 'noscript', 'audio', 'video', 'source', 'track', 'portal', 'title', 'head');
+		'textarea', 'link', 'meta', 'base', 'svg', 'math', 'template', 'noscript', 'audio', 'video', 'source', 'track', 'portal', 'title', 'head',
+		// Read by the browsers as raw text, by libxml as elements: what they hold would not be the same HTML (audit INBX-001)
+		'xmp', 'noembed', 'noframes', 'plaintext', 'listing', 'style');
 
 	/**
 	 * @param string $raw   RFC 822 source
@@ -293,7 +295,9 @@ class InboxMimeParser
 	 */
 	public static function htmlToText($html)
 	{
-		$html = preg_replace('#<(script|style|head)\b[^>]*>.*?</\1>#is', ' ', (string) $html);
+		// Cut first (the text kept is shorter anyway): a forged HTML never makes the expressions below slow (audit INBX-027)
+		$html = mb_strcut((string) $html, 0, self::MAX_HTML_LENGTH, 'UTF-8');
+		$html = preg_replace('#<(script|style|head)\b[^>]*>.*?</\1>#is', ' ', $html);
 		$html = preg_replace('#<(br|/p|/div|/tr|/li|/h\d)\b[^>]*>#i', "\n", $html);
 		$html = preg_replace('#</t[dh]>#i', "\t", $html);
 
@@ -337,6 +341,10 @@ class InboxMimeParser
 			}
 		}
 		$xpath = new DOMXPath($doc);
+		// Comments and processing instructions: never sent to the browser, nothing hides in them (audit INBX-001)
+		foreach (iterator_to_array($xpath->query('//comment() | //processing-instruction()')) as $node) {
+			$node->parentNode->removeChild($node);
+		}
 		foreach (iterator_to_array($xpath->query('//*')) as $node) {
 			/** @var DOMElement $node */
 			foreach (iterator_to_array($node->attributes) as $attr) {
@@ -535,8 +543,9 @@ class InboxMimeParser
 	 */
 	protected static function document($body, $styles)
 	{
-		// The CSS of a mail cannot close the style element (no « </style » kept)
-		$styles = str_ireplace('</style', '', $styles);
+		// The CSS of a mail cannot close the style element nor open a tag: no « < » in it (written \3C, the same
+		// character for CSS), whatever the HTML parser of the browser (audit INBX-001)
+		$styles = str_replace('<', '\\3C ', (string) $styles);
 
 		return '<!doctype html><html><head><meta charset="utf-8"><style>'
 			.'html{color-scheme:light}body{margin:16px;font:14px/1.45 Arial,Helvetica,sans-serif;color:#222;background:#fff;overflow-wrap:break-word}'
