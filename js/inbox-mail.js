@@ -267,6 +267,8 @@
 	}
 
 	function renderTree() {
+		// Unread counter of the tab (js/inbox-notify.js): summed again on the counters known here, at once
+		Dolibarr.executeHook('inbox:folders:counts', S.folders);
 		const pane = $('.ibx-pane--folders', S.el);
 		const body = $('.ibx-pane__body', pane);
 		if (!S.accounts.length) {

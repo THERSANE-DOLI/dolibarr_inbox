@@ -27,7 +27,182 @@
 	const I = Dolibarr.tools.inbox;
 	const { esc, t, th, ic, api, post, toast, $, $$ } = I;
 	const IDLE_MS = 30 * 60 * 1000;
-	const N = { unread: 0, last: -1, at: 0, panel: null, items: [], more: false, loading: false };
+	const N = { unread: 0, last: -1, at: 0, panel: null, items: [], more: false, loading: false, mails: -1, mailFolders: null };
+
+	// ---------- Unread counter: tab, installed application, top bar of Dolibarr (lot W8 1.21.0) ----------
+	const icons = new Map();
+	let iconBase = null;
+
+	/** Icon of the tab with a round badge of the count (1 to 99, then 99+), drawn once per number */
+	function favicon(n) {
+		const link = document.querySelector('link[rel="icon"]');
+		if (!link) {
+			return;
+		}
+		if (iconBase === null) {
+			iconBase = link.href;
+		}
+		if (n <= 0) {
+			link.href = iconBase;
+			return;
+		}
+		const label = n > 99 ? '99+' : String(n);
+		if (icons.has(label)) {
+			link.href = icons.get(label);
+			return;
+		}
+		const img = new Image();
+		img.onload = () => {
+			const c = document.createElement('canvas');
+			c.width = c.height = 64;
+			const g = c.getContext('2d');
+			g.drawImage(img, 0, 0, 64, 64);
+			const r = label.length > 2 ? 22 : 19;
+			const x = 64 - r;
+			const y = r;
+			// Outline of the colour of the tab bar: readable on a light or dark one
+			g.beginPath();
+			g.arc(x, y, r + 3, 0, Math.PI * 2);
+			g.fillStyle = window.matchMedia('(prefers-color-scheme: dark)').matches ? '#202124' : '#ffffff';
+			g.fill();
+			g.beginPath();
+			g.arc(x, y, r, 0, Math.PI * 2);
+			g.fillStyle = '#d93025';
+			g.fill();
+			g.fillStyle = '#ffffff';
+			g.font = 'bold ' + (label.length > 2 ? 20 : 28) + 'px system-ui, sans-serif';
+			g.textAlign = 'center';
+			g.textBaseline = 'middle';
+			g.fillText(label, x, y + 1);
+			try {
+				icons.set(label, c.toDataURL('image/png'));
+				// Still the number to show (another may have come while drawing)
+				if ((N.mails > 99 ? '99+' : String(N.mails)) === label) {
+					link.href = icons.get(label);
+				}
+			} catch (e) {
+				// Canvas refused: the icon stays plain, the title still tells the number
+			}
+		};
+		img.src = iconBase;
+	}
+
+	function paintMails(n) {
+		if (n === N.mails) {
+			return;
+		}
+		N.mails = n;
+		favicon(n);
+		I.setTitleCount(n);
+		if (navigator.setAppBadge) {
+			(n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+		}
+		// The top bar of the other pages of Dolibarr reads it (js/inbox-topbar.js)
+		try {
+			localStorage.setItem(I.scope('inbox-unread'), JSON.stringify({ n, at: Date.now() }));
+		} catch (e) {
+			// Storage refused: the top bar keeps the number of its page
+		}
+	}
+
+	// The tree of the Mail space knows the counters at once after an action (read, moved): summed again here
+	Dolibarr.on('inbox:folders:counts', folders => {
+		if (!N.mailFolders || !folders) {
+			return;
+		}
+		let n = 0;
+		let known = 0;
+		N.mailFolders.forEach(id => {
+			const e = folders.get(id);
+			if (e) {
+				n += e.folder.unread || 0;
+				known++;
+			}
+		});
+		if (known === N.mailFolders.size) {
+			paintMails(n);
+		}
+	});
+
+	// ---------- Notifications of the browser (lot W8 1.21.0) ----------
+	/**
+	 * Turned on by the user (Settings > Notifications, the permission asked then). Only the leader tab asks the server
+	 * and tells: one notification even with five tabs. The sender and the subject only, never the text of the mail.
+	 */
+	const B = { on: false, mail: 0, notif: 0, first: true, timer: 0, busy: false };
+	function browserReady() {
+		return B.on && 'Notification' in window && Notification.permission === 'granted' && I.isLeader();
+	}
+	function setBrowser(params) {
+		B.on = !!params && String(params.browser_notify) === '1';
+		clearTimeout(B.timer);
+		if (B.on) {
+			B.timer = setTimeout(fresh, 3000);
+		}
+	}
+	function show(title, body, tag, onclick) {
+		try {
+			const n = new Notification(title, { body, tag, icon: iconBase || undefined });
+			n.onclick = () => {
+				window.focus();
+				n.close();
+				onclick();
+			};
+		} catch (e) {
+			// Notification refused by the browser (some phones need a service worker): the bell stays
+		}
+	}
+	function openMail(m) {
+		Dolibarr.executeHook('inbox:mail:goto', { folder: m.folder, mail: m.id });
+		if (I.route().space !== 'mail') {
+			I.go('#/mail');
+		}
+	}
+	async function fresh() {
+		clearTimeout(B.timer);
+		if (!browserReady() || B.busy) {
+			B.timer = setTimeout(fresh, 30000);
+			return;
+		}
+		B.busy = true;
+		try {
+			const first = B.first;
+			const r = await api('notification', 'fresh', { mail: B.mail, notif: B.notif, first: first ? 1 : 0 });
+			B.first = false;
+			B.mail = r.mail_last || B.mail;
+			B.notif = r.notif_last || B.notif;
+			if (!first) {
+				// The mail shown in front in the open folder is not told: the user sees it already
+				const front = !document.hidden && document.hasFocus();
+				const mails = (r.mails || []).filter(m => !(front && I.route().space === 'mail'));
+				if (mails.length > 3) {
+					const byBox = mails[0].account;
+					show(t('InboxBrowserNewMails', mails.length), mails.every(m => m.account === byBox) ? byBox : '', 'inbox-mails', () => openMail(mails[mails.length - 1]));
+				} else {
+					mails.forEach(m => show(m.from || t('InboxBrowserNewMail'), m.subject + (m.account ? '\n' + m.account : ''), 'inbox-mail-' + m.id, () => openMail(m)));
+				}
+				(r.notifs || []).forEach(n => show(textOf(n), n.subject || n.account || '', 'inbox-notif-' + n.id, async () => {
+					try {
+						const res = await post('notification', 'open', { id: n.id });
+						apply(res);
+						if (res.mail) {
+							openMail({ folder: res.folder, id: res.mail });
+						} else if (res.url) {
+							I.go(res.url);
+						}
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+				}));
+			}
+		} catch (e) {
+			// Network lost: next time
+		}
+		B.busy = false;
+		B.timer = setTimeout(fresh, 30000);
+	}
+	Dolibarr.on('inbox:params:changed', setBrowser);
+	Dolibarr.on('inbox:app:leader', () => setBrowser({ browser_notify: B.on ? '1' : '0' }));
 
 	function bell() {
 		return $('.ibx-rail .ibx-js-bell');
@@ -51,12 +226,20 @@
 		if (!c) {
 			return;
 		}
-		const fresh = N.last >= 0 && (c.last || 0) > N.last && (c.unread || 0) > 0;
+		const isNew = N.last >= 0 && (c.last || 0) > N.last && (c.unread || 0) > 0;
 		N.unread = c.unread || 0;
 		N.last = c.last || 0;
 		N.at = Date.now();
 		paintBadge();
-		if (fresh) {
+		if (typeof c.mails === 'number') {
+			N.mailFolders = new Set(c.mail_folders || []);
+			paintMails(c.mails);
+		}
+		if (isNew && browserReady()) {
+			// A new notification: told now rather than at the next pass
+			fresh();
+		}
+		if (isNew) {
 			Dolibarr.executeHook('inbox:notification:new', { unread: N.unread, last: N.last });
 			if (N.panel) {
 				load(false);
@@ -109,6 +292,9 @@
 		}
 		if (n.type === 'send_failed') {
 			return t('InboxNotifSendFailed');
+		}
+		if (n.type === 'box_error') {
+			return t('InboxNotifBoxError');
 		}
 		return n.text || n.type;
 	}
@@ -197,6 +383,7 @@
 		p.setAttribute('aria-label', t('InboxNotifications'));
 		p.innerHTML = '<div class="ibx-notifpanel__head"><h2 class="ibx-notifpanel__title">' + th('InboxNotifications') + '</h2>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-notifreadall">' + ic('mark-read') + ' ' + th('InboxNotifReadAll') + '</button>'
+			+ '<a class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifsettings" href="#/settings/notifications" aria-label="' + th('InboxNotifSettings') + '" title="' + th('InboxNotifSettings') + '">' + ic('settings') + '</a>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifclose" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-notifpanel__body ibx-js-notiflist" aria-live="polite"></div>';
 		document.body.appendChild(p);
@@ -245,6 +432,10 @@
 	}
 
 	async function onPanelClick(e) {
+		if (e.target.closest('.ibx-js-notifsettings')) {
+			close(false);
+			return;
+		}
 		if (e.target.closest('.ibx-js-notifclose')) {
 			close(true);
 			return;
@@ -311,6 +502,7 @@
 
 	Dolibarr.on('inbox:notif:state', c => apply(c));
 	Dolibarr.on('inbox:app:ready', () => {
+		setBrowser(I.ctxJson('INBOX_PARAMS_JSON', {}));
 		const b = bell();
 		if (!b) {
 			return;

@@ -100,6 +100,16 @@ class InboxUserParam
 			'compose_size' => array('', 'json'),
 			// Colours of the writing (1.16.1): last colour of the text and of the highlight, recent ones
 			'compose_colors' => array('', 'json'),
+			// Notifications (1.21.0): mailboxes counted in the unread counter (all, or only the personal ones; one can be
+			// left out: count_box per mailbox), the counter in the top bar of Dolibarr, the notifications of the browser
+			// (asked by the user), the new mails told per mailbox (auto: yes for a personal mailbox, no for a shared
+			// one), the channels per type of notification {"type": {"b": 0|1, "m": 0|1}} (browser on, mail off by default)
+			'count_scope' => array('all', array('all', 'personal')),
+			'count_box' => array('1', 'int:0:1'),
+			'count_in_dolibarr' => array('1', 'int:0:1'),
+			'browser_notify' => array('0', 'int:0:1'),
+			'new_mail_notify' => array('auto', array('auto', '1', '0')),
+			'notif_channels' => array('', 'json'),
 		);
 	}
 

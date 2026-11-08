@@ -460,7 +460,7 @@
 			});
 			this.current = space;
 			space.render(space.el, route);
-			document.title = space.label() + ' - ' + t('InboxAppName');
+			setTitle(space.label() + ' - ' + t('InboxAppName'));
 		},
 		refresh(msg) {
 			if (this.current && this.current.refresh) {
@@ -468,6 +468,20 @@
 			}
 		},
 	};
+
+	// ---------- Title of the tab: « (12) Mail - Inbox » with the unread counter (lot W8 1.21.0) ----------
+	const title = { base: '', unread: 0 };
+	function paintTitle() {
+		document.title = (title.unread > 0 ? '(' + (title.unread > 99 ? '99+' : title.unread) + ') ' : '') + title.base;
+	}
+	function setTitle(base) {
+		title.base = base;
+		paintTitle();
+	}
+	function setTitleCount(n) {
+		title.unread = Math.max(0, n | 0);
+		paintTitle();
+	}
 
 	function renderRail() {
 		const app = $('#ibx-app');
@@ -552,7 +566,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope, setTitleCount,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,

@@ -114,6 +114,12 @@ class InboxSync
 			$sql .= " date_sync_error = '".$this->db->idate($now)."', sync_fail_count = ".$fails.", sync_retry_at = '".$this->db->idate($now + $wait)."' WHERE rowid = ".((int) $accountId);
 		}
 		$this->db->query($sql);
+		if (!in_array($state, array('ok', 'first_sync'), true)) {
+			// Lot W8 1.21.0: the managers of the mailbox are told (bell, and the browser or a mail if they chose it)
+			dol_include_once('/inbox/class/inboxnotification.class.php');
+			$notify = new InboxNotification($this->db);
+			$notify->boxError((int) $accountId, (string) $state);
+		}
 	}
 
 	/**

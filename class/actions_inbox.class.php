@@ -66,4 +66,51 @@ class ActionsInbox
 
 		return 0;
 	}
+
+	/**
+	 * Top bar of the other pages of Dolibarr: the unread counter of inbox (lot W8 1.21.0). Counted when the page is
+	 * made (one light query), then kept up to date without any call by the tabs of inbox open in the browser (local
+	 * storage, js/inbox-topbar.js): no polling from every page of Dolibarr. The menu entries have no hook: the script
+	 * moves the badge onto the entry Inbox of the top menu; this envelope stays only when that entry is not in the page.
+	 *
+	 * @param array<string,mixed> $parameters  Parameters
+	 * @param object|null         $object      Unused
+	 * @param string              $action      Unused
+	 * @param HookManager         $hookmanager Hook manager
+	 * @return int 0
+	 */
+	public function printTopRightMenu($parameters, &$object, &$action, $hookmanager)
+	{
+		global $conf, $langs, $user;
+
+		if (!isModEnabled('inbox') || empty($user->id) || !empty($user->socid) || !$user->hasRight('inbox', 'webmail', 'use') || empty($conf->use_javascript_ajax)) {
+			return 0;
+		}
+		dol_include_once('/inbox/class/inboxnotification.class.php');
+		$params = new InboxUserParam($this->db);
+		if ($params->get($user, 'count_in_dolibarr') !== '1') {
+			return 0;
+		}
+		$notify = new InboxNotification($this->db);
+		if (!$notify->accountsFor($user, 'count')) {
+			return 0;
+		}
+		$count = $notify->mailCount($user)['mails'];
+		$langs->load('inbox@inbox');
+		$url = dol_buildpath('/inbox/index.php', 1);
+		$label = $langs->trans('InboxTopbarUnread', '%s');
+		$none = $langs->trans('InboxTopbarNone');
+		$title = $count > 0 ? str_replace('%s', (string) $count, $label) : $none;
+		$out = '<div class="inline-block nowrap login_block_elem inbox-topbar-block">';
+		$out .= '<a href="'.dol_escape_htmltag($url).'" class="atoplogin inbox-topbar" data-inbox-key="'.dol_escape_htmltag('inbox-unread:'.$url).'"';
+		$out .= ' data-label="'.dol_escape_htmltag($label).'" data-label-none="'.dol_escape_htmltag($none).'" title="'.dol_escape_htmltag($title).'" aria-label="'.dol_escape_htmltag($title).'">';
+		$out .= '<span class="fa fa-envelope atoplogin valignmiddle" aria-hidden="true"></span>';
+		// display, not the attribute hidden: .badge of the theme forces its display
+		$out .= '<span class="badge badge-danger inbox-topbar__badge" style="position:relative;top:-0.6em;left:-0.4em;font-size:0.65em'.($count > 0 ? '' : ';display:none').'">'.($count > 99 ? '99+' : $count).'</span>';
+		$out .= '</a></div>';
+		$out .= '<script src="'.dol_escape_htmltag(dol_buildpath('/inbox/js/inbox-topbar.js', 1).'?v='.((int) @filemtime(dol_buildpath('/inbox/js/inbox-topbar.js', 0)))).'" defer></script>';
+		$this->resprints = $out;
+
+		return 0;
+	}
 }

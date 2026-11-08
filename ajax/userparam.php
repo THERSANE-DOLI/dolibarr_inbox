@@ -43,6 +43,8 @@ switch ($action) {
 		$tagHelper = new InboxTag($db);
 		foreach ($access->getAccounts($user) as $account) {
 			$mailboxes[] = array('id' => (int) $account->id, 'email' => $account->email, 'label' => $account->label, 'params' => $params->getAll($user, (int) $account->id),
+				// Settings > Notifications: a personal mailbox of the user tells its new mails by default
+				'personal' => $account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner === (int) $user->id,
 				// Active tags, to tell the user which ones show another colour for his vision
 				'tags' => array_map(function ($t) {
 					return array('label' => $t['label'], 'color' => $t['color']);

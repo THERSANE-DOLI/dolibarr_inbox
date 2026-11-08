@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: unread counter and notifications of the browser :   1.21.0
+  - unread mails of the inbox folders on the icon of the tab (badge up to 99+), in its title, on the icon of the
+    installed application and in the top bar of the other pages of Dolibarr (envelope with the number).
+  - Settings > Notifications: mailboxes counted (all, personal only, one left out), counter in Dolibarr, notifications
+    of the browser (asked on a click only), new mails told per mailbox (personal ones by default), channels per type.
+  - notifications of the browser: new mails (sender and subject only) and the notifications of the bell, by one tab
+    only; a click opens the mail.
+  - summary by mail of the notifications still unread after 15 minutes, for the types chosen (scheduled job).
+  - new notification: a mailbox that keeps failing is told to its managers, once per episode.
 - NEW: fast search in the text of the mails with Meilisearch (option) :   1.20.0
   - Settings > General > Search: address of Meilisearch, master key (never sent back), prefix of the indexes, test;
     turned on, inbox creates its own key, limited to the indexes of the prefix; turned off, every index is removed.

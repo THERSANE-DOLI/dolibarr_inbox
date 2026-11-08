@@ -51,13 +51,14 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.20.0';
+		$this->version = '1.21.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
 		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
-		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0)
-		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates'), 'entity' => '0'));
+		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0), the unread
+		// counter in the top bar of the other pages of Dolibarr (lot W8 1.21.0)
+		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates', 'toprightmenu'), 'entity' => '0'));
 		// Raw mails kept for a while (never served by document.php: no read right at the root of the module)
 		$this->dirs = array('/inbox/raw');
 		$this->config_page_url = array("setup.php@inbox");
@@ -162,6 +163,22 @@ class modInbox extends DolibarrModules
 			'status' => 1,
 			'test' => 'isModEnabled("inbox")',
 			'priority' => 60,
+		);
+
+		// Notifications (lot W8 1.21.0): those still unread after 15 minutes go by mail to the users who chose it
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronNotifMail',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxnotification.class.php',
+			'objectname' => 'InboxNotification',
+			'method' => 'cronMail',
+			'parameters' => '',
+			'comment' => 'InboxCronNotifMailComment',
+			'frequency' => 5,
+			'unitfrequency' => 60,
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 70,
 		);
 
 		$this->rights = array();

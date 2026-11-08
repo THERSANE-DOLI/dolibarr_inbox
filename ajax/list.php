@@ -341,7 +341,7 @@ switch ($action) {
 		// The bell: unread notifications and the last one (a new one rings in every tab)
 		dol_include_once('/inbox/class/inboxnotification.class.php');
 		$notify = new InboxNotification($db);
-		$out['notif'] = $notify->counts($user);
+		$out['notif'] = $notify->counts($user) + $notify->mailCount($user);
 		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
 		dol_include_once('/inbox/class/inboxuserparam.class.php');
 		$mailId = (int) inboxAjaxParam('mail', 'int');

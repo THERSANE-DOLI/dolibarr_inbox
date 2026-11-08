@@ -26,5 +26,6 @@ CREATE TABLE llx_inbox_notification(
 	payload text DEFAULT NULL,
 	url varchar(255) DEFAULT NULL,
 	date_creation datetime NOT NULL,
-	date_read datetime DEFAULT NULL
+	date_read datetime DEFAULT NULL,
+	date_mailed datetime DEFAULT NULL
 ) ENGINE=innodb;

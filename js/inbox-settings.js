@@ -105,7 +105,7 @@
 			$('.ibx-settings', el).dataset.mobile = page ? 'main' : 'nav';
 			renderNav(el, page);
 			const main = $('.ibx-settings__main', el);
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, me: renderMe };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -131,7 +131,8 @@
 			+ (isAdmin() && importSources && importSources.length ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
 			+ '<div class="ibx-settings__navgroup">' + th('InboxNavPersonal') + '</div>'
-			+ link('me', 'account', 'InboxNavMe');
+			+ link('me', 'account', 'InboxNavMe')
+			+ link('notifications', 'bell', 'InboxNavNotifications');
 		if (isAdmin() && importSources === null) {
 			importSources = [];
 			api('import', 'sources').then(r => {
@@ -2031,5 +2032,139 @@
 				}
 			});
 		});
+	}
+	// ---------- Notifications (lot W8 1.21.0) ----------
+	/**
+	 * Settings > Notifications: what the unread counter counts, the counter in the top bar of Dolibarr, the
+	 * notifications of the browser (permission asked on the click only), the new mails told per mailbox, the channels
+	 * per type (the bell always: it is the list of reference)
+	 */
+	async function renderNotifications(main) {
+		main.innerHTML = skeleton();
+		let data;
+		try {
+			data = await api('userparam', 'get');
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderNotifications(main)));
+			return;
+		}
+		const p = data.params;
+		let channels = {};
+		try {
+			channels = JSON.parse(p.notif_channels || '{}') || {};
+		} catch (e) {
+			channels = {};
+		}
+		const chan = (type, c) => (channels[type] && channels[type][c] !== undefined ? +channels[type][c] === 1 : c === 'b');
+		const sw = (attrs, on, label) => '<button type="button" class="ibx-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '" ' + attrs + '></button>';
+		const newMail = m => (m.params.new_mail_notify === 'auto' ? !!m.personal : m.params.new_mail_notify === '1');
+		const types = ['assign', 'send_failed', 'box_error'];
+		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavNotifications') + '</h1></div>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionBrowserNotif') + '</h2><div class="ibx-js-browser"></div></section>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionNotifTypes') + '</h2><p class="ibx-section__help">' + th('InboxNotifTypesHelp') + '</p>'
+			+ '<table class="ibx-table"><thead><tr><th scope="col">' + th('InboxNotifType') + '</th><th scope="col">' + th('InboxChannelBell') + '</th><th scope="col">' + th('InboxChannelBrowser') + '</th><th scope="col">' + th('InboxChannelMail') + '</th></tr></thead><tbody>'
+			+ types.map(type => '<tr><td>' + th('InboxNotifType_' + type) + '</td>'
+				+ '<td>' + sw('aria-disabled="true" title="' + th('InboxChannelBellAlways') + '"', true, t('InboxChannelBell')) + '</td>'
+				+ '<td>' + sw('data-type="' + type + '" data-chan="b"', chan(type, 'b'), t('InboxChannelBrowser') + ' : ' + t('InboxNotifType_' + type)) + '</td>'
+				+ '<td>' + sw('data-type="' + type + '" data-chan="m"', chan(type, 'm'), t('InboxChannelMail') + ' : ' + t('InboxNotifType_' + type)) + '</td></tr>').join('')
+			+ '</tbody></table></section>'
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionCounter') + '</h2><p class="ibx-section__help">' + th('InboxCounterHelp') + '</p><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="nt-count_scope">' + th('InboxCountScope') + '</label><div><select class="ibx-field ibx-field--medium" id="nt-count_scope">'
+			+ ['all', 'personal'].map(v => '<option value="' + v + '"' + (p.count_scope === v ? ' selected' : '') + '>' + th('Inbox_count_scope_' + v) + '</option>').join('') + '</select></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxCountInDolibarr') + '</span><div>' + sw('data-param="count_in_dolibarr"', p.count_in_dolibarr === '1', t('InboxCountInDolibarr'))
+			+ '<div class="ibx-formrow__help">' + th('InboxCountInDolibarrHelp') + '</div></div></div></div></section>';
+		if (data.mailboxes.length) {
+			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionNotifBoxes') + '</h2><p class="ibx-section__help">' + th('InboxNotifBoxesHelp') + '</p>'
+				+ '<table class="ibx-table"><thead><tr><th scope="col">' + th('InboxMailbox') + '</th><th scope="col">' + th('InboxCountBox') + '</th><th scope="col">' + th('InboxNewMailNotify') + '</th></tr></thead><tbody>'
+				+ data.mailboxes.map(m => '<tr><td><b>' + esc(m.label || m.email) + '</b><div class="ibx-muted">' + esc(m.email) + '</div></td>'
+					+ '<td>' + sw('data-param="count_box" data-account="' + m.id + '"', m.params.count_box === '1', t('InboxCountBox') + ' : ' + (m.label || m.email)) + '</td>'
+					+ '<td>' + sw('data-param="new_mail_notify" data-account="' + m.id + '"', newMail(m), t('InboxNewMailNotify') + ' : ' + (m.label || m.email)) + '</td></tr>').join('')
+				+ '</tbody></table></section>';
+		}
+		html += '</div>';
+		main.innerHTML = html;
+
+		const recount = () => api('notification', 'count').then(c => Dolibarr.executeHook('inbox:notif:state', c)).catch(() => {});
+		const save = async (accountId, param, value) => {
+			const r = await post('userparam', 'set', { id: accountId, param, value });
+			if (!accountId) {
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+			}
+			toast(t('InboxSaved'));
+			return r;
+		};
+
+		// Notifications of the browser: state of the permission, asked on the click only
+		const browser = $('.ibx-js-browser', main);
+		const paintBrowser = () => {
+			const supported = 'Notification' in window && window.isSecureContext;
+			const perm = supported ? Notification.permission : 'unsupported';
+			const on = p.browser_notify === '1' && perm === 'granted';
+			let state;
+			let button = '';
+			if (!supported) {
+				state = '<span class="ibx-status">' + th('InboxBrowserNotifUnsupported') + '</span>';
+			} else if (perm === 'denied') {
+				state = '<span class="ibx-status ibx-status--warning">' + th('InboxBrowserNotifDenied') + '</span><div class="ibx-formrow__help">' + th('InboxBrowserNotifDeniedHelp') + '</div>';
+			} else if (on) {
+				state = '<span class="ibx-status ibx-status--ok">' + th('InboxBrowserNotifOn') + '</span>';
+				button = '<button type="button" class="ibx-btn ibx-js-browseroff">' + th('InboxBrowserNotifDisable') + '</button>';
+			} else {
+				state = '<span class="ibx-status">' + th('InboxBrowserNotifOff') + '</span>';
+				button = '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-browseron">' + ic('bell') + ' ' + th('InboxBrowserNotifEnable') + '</button>';
+			}
+			browser.innerHTML = '<div class="ibx-form"><div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>' + state
+				+ '<div class="ibx-formrow__help">' + th('InboxBrowserNotifHelp') + '</div>' + (button ? '<div class="ibx-formrow__actions">' + button + '</div>' : '') + '</div></div></div>';
+		};
+		paintBrowser();
+		browser.addEventListener('click', async e => {
+			const enable = e.target.closest('.ibx-js-browseron');
+			const disable = e.target.closest('.ibx-js-browseroff');
+			if (!enable && !disable) {
+				return;
+			}
+			try {
+				if (enable) {
+					const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+					if (perm !== 'granted') {
+						paintBrowser();
+						return;
+					}
+				}
+				const r = await save(0, 'browser_notify', enable ? '1' : '0');
+				p.browser_notify = r.params.browser_notify;
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			paintBrowser();
+		});
+
+		$('#nt-count_scope', main).addEventListener('change', async ev => {
+			try {
+				await save(0, 'count_scope', ev.target.value);
+				recount();
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
+		$$('.ibx-switch:not([aria-disabled])', main).forEach(b => b.addEventListener('click', async () => {
+			const on = b.getAttribute('aria-checked') !== 'true';
+			// Shown at once, put back if the server refuses
+			b.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				if (b.dataset.chan) {
+					channels[b.dataset.type] = Object.assign({}, channels[b.dataset.type] || {}, { [b.dataset.chan]: on ? 1 : 0 });
+					await save(0, 'notif_channels', JSON.stringify(channels));
+				} else {
+					await save(+b.dataset.account || 0, b.dataset.param, on ? '1' : '0');
+					if (b.dataset.param !== 'new_mail_notify') {
+						recount();
+					}
+				}
+			} catch (err) {
+				b.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
+			}
+		}));
 	}
 })();

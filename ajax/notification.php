@@ -27,22 +27,31 @@ dol_include_once('/inbox/class/inboxnotification.class.php');
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('read', 'open'), true));
 $notify = new InboxNotification($db);
+// The bell, and the unread mails counted for the tab, the installed application and the top bar (lot W8 1.21.0)
+$counts = function () use ($notify, $user) {
+	return $notify->counts($user) + $notify->mailCount($user);
+};
 
 switch ($action) {
 	case 'count':
-		inboxAjaxReply($notify->counts($user));
+		inboxAjaxReply($counts());
 		// no break
 
 	case 'list':
 		$res = $notify->listFor($user, 50, (int) inboxAjaxParam('before', 'int'));
-		inboxAjaxReply($res + $notify->counts($user));
+		inboxAjaxReply($res + $counts());
 		// no break
 
 	case 'read':
 		// ids: these ones, none: all of them
 		$ids = inboxAjaxParam('ids', 'none');
 		$notify->markRead($user, array_map('intval', is_array($ids) ? $ids : array_filter(explode(',', (string) $ids))));
-		inboxAjaxReply($notify->counts($user));
+		inboxAjaxReply($counts());
+		// no break
+
+	case 'fresh':
+		// Leader tab of the browser, notifications of the browser turned on: the new mails and notifications to tell
+		inboxAjaxReply($notify->fresh($user, (int) inboxAjaxParam('mail', 'int'), (int) inboxAjaxParam('notif', 'int'), (int) inboxAjaxParam('first', 'int') === 1));
 		// no break
 
 	case 'open':
@@ -58,7 +67,7 @@ switch ($action) {
 			$target['message'] = $langs->transnoentities($messages[$target['error']]);
 			unset($target['error']);
 		}
-		inboxAjaxReply($target + $notify->counts($user));
+		inboxAjaxReply($target + $counts());
 		// no break
 
 	default:

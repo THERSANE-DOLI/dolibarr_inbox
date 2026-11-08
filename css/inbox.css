@@ -1682,3 +1682,4 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-apreview__mail { padding: 0.3rem 0.5rem; border: 1px solid var(--ibx-border); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius-sm); }
 .ibx-apreview__mail span { display: block; color: var(--ibx-text-muted); }
 .ibx-apreview__btn { align-self: flex-start; padding: 0.15rem 0.6rem; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent); color: var(--ibx-on-accent); font-weight: 600; }
+.ibx-formrow__actions { margin-top: .5rem; }
