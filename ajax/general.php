@@ -60,6 +60,8 @@ function inboxGeneralSettings()
 		// AI in the writing (1.27.0): off by default; the mail answered may go with a request (allowed by default)
 		'INBOX_AI_ENABLED' => array('default' => '0', 'check' => 'int:0:1'),
 		'INBOX_AI_WITH_MAIL' => array('default' => '1', 'check' => 'int:0:1'),
+		// Voice typing (1.28.0): off by default; each user then agrees once per receiver of the voice
+		'INBOX_DICTATION_ENABLED' => array('default' => '0', 'check' => 'int:0:1'),
 	);
 }
 

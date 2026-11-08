@@ -60,11 +60,13 @@ function inboxAccountFromInput(InboxAccount $account)
 	if ((int) $account->fk_user_owner <= 0) {
 		$account->fk_user_owner = null;
 	}
-	// Never the AI for this mailbox (1.27.0)
-	if (inboxAjaxHas('ai_off')) {
-		$config = $account->getConnectorConfig();
-		$config['ai_off'] = inboxAjaxParam('ai_off', 'int') ? 1 : 0;
-		$account->setConnectorConfig($config);
+	// Never the AI (1.27.0), never the voice typing (1.28.0) for this mailbox
+	foreach (array('ai_off', 'dictation_off') as $flag) {
+		if (inboxAjaxHas($flag)) {
+			$config = $account->getConnectorConfig();
+			$config[$flag] = inboxAjaxParam($flag, 'int') ? 1 : 0;
+			$account->setConnectorConfig($config);
+		}
 	}
 	// Copy of the mails sent (1.26.0): kept in the settings of the connector
 	if (inboxAjaxHas('sent_copy')) {

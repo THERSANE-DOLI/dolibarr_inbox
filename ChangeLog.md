@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: bar of the selection never wider than the list (count shortened, less used actions in « ⋯ »), actions with their names in the reading pane :   1.28.1
+- NEW: voice typing in the writing, with an informed consent :   1.28.0
+  - microphone button in the toolbar of the writing (speech recognition of the browser): the text comes at the
+    cursor while speaking, a red bar « Dictation in progress · Google » shows it, Stop or Escape ends it.
+  - before the first dictation toward a receiver of the voice (Google for Chrome, Microsoft for Edge, Apple for
+    Safari), a dialog names it and says what leaves; the consent is per user and per receiver, written in the
+    journal, withdrawn in My account. No button in Firefox (no speech recognition) nor Brave.
+  - off by default (Settings > General), a mailbox may forbid it (its card, apart from the AI).
 - NEW: AI in the writing, through the AI module of Dolibarr :   1.27.0
   - button « AI help » in the toolbar of the writing: write from an instruction (with the text of the mail answered,
     untickable), rephrase (shorter, more formal, warmer, spelling) or translate the selection or the whole text.

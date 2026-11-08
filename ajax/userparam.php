@@ -55,7 +55,8 @@ switch ($action) {
 
 	case 'set':
 		// The presence is written by the call of state of the Mail space only (audit INBX-028)
-		if ((string) inboxAjaxParam('param', 'aZ09') === 'presence') {
+		// The consents of the voice typing go through ajax/dictation.php (journal): never set here
+		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', 'dictation_consent'), true)) {
 			inboxAjaxError('Unknown param', 400);
 		}
 		if ($params->set($user, (string) inboxAjaxParam('param', 'aZ09'), (string) inboxAjaxParam('value', 'none'), $accountId) < 0) {

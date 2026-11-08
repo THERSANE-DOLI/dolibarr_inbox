@@ -988,6 +988,19 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 @container (max-width: 46rem) {
 	.ibx-bulkbar__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+/* Never wider than the list (1.28.0): the count as « 6 sélectionnés » then « 6 », the actions of priority 3 then 2 in « ⋯ » */
+.ibx-bulkbar > * { flex: none; }
+.ibx-bulkbar__count { display: inline-flex; align-items: baseline; gap: var(--ibx-s1); white-space: nowrap; }
+.ibx-bulkbar__num { display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; padding: 0 var(--ibx-s1); border-radius: 999px; background: var(--ibx-on-accent); color: var(--ibx-accent); font-size: var(--ibx-fs-sm); }
+.ibx-bulkbar__more { display: none; }
+.ibx-bulkbar .ibx-spacer { flex: 1 1 0; min-width: 0; }
+@container (max-width: 36rem) { .ibx-bulkbar__word { display: none; } }
+@container (max-width: 32rem) { .ibx-bulkbar .ibx-js-bulk[data-prio="3"] { display: none; } .ibx-bulkbar__more { display: inline-flex; } }
+@container (max-width: 25rem) { .ibx-bulkbar .ibx-js-bulk[data-prio="2"] { display: none; } }
+/* Several mails selected: the actions with their names in the reading pane */
+.ibx-multi__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ibx-s2); max-width: 36rem; margin: var(--ibx-s2) 0; }
+.ibx-multi__actions .ibx-btn { gap: var(--ibx-s2); }
+.ibx-multi__actions .ibx-bulkbar__label { position: static; width: auto; height: auto; clip: auto; overflow: visible; }
 .ibx-btn--danger-quiet { color: var(--ibx-danger); }
 .ibx-btn--danger-quiet:hover { background: var(--ibx-danger-soft); }
 .ibx-readhead__actions .ibx-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
@@ -1925,4 +1938,11 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-ai__working .ibx-icon { animation: ibx-ai-pulse 1.2s ease-in-out infinite; color: var(--ibx-accent); }
 @keyframes ibx-ai-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .ibx-ai__working .ibx-icon { animation: none; } }
+/* Voice typing (1.28.0): the user sees that the voice leaves, and to whom */
+.ibx-compose__dictation { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); background: var(--ibx-danger-soft); font-size: var(--ibx-fs-sm); }
+.ibx-compose__dictation[hidden] { display: none; }
+.ibx-dict__dot { flex: none; width: 0.625rem; height: 0.625rem; border-radius: 50%; background: var(--ibx-danger); animation: ibx-dict-pulse 1.2s ease-in-out infinite; }
+.ibx-dict__interim { flex: 1; min-width: 0; font-style: italic; color: var(--ibx-text-muted); }
+@keyframes ibx-dict-pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .ibx-dict__dot { animation: none; } }
 

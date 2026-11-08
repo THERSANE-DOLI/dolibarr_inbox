@@ -24,6 +24,7 @@
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxcomposer.class.php');
 dol_include_once('/inbox/class/inboxai.class.php');
+dol_include_once('/inbox/class/inboxdictation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(true);
@@ -89,6 +90,9 @@ switch ($action) {
 		// AI in the writing (1.27.0): the mailboxes it may be used from, and whether the mail answered may go with it
 		$ai = new InboxAi($db);
 		$res['ai'] = array('accounts' => $ai->accountsFor($user), 'mail' => InboxAi::mailAllowed() ? 1 : 0);
+		// Voice typing (1.28.0): the mailboxes it may be used from, and the receivers of the voice already agreed to
+		$dictation = new InboxDictation($db);
+		$res['dictation'] = array('accounts' => $dictation->accountsFor($user), 'consents' => (object) $dictation->consents($user));
 		inboxAjaxReply($res);
 		break;
 	case 'ai':

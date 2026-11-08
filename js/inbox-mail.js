@@ -2236,9 +2236,12 @@
 		S.openId = 0;
 		S.mail = null;
 		const n = S.selected.size;
-		readPane().innerHTML = '<div class="ibx-empty">' + ic('multi', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSelectedCount', n) + '</div>'
+		// The actions with their names here, where there is room (the bar of the list keeps them short)
+		readPane().innerHTML = '<div class="ibx-empty ibx-multi">' + ic('multi', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSelectedCount', n) + '</div>'
 			+ (S.next && n >= S.rows.length ? '<button type="button" class="ibx-btn ibx-js-allfolder">' + th('InboxSelectWholeFolder', (S.total || 0).toLocaleString(locale())) + '</button>' : '')
+			+ '<div class="ibx-multi__actions" role="toolbar" aria-label="' + th('InboxBulkActions') + '">' + bulkActions(Array.from(S.selected)).map(a => bulkButton(a, '', false)).join('') + '</div>'
 			+ '<div class="ibx-muted">' + th('InboxBulkHint') + '</div></div>';
+		$('.ibx-multi__actions', readPane()).addEventListener('click', onBulkClick);
 		const all = $('.ibx-js-allfolder', readPane());
 		if (all) {
 			all.addEventListener('click', () => {
@@ -3864,67 +3867,105 @@
 			bar.parentNode.classList.remove('has-bulk');
 			return;
 		}
-		const rows = ids.map(rowOf).filter(Boolean);
-		const anyUnread = rows.some(r => !seenOf(r));
-		const why = refusal('move', ids);
-		// The key of the action in its bubble: learnt where it is used
-		const btn = (cls, icon, label, disabled, extra, key) => '<button type="button" class="ibx-btn ibx-btn--sm ' + cls + '"' + (disabled ? ' aria-disabled="true" title="' + esc(why) + '"' : ' title="' + esc(label + (key ? ' (' + key + ')' : '')) + '"') + (extra || '') + (key && key.indexOf('…') < 0 ? ' aria-keyshortcuts="' + esc(key.replace('Maj', 'Shift').replace('Suppr', 'Delete')) + '"' : '') + '>'
-			+ ic(icon) + '<span class="ibx-bulkbar__label">' + esc(label) + '</span></button>';
-		const role = rows[0] ? (S.folders.get(rows[0].folder) || { folder: {} }).folder.role : '';
 		bar.hidden = false;
 		// Floating over the list: showing it never moves the mails
 		bar.parentNode.classList.add('has-bulk');
-		bar.innerHTML = '<span class="ibx-bulkbar__count" role="status">' + th('InboxSelectedCount', ids.length) + '</span>'
-			+ btn('ibx-js-bulk', 'archive', t('InboxArchive'), !!why, ' data-act="archive"', 'A')
-			+ btn('ibx-js-bulk', anyUnread ? 'mark-read' : 'unread', t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), false, ' data-act="seen"', 'M')
-			+ btn('ibx-js-bulk', 'user-plus', t(rows.length && rows.every(r => (r.assignees || []).includes(S.me)) ? 'InboxUnassignMe' : 'InboxAssignMe'), false, ' data-act="assign"', t('InboxKeySpace'))
-			+ btn('ibx-js-bulk', 'tag', t('InboxTagMenu'), !!why, ' data-act="tag" aria-haspopup="menu"', '1…9')
-			+ btn('ibx-js-bulk', 'folder-move', t('InboxMoveToMenu'), !!why, ' data-act="move"', 'Maj+M')
-			+ btn('ibx-js-bulk', role === 'junk' ? 'inbox' : 'junk', t(role === 'junk' ? 'InboxNotJunk' : 'InboxJunk'), !!why, ' data-act="' + (role === 'junk' ? 'notjunk' : 'junk') + '"', role === 'junk' ? 'Maj+J' : 'J')
-			+ '<span class="ibx-spacer"></span>'
-			+ btn('ibx-js-bulk ibx-btn--danger-quiet', 'delete', t(role === 'trash' ? 'InboxDestroy' : 'InboxDelete'), !!why, ' data-act="delete"', 'Suppr')
+		// Never wider than the list: the count shortens, the less used actions go in « ⋯ » (container queries)
+		bar.innerHTML = '<span class="ibx-bulkbar__count" role="status" aria-label="' + th('InboxSelectedCount', ids.length) + '"><b class="ibx-bulkbar__num">' + ids.length + '</b>'
+			+ '<span class="ibx-bulkbar__word" aria-hidden="true">' + th('InboxSelectedWord') + '</span></span>'
+			+ bulkActions(ids).map(a => bulkButton(a, 'ibx-btn--sm', true)).join('')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-bulkbar__more ibx-js-bulkmore" aria-haspopup="menu" title="' + th('InboxMoreActions') + '" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-bulkclose" title="' + th('InboxClearSelection') + ' (Échap)" aria-label="' + th('InboxClearSelection') + '">' + ic('close') + '</button>';
+	}
+	/** Role of the folder of the selection (junk, trash: other words for some actions) */
+	function bulkRole(ids) {
+		const r = rowOf(ids[0]);
+		return r ? (S.folders.get(r.folder) || { folder: {} }).folder.role : '';
+	}
+	/**
+	 * Actions on several mails, shared by the bar of the list and the reading pane. prio: 1 always in the bar, 2 and
+	 * 3 go in « ⋯ » when the list is narrow (2 last).
+	 */
+	function bulkActions(ids) {
+		const rows = ids.map(rowOf).filter(Boolean);
+		const anyUnread = rows.some(r => !seenOf(r));
+		const why = refusal('move', ids);
+		const role = bulkRole(ids);
+		return [
+			{ act: 'archive', icon: 'archive', label: t('InboxArchive'), disabled: why, key: 'A', prio: 1 },
+			{ act: 'seen', icon: anyUnread ? 'mark-read' : 'unread', label: t(anyUnread ? 'InboxMarkRead' : 'InboxMarkUnread'), key: 'M', prio: 1 },
+			{ act: 'assign', icon: 'user-plus', label: t(rows.length && rows.every(r => (r.assignees || []).includes(S.me)) ? 'InboxUnassignMe' : 'InboxAssignMe'), key: t('InboxKeySpace'), prio: 2 },
+			{ act: 'tag', icon: 'tag', label: t('InboxTagMenu'), disabled: why, key: '1…9', prio: 2, menu: true },
+			{ act: 'move', icon: 'folder-move', label: t('InboxMoveToMenu'), disabled: why, key: 'Maj+M', prio: 3 },
+			{ act: role === 'junk' ? 'notjunk' : 'junk', icon: role === 'junk' ? 'inbox' : 'junk', label: t(role === 'junk' ? 'InboxNotJunk' : 'InboxJunk'), disabled: why, key: role === 'junk' ? 'Maj+J' : 'J', prio: 3 },
+			{ act: 'delete', icon: 'delete', label: t(role === 'trash' ? 'InboxDestroy' : 'InboxDelete'), disabled: why, key: 'Suppr', prio: 1, danger: true },
+		];
+	}
+	/** A button of an action on several mails; in the bar its name hides on a narrow list (kept as title and for the screen readers) */
+	function bulkButton(a, size, inBar) {
+		return (a.danger && inBar ? '<span class="ibx-spacer"></span>' : '')
+			+ '<button type="button" class="ibx-btn ' + size + ' ibx-js-bulk' + (a.danger ? ' ibx-btn--danger-quiet' : '') + '" data-act="' + a.act + '" data-prio="' + a.prio + '" data-icon="' + a.icon + '"'
+			+ (a.disabled ? ' aria-disabled="true" title="' + esc(a.disabled) + '"' : ' title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '"')
+			+ (a.menu ? ' aria-haspopup="menu"' : '') + (a.key && a.key.indexOf('…') < 0 ? ' aria-keyshortcuts="' + esc(a.key.replace('Maj', 'Shift').replace('Suppr', 'Delete')) + '"' : '')
+			+ ' aria-label="' + esc(a.label) + '">' + ic(a.icon) + '<span class="ibx-bulkbar__label">' + esc(a.label) + '</span></button>';
 	}
 	function bindBulkBar() {
 		const bar = $('.ibx-js-bulkbar', S.el);
-		bar.addEventListener('click', async e => {
-			if (e.target.closest('.ibx-js-bulkclose')) {
-				S.selected.clear();
-				S.allInFolder = false;
-				paintSelection();
-				renderBulkBar();
-				showNothing();
-				return;
-			}
-			const b = e.target.closest('.ibx-js-bulk');
-			if (!b) {
-				return;
-			}
-			const act = b.dataset.act;
-			if (b.getAttribute('aria-disabled') === 'true') {
-				toast(b.getAttribute('data-title') || b.title, { error: true });
-				return;
-			}
-			const ids = S.allInFolder ? await wholeFolderIds() : Array.from(S.selected);
-			if (!ids) {
-				return;
-			}
-			if (act === 'seen') {
-				doSeen(ids);
-			} else if (act === 'assign') {
-				doAssignMe(ids);
-			} else if (act === 'tag') {
-				tagMenu(b, ids);
-			} else if (act === 'move') {
-				moveDialog(ids);
-			} else if (act === 'archive') {
-				doArchive(ids);
-			} else if (act === 'junk' || act === 'notjunk') {
-				doJunk(ids, act === 'junk');
-			} else if (act === 'delete') {
-				doDelete(ids);
-			}
-		});
+		bar.addEventListener('click', onBulkClick);
+	}
+	/** A click on an action on several mails: in the bar of the list, its « ⋯ » menu, or the reading pane */
+	function onBulkClick(e) {
+		const more = e.target.closest('.ibx-js-bulkmore');
+		if (more) {
+			// The actions hidden by the narrow list, with their names
+			const hidden = $$('.ibx-js-bulk', $('.ibx-js-bulkbar', S.el)).filter(b => b.offsetParent === null);
+			menu(more, hidden.map(b => ({ icon: b.dataset.icon, label: b.getAttribute('aria-label'), disabled: b.getAttribute('aria-disabled') === 'true', reason: b.title,
+				run: () => runBulk(b.dataset.act, more, b) })));
+			return;
+		}
+		if (e.target.closest('.ibx-js-bulkclose')) {
+			S.selected.clear();
+			S.allInFolder = false;
+			paintSelection();
+			renderBulkBar();
+			showNothing();
+			return;
+		}
+		const b = e.target.closest('.ibx-js-bulk');
+		if (b) {
+			runBulk(b.dataset.act, b, b);
+		}
+	}
+	/**
+	 * Run an action on the selection
+	 * @param {string} act Action
+	 * @param {HTMLElement} anchor Where a menu opens (the button, or « ⋯ » for a hidden one)
+	 * @param {HTMLElement} b Button of the action (its refusal)
+	 */
+	async function runBulk(act, anchor, b) {
+		if (b.getAttribute('aria-disabled') === 'true') {
+			toast(b.getAttribute('data-title') || b.title, { error: true });
+			return;
+		}
+		const ids = S.allInFolder ? await wholeFolderIds() : Array.from(S.selected);
+		if (!ids) {
+			return;
+		}
+		if (act === 'seen') {
+			doSeen(ids);
+		} else if (act === 'assign') {
+			doAssignMe(ids);
+		} else if (act === 'tag') {
+			tagMenu(anchor, ids);
+		} else if (act === 'move') {
+			moveDialog(ids);
+		} else if (act === 'archive') {
+			doArchive(ids);
+		} else if (act === 'junk' || act === 'notjunk') {
+			doJunk(ids, act === 'junk');
+		} else if (act === 'delete') {
+			doDelete(ids);
+		}
 	}
 	/** « Select the 3 245 mails of the folder »: their ids asked to the server (sent after by batches of 200) */
 	async function wholeFolderIds() {

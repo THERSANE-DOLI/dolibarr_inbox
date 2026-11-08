@@ -136,6 +136,39 @@
 			+ link('notifications', 'bell', 'InboxNavNotifications');
 	}
 
+	/** My settings: the receivers of my voice I agreed to, withdrawn one by one (1.28.0) */
+	async function myDictation(box) {
+		if (!box) {
+			return;
+		}
+		let r;
+		try {
+			r = await api('dictation', 'get', {});
+		} catch (err) {
+			return;
+		}
+		const list = Object.entries(r.consents || {});
+		if (!r.enabled && !list.length) {
+			return;
+		}
+		const date = ts => new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
+		box.hidden = false;
+		box.innerHTML = '<h2 class="ibx-section__title">' + th('InboxDictationSection') + '</h2>'
+			+ (list.length ? '<ul class="ibx-checklist">' + list.map(([p, ts]) => '<li class="ibx-checklist__item">' + ic('mic') + '<div>' + th('InboxDictationMineGiven', t('InboxDictateProvider_' + p), date(ts)) + '</div>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictrevoke" data-provider="' + esc(p) + '">' + th('InboxDictationRevoke') + '</button></li>').join('') + '</ul>'
+				: '<p class="ibx-section__help">' + th('InboxDictationMineNone') + '</p>');
+		$$('.ibx-js-dictrevoke', box).forEach(b => b.addEventListener('click', async () => {
+			try {
+				await post('dictation', 'revoke', { provider: b.dataset.provider });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			toast(t('InboxDictationRevoked'));
+			myDictation(box);
+		}));
+	}
+
 	// Helpers of the pages, for the shared modules (js/inbox-rules.js)
 	I.settingsUi = { skeleton: lines => skeleton(lines), errorBox: (err, retry) => errorBox(err, retry) };
 
@@ -567,6 +600,8 @@
 			// Never the AI for this mailbox (1.27.0)
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAiSection') + '</span><div><label class="ibx-check"><input type="checkbox" name="ai_off"' + (a.connector_config && a.connector_config.ai_off ? ' checked' : '') + '> ' + th('InboxAiOff') + '</label>'
 			+ '<div class="ibx-formrow__help">' + th('InboxAiOffHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxDictationSection') + '</span><div><label class="ibx-check"><input type="checkbox" name="dictation_off"' + (a.connector_config && a.connector_config.dictation_off ? ' checked' : '') + '> ' + th('InboxDictationOff') + '</label>'
+			+ '<div class="ibx-formrow__help">' + th('InboxDictationOffHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<div class="ibx-js-testresult"></div>'
 			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-test">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>'
@@ -1880,6 +1915,12 @@
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
+			// Voice typing (1.28.0): off by default, each user agrees once per receiver of the voice
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxDictationSection') + '</h2><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxDictationEnabled') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_DICTATION_ENABLED" aria-checked="' + (s.INBOX_DICTATION_ENABLED === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxDictationEnabled') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxDictationEnabledHelp') + '</div></div></div>'
+			+ '</div></section>'
 			+ '<section class="ibx-section ibx-js-searchsettings"></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
 		// Look: accent (offered colours or another one), accent of the dark theme, greys; preview and page at once
@@ -2131,6 +2172,8 @@
 					+ '<option value="">' + th('InboxSameAsAbove') + '</option>' + ['immediate', 'delay', 'manual'].map(v => '<option value="' + v + '"' + (m.params.read_mode === v && m.params.read_mode !== p.read_mode ? ' selected' : '') + '>' + th('Inbox_read_mode_' + v) + '</option>').join('') + '</select></td></tr>').join('')
 				+ '</tbody></table></section>';
 		}
+		// Voice typing (1.28.0): the receivers of the voice agreed to, each one withdrawn here
+		html += '<section class="ibx-section ibx-js-mydictation" hidden></section>';
 		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDisplay') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-view">' + th('InboxView') + '</label><div>' + opt('view', ['cards', 'table'], p.view) + '<div class="ibx-formrow__help">' + th('InboxViewHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-conversation">' + th('InboxConversationsSetting') + '</label><div>' + opt('conversation', ['1', '0'], p.conversation) + '<div class="ibx-formrow__help">' + th('InboxConversationsHelp') + '</div></div></div>'
@@ -2153,6 +2196,7 @@
 				+ (k === 'swipe_right' ? '<div class="ibx-formrow__help">' + th('InboxSwipeHelp') + '</div>' : '') + '</div></div>').join('')
 			+ '</div></section></div>';
 		main.innerHTML = html;
+		myDictation($('.ibx-js-mydictation', main));
 		const mailto = $('.ibx-js-mailto', main);
 		if (mailto) {
 			mailto.addEventListener('click', () => {

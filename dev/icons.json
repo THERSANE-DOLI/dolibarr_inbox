@@ -76,6 +76,7 @@
 		"mail-opened": ["mail-opened", "outline"],
 		"info": ["info-circle", "outline"],
 		"qrcode": ["qrcode", "outline"],
+		"mic": ["microphone", "outline"],
 		"camera": ["camera", "outline"],
 		"warning": ["alert-triangle", "outline"],
 		"check": ["check", "outline"],

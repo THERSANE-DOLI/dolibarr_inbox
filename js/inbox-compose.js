@@ -46,8 +46,8 @@
 		['quote', 'fmt-quote', 'InboxFmtQuote', ''], null,
 		['link', 'link', 'InboxFmtLink', 'Ctrl+K'], ['table', 'fmt-table', 'InboxFmtTable', '', 'menu'], ['clearFormat', 'fmt-clear', 'InboxFmtClear', ''], null,
 		['source', 'fmt-source', 'InboxFmtSource', '', 'toggle'], null,
-		// AI of the writing (1.27.0): shown only when allowed for the mailbox of the identity
-		['ai', 'magic', 'InboxAi', '', 'toggle'],
+		// Voice typing (1.28.0) and AI of the writing (1.27.0): shown only when allowed for the mailbox of the identity
+		['dictate', 'mic', 'InboxDictate', '', 'toggle'], ['ai', 'magic', 'InboxAi', '', 'toggle'],
 	];
 	/** A button of the toolbar: flat icon, a small arrow when it opens a menu */
 	function toolButton(x) {
@@ -405,6 +405,7 @@
 
 	function finish(w) {
 		w.closed = true;
+		dictateStop(w);
 		clearTimeout(w.saveTimer);
 		w.editor.destroy();
 		w.dlg.remove();
@@ -440,6 +441,7 @@
 			}
 		}
 		w.closed = true;
+		dictateStop(w);
 		try {
 			await post('compose', 'close', { compose: w.token, discard: 1 });
 		} catch (e) {
@@ -506,6 +508,7 @@
 		try {
 			const res = await post('compose', 'send', ctx.data);
 			w.closed = true;
+			dictateStop(w);
 			finish(w);
 			if (res.queued) {
 				sendBar(res);
@@ -1284,6 +1287,157 @@
 		const items = (w.editor.isActive('table') ? tableItems(w).concat([{ sep: true }]) : []).concat(formatItems(w, x, y), [{ sep: true }, { note: t('InboxBrowserMenuSpellHint') }]);
 		popMenu(pointAnchor(w, x, y), items, { x, y });
 	}
+	// ---------- Voice typing (1.28.0) ----------
+	/**
+	 * Speech recognition of the browser and who gets the voice, told from the browser (its interface does not say it):
+	 * Chrome sends it to Google, Edge to Microsoft, Safari to Apple; another one: « the maker of your browser ».
+	 * Firefox has none, Brave refuses it: no button there.
+	 */
+	function speech() {
+		const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+		if (!SR || navigator.brave) {
+			return null;
+		}
+		const ua = navigator.userAgent || '';
+		let provider = 'browser';
+		if (/\bEdg\//.test(ua)) {
+			provider = 'microsoft';
+		} else if (/\bOPR\/|\bVivaldi\b|\bYaBrowser\b|\bSamsungBrowser\b/.test(ua)) {
+			provider = 'browser';
+		} else if (/\bChrome\/|\bCriOS\//.test(ua)) {
+			provider = 'google';
+		} else if (/\bSafari\//.test(ua) && /\bVersion\//.test(ua)) {
+			provider = 'apple';
+		}
+		return { SR, provider };
+	}
+	function paintDictateButton(w) {
+		const b = $('[data-cmd="dictate"]', w.dlg);
+		if (!b) {
+			return;
+		}
+		const ok = !!(speech() && w.data.dictation && w.data.dictation.accounts.includes(identityOf(w).account));
+		b.hidden = !ok;
+		if (!ok && w.rec) {
+			dictateStop(w);
+		}
+	}
+	function dictateToggle(w) {
+		if (w.rec) {
+			dictateStop(w);
+			return;
+		}
+		const sp = speech();
+		if (!sp) {
+			return;
+		}
+		const consents = w.data.dictation.consents || {};
+		if (consents[sp.provider]) {
+			dictateStart(w, sp);
+			return;
+		}
+		// First use toward this receiver: what leaves and where, then the choice of the user
+		const who = t('InboxDictateProvider_' + sp.provider);
+		dialog({
+			title: t('InboxDictateConsentTitle'),
+			body: '<p>' + th('InboxDictateConsentText', who) + '</p><p class="ibx-muted">' + th('InboxDictateConsentRevoke') + '</p>',
+			actions: [{ label: t('InboxDictateConsentOk'), primary: true, run: async () => {
+				try {
+					const r = await post('dictation', 'consent', { provider: sp.provider, account: identityOf(w).account });
+					w.data.dictation.consents = r.consents;
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				dictateStart(w, sp);
+			} }],
+		});
+	}
+	function dictateStart(w, sp) {
+		const rec = new sp.SR();
+		rec.lang = (I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-');
+		rec.continuous = true;
+		rec.interimResults = true;
+		const bar = $('.ibx-js-dictbar', w.dlg);
+		const b = $('[data-cmd="dictate"]', w.dlg);
+		bar.innerHTML = '<span class="ibx-dict__dot" aria-hidden="true"></span><b>' + th('InboxDictateOn') + '</b><span class="ibx-muted"> · ' + esc(t('InboxDictateProvider_' + sp.provider)) + '</span>'
+			+ '<span class="ibx-dict__interim ibx-ellipsis ibx-js-dictinterim"></span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictstop">' + ic('close') + ' ' + th('InboxDictateStop') + '</button>';
+		$('.ibx-js-dictstop', bar).addEventListener('click', () => dictateStop(w));
+		bar.hidden = false;
+		if (b) {
+			b.setAttribute('aria-pressed', 'true');
+		}
+		rec.onresult = e => {
+			let interim = '';
+			for (let i = e.resultIndex; i < e.results.length; i++) {
+				const text = e.results[i][0].transcript;
+				if (e.results[i].isFinal) {
+					// At the cursor, as typed text (Ctrl+Z takes it back)
+					const clean = text.trim();
+					if (clean) {
+						w.editor.insertHtml(esc(clean) + ' ');
+						w.changed();
+					}
+				} else {
+					interim += text;
+				}
+			}
+			const box = $('.ibx-js-dictinterim', bar);
+			if (box) {
+				box.textContent = interim;
+			}
+		};
+		rec.onerror = e => {
+			const known = { 'not-allowed': 'InboxDictateNoMic', 'service-not-allowed': 'InboxDictateNoMic', 'audio-capture': 'InboxDictateNoMicDevice', network: 'InboxDictateNetwork' };
+			if (known[e.error]) {
+				toast(t(known[e.error]), { error: true });
+				w.recStopped = true;
+			}
+		};
+		rec.onend = () => {
+			// The browser stops after a silence: started again while the user did not stop it
+			if (w.rec === rec && !w.recStopped && !w.closed) {
+				try {
+					rec.start();
+					return;
+				} catch (err) {
+					// ended below
+				}
+			}
+			if (w.rec === rec) {
+				w.rec = null;
+				bar.hidden = true;
+				bar.innerHTML = '';
+				if (b) {
+					b.setAttribute('aria-pressed', 'false');
+				}
+			}
+		};
+		w.rec = rec;
+		w.recStopped = false;
+		try {
+			rec.start();
+		} catch (err) {
+			w.rec = null;
+			bar.hidden = true;
+			toast(t('InboxDictateNoMic'), { error: true });
+			return;
+		}
+		w.editor.focus();
+	}
+	function dictateStop(w) {
+		if (!w.rec) {
+			return;
+		}
+		w.recStopped = true;
+		try {
+			w.rec.stop();
+		} catch (err) {
+			// already stopped
+		}
+	}
+
 	// ---------- AI of the writing (1.27.0, analyse-ia-redaction.md) ----------
 	/** The button follows the mailbox of the identity: allowed there, else hidden (and its panel closed) */
 	function paintAiButton(w) {
@@ -1923,6 +2077,7 @@
 			+ TOOLS.map(toolButton).join('')
 			+ '</div>'
 			+ '<div class="ibx-compose__vars ibx-js-vars" role="group" hidden></div>'
+			+ '<div class="ibx-compose__dictation ibx-js-dictbar" role="status" hidden></div>'
 			+ '<div class="ibx-compose__ai ibx-js-ai" role="region" aria-label="' + th('InboxAi') + '" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
 			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
@@ -1968,6 +2123,7 @@
 		});
 		$('.ibx-js-from', dlg).addEventListener('change', () => {
 			paintAiButton(w);
+			paintDictateButton(w);
 			paintSignature(w);
 			paintBoxWarning(w);
 			w.changed();
@@ -2012,6 +2168,8 @@
 				toggleSource(w);
 			} else if (cmd === 'ai') {
 				aiToggle(w);
+			} else if (cmd === 'dictate') {
+				dictateToggle(w);
 			} else if (cmd === 'colorApply' || cmd === 'backgroundApply') {
 				const kind = cmd === 'colorApply' ? 'color' : 'background';
 				ed.exec(kind, ed.styleOf && ed.styleOf(kind) ? '' : colorState()[kind]);
@@ -2317,6 +2475,14 @@
 		w.editor.on('blur', () => setTimeout(() => bubble(w), 150));
 		$('.ibx-compose__body', dlg).addEventListener('scroll', () => bubble(w), { passive: true });
 		paintAiButton(w);
+		paintDictateButton(w);
+		// Escape stops the voice typing
+		dlg.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && w.rec) {
+				e.stopPropagation();
+				dictateStop(w);
+			}
+		}, true);
 		w.editor.on('change', ev => {
 			paintColorButtons(w);
 			paintTableButton(w);

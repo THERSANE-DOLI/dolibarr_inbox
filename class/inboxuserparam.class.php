@@ -112,6 +112,8 @@ class InboxUserParam
 			'notif_channels' => array('', 'json'),
 			// Read receipts asked by the mails (1.22.0): ask each time, or never send (the question is not shown)
 			'mdn_mode' => array('ask', array('ask', 'never')),
+			// Voice typing (1.28.0): receivers of the voice the user agreed to (provider => date), written by InboxDictation
+			'dictation_consent' => array('', 'json'),
 		);
 	}
 
