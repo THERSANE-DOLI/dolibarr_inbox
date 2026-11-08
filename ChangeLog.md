@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: Settings > General and My account, their sections in the menu :   1.32.0
+  - Under the page open in the menu, its sections, each with its icon (also before the title of its section).
+    General: Look, Defaults, Pictures of the senders, AI, Voice typing, Search, Global tags. My account: Reading,
+    My mailbox, Reading per mailbox, Unified views, Voice typing, Display, Actions (those the user has).
+  - A click brings the section into view and lights it, the page stays as it is; the address points at it
+    (#/settings/general/ai).
+  - The section on screen is lit in the menu as the page scrolls. On a phone: a row of chips kept at the top.
+  - On a large screen, the title of a long section stays at the top while it is read, pushed by the next one.
+
 - NEW: virtual views, kept searches shared with users and groups :   1.31.0
   - « Save as a view » beside a search: name, icon, colour, every mailbox or some, optional unread counter. The view
     sits in the « Views » section and replays its words, pills, filters, thirdparty, tag and period.

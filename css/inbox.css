@@ -610,6 +610,22 @@ a.ibx-btn, a.ibx-btn:hover { text-decoration: none; }
 .ibx-navlink:hover { background: var(--ibx-bg-hover); }
 .ibx-navlink[aria-current="page"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); font-weight: 600; }
 .ibx-settings__main { position: relative; overflow: auto; }
+/* Sections of the page open in the menu (1.32.0): under its link, a thread on the left, the one on screen lit */
+.ibx-navsub { display: grid; margin: 2px 0 var(--ibx-s2) calc(var(--ibx-s2) + 0.5em); padding-left: var(--ibx-s2); border-left: 1px solid var(--ibx-border); }
+.ibx-navlink--sub { min-height: 1.75rem; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-navlink--sub > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-navlink--sub.is-on { color: var(--ibx-accent); font-weight: 600; }
+/* On the phone (no menu beside the page): a row of chips kept at the top */
+.ibx-subchips { display: none; }
+.ibx-navlink[hidden], .ibx-subchip[hidden] { display: none !important; }
+/* Large screens: the title of a long section kept at the top while it is read, pushed by the next one; a line under
+   it once kept there (the phone has its chips at the top) */
+@media (min-width: 40rem) {
+	.ibx-section[data-section] > .ibx-section__title { position: sticky; top: 0; z-index: 1; margin: 0 0 var(--ibx-s1); padding: var(--ibx-s2) 0; background: var(--ibx-bg); }
+	.ibx-section[data-section] > .ibx-section__title.is-stuck { box-shadow: 0 1px 0 var(--ibx-border); }
+	.ibx-section[data-section].is-flash > .ibx-section__title { background: transparent; }
+}
+.ibx-section__title > .ibx-icon { color: var(--ibx-text-muted); margin-right: 0.15em; }
 .ibx-page { max-width: 60rem; padding: var(--ibx-s5) var(--ibx-s6) var(--ibx-s6); }
 .ibx-page__head { display: flex; align-items: center; gap: var(--ibx-s3); flex-wrap: wrap; margin-bottom: var(--ibx-s4); }
 .ibx-page__title { margin: 0; flex: 1; min-width: 0; font-size: var(--ibx-fs-xl); font-weight: 600; }
@@ -742,6 +758,9 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 	.ibx-settings[data-mobile="nav"] .ibx-settings__nav { display: block; }
 	.ibx-settings[data-mobile="nav"] .ibx-settings__main { display: none; }
 	.ibx-page { padding: var(--ibx-s4) var(--ibx-s4) var(--ibx-s6); }
+	.ibx-subchips { position: sticky; top: 0; z-index: 2; display: flex; gap: var(--ibx-s2); overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--ibx-s4)) var(--ibx-s4); padding: var(--ibx-s2) var(--ibx-s4); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); }
+	.ibx-subchip { flex: none; display: inline-flex; align-items: center; gap: var(--ibx-s1); min-height: 2.75rem; padding: 0 var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: 999px; color: var(--ibx-text); text-decoration: none; white-space: nowrap; }
+	.ibx-subchip.is-on { color: var(--ibx-accent); border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 	.ibx-formrow { grid-template-columns: 1fr; }
 	.ibx-formrow__label { padding-top: 0; }
 	.ibx-table thead { display: none; }
@@ -1970,6 +1989,8 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 @media (prefers-reduced-motion: reduce) { .ibx-section.is-flash { animation: none; outline: 2px solid var(--ibx-accent); outline-offset: 0.5rem; } }
 
 .ibx-section[data-section] { scroll-margin-top: var(--ibx-s5); }
+/* Below the chips kept at the top on the phone */
+@media (max-width: 39.9375rem) { .ibx-section[data-section] { scroll-margin-top: 4.5rem; } }
 /* One mailbox at a time (1.30.0): the selector on top of the folders, the list of the mailboxes in the panel */
 .ibx-boxpick__li { list-style: none; margin: var(--ibx-s1) 0 var(--ibx-s2); }
 .ibx-boxpick { display: flex; align-items: center; gap: var(--ibx-s1); }

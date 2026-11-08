@@ -104,6 +104,21 @@
 			$('.ibx-settings', el).dataset.mobile = page ? 'main' : 'nav';
 			renderNav(el, page);
 			const main = $('.ibx-settings__main', el);
+			main.onscroll = null;
+			if (!el.dataset.goto) {
+				// A section of the page already shown: brought into view in place, the page is not made again
+				el.dataset.goto = '1';
+				el.addEventListener('click', ev => {
+					const a = ev.target.closest('a[data-goto]');
+					const sec = a && $('[data-section="' + a.dataset.goto + '"]', main);
+					if (!sec || ev.ctrlKey || ev.metaKey || ev.shiftKey) {
+						return;
+					}
+					ev.preventDefault();
+					history.replaceState(null, '', a.getAttribute('href'));
+					pointSection(main, a.dataset.goto);
+				});
+			}
 			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
@@ -124,9 +139,39 @@
 	};
 	I.registerSpace(space);
 
+	/** Sections of Settings > General (1.32.0): id of the route, icon, title; in the menu, on the phone, on the titles */
+	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['avatars', 'user-circle', 'InboxAvatars'],
+		['ai', 'magic', 'InboxAiSection'], ['dictation', 'mic', 'InboxDictationSection'], ['search', 'search', 'InboxSectionSearch'], ['tags', 'tag', 'InboxGlobalTags']];
+	/** Sections of Settings > My account (1.32.0); the 4th value: shown only for some users, hidden until there */
+	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true],
+		['permailbox', 'mark-read', 'InboxReadPerMailbox', true], ['unified', 'multi', 'InboxUnifiedSection', true], ['dictation', 'mic', 'InboxDictationSection', true],
+		['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
+	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, me: ME_SECTIONS };
+
+	/** Links to the sections of a page: under its link in the menu, or the row of chips of the phone */
+	function sectionLinks(page, sections, cls) {
+		return sections.map(([id, icon, key, cond]) => '<a class="' + cls + '" href="#/settings/' + page + '/' + id + '" data-goto="' + id + '"' + (cond ? ' hidden' : '') + '>' + ic(icon) + ' <span>' + th(key) + '</span></a>').join('');
+	}
+
+	/** Links of the sections the page shows only (the others are not there for this user) */
+	function syncSectionLinks(main) {
+		$$('a[data-goto]', main.closest('.ibx-settings')).forEach(a => {
+			const sec = $('[data-section="' + a.dataset.goto + '"]', main);
+			a.hidden = !sec || sec.hidden;
+		});
+	}
+
+	/** Title of a section with its icon */
+	function sectionTitle(sections, id) {
+		const s = sections.find(x => x[0] === id);
+		return '<h2 class="ibx-section__title">' + ic(s[1]) + ' ' + th(s[2]) + '</h2>';
+	}
+
 	function renderNav(el, page) {
 		const nav = $('.ibx-settings__nav', el);
-		const link = (id, icon, key) => '<a class="ibx-navlink" href="#/settings/' + id + '"' + (page === id ? ' aria-current="page"' : '') + '>' + ic(icon) + ' ' + th(key) + '</a>';
+		// The page open: its sections under its link (1.32.0)
+		const link = (id, icon, key) => '<a class="ibx-navlink" href="#/settings/' + id + '"' + (page === id ? ' aria-current="page"' : '') + '>' + ic(icon) + ' ' + th(key) + '</a>'
+			+ (page === id && PAGE_SECTIONS[id] ? '<div class="ibx-navsub">' + sectionLinks(id, PAGE_SECTIONS[id], 'ibx-navlink ibx-navlink--sub') + '</div>' : '');
 		nav.innerHTML = '<div class="ibx-settings__navtitle">' + th('InboxSettings') + '</div>'
 			+ link('accounts', 'inbox', 'InboxNavAccounts')
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
@@ -153,7 +198,7 @@
 		}
 		const date = ts => new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
 		box.hidden = false;
-		box.innerHTML = '<h2 class="ibx-section__title">' + th('InboxDictationSection') + '</h2>'
+		box.innerHTML = sectionTitle(ME_SECTIONS, 'dictation')
 			+ (list.length ? '<ul class="ibx-checklist">' + list.map(([p, ts]) => '<li class="ibx-checklist__item">' + ic('mic') + '<div>' + th('InboxDictationMineGiven', t('InboxDictateProvider_' + p), date(ts)) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictrevoke" data-provider="' + esc(p) + '">' + th('InboxDictationRevoke') + '</button></li>').join('') + '</ul>'
 				: '<p class="ibx-section__help">' + th('InboxDictationMineNone') + '</p>');
@@ -1852,7 +1897,7 @@
 	}
 
 	// ---------- General (admins) ----------
-	async function renderGeneral(main) {
+	async function renderGeneral(main, parts) {
 		if (!isAdmin()) {
 			I.go('#/settings/accounts');
 			return;
@@ -1865,12 +1910,14 @@
 			s = g.settings;
 			aiModule = g.ai_module;
 		} catch (err) {
-			main.replaceChildren(errorBox(err, () => renderGeneral(main)));
+			main.replaceChildren(errorBox(err, () => renderGeneral(main, parts)));
 			return;
 		}
+		const title = id => sectionTitle(GENERAL_SECTIONS, id);
 		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavGeneral') + '</h1></div><p class="ibx-page__intro">' + th('InboxGeneralIntro') + '</p>'
+			+ '<nav class="ibx-subchips" aria-label="' + th('InboxNavGeneral') + '">' + sectionLinks('general', GENERAL_SECTIONS, 'ibx-subchip') + '</nav>'
 			// Look (accent, accent of the dark theme, greys, preview): applied at once to the page
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionLook') + '</h2><div class="ibx-form ibx-js-look">'
+			+ '<section class="ibx-section" data-section="look">' + title('look') + '<div class="ibx-form ibx-js-look">'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-accent-label">' + th('InboxAccent') + '</span><div><div class="ibx-swatches" role="radiogroup" aria-labelledby="g-accent-label">'
 			+ ACCENTS.map(([c, k]) => '<label class="ibx-swatchpick" title="' + th('InboxAccent_' + k) + '"><input type="radio" name="g-accent" value="' + c + '" aria-label="' + th('InboxAccent_' + k) + '"><span class="ibx-swatchpick__dot" data-color="' + c + '"></span></label>').join('')
 			+ '<label class="ibx-inline"><input type="radio" name="g-accent" value="other"> ' + th('InboxAccentOther') + ' <input type="color" class="ibx-color" id="g-accent" aria-label="' + th('InboxAccentOther') + '" value="' + esc(s.INBOX_ACCENT) + '"></label></div>'
@@ -1890,7 +1937,7 @@
 				+ '<div class="ibx-apreview__list"><span class="ibx-apreview__search">' + th('InboxSearchPlaceholder') + '</span><span class="ibx-apreview__mail">' + th('InboxLookPreviewMail') + '<span>' + th('InboxLookPreviewText') + '</span></span><span class="ibx-apreview__btn">' + th('InboxNewMail') + '</span></div></div>').join('')
 			+ '</div></div>'
 			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDefaults') + '</h2><div class="ibx-form ibx-js-general">'
+			+ '<section class="ibx-section" data-section="defaults">' + title('defaults') + '<div class="ibx-form ibx-js-general">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-read">' + th('InboxReadMode') + '</label><div><select class="ibx-field ibx-field--medium" id="g-read" data-name="INBOX_DEFAULT_READ_MODE">' + ['immediate', 'delay', 'manual'].map(v => '<option value="' + v + '"' + (v === s.INBOX_DEFAULT_READ_MODE ? ' selected' : '') + '>' + th('InboxReadMode_' + v) + '</option>').join('') + '</select><div class="ibx-formrow__help">' + th('InboxReadModeDefaultHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" id="g-delay" data-name="INBOX_DEFAULT_READ_DELAY" value="' + esc(s.INBOX_DEFAULT_READ_DELAY) + '"> ' + th('InboxSeconds') + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-send">' + th('InboxSendDelay') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-send" data-name="INBOX_SEND_DELAY" value="' + esc(s.INBOX_SEND_DELAY) + '"> ' + th('InboxSeconds') + '</div><div class="ibx-formrow__help">' + th('InboxSendDelayHelp') + '</div></div></div>'
@@ -1902,13 +1949,13 @@
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_SEND_AUTOCOPY" aria-checked="' + (s.INBOX_SEND_AUTOCOPY === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxSendAutocopy') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxSendAutocopyHelp') + '</div></div></div>'
 			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAvatars') + '</h2><p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
+			+ '<section class="ibx-section" data-section="avatars">' + title('avatars') + '<p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
 			// AI in the writing (1.27.0): through the AI module of Dolibarr, off by default
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAiSection') + '</h2>'
+			+ '<section class="ibx-section" data-section="ai">' + title('ai')
 			+ (aiModule ? '' : '<div class="ibx-notice">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxAiNoModule') + '</div></div>')
 			+ '<div class="ibx-form">'
 			+ [['INBOX_AI_ENABLED', 'InboxAiEnabled'], ['INBOX_AI_WITH_MAIL', 'InboxAiWithMailSetting']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
@@ -1916,13 +1963,13 @@
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
 			// Voice typing (1.28.0): off by default, each user agrees once per receiver of the voice
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxDictationSection') + '</h2><div class="ibx-form">'
+			+ '<section class="ibx-section" data-section="dictation">' + title('dictation') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxDictationEnabled') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_DICTATION_ENABLED" aria-checked="' + (s.INBOX_DICTATION_ENABLED === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxDictationEnabled') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxDictationEnabledHelp') + '</div></div></div>'
 			+ '</div></section>'
-			+ '<section class="ibx-section ibx-js-searchsettings"></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
+			+ '<section class="ibx-section ibx-js-searchsettings" data-section="search">' + title('search') + '</section>'
+			+ '<section class="ibx-section" data-section="tags">' + title('tags') + '<p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
 		// Look: accent (offered colours or another one), accent of the dark theme, greys; preview and page at once
 		const look = $('.ibx-js-look', main);
 		const accentInput = $('#g-accent', look);
@@ -2007,7 +2054,13 @@
 			}
 		}));
 		tabTags($('.ibx-js-tags', main), null);
-		renderSearchSettings($('.ibx-js-searchsettings', main));
+		const searchDone = renderSearchSettings($('.ibx-js-searchsettings', main));
+		// The section on screen lit in the menu (and the chips); a section asked by the route brought into view once
+		// the page is complete (the search settings come later and move what is below them)
+		spySections(main, GENERAL_SECTIONS.map(x => x[0]));
+		if (parts && parts[0]) {
+			searchDone.then(() => requestAnimationFrame(() => pointSection(main, parts[0])));
+		}
 	}
 
 	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------
@@ -2024,7 +2077,7 @@
 			return;
 		}
 		const on = !!s.enabled;
-		sec.innerHTML = '<h2 class="ibx-section__title">' + th('InboxSectionSearch') + '</h2><p class="ibx-section__help">' + th('InboxMeiliHelp') + '</p>'
+		sec.innerHTML = sectionTitle(GENERAL_SECTIONS, 'search') + '<p class="ibx-section__help">' + th('InboxMeiliHelp') + '</p>'
 			+ '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>' + (on ? '<span class="ibx-status ibx-status--ok">' + th('InboxMeiliOn') + '</span>' : '<span class="ibx-status">' + th('InboxMeiliOff') + '</span>')
 			+ '<div class="ibx-formrow__help">' + th(on ? 'InboxMeiliOnHelp' : 'InboxMeiliOffHelp') + '</div></div></div>'
@@ -2138,6 +2191,82 @@
 		});
 	}
 
+	/**
+	 * A section pointed at (from a menu, a link, the route): brought into view, its background lit then fading, so
+	 * the eye finds it; the focus on its first field (1.29.0)
+	 */
+	function pointSection(main, name) {
+		const target = $('[data-section="' + String(name).replace(/[^a-z]/g, '') + '"]', main);
+		if (!target) {
+			return;
+		}
+		target.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+		target.classList.remove('is-flash');
+		void target.offsetWidth;
+		target.classList.add('is-flash');
+		// Removed after the fading (also without animation: the outline of the reduced motion goes too)
+		setTimeout(() => target.classList.remove('is-flash'), 2600);
+		const first = $('input, select, button', target);
+		if (first) {
+			first.focus({ preventScroll: true });
+		}
+	}
+
+	/**
+	 * The section at the top of the page lit in its links (menu and chips), as the page scrolls; its title kept at
+	 * the top marked (1.32.0)
+	 */
+	function spySections(main, ids) {
+		const nav = main.closest('.ibx-settings');
+		let last = '';
+		const update = () => {
+			const top = main.getBoundingClientRect().top + 96;
+			let on = ids[0];
+			// At the bottom of the page: the last sections, too short to reach the top, are lit when reached
+			const atEnd = main.scrollTop + main.clientHeight >= main.scrollHeight - 4;
+			ids.forEach(id => {
+				const sec = $('[data-section="' + id + '"]', main);
+				if (sec && !sec.hidden && sec.offsetHeight && (sec.getBoundingClientRect().top <= top || atEnd)) {
+					on = id;
+				}
+			});
+			// A title kept at the top of the page (large screens) marked so: its line under it
+			const edge = main.getBoundingClientRect().top + 1;
+			ids.forEach(id => {
+				const sec = $('[data-section="' + id + '"]', main);
+				const h = sec && $(':scope > .ibx-section__title', sec);
+				if (h) {
+					h.classList.toggle('is-stuck', sec.getBoundingClientRect().top < edge - 1 && h.getBoundingClientRect().top <= edge);
+				}
+			});
+			if (on === last) {
+				return;
+			}
+			last = on;
+			$$('a[data-goto]', nav).forEach(a => {
+				a.classList.toggle('is-on', a.dataset.goto === on);
+				if (a.dataset.goto === on && a.classList.contains('ibx-subchip')) {
+					// The chip brought into its row by hand: a scrollIntoView would stop the scrolling of the page
+					const row = a.parentElement;
+					if (a.offsetLeft < row.scrollLeft || a.offsetLeft + a.offsetWidth > row.scrollLeft + row.clientWidth) {
+						row.scrollLeft = a.offsetLeft - 16;
+					}
+				}
+			});
+		};
+		let queued = false;
+		main.onscroll = () => {
+			if (!queued) {
+				queued = true;
+				requestAnimationFrame(() => {
+					queued = false;
+					update();
+				});
+			}
+		};
+		update();
+	}
+
 	// ---------- My account ----------
 	async function renderMe(main, parts) {
 		main.innerHTML = skeleton();
@@ -2145,13 +2274,15 @@
 		try {
 			data = await api('userparam', 'get');
 		} catch (err) {
-			main.replaceChildren(errorBox(err, () => renderMe(main)));
+			main.replaceChildren(errorBox(err, () => renderMe(main, parts)));
 			return;
 		}
 		const p = data.params;
 		const opt = (name, values, current) => '<select class="ibx-field ibx-field--medium" data-param="' + name + '" id="me-' + name + '">' + values.map(v => '<option value="' + v + '"' + (v === current ? ' selected' : '') + '>' + th('Inbox_' + name + '_' + v) + '</option>').join('') + '</select>';
+		const title = id => sectionTitle(ME_SECTIONS, id);
 		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavMe') + '</h1></div>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionReading') + '</h2><div class="ibx-form">'
+			+ '<nav class="ibx-subchips" aria-label="' + th('InboxNavMe') + '">' + sectionLinks('me', ME_SECTIONS, 'ibx-subchip') + '</nav>'
+			+ '<section class="ibx-section" data-section="reading">' + title('reading') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_mode">' + th('InboxReadMode') + '</label><div>' + opt('read_mode', ['immediate', 'delay', 'manual'], p.read_mode) + '<div class="ibx-formrow__help">' + th('InboxReadModeHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" data-param="read_delay" id="me-read_delay" value="' + esc(p.read_delay) + '"> ' + th('InboxSeconds') + '</div></div>'
 			// Read receipts asked (lot W8 1.22.0): never sent without a click
@@ -2160,14 +2291,14 @@
 		// Rules and out of office of the personal mailboxes (lot W8 1.23.0): kept on the card of the mailbox
 		const mine = data.mailboxes.filter(m => m.personal);
 		if (mine.length) {
-			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMyBox') + '</h2><p class="ibx-section__help">' + th('InboxMyBoxHelp') + '</p><div class="ibx-form">'
+			html += '<section class="ibx-section" data-section="mybox">' + title('mybox') + '<p class="ibx-section__help">' + th('InboxMyBoxHelp') + '</p><div class="ibx-form">'
 				+ mine.map(m => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + esc(m.label || m.email) + '</span><div class="ibx-inline" style="gap:var(--ibx-s2)">'
 					+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + m.id + '/rules">' + ic('folder-bolt') + ' ' + th('InboxTabRules') + '</a>'
 					+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + m.id + '/away">' + ic('agenda') + ' ' + th('InboxTabAway') + '</a></div></div>').join('')
 				+ '</div></section>';
 		}
 		if (data.mailboxes.length) {
-			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxReadPerMailbox') + '</h2><p class="ibx-section__help">' + th('InboxReadPerMailboxHelp') + '</p><table class="ibx-table"><tbody>'
+			html += '<section class="ibx-section" data-section="permailbox">' + title('permailbox') + '<p class="ibx-section__help">' + th('InboxReadPerMailboxHelp') + '</p><table class="ibx-table"><tbody>'
 				+ data.mailboxes.map(m => '<tr><td><b>' + esc(m.label || m.email) + '</b><div class="ibx-muted">' + esc(m.email) + '</div></td><td><select class="ibx-field ibx-field--medium" data-param="read_mode" data-account="' + m.id + '" aria-label="' + th('InboxReadMode') + '">'
 					+ '<option value="">' + th('InboxSameAsAbove') + '</option>' + ['immediate', 'delay', 'manual'].map(v => '<option value="' + v + '"' + (m.params.read_mode === v && m.params.read_mode !== p.read_mode ? ' selected' : '') + '>' + th('Inbox_read_mode_' + v) + '</option>').join('') + '</select></td></tr>').join('')
 				+ '</tbody></table></section>';
@@ -2181,12 +2312,12 @@
 			} catch (e) {
 				out = [];
 			}
-			html += '<section class="ibx-section" data-section="unified"><h2 class="ibx-section__title">' + th('InboxUnifiedSection') + '</h2><p class="ibx-section__help">' + th('InboxUnifiedHelp') + '</p>'
+			html += '<section class="ibx-section" data-section="unified">' + title('unified') + '<p class="ibx-section__help">' + th('InboxUnifiedHelp') + '</p>'
 				+ '<div class="ibx-form ibx-js-unified">' + data.mailboxes.map(m => '<label class="ibx-check"><input type="checkbox" value="' + m.id + '"' + (out.includes(m.id) ? '' : ' checked') + '> '
 					+ esc(m.label && m.label !== m.email ? m.label + ' <' + m.email + '>' : m.email) + '</label>').join('') + '</div></section>';
 		}
-		html += '<section class="ibx-section ibx-js-mydictation" hidden></section>';
-		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDisplay') + '</h2><div class="ibx-form">'
+		html += '<section class="ibx-section ibx-js-mydictation" data-section="dictation" hidden></section>';
+		html += '<section class="ibx-section" data-section="display">' + title('display') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-view">' + th('InboxView') + '</label><div>' + opt('view', ['cards', 'table'], p.view) + '<div class="ibx-formrow__help">' + th('InboxViewHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-conversation">' + th('InboxConversationsSetting') + '</label><div>' + opt('conversation', ['1', '0'], p.conversation) + '<div class="ibx-formrow__help">' + th('InboxConversationsHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-context_menus">' + th('InboxContextMenus') + '</label><div>' + opt('context_menus', ['1', '0'], p.context_menus) + '<div class="ibx-formrow__help">' + th('InboxContextMenusHelp') + '</div></div></div>'
@@ -2203,29 +2334,23 @@
 			// mailto: links of the browser opened in inbox (lot W6 1.18.0): asked by the browser, per computer
 			+ (I.ctx('INBOX_CAN_SEND', false) && window.isSecureContext && navigator.registerProtocolHandler ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMailtoLinks') + '</span><div><button type="button" class="ibx-btn ibx-js-mailto">' + ic('mail') + ' ' + th('InboxMailtoRegister') + '</button><div class="ibx-formrow__help">' + th('InboxMailtoHelp') + '</div></div></div>' : '')
 			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionActions') + '</h2><div class="ibx-form">'
+			+ '<section class="ibx-section" data-section="actions">' + title('actions') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-after_move">' + th('InboxAfterMove') + '</label><div>' + opt('after_move', ['next', 'previous'], p.after_move) + '<div class="ibx-formrow__help">' + th('InboxAfterMoveHelp') + '</div></div></div>'
 			+ ['swipe_left', 'swipe_right'].map(k => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-' + k + '">' + th(k === 'swipe_left' ? 'InboxSwipeLeft' : 'InboxSwipeRight') + '</label><div>'
 				+ '<select class="ibx-field ibx-field--medium" data-param="' + k + '" id="me-' + k + '">' + ['none', 'archive', 'delete', 'read', 'flag', 'tag', 'move'].map(v => '<option value="' + v + '"' + (v === p[k] ? ' selected' : '') + '>' + th('InboxSwipe_' + v) + '</option>').join('') + '</select>'
 				+ (k === 'swipe_right' ? '<div class="ibx-formrow__help">' + th('InboxSwipeHelp') + '</div>' : '') + '</div></div>').join('')
 			+ '</div></section></div>';
 		main.innerHTML = html;
-		myDictation($('.ibx-js-mydictation', main));
-		// Come from a menu that points at a section (#/settings/me/unified): brought into view, its background lit
-		// then fading, so the eye finds it (1.29.0)
-		const target = parts && parts[0] ? $('[data-section="' + parts[0].replace(/[^a-z]/g, '') + '"]', main) : null;
-		if (target) {
-			target.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-			target.classList.remove('is-flash');
-			void target.offsetWidth;
-			target.classList.add('is-flash');
-			// Removed after the fading (also without animation: the outline of the reduced motion goes too)
-			setTimeout(() => target.classList.remove('is-flash'), 2600);
-			const first = $('input, select, button', target);
-			if (first) {
-				first.focus({ preventScroll: true });
+		syncSectionLinks(main);
+		spySections(main, ME_SECTIONS.map(x => x[0]));
+		// My dictation comes later (shown only when used): its link then, and a section asked by the route
+		// (#/settings/me/unified, from a menu) brought into view once the page is complete
+		myDictation($('.ibx-js-mydictation', main)).then(() => {
+			syncSectionLinks(main);
+			if (parts && parts[0]) {
+				requestAnimationFrame(() => pointSection(main, parts[0]));
 			}
-		}
+		});
 		const unified = $('.ibx-js-unified', main);
 		if (unified) {
 			unified.addEventListener('change', async () => {
