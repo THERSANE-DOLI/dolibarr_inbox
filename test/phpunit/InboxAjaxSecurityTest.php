@@ -199,8 +199,8 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id='.$row->rowid)['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=page&folder='.$row->fk_folder)['code']);
 		// Deep search (lot W7 1.19.0): a mailbox without access is never searched on its server
-		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'all', 'q' => 'raccords'))['code'], 'IDOR: deep search');
-		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords'))['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'all', 'q' => 'raccords', 'token' => $token))['code'], 'IDOR: deep search');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords', 'token' => $token))['code']);
 		$sug = $this->call('/custom/inbox/ajax/list.php', array('action' => 'suggest', 'q' => 'dupont'));
 		$this->assertSame(array(), $sug['json']['senders'], 'no sender of a mailbox without access');
 
@@ -211,11 +211,11 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$page = $this->call('/custom/inbox/ajax/list.php', array('action' => 'page', 'folder' => (int) $row->fk_folder, 'q' => '"raccords inox"'));
 		$this->assertSame(200, $page['code'], 'a phrase in quotes, sent in the body');
 		$this->assertSame(1, $page['json']['total']);
-		$deep = $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords'));
+		$deep = $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords', 'token' => $token));
 		$this->assertSame(200, $deep['code'], $deep['body']);
 		$this->assertTrue($deep['json']['complete']);
 		$this->assertGreaterThanOrEqual(1, $deep['json']['found']);
-		$this->assertSame(400, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'from:dupont'))['code'], 'deep search without a word refused');
+		$this->assertSame(400, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'from:dupont', 'token' => $token))['code'], 'deep search without a word refused');
 		$sug = $this->call('/custom/inbox/ajax/list.php', array('action' => 'suggest', 'q' => 'dupont'));
 		$this->assertSame('j.dupont@acme.invalid', $sug['json']['senders'][0]['email'] ?? '', 'known sender suggested');
 
@@ -239,7 +239,12 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$readOnly = $this->call('/custom/inbox/ajax/action.php', array('action' => 'run', 'what' => 'archive', 'ids' => array((int) $row->rowid), 'token' => $token));
 		$this->assertSame(403, $readOnly['code'], 'level read: no archive');
 		$this->assertSame('InboxErrorNeedManage', $readOnly['json']['code']);
-		// Journal: managers of the mailbox and admins of the mailboxes (the user of the HTTP tests is one), a forged one not found
+		// Journal: it names the mails, so the level « manage » on the mailbox only, even for an admin of the mailboxes
+		// (audit INBX-006, 1.23.1); a forged one not found
+		$this->assertSame(403, $this->call('/custom/inbox/ajax/action.php?action=journal&id='.$a->id)['code'], 'level read: no journal');
+		$me = new User($this->db);
+		$me->fetch(0, (string) getenv('INBOX_TEST_LOGIN'));
+		(new InboxAccess($this->db))->grant($this->admin, $a->id, $me->id, 0, InboxAccess::LEVEL_MANAGE);
 		$journal = $this->call('/custom/inbox/ajax/action.php?action=journal&id='.$a->id);
 		$this->assertSame(200, $journal['code'], $journal['body']);
 		$this->assertArrayHasKey('lines', $journal['json']);
@@ -279,5 +284,56 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/template.php', array('action' => 'save', 'label' => 'ZzTpl x'))['code'], 'save without token refused');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/template.php?action=list&id=99999999')['code'], 'tab of a mailbox not managed');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/template.php?action=get&template=99999999')['code']);
+	}
+
+	/**
+	 * Voice typing (1.28.0): the consent given only by POST with the token, for a known receiver and a mailbox the user
+	 * may dictate from, never written by the generic settings; withdrawn the same way
+	 *
+	 * @return void
+	 */
+	public function testDictationConsent()
+	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		dol_include_once('/inbox/class/inboxdictation.class.php');
+		$token = $this->login();
+		$me = new User($this->db);
+		$this->assertGreaterThan(0, $me->fetch(0, (string) getenv('INBOX_TEST_LOGIN')));
+		$before = getDolGlobalString('INBOX_DICTATION_ENABLED');
+		dolibarr_set_const($this->db, 'INBOX_DICTATION_ENABLED', '1', 'chaine', 0, '', $conf->entity);
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$access = new InboxAccess($this->db);
+		$access->grant($this->admin, $a->id, $me->id, 0, InboxAccess::LEVEL_SEND);
+		InboxAccess::clearCache();
+		$params = new InboxUserParam($this->db);
+		$params->remove($me, InboxDictation::PARAM);
+		try {
+			$get = $this->call('/custom/inbox/ajax/dictation.php?action=get');
+			$this->assertSame(200, $get['code']);
+			$this->assertSame(1, $get['json']['enabled']);
+			$consent = array('action' => 'consent', 'provider' => 'google', 'account' => (int) $a->id);
+			$this->assertSame(403, $this->call('/custom/inbox/ajax/dictation.php', $consent)['code'], 'consent without token refused');
+			$this->assertSame(405, $this->call('/custom/inbox/ajax/dictation.php?action=consent&provider=google&account='.$a->id.'&token='.urlencode($token))['code'], 'consent by GET refused');
+			$this->assertSame(403, $this->call('/custom/inbox/ajax/dictation.php', array('provider' => 'evil') + $consent + array('token' => $token))['code'], 'unknown receiver');
+			$this->assertSame(403, $this->call('/custom/inbox/ajax/dictation.php', array('account' => 99999999) + $consent + array('token' => $token))['code'], 'mailbox not allowed');
+			// Never written by the generic settings (the journal would be bypassed)
+			$this->assertSame(400, $this->call('/custom/inbox/ajax/userparam.php', array('action' => 'set', 'param' => 'dictation_consent', 'value' => '{"google":1}', 'token' => $token))['code']);
+			$ok = $this->call('/custom/inbox/ajax/dictation.php', $consent + array('token' => $token));
+			$this->assertSame(200, $ok['code'], $ok['body']);
+			$this->assertArrayHasKey('google', $ok['json']['consents']);
+			$this->assertSame(403, $this->call('/custom/inbox/ajax/dictation.php', array('action' => 'revoke', 'provider' => 'google'))['code'], 'withdrawal without token refused');
+			$gone = $this->call('/custom/inbox/ajax/dictation.php', array('action' => 'revoke', 'provider' => 'google', 'token' => $token));
+			$this->assertSame(array(), (array) $gone['json']['consents']);
+			// A mailbox excluded: no consent from it
+			$a->setConnectorConfig(array('dictation_off' => 1));
+			$a->update($this->admin);
+			$this->assertSame(403, $this->call('/custom/inbox/ajax/dictation.php', $consent + array('token' => $token))['code'], 'mailbox excluded');
+		} finally {
+			$params->remove($me, InboxDictation::PARAM);
+			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_action_log WHERE action IN ('dictation_on', 'dictation_off') AND fk_user = ".((int) $me->id));
+			dolibarr_set_const($this->db, 'INBOX_DICTATION_ENABLED', $before === '' ? '0' : $before, 'chaine', 0, '', $conf->entity);
+		}
 	}
 }
