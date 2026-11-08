@@ -57,6 +57,9 @@ function inboxGeneralSettings()
 		// Off by default (audit INBX-008): when on, the server asks the domain of the sender at the opening of a mail
 		'INBOX_AVATAR_BIMI' => array('default' => '0', 'check' => 'int:0:1'),
 		'INBOX_AVATAR_GRAVATAR' => array('default' => '0', 'check' => 'int:0:1'),
+		// AI in the writing (1.27.0): off by default; the mail answered may go with a request (allowed by default)
+		'INBOX_AI_ENABLED' => array('default' => '0', 'check' => 'int:0:1'),
+		'INBOX_AI_WITH_MAIL' => array('default' => '1', 'check' => 'int:0:1'),
 	);
 }
 
@@ -91,7 +94,8 @@ switch ($action) {
 		foreach ($settings as $name => $def) {
 			$out[$name] = getDolGlobalString($name, $def['default']);
 		}
-		inboxAjaxReply(array('settings' => $out));
+		// The AI module of Dolibarr is there (the setting of inbox only matters then)
+		inboxAjaxReply(array('settings' => $out, 'ai_module' => isModEnabled('ai') ? 1 : 0));
 		// no break
 
 	case 'set':

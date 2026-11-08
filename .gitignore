@@ -24,3 +24,5 @@
 /analyses
 .phpunit.result.cache
 /dev/tiptap/node_modules
+
+/dev/editor-tests/node_modules

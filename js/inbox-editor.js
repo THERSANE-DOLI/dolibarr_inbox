@@ -554,6 +554,32 @@
 				}
 			},
 			tableStyle, tableInfo, tableProps, cellInfo, cellProps, imageInfo, imageProps, imageBox,
+			/** The selection: its bounds and its text ('' for a cursor) (AI of the writing, 1.27.0) */
+			selectionRange() {
+				if (!editor) {
+					return null;
+				}
+				const { from, to } = editor.state.selection;
+				return { from, to, text: from < to ? editor.state.doc.textBetween(from, to, '\n') : '' };
+			},
+			/** HTML put in place of a range (null: the whole text), in the history (Ctrl+Z takes it back) */
+			replaceRange(from, to, html) {
+				if (!editor) {
+					return;
+				}
+				if (from === null || from === undefined) {
+					editor.chain().focus().selectAll().insertContent(html).run();
+					return;
+				}
+				const size = editor.state.doc.content.size;
+				const a = Math.max(0, Math.min(+from, size));
+				const b = Math.max(a, Math.min(+to, size));
+				editor.chain().focus().insertContentAt({ from: a, to: b }, html).run();
+			},
+			/** The Tiptap editor itself: for a module that adds to it, and for the tests of dev/editor-tests */
+			raw() {
+				return editor;
+			},
 			getCapabilities() {
 				return { tables: true, images: true, headings: true, colors: true, align: true, variables: true };
 			},

@@ -1,0 +1,12 @@
+{
+  "name": "inbox-editor-tests",
+  "private": true,
+  "description": "Tests of the editor of the writing (js/inbox-editor.js with the frozen Tiptap bundle) in a DOM made by jsdom; never shipped, never served",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

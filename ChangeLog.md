@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: AI in the writing, through the AI module of Dolibarr :   1.27.0
+  - button « AI help » in the toolbar of the writing: write from an instruction (with the text of the mail answered,
+    untickable), rephrase (shorter, more formal, warmer, spelling) or translate the selection or the whole text.
+  - the answer is a proposal shown in the panel: Insert / Replace / Try again; nothing enters the mail without a click,
+    Ctrl+Z takes it back. Cleaned as a mail (no script, no picture from elsewhere).
+  - what leaves: the instruction, the text, the mail answered as data (framed, never followed as an order); never the
+    attachments, the signature or the Bcc. Dolibarr 24: personal data masked during the call (PrivacyGuard).
+  - off by default (Settings > General), the mail answered may be forbidden, a mailbox may be excluded (its card);
+    sending level on the mailbox and the right of the AI module (24); 30 requests per hour and per user; each request
+    written in the journal of the actions, without its text.
+  - tests of the editor in Node with jsdom (dev/editor-tests), the editor gives its Tiptap instance (raw()).
 - NEW: gaps of the writing (lot W6) closed :   1.26.0
   - a mail forwarded gets the keyword $Forwarded on the server (read by the other mail software), shown in the list.
   - copy in Sent: automatic, by inbox or by the sending server (some servers file it themselves: no second copy).

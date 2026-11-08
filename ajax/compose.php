@@ -23,6 +23,7 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxcomposer.class.php');
+dol_include_once('/inbox/class/inboxai.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(true);
@@ -85,7 +86,34 @@ switch ($action) {
 		if ($res === null) {
 			inboxComposeFail($composer);
 		}
+		// AI in the writing (1.27.0): the mailboxes it may be used from, and whether the mail answered may go with it
+		$ai = new InboxAi($db);
+		$res['ai'] = array('accounts' => $ai->accountsFor($user), 'mail' => InboxAi::mailAllowed() ? 1 : 0);
 		inboxAjaxReply($res);
+		break;
+	case 'ai':
+		// A proposal of the AI for the writing: written, rephrased or translated; never put in the mail by the server
+		$dir = $composer->held($user, $token);
+		$identity = $dir !== null ? $composer->identityOf($user, (int) inboxAjaxParam('identity', 'int')) : null;
+		if ($dir === null || !$identity) {
+			$composer->errorCode = 'not_found';
+			inboxComposeFail($composer);
+		}
+		$ai = new InboxAi($db);
+		$state = InboxComposer::readState($dir);
+		$mailId = (int) inboxAjaxParam('with_mail', 'int') === 1 && !empty($state['source']['mail']) ? (int) $state['source']['mail'] : 0;
+		$html = $ai->run($user, (int) $identity['account'], (string) inboxAjaxParam('kind', 'aZ09'), array(
+			'prompt' => (string) inboxAjaxParam('prompt', 'none'),
+			'text' => (string) inboxAjaxParam('text', 'none'),
+			'style' => (string) inboxAjaxParam('style', 'aZ09'),
+			'lang' => (string) inboxAjaxParam('lang', 'aZ09'),
+			'mail' => $mailId ? $ai->mailText($user, $mailId) : '',
+		));
+		if ($html === null) {
+			$http = array('off' => 403, 'mailbox' => 403, 'right' => 403, 'limit' => 429, 'empty' => 422, 'service' => 502);
+			inboxAjaxReply(array('error' => $langs->transnoentities('InboxAiError_'.$ai->errorCode), 'code' => $ai->errorCode, 'detail' => $ai->error), $http[$ai->errorCode] ?? 502);
+		}
+		inboxAjaxReply(array('html' => $html));
 		break;
 	case 'recipients':
 		inboxAjaxReply(array('items' => $composer->recipients($user, (string) inboxAjaxParam('q', 'alphanohtml'))));

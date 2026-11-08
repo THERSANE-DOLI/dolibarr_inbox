@@ -1907,4 +1907,22 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Fingers: targets of 44 px */
 @media (pointer: coarse) { .ibx-attbar .ibx-btn { height: 2.75rem; min-width: 2.75rem; justify-content: center; } }
 @media print { .ibx-quickreply, .ibx-convo__foot { display: none; } }
+/* AI of the writing (1.27.0): a panel under the toolbar, the proposal shown before anything goes in the mail */
+.ibx-compose__ai { display: grid; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); background: var(--ibx-accent-softer); font-size: var(--ibx-fs-sm); }
+.ibx-compose__ai[hidden], .ibx-ai__pane[hidden], .ibx-ai__result[hidden] { display: none; }
+.ibx-ai__head, .ibx-ai__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
+.ibx-ai__icon { color: var(--ibx-accent); }
+.ibx-ai__spacer { flex: 1; }
+.ibx-ai__prompt { width: 100%; min-height: 3.25rem; resize: vertical; font: inherit; }
+.ibx-ai__pane { display: grid; gap: var(--ibx-s2); }
+.ibx-ai__hint, .ibx-ai__note { margin: 0; color: var(--ibx-text-muted); }
+.ibx-ai__note { font-size: var(--ibx-fs-xs); }
+.ibx-ai__result { display: grid; gap: var(--ibx-s2); padding: var(--ibx-s2); background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); }
+.ibx-ai__label { font-weight: 600; color: var(--ibx-text-muted); }
+.ibx-ai__proposal { max-height: 14rem; overflow: auto; font-size: var(--ibx-fs-body); overflow-wrap: anywhere; }
+.ibx-ai__proposal > :first-child { margin-top: 0; }
+.ibx-ai__working { margin: 0; color: var(--ibx-text-muted); }
+.ibx-ai__working .ibx-icon { animation: ibx-ai-pulse 1.2s ease-in-out infinite; color: var(--ibx-accent); }
+@keyframes ibx-ai-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .ibx-ai__working .ibx-icon { animation: none; } }
 

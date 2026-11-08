@@ -45,7 +45,9 @@
 		['align', 'fmt-align-left', 'InboxFmtAlign', '', 'menu'], ['bulletList', 'fmt-bullets', 'InboxFmtBullets', ''], ['orderedList', 'fmt-numbers', 'InboxFmtNumbers', ''],
 		['quote', 'fmt-quote', 'InboxFmtQuote', ''], null,
 		['link', 'link', 'InboxFmtLink', 'Ctrl+K'], ['table', 'fmt-table', 'InboxFmtTable', '', 'menu'], ['clearFormat', 'fmt-clear', 'InboxFmtClear', ''], null,
-		['source', 'fmt-source', 'InboxFmtSource', '', 'toggle'],
+		['source', 'fmt-source', 'InboxFmtSource', '', 'toggle'], null,
+		// AI of the writing (1.27.0): shown only when allowed for the mailbox of the identity
+		['ai', 'magic', 'InboxAi', '', 'toggle'],
 	];
 	/** A button of the toolbar: flat icon, a small arrow when it opens a menu */
 	function toolButton(x) {
@@ -1282,6 +1284,167 @@
 		const items = (w.editor.isActive('table') ? tableItems(w).concat([{ sep: true }]) : []).concat(formatItems(w, x, y), [{ sep: true }, { note: t('InboxBrowserMenuSpellHint') }]);
 		popMenu(pointAnchor(w, x, y), items, { x, y });
 	}
+	// ---------- AI of the writing (1.27.0, analyse-ia-redaction.md) ----------
+	/** The button follows the mailbox of the identity: allowed there, else hidden (and its panel closed) */
+	function paintAiButton(w) {
+		const b = $('[data-cmd="ai"]', w.dlg);
+		if (!b) {
+			return;
+		}
+		const ok = !!(w.data.ai && w.data.ai.accounts.includes(identityOf(w).account));
+		b.hidden = !ok;
+		const sep = b.previousElementSibling;
+		if (sep && sep.classList.contains('ibx-compose__sep')) {
+			sep.hidden = !ok;
+		}
+		if (!ok && !$('.ibx-js-ai', w.dlg).hidden) {
+			aiToggle(w, false);
+		}
+	}
+	function aiToggle(w, on) {
+		const box = $('.ibx-js-ai', w.dlg);
+		const show = on === undefined ? box.hidden : on;
+		box.hidden = !show;
+		const b = $('[data-cmd="ai"]', w.dlg);
+		if (b) {
+			b.setAttribute('aria-pressed', String(show));
+		}
+		if (show) {
+			if (!box.dataset.done) {
+				aiPaint(w, box);
+			}
+			const first = $('.ibx-js-aiprompt', box);
+			if (first && box.dataset.mode === 'write') {
+				first.focus();
+			}
+		} else {
+			w.editor.focus();
+		}
+	}
+	function aiPaint(w, box) {
+		box.dataset.done = '1';
+		box.dataset.mode = box.dataset.mode || 'write';
+		const withMail = !!(w.source && w.data.ai && w.data.ai.mail);
+		const uiLang = (I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR');
+		const langs = ['fr_FR', 'en_US', 'de_DE', 'it_IT', 'es_ES', 'nl_NL', 'pt_PT'];
+		let names = null;
+		try {
+			names = new Intl.DisplayNames([uiLang.replace('_', '-')], { type: 'language' });
+		} catch (e) {
+			names = null;
+		}
+		const langName = c => (names ? names.of(c.slice(0, 2)) : c);
+		const defLang = uiLang.slice(0, 2) === 'fr' ? 'en_US' : 'fr_FR';
+		const mode = (id, key) => '<label class="ibx-seg__opt"><input type="radio" name="' + w.id + '-aimode" value="' + id + '"' + (box.dataset.mode === id ? ' checked' : '') + '><span>' + th(key) + '</span></label>';
+		box.innerHTML = '<div class="ibx-ai__head">' + ic('magic', 'ibx-ai__icon')
+			+ '<div class="ibx-seg" role="radiogroup" aria-label="' + th('InboxAi') + '">' + mode('write', 'InboxAiWrite') + mode('rephrase', 'InboxAiRephrase') + mode('translate', 'InboxAiTranslate') + '</div>'
+			+ '<span class="ibx-ai__spacer"></span><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-aiclose" title="' + th('InboxAiClose') + '" aria-label="' + th('InboxAiClose') + '">' + ic('close') + '</button></div>'
+			+ '<div class="ibx-ai__pane" data-pane="write"><label class="ibx-sr-only" for="' + w.id + '-aiprompt">' + th('InboxAiPrompt') + '</label>'
+			+ '<textarea class="ibx-field ibx-ai__prompt ibx-js-aiprompt" id="' + w.id + '-aiprompt" rows="2" maxlength="2000" placeholder="' + th('InboxAiPromptPlaceholder') + '"></textarea>'
+			+ '<div class="ibx-ai__row">' + (withMail ? '<label class="ibx-check"><input type="checkbox" class="ibx-js-aimail" checked> ' + th('InboxAiWithMail') + '</label>' : '')
+			+ '<span class="ibx-ai__spacer"></span><button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-airun" data-kind="write">' + th('InboxAiGenerate') + '</button></div></div>'
+			+ '<div class="ibx-ai__pane" data-pane="rephrase"><p class="ibx-ai__hint">' + th('InboxAiOnSelection') + '</p><div class="ibx-ai__row">'
+			+ ['shorter', 'formal', 'warm', 'correct'].map(s => '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-airun" data-kind="rephrase" data-style="' + s + '">' + th('InboxAiStyle_' + s) + '</button>').join('') + '</div></div>'
+			+ '<div class="ibx-ai__pane" data-pane="translate"><p class="ibx-ai__hint">' + th('InboxAiOnSelection') + '</p><div class="ibx-ai__row">'
+			+ '<label for="' + w.id + '-ailang">' + th('InboxAiLang') + '</label><select class="ibx-field ibx-field--medium ibx-js-ailang" id="' + w.id + '-ailang">'
+			+ langs.map(c => '<option value="' + c + '"' + (c === defLang ? ' selected' : '') + '>' + esc(langName(c)) + '</option>').join('') + '</select>'
+			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-airun" data-kind="translate">' + th('InboxAiTranslate') + '</button></div></div>'
+			+ '<div class="ibx-ai__result ibx-js-airesult" aria-live="polite" hidden></div>'
+			+ '<p class="ibx-ai__note">' + th('InboxAiNote') + '</p>';
+		const panes = () => $$('.ibx-ai__pane', box).forEach(p => {
+			p.hidden = p.dataset.pane !== box.dataset.mode;
+		});
+		panes();
+		$$('[name="' + w.id + '-aimode"]', box).forEach(r => r.addEventListener('change', () => {
+			box.dataset.mode = r.value;
+			panes();
+		}));
+		$('.ibx-js-aiclose', box).addEventListener('click', () => aiToggle(w, false));
+		// The selection of the text stays: a click in the panel (out of its fields) never takes the focus from it
+		box.addEventListener('mousedown', e => {
+			if (e.target.closest('button') && !e.target.closest('.ibx-js-airesult')) {
+				e.preventDefault();
+			}
+		});
+		box.addEventListener('click', e => {
+			const b = e.target.closest('.ibx-js-airun');
+			if (b) {
+				aiRun(w, box, { kind: b.dataset.kind, style: b.dataset.style || '' });
+			}
+		});
+		$('.ibx-js-aiprompt', box).addEventListener('keydown', e => {
+			if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+				e.preventDefault();
+				aiRun(w, box, { kind: 'write' });
+			}
+		});
+	}
+	/** A request: on the selection, else the whole text; the answer shown as a proposal, never put in the mail by itself */
+	async function aiRun(w, box, req) {
+		const ed = w.editor;
+		const range = ed.selectionRange ? ed.selectionRange() : null;
+		const onSelection = !!(range && range.text.trim() !== '');
+		const text = onSelection ? range.text : ed.getText();
+		const data = { compose: w.token, identity: +$('.ibx-js-from', w.dlg).value, kind: req.kind, text };
+		if (req.kind === 'write') {
+			data.prompt = $('.ibx-js-aiprompt', box).value.trim();
+			if (!data.prompt) {
+				$('.ibx-js-aiprompt', box).focus();
+				return;
+			}
+			const m = $('.ibx-js-aimail', box);
+			data.with_mail = m && m.checked ? 1 : 0;
+		} else if (req.kind === 'rephrase') {
+			data.style = req.style;
+		} else {
+			data.lang = $('.ibx-js-ailang', box).value;
+		}
+		if (req.kind !== 'write' && !text.trim()) {
+			toast(t('InboxAiError_empty'), { error: true });
+			return;
+		}
+		w.aiLast = { req, range: onSelection ? { from: range.from, to: range.to } : null, cursor: range };
+		const res = $('.ibx-js-airesult', box);
+		res.hidden = false;
+		res.innerHTML = '<p class="ibx-ai__working">' + ic('magic') + ' ' + th('InboxAiWorking') + '</p>';
+		$$('.ibx-js-airun', box).forEach(b => b.setAttribute('aria-disabled', 'true'));
+		let r;
+		try {
+			r = await post('compose', 'ai', data);
+		} catch (err) {
+			res.innerHTML = '<div class="ibx-notice ibx-notice--error">' + ic('warning') + '<div class="ibx-notice__text">' + esc(err.message) + '</div></div>'
+				+ '<div class="ibx-ai__row"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-airetry">' + th('InboxAiRetry') + '</button></div>';
+			$('.ibx-js-airetry', res).addEventListener('click', () => aiRun(w, box, req));
+			return;
+		} finally {
+			$$('.ibx-js-airun', box).forEach(b => b.removeAttribute('aria-disabled'));
+		}
+		// Cleaned by the allow list of the mails on the server (no script, no event, no picture from elsewhere)
+		const replaceWhat = w.aiLast.range ? 'InboxAiReplace' : 'InboxAiReplaceAll';
+		res.innerHTML = '<div class="ibx-ai__label">' + th('InboxAiProposal') + '</div><div class="ibx-ai__proposal"></div>'
+			+ '<div class="ibx-ai__row"><button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'insert' : 'replace') + '">' + th(req.kind === 'write' ? 'InboxAiInsert' : replaceWhat) + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'replace' : 'insert') + '">' + th(req.kind === 'write' ? replaceWhat : 'InboxAiInsert') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-airetry">' + th('InboxAiRetry') + '</button></div>';
+		$('.ibx-ai__proposal', res).innerHTML = r.html;
+		$('.ibx-js-airetry', res).addEventListener('click', () => aiRun(w, box, req));
+		$$('.ibx-js-aiuse', res).forEach(b => b.addEventListener('click', () => {
+			if (b.dataset.use === 'insert') {
+				const c = w.aiLast.cursor;
+				if (c) {
+					ed.replaceRange(c.to, c.to, r.html);
+				} else {
+					ed.insertHtml(r.html);
+				}
+			} else {
+				ed.replaceRange(w.aiLast.range ? w.aiLast.range.from : null, w.aiLast.range ? w.aiLast.range.to : null, r.html);
+			}
+			w.changed();
+			res.hidden = true;
+			res.innerHTML = '';
+			toast(t('InboxAiDone'));
+		}));
+	}
+
 	/** Text of a picture for who does not see it (screen readers, pictures blocked by the mail software) */
 	function imageAltDialog(w) {
 		const info = w.editor.imageInfo();
@@ -1760,6 +1923,7 @@
 			+ TOOLS.map(toolButton).join('')
 			+ '</div>'
 			+ '<div class="ibx-compose__vars ibx-js-vars" role="group" hidden></div>'
+			+ '<div class="ibx-compose__ai ibx-js-ai" role="region" aria-label="' + th('InboxAi') + '" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
 			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
@@ -1803,6 +1967,7 @@
 			w.changed();
 		});
 		$('.ibx-js-from', dlg).addEventListener('change', () => {
+			paintAiButton(w);
 			paintSignature(w);
 			paintBoxWarning(w);
 			w.changed();
@@ -1845,6 +2010,8 @@
 				linkDialog(w);
 			} else if (cmd === 'source') {
 				toggleSource(w);
+			} else if (cmd === 'ai') {
+				aiToggle(w);
 			} else if (cmd === 'colorApply' || cmd === 'backgroundApply') {
 				const kind = cmd === 'colorApply' ? 'color' : 'background';
 				ed.exec(kind, ed.styleOf && ed.styleOf(kind) ? '' : colorState()[kind]);
@@ -2149,6 +2316,7 @@
 		['mouseup', 'keyup'].forEach(ev => edBox.addEventListener(ev, () => setTimeout(() => bubble(w), 0)));
 		w.editor.on('blur', () => setTimeout(() => bubble(w), 150));
 		$('.ibx-compose__body', dlg).addEventListener('scroll', () => bubble(w), { passive: true });
+		paintAiButton(w);
 		w.editor.on('change', ev => {
 			paintColorButtons(w);
 			paintTableButton(w);

@@ -564,6 +564,9 @@
 			+ field('sieve_port', t('InboxSievePort'), a.sieve_port, { type: 'number', min: 0, max: 65535, inputmode: 'numeric', help: t('InboxSievePortHelp'), cls: 'ibx-field--narrow' })
 			+ field('sync_max_days', t('InboxSyncMaxDays'), a.sync_max_days, { type: 'number', min: 0, max: 36500, inputmode: 'numeric', help: t('InboxSyncLimitsHelp'), cls: 'ibx-field--narrow' })
 			+ field('sync_max_mails', t('InboxSyncMaxMails'), a.sync_max_mails, { type: 'number', min: 0, max: 1000000, inputmode: 'numeric', cls: 'ibx-field--narrow' })
+			// Never the AI for this mailbox (1.27.0)
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAiSection') + '</span><div><label class="ibx-check"><input type="checkbox" name="ai_off"' + (a.connector_config && a.connector_config.ai_off ? ' checked' : '') + '> ' + th('InboxAiOff') + '</label>'
+			+ '<div class="ibx-formrow__help">' + th('InboxAiOffHelp') + '</div></div></div>'
 			+ '</div></section>'
 			+ '<div class="ibx-js-testresult"></div>'
 			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-test">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>'
@@ -1821,8 +1824,11 @@
 		}
 		main.innerHTML = skeleton();
 		let s;
+		let aiModule = 0;
 		try {
-			s = (await api('general', 'get')).settings;
+			const g = await api('general', 'get');
+			s = g.settings;
+			aiModule = g.ai_module;
 		} catch (err) {
 			main.replaceChildren(errorBox(err, () => renderGeneral(main)));
 			return;
@@ -1863,6 +1869,14 @@
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAvatars') + '</h2><p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
+				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
+				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
+			+ '</div></section>'
+			// AI in the writing (1.27.0): through the AI module of Dolibarr, off by default
+			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxAiSection') + '</h2>'
+			+ (aiModule ? '' : '<div class="ibx-notice">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxAiNoModule') + '</div></div>')
+			+ '<div class="ibx-form">'
+			+ [['INBOX_AI_ENABLED', 'InboxAiEnabled'], ['INBOX_AI_WITH_MAIL', 'InboxAiWithMailSetting']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
