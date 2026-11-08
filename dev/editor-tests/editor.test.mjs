@@ -139,3 +139,14 @@ test('AI of the writing: the selection read, then a range or the whole text repl
 	ed.replaceRange(0, 99999, '<p>Bornes hors du texte</p>');
 	assert.match(ed.getHtml(), /Bornes hors du texte/, 'positions bounded to the text');
 });
+
+test('voice typing: text inserted as text (apostrophe kept, a tag stays text)', async () => {
+	const { ed } = await editorWith('<p>Début</p>');
+	ed.focus('end');
+	ed.insertText("c'est <b>vrai</b> & simple ", true);
+	assert.match(ed.getText(), /Début c'est <b>vrai<\/b> & simple /, 'a space after the word before');
+	ed.insertText('encore', true);
+	assert.match(ed.getText(), /simple encore$/, 'no double space after a space');
+	assert.doesNotMatch(ed.getHtml(), /<strong>|<b>vrai/, 'no formatting from what was said');
+	assert.doesNotMatch(ed.getText(), /&#39;/);
+});

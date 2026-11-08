@@ -1,5 +1,6 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: voice typing: apostrophes no more written « &#39; » (text inserted as text, never as HTML), a space before a sentence that follows a word; voice typing in its own file js/inbox-dictation.js, tested in jsdom (dev/editor-tests) :   1.28.2
 - FIX: bar of the selection never wider than the list (count shortened, less used actions in « ⋯ »), actions with their names in the reading pane :   1.28.1
 - NEW: voice typing in the writing, with an informed consent :   1.28.0
   - microphone button in the toolbar of the writing (speech recognition of the browser): the text comes at the

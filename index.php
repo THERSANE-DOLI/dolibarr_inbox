@@ -111,6 +111,7 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-mail.js').'" defe
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-notify.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-editor.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-dictation.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-invite.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-rules.js').'" defer></script>'."\n";

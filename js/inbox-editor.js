@@ -554,6 +554,24 @@
 				}
 			},
 			tableStyle, tableInfo, tableProps, cellInfo, cellProps, imageInfo, imageProps, imageBox,
+			/**
+			 * Plain text at the cursor, never read as HTML (voice typing: « c'est » stays « c'est », « <b> » stays text);
+			 * spaced: a space first when the cursor follows a word (dictated sentences one after the other)
+			 */
+			insertText(text, spaced) {
+				if (!editor || !text) {
+					return;
+				}
+				let value = String(text);
+				if (spaced) {
+					const { from } = editor.state.selection;
+					const before = from > 0 ? editor.state.doc.textBetween(Math.max(0, from - 1), from, '\n', '\n') : '';
+					if (before !== '' && !/[\s\u00a0]/.test(before)) {
+						value = ' ' + value;
+					}
+				}
+				chain().insertContent({ type: 'text', text: value }).run();
+			},
 			/** The selection: its bounds and its text ('' for a cursor) (AI of the writing, 1.27.0) */
 			selectionRange() {
 				if (!editor) {
