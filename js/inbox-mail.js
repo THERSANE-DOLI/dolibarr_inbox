@@ -306,7 +306,40 @@
 			}
 			html += '</li>';
 		});
-		body.innerHTML = '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + html + '</ul>';
+		body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + html + '</ul>';
+	}
+
+	/**
+	 * Out of office of the mailboxes read (lot W8 1.23.0): said to every reader (they know the senders got an automatic
+	 * answer); Turn off and Change for the managers
+	 */
+	function awayNotes() {
+		const fmt = d => new Date(d + 'T12:00:00').toLocaleDateString(locale(), { day: 'numeric', month: 'long' });
+		const today = new Date().toISOString().slice(0, 10);
+		return S.accounts.filter(a => a.away && a.away.to >= today).map(a => '<div class="ibx-awaynote" role="status">' + ic('warning')
+			+ '<span>' + (a.away.from > today ? th('InboxAwayNotePlanned', accountName(a), fmt(a.away.from), fmt(a.away.to)) : th('InboxAwayNoteActive', accountName(a), fmt(a.away.to))) + '</span>'
+			+ (a.level === 'manage' ? '<span class="ibx-awaynote__acts"><button type="button" class="ibx-linkbtn ibx-js-awayoff" data-account="' + a.id + '">' + th('InboxAwayTurnOff') + '</button>'
+				+ '<a class="ibx-linkbtn" href="#/settings/accounts/' + a.id + '/away">' + th('InboxEdit') + '</a></span>' : '') + '</div>').join('');
+	}
+	// Out of office changed in the settings: the banner follows
+	Dolibarr.on('inbox:away:changed', () => {
+		if (S.el) {
+			refreshTree();
+		}
+	});
+	async function awayOff(accountId) {
+		const a = S.accounts.find(x => x.id === accountId);
+		if (!a || !(await I.confirmDialog({ title: t('InboxAwayTurnOffTitle', accountName(a)), text: t('InboxAwayTurnOffText'), confirm: t('InboxAwayTurnOff') }))) {
+			return;
+		}
+		try {
+			await post('rules', 'away_off', { id: accountId });
+			a.away = null;
+			renderTree();
+			toast(t('InboxAwayTurnedOff'));
+		} catch (err) {
+			toast(err.message, { error: true });
+		}
 	}
 
 	/** Folders under a parent (0 = first level), depth for the indent */
@@ -344,6 +377,12 @@
 	function bindTree() {
 		const pane = $('.ibx-pane--folders', S.el);
 		pane.addEventListener('click', e => {
+			const off = e.target.closest('.ibx-js-awayoff');
+			if (off) {
+				e.stopPropagation();
+				awayOff(+off.dataset.account);
+				return;
+			}
 			const toggle = e.target.closest('[data-toggle]');
 			if (toggle) {
 				e.stopPropagation();
@@ -4453,6 +4492,12 @@
 			list.push({ id: 'redirect', icon: 'redirect', label: t('InboxRedirect'), disabled: !!noSend, reason: noSend, run: () => redirectDialog(m) });
 		}
 		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'editnew', mail: m.id }) });
+		// Rule made from this mail (lot W8 1.23.0): its sender and subject in the editor of the rules of the mailbox
+		if (m.level === 'manage' && m.from && m.from.email && I.rules) {
+			// The editor over the mail (the mail stays read); the rules of the mailbox in the panel on the right
+			list.push({ id: 'rule', icon: 'folder-bolt', label: t('InboxRuleFromMail'), run: () => I.rules.fromMail(m) });
+			list.push({ id: 'rules', icon: 'folders', label: t('InboxRulesPanelOpen'), run: () => I.rules.openPanel(m.account) });
+		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
 		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
@@ -4485,6 +4530,10 @@
 	}
 
 	/** Small menu under a button; closes on Escape, outside click; arrows move */
+	// The menus of inbox for the other spaces too (Settings: menu of a rule)
+	I.menu = (anchor, items, at) => menu(anchor, items, at);
+	// What the panel of the rules (js/inbox-rules.js) needs to know: the mailboxes, the mail read
+	I.mailState = () => ({ accounts: S.accounts, mail: S.mail });
 	function menu(anchor, items, at) {
 		if (S.menu && S.menuAnchor === anchor && !at) {
 			// Second click on the button of the open menu: it closes
@@ -5761,6 +5810,7 @@
 				}
 			} },
 			{ sep: true },
+			{ icon: 'folder-bolt', label: t('InboxRulesPanelOpen'), disabled: a.level !== 'manage' || !I.rules, reason: a.level !== 'manage' ? t('InboxRulesNoManage') : '', run: () => I.rules.openPanel(a.id) },
 			{ icon: 'settings', label: t('InboxAccountSettings'), run: () => I.go('#/settings/accounts/' + a.id) },
 			HINT(),
 		];

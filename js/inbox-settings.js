@@ -117,6 +117,8 @@
 		},
 		refresh(msg) {
 			if (this.el && !this.el.hidden && this.route && ['account', 'access', 'identity', 'tag'].includes(msg.entity)) {
+				// Changed elsewhere: the card is made again (its head too)
+				card = null;
 				this.render(this.el, this.route);
 			}
 		},
@@ -143,6 +145,9 @@
 			}).catch(() => {});
 		}
 	}
+
+	// Helpers of the pages, for the shared modules (js/inbox-rules.js)
+	I.settingsUi = { skeleton: lines => skeleton(lines), errorBox: (err, retry) => errorBox(err, retry) };
 
 	// ---------- Mailboxes: list ----------
 	async function renderAccounts(main, parts) {
@@ -291,8 +296,53 @@
 		{ id: 'access', key: 'InboxTabAccess', admin: true },
 		{ id: 'tags', key: 'InboxTabTags', admin: false },
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
+		{ id: 'rules', key: 'InboxTabRules', admin: false },
+		{ id: 'away', key: 'InboxTabAway', admin: false },
 		{ id: 'journal', key: 'InboxTabJournal', admin: false },
 	];
+
+	/** Card on screen: the same mailbox in another tab keeps its head and tabs, only the content of the tab changes */
+	let card = null;
+	const TAB_FNS = () => ({ server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), journal: tabJournal });
+
+	/**
+	 * Content of a tab, without flash: made aside and put in place once loaded (or after 300 ms, then with its
+	 * skeleton), the height of the previous content kept meanwhile, a short fade in
+	 */
+	function showTab(main, account, tab) {
+		$$('.ibx-tabs .ibx-tab', main).forEach(a => a.setAttribute('aria-selected', a.getAttribute('href').endsWith('/' + tab) ? 'true' : 'false'));
+		const old = $('.ibx-js-tab', main);
+		const stage = document.createElement('div');
+		stage.className = 'ibx-js-tab';
+		stage.style.minHeight = old.offsetHeight + 'px';
+		let placed = false;
+		let timer = 0;
+		const place = () => {
+			if (placed) {
+				return;
+			}
+			placed = true;
+			clearTimeout(timer);
+			stage.classList.add('is-entering');
+			old.replaceWith(stage);
+		};
+		const ready = () => stage.childNodes.length > 0 && !stage.querySelector('[aria-busy="true"]');
+		const obs = new MutationObserver(() => {
+			if (ready()) {
+				place();
+				stage.style.minHeight = '';
+				obs.disconnect();
+			}
+		});
+		timer = setTimeout(place, 300);
+		obs.observe(stage, { childList: true, subtree: true });
+		TAB_FNS()[tab](stage, account, main);
+		if (ready()) {
+			place();
+			stage.style.minHeight = '';
+			obs.disconnect();
+		}
+	}
 
 	async function renderAccountCard(main, id, tab) {
 		const isNew = id === 'new';
@@ -300,6 +350,11 @@
 			I.go('#/settings/accounts');
 			return;
 		}
+		if (!isNew && card && card.id === String(id) && card.main === main && $('.ibx-js-tab', main) && card.tabs.some(x => x.id === tab)) {
+			showTab(main, card.account, tab);
+			return;
+		}
+		card = null;
 		main.innerHTML = skeleton();
 		let account = null;
 		if (!isNew) {
@@ -331,12 +386,14 @@
 			bindStatusSwitch(main, account, tab);
 		}
 		const box = $('.ibx-js-tab', main);
-		const fns = { server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, sync: tabSync, journal: tabJournal };
-		fns[tab](box, account, main);
+		if (!isNew) {
+			card = { id: String(id), main, account, tabs };
+		}
+		TAB_FNS()[tab](box, account, main);
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -568,6 +625,7 @@
 				if (!account) {
 					I.go('#/settings/accounts/' + r.account.id + '/server');
 				} else {
+					card = null;
 					renderAccountCard(main, account.id, 'server');
 				}
 			} catch (err) {
@@ -1970,6 +2028,15 @@
 			// Read receipts asked (lot W8 1.22.0): never sent without a click
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-mdn_mode">' + th('InboxMdnMode') + '</label><div>' + opt('mdn_mode', ['ask', 'never'], p.mdn_mode) + '<div class="ibx-formrow__help">' + th('InboxMdnModeHelp') + '</div></div></div>'
 			+ '</div></section>';
+		// Rules and out of office of the personal mailboxes (lot W8 1.23.0): kept on the card of the mailbox
+		const mine = data.mailboxes.filter(m => m.personal);
+		if (mine.length) {
+			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMyBox') + '</h2><p class="ibx-section__help">' + th('InboxMyBoxHelp') + '</p><div class="ibx-form">'
+				+ mine.map(m => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + esc(m.label || m.email) + '</span><div class="ibx-inline" style="gap:var(--ibx-s2)">'
+					+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + m.id + '/rules">' + ic('folder-bolt') + ' ' + th('InboxTabRules') + '</a>'
+					+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + m.id + '/away">' + ic('agenda') + ' ' + th('InboxTabAway') + '</a></div></div>').join('')
+				+ '</div></section>';
+		}
 		if (data.mailboxes.length) {
 			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxReadPerMailbox') + '</h2><p class="ibx-section__help">' + th('InboxReadPerMailboxHelp') + '</p><table class="ibx-table"><tbody>'
 				+ data.mailboxes.map(m => '<tr><td><b>' + esc(m.label || m.email) + '</b><div class="ibx-muted">' + esc(m.email) + '</div></td><td><select class="ibx-field ibx-field--medium" data-param="read_mode" data-account="' + m.id + '" aria-label="' + th('InboxReadMode') + '">'
@@ -2060,7 +2127,7 @@
 		const chan = (type, c) => (channels[type] && channels[type][c] !== undefined ? +channels[type][c] === 1 : c === 'b');
 		const sw = (attrs, on, label) => '<button type="button" class="ibx-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '" ' + attrs + '></button>';
 		const newMail = m => (m.params.new_mail_notify === 'auto' ? !!m.personal : m.params.new_mail_notify === '1');
-		const types = ['assign', 'send_failed', 'box_error'];
+		const types = ['assign', 'send_failed', 'box_error', 'rule_redirect'];
 		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavNotifications') + '</h1></div>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionBrowserNotif') + '</h2><div class="ibx-js-browser"></div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionNotifTypes') + '</h2><p class="ibx-section__help">' + th('InboxNotifTypesHelp') + '</p>'

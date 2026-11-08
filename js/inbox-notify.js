@@ -296,6 +296,9 @@
 		if (n.type === 'box_error') {
 			return t('InboxNotifBoxError');
 		}
+		if (n.type === 'rule_redirect') {
+			return t('InboxNotifRuleRedirect', who);
+		}
 		return n.text || n.type;
 	}
 

@@ -123,6 +123,15 @@ switch ($action) {
 				return (int) $a->id;
 			}, $accounts));
 		}
+		// Out of office (lot W8 1.23.0) not over yet: banner of the application, for every reader of the mailbox
+		$aways = array();
+		if ($accounts) {
+			$rows = $db->getRows("SELECT rowid, away_from, away_to FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', array_map('intval', array_keys($accounts))).")"
+				." AND away_to IS NOT NULL AND away_to >= '".$db->escape(dol_print_date(dol_now(), '%Y-%m-%d', 'tzserver'))."' LIMIT 1000");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$aways[(int) $r->rowid] = array('from' => substr((string) $r->away_from, 0, 10), 'to' => substr((string) $r->away_to, 0, 10));
+			}
+		}
 		foreach ($accounts as $account) {
 			$account->loadSyncState();
 			// New mails of this user (arrived since he last left the folder, still unread)
@@ -147,6 +156,7 @@ switch ($action) {
 				'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null,
 				'folders' => $folderTree,
 				'fulltext' => isset($ftStates[(int) $account->id]) ? (string) $ftStates[(int) $account->id]->state : '',
+				'away' => $aways[(int) $account->id] ?? null,
 				'marks' => (object) $marks,
 				// Tags of the mailbox (its own list or the global one): keyword => label, color and border
 				'tags' => array_values(array_map(function ($t) {

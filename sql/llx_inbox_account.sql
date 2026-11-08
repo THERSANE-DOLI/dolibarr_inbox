@@ -57,6 +57,8 @@ CREATE TABLE llx_inbox_account(
 	date_folders datetime DEFAULT NULL,
 	sync_lock datetime DEFAULT NULL,
 	sync_retry_at datetime DEFAULT NULL,
+	away_from date DEFAULT NULL,
+	away_to date DEFAULT NULL,
 	sync_fail_count integer DEFAULT 0 NOT NULL,
 	quota_used bigint DEFAULT NULL,
 	quota_limit bigint DEFAULT NULL,

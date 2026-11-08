@@ -36,7 +36,7 @@ class InboxNotification
 	const MERGE_DELAY = 60;
 
 	/** Types of inbox, listed in Settings > Notifications; the types of other modules follow the defaults */
-	const TYPES = array('assign', 'send_failed', 'box_error');
+	const TYPES = array('assign', 'send_failed', 'box_error', 'rule_redirect');
 
 	/** A notification still unread after this time (s) goes in the summary by mail */
 	const MAIL_AFTER = 900;
@@ -523,6 +523,9 @@ class InboxNotification
 		}
 		if ($n['type'] === 'box_error') {
 			return $langs->transnoentities('InboxNotifBoxError');
+		}
+		if ($n['type'] === 'rule_redirect') {
+			return $langs->transnoentities('InboxNotifRuleRedirect', $n['actor'] ? $n['actor']['name'] : '');
 		}
 
 		return (string) ($n['text'] !== '' ? $n['text'] : $n['type']);

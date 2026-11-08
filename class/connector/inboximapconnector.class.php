@@ -87,6 +87,11 @@ class InboxImapConnector extends InboxConnector
 		// Writes of lot W4: tags, move (MOVE, or COPY + UID EXPUNGE with UIDPLUS), import (APPEND), folders
 		$caps[] = self::CAP_TAGS;
 		$caps[] = self::CAP_IMPORT;
+		// Rules and out of office (lot W8 1.23.0): by ManageSieve, when the mailbox has its port
+		if ((int) $this->account->sieve_port > 0) {
+			$caps[] = self::CAP_RULES;
+			$caps[] = self::CAP_VACATION;
+		}
 		$caps[] = self::CAP_FOLDERS_MANAGE;
 		if (in_array('MOVE', $server, true) || in_array('UIDPLUS', $server, true)) {
 			$caps[] = self::CAP_MOVE;
@@ -1697,6 +1702,70 @@ class InboxImapConnector extends InboxConnector
 		}
 
 		return array('status' => 'BYE', 'lines' => $lines, 'last' => '');
+	}
+
+	/**
+	 * Session on the rules of the mailbox (lot W8 1.23.0): ManageSieve opened, STARTTLS (never a password in clear
+	 * outside this server), authenticated. The caller closes it.
+	 *
+	 * @param string $error Code of the error (sieve_disabled, sieve_connect, sieve_tls, sieve_no_tls, sieve_auth...)
+	 * @return InboxManageSieve|null
+	 */
+	public function sieveSession(&$error = '')
+	{
+		require_once __DIR__.'/inboxmanagesieve.class.php';
+		$account = $this->account;
+		if ((int) $account->sieve_port <= 0) {
+			$error = 'sieve_disabled';
+			return null;
+		}
+		$host = trim((string) $account->imap_host);
+		$detail = '';
+		$socket = $this->openSocket($host, (int) $account->sieve_port, 'none', $detail);
+		if (!$socket) {
+			$error = 'sieve_connect';
+			$this->error = $detail;
+			return null;
+		}
+		$caps = $this->sieveRead($socket);
+		if (preg_grep('/^"STARTTLS"/i', $caps['lines'])) {
+			fwrite($socket, "STARTTLS\r\n");
+			$answer = $this->sieveRead($socket);
+			if ($answer['status'] !== 'OK' || !$this->startTls($socket)) {
+				fclose($socket);
+				$error = 'sieve_tls';
+				return null;
+			}
+			$caps = $this->sieveRead($socket);
+		} elseif (!InboxAccount::isLocalHost($host)) {
+			fclose($socket);
+			$error = 'sieve_no_tls';
+			return null;
+		}
+		$extensions = array();
+		foreach ($caps['lines'] as $line) {
+			if (preg_match('/^"SIEVE"\s+"([^"]*)"/i', $line, $m)) {
+				$extensions = preg_split('/\s+/', trim($m[1]));
+			}
+		}
+		$secret = $this->getSecret();
+		if ($secret === '') {
+			fclose($socket);
+			$error = 'sieve_no_password';
+			return null;
+		}
+		$login = $this->getLogin();
+		$mechanism = $account->imap_auth_mode === InboxAccount::AUTH_OAUTH ? 'XOAUTH2' : 'PLAIN';
+		$payload = $mechanism === 'XOAUTH2' ? 'user='.$login."\1auth=Bearer ".$secret."\1\1" : "\0".$login."\0".$secret;
+		fwrite($socket, 'AUTHENTICATE "'.$mechanism.'" "'.base64_encode($payload).'"'."\r\n");
+		$auth = $this->sieveRead($socket);
+		if ($auth['status'] !== 'OK') {
+			fclose($socket);
+			$error = 'sieve_auth';
+			return null;
+		}
+
+		return new InboxManageSieve($socket, $extensions);
 	}
 
 	/**

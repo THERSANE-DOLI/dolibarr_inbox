@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: rules and out of office on the mail server (Sieve) :   1.23.0
+  - tab Rules of a mailbox (managers): rules run by the server when a mail arrives, even inbox closed; conditions on
+    From, To, Cc, Subject, List-Id or a header; move, copy, tag, mark read, star, trash, forward (copy kept).
+  - order by drag and drop, rules on or off, duplicate, preview on the mails of the last 30 days, applied once to the
+    mails already received if asked; « Create a rule from this mail » in the menu of a mail.
+  - script written by ManageSieve and checked by the server; previous version kept (back in one click); a script
+    changed elsewhere is shown read only, one active before inbox is kept and run after the rules.
+  - tab Out of office: period, subject, message, one answer per sender every N days, addresses; never to lists,
+    automatic mails or noreply; a banner in the Mail space for every reader of the mailbox (Turn off, Change).
+  - a forward to an outside address is written in the journal and told to the administrators.
 - NEW: invitations and read receipts :   1.22.0
   - an invitation (Outlook, Google...) is shown as a card above the mail: when (in your time zone, and the one of the
     organizer), where, organizer, attendees, recurrence, events of your agenda at the same time.
