@@ -112,7 +112,18 @@ switch ($action) {
 		$tagHelper = new InboxTag($db);
 		$newMarks = new InboxNewMarks($db);
 		$list = array();
-		foreach ($access->getAccounts($user) as $account) {
+		$accounts = $access->getAccounts($user);
+		// Meilisearch (lot W7 1.20.0): state of the mailboxes indexed (indexing, ready)
+		dol_include_once('/inbox/class/inboxfulltext.class.php');
+		$ftOn = InboxFulltext::enabled();
+		$ftStates = array();
+		if ($ftOn) {
+			$fulltext = new InboxFulltext($db);
+			$ftStates = $fulltext->states(array_map(function ($a) {
+				return (int) $a->id;
+			}, $accounts));
+		}
+		foreach ($accounts as $account) {
 			$account->loadSyncState();
 			// New mails of this user (arrived since he last left the folder, still unread)
 			$marks = $newMarks->marks($user, (int) $account->id);
@@ -135,6 +146,7 @@ switch ($action) {
 				'progress' => $sync->progress((int) $account->id),
 				'quota' => $account->quota_limit ? array('used' => (int) $account->quota_used, 'limit' => (int) $account->quota_limit) : null,
 				'folders' => $folderTree,
+				'fulltext' => isset($ftStates[(int) $account->id]) ? (string) $ftStates[(int) $account->id]->state : '',
 				'marks' => (object) $marks,
 				// Tags of the mailbox (its own list or the global one): keyword => label, color and border
 				'tags' => array_values(array_map(function ($t) {

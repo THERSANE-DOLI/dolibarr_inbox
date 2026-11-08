@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: fast search in the text of the mails with Meilisearch (option) :   1.20.0
+  - Settings > General > Search: address of Meilisearch, master key (never sent back), prefix of the indexes, test;
+    turned on, inbox creates its own key, limited to the indexes of the prefix; turned off, every index is removed.
+  - mailboxes chosen one by one (tab Synchronisation, admin): one index per mailbox, filled by a scheduled job
+    (start of each mail only, attachments not downloaded), cleaned once a day; progress shown.
+  - the search asks only the indexes of the mailboxes the user may read; typos and accents tolerated, sorted by
+    relevance, crop of the text with the words marked; the mails not indexed yet are still found by the index.
+  - Meilisearch not answering: the search goes on without it and the panel offers the search on the mail server.
 - NEW: search panel and search in the text of the mails :   1.19.0
   - the search field opens into a panel: where to search (folder, mailbox, all mailboxes), suggestions (sender,
     third party, tag, subject), filters (unread, starred, attachment, my mails, period, tag), recent searches.

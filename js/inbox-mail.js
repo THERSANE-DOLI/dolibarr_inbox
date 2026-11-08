@@ -47,6 +47,9 @@
 		period: '',
 		sx: { open: false, active: -1, opts: [], sug: null, sugSeq: 0, text: '', timer: 0 },
 		deep: null,
+		// Meilisearch (lot W7 1.20.0): state given by the last list, crops of the text per row
+		ft: null,
+		crops: {},
 		// Names of the people assigned seen in the lists (user => name), and the user (lot W4 1.9.0)
 		people: {},
 		me: +(I.ctx('INBOX_USER_ID', 0) || 0),
@@ -487,6 +490,9 @@
 				return;
 			}
 			S.pills = res.query;
+			// Meilisearch (lot W7 1.20.0): mailboxes fully indexed, error, order, crops of the text
+			S.ft = res.fulltext || null;
+			S.crops = Object.assign({}, res.crops || {});
 			learnPeople(res.people);
 			if (keep) {
 				mergeRows(res.rows, res.next);
@@ -537,6 +543,7 @@
 				learnPeople(res.people);
 				const known = new Set(S.rows.map(r => r.id));
 				S.rows = S.rows.concat(res.rows.filter(r => !known.has(r.id)));
+				Object.assign(S.crops, res.crops || {});
 				S.next = res.next;
 				renderList();
 			}
@@ -1001,7 +1008,8 @@
 					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
 					+ '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
-					+ (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : '')
+					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
+						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
 					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + assigneesHtml(r.assignees, 'ibx-mailcard__assign') + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
 					+ (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '')
 					+ '</span>'
@@ -1147,7 +1155,8 @@
 		$('.ibx-js-view', S.el).title = t(params.view === 'table' ? 'InboxViewCards' : 'InboxViewTable');
 		$('.ibx-js-view', S.el).setAttribute('aria-label', $('.ibx-js-view', S.el).title);
 		const sortKey = { 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFrom', 'from:desc': 'InboxSortFrom', 'subject:asc': 'InboxSortSubject', 'subject:desc': 'InboxSortSubject', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSize' }[params.list_sort || 'date:desc'];
-		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortKey ? ' · ' + t('InboxSortedBy', t(sortKey)) : '');
+		const sortLabel = S.ft && S.ft.relevance ? t('InboxSortRelevance') : (sortKey ? t(sortKey) : '');
+		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortLabel ? ' · ' + t('InboxSortedBy', sortLabel) : '');
 		renderPills();
 	}
 
@@ -1205,12 +1214,23 @@
 	function deepOn() {
 		return !!(S.deep && S.deep.key === deepKey() && S.deep.done > 0);
 	}
-	function deepAccounts() {
+	function scopeAccounts() {
 		if (S.scope === 'all') {
 			return S.accounts.map(a => a.id);
 		}
 		const f = currentFolder();
 		return f ? [f.account.id] : [];
+	}
+	/** Mailboxes whose text is in Meilisearch (fully indexed) and answering: no deep search needed */
+	function ftCovered() {
+		if (S.ft && S.ft.error) {
+			return [];
+		}
+		return scopeAccounts().filter(id => (accountById(id) || {}).fulltext === 'ready');
+	}
+	function deepAccounts() {
+		const covered = ftCovered();
+		return scopeAccounts().filter(id => !covered.includes(id));
 	}
 	function canDeep() {
 		return sxWords().length > 0 && deepAccounts().length > 0 && !(S.deep && S.deep.key === deepKey());
@@ -1223,7 +1243,7 @@
 	function sxTagDefs() {
 		const seen = new Set();
 		const out = [];
-		deepAccounts().map(accountById).filter(Boolean).forEach(a => (a.tags || []).forEach(d => {
+		scopeAccounts().map(accountById).filter(Boolean).forEach(a => (a.tags || []).forEach(d => {
 			if (!seen.has(d.keyword.toLowerCase())) {
 				seen.add(d.keyword.toLowerCase());
 				out.push(d);
@@ -1426,13 +1446,19 @@
 				+ tags.map(d => '<option value="' + esc(d.keyword) + '"' + (S.tag.toLowerCase() === d.keyword.toLowerCase() ? ' selected' : '') + '>' + esc(d.label) + '</option>').join('') + '</select></label>' : '')
 			+ '</div></div>';
 
-		// Text of the mails
+		// Text of the mails: already in Meilisearch for the mailboxes indexed, deep search for the others
 		const words = sxWords();
+		const covered = ftCovered().map(id => accountById(id)).filter(Boolean).map(accountName);
+		const notes = (covered.length ? '<p class="ibx-sx__note">' + ic('check') + '<span>' + th('InboxSxTextIncluded', covered.join(', ')) + '</span></p>' : '')
+			+ (S.ft && S.ft.error ? '<p class="ibx-sx__note ibx-sx__note--warn">' + ic('warning') + '<span>' + th('InboxSxFastDown') + '</span></p>' : '');
+		if (words.length && notes && !canDeep()) {
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxText') + '</p>' + notes + '</div>';
+		}
 		if (words.length && canDeep()) {
 			const i = opts.length;
 			opts.push(startDeep);
 			const names = deepAccounts().map(id => accountById(id)).filter(Boolean).map(accountName).join(', ');
-			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxText') + '</p>'
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxText') + '</p>' + notes
 				+ '<div class="ibx-sx__deep' + (S.sx.active === i ? ' is-active' : '') + '" role="option" id="ibx-sxo' + i + '" data-opt="' + i + '" aria-selected="' + (S.sx.active === i) + '">' + ic('search')
 				+ '<strong>' + th('InboxDeepSearchRun', words.join(' ')) + '</strong>'
 				+ '<small>' + th('InboxDeepSearchHint', names + (S.scope === 'folder' && f ? ' (' + folderName(f.folder) + ')' : '')) + '</small>'
@@ -1580,6 +1606,11 @@
 				renderDeepbar();
 			});
 		}
+	}
+
+	/** Crop of the text given by Meilisearch: escaped, then the words found marked */
+	function cropHtml(crop) {
+		return esc(crop).replace(/\uE000/g, '<mark>').replace(/\uE001/g, '</mark>');
 	}
 
 	/** Mark of a row found only in its text */

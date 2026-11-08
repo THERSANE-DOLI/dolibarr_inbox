@@ -681,6 +681,8 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-notice--warning { background: var(--ibx-warning-soft); border-color: color-mix(in srgb, var(--ibx-warning) 40%, transparent); }
 .ibx-notice--error { background: var(--ibx-danger-soft); border-color: color-mix(in srgb, var(--ibx-danger) 40%, transparent); }
 .ibx-notice--info { background: var(--ibx-accent-softer); border-color: color-mix(in srgb, var(--ibx-accent) 30%, transparent); }
+.ibx-notice--success { background: var(--ibx-success-soft); border-color: color-mix(in srgb, var(--ibx-success) 40%, transparent); }
+.ibx-notice--success > .ibx-icon { color: var(--ibx-success); }
 .ibx-notice__text { flex: 1; min-width: 0; }
 
 /* ===== 23. Dialog (native <dialog>, Cancel left, main action right, never confirm()) ===== */
@@ -825,6 +827,13 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-sx-deepbar.is-done { background: var(--ibx-bg-pane); border-color: var(--ibx-border); }
 .ibx-sx-deepbar__track { grid-column: 1 / 3; height: 0.25rem; overflow: hidden; background: var(--ibx-bg-sunken); border-radius: 1rem; }
 .ibx-sx-deepbar__fill { height: 100%; background: var(--ibx-accent); transition: width 300ms ease-out; }
+.ibx-sx__note { display: flex; gap: var(--ibx-s2); align-items: flex-start; margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-sx__note > .ibx-icon { margin-top: 0.125rem; color: var(--ibx-success); }
+.ibx-sx__note--warn > .ibx-icon { color: var(--ibx-warning); }
+.ibx-sx__note + .ibx-sx__deep, .ibx-sx__note + .ibx-sx__note { margin-top: var(--ibx-s2); }
+/* Crop of the text found by Meilisearch, the words marked */
+.ibx-mailcard__crop { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ibx-mailcard__crop mark { color: inherit; background: color-mix(in srgb, var(--ibx-tag-2) 30%, transparent); border-radius: var(--ibx-radius-sm); }
 .ibx-found { display: inline-flex; align-items: center; gap: 0.25rem; font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-accent); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .ibx-sx-deepbar__fill { transition: none; } }
 /* Phone and tablet: the panel takes the whole screen, the field on top with a close button */

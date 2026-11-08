@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.19.0';
+		$this->version = '1.20.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -145,6 +145,23 @@ class modInbox extends DolibarrModules
 			'status' => 1,
 			'test' => 'isModEnabled("inbox")',
 			'priority' => 30,
+		);
+
+		// Full text search (lot W7 1.20.0): the next mails of the mailboxes indexed sent to Meilisearch, every minute
+		// (nothing done while the option is off)
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronFulltext',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxfulltext.class.php',
+			'objectname' => 'InboxFulltext',
+			'method' => 'cronIndex',
+			'parameters' => '',
+			'comment' => 'InboxCronFulltextComment',
+			'frequency' => 1,
+			'unitfrequency' => 60,
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 60,
 		);
 
 		$this->rights = array();

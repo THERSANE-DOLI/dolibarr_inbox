@@ -153,6 +153,17 @@ abstract class InboxConnector implements InboxConnectorInterface
 	}
 
 	/**
+	 * @param string   $folder    Folder
+	 * @param string[] $remoteIds Identifiers
+	 * @param int      $max       Bytes
+	 * @return null
+	 */
+	public function fetchStarts($folder, array $remoteIds, $max = 131072)
+	{
+		return $this->unsupported('fetchStarts');
+	}
+
+	/**
 	 * @param string              $folder  Folder
 	 * @param string              $cursor  Cursor
 	 * @param array<string,mixed> $options Options

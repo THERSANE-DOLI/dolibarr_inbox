@@ -507,6 +507,61 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
+	 * BODY.PEEK[HEADER] and BODY.PEEK[TEXT]<0.max> by chunks: the mails stay unread, the big attachments are not
+	 * downloaded (the text parts come first in nearly every mail)
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds "uidvalidity:uid"
+	 * @param int      $max       Bytes of the body at most
+	 * @return array<string,string>|null
+	 */
+	public function fetchStarts($folder, array $remoteIds, $max = 131072)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			if ($this->error === '') {
+				$this->error = 'Invalid folder';
+			}
+			return null;
+		}
+		$out = array();
+		try {
+			if (!$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$uids = array();
+			foreach ($remoteIds as $rid) {
+				if (preg_match('/^(\d+):(\d+)$/', (string) $rid, $m) && (int) $m[1] === $this->examinedValidity) {
+					$uids[] = (int) $m[2];
+				}
+			}
+			$max = max(1024, (int) $max);
+			foreach (array_chunk($uids, 50) as $chunk) {
+				$response = $this->fetchDecoded(implode(',', $chunk), '(UID BODY.PEEK[HEADER] BODY.PEEK[TEXT]<0.'.$max.'>)');
+				foreach ($this->fetchItems($response) as $item) {
+					if (empty($item['UID'])) {
+						continue;
+					}
+					$text = '';
+					foreach ($item as $name => $value) {
+						if (strpos((string) $name, 'BODY[TEXT]') === 0 && is_string($value)) {
+							$text = $value;
+						}
+					}
+					$out[$this->examinedValidity.':'.((int) $item['UID'])] = rtrim((string) ($item['HEADER'] ?? ''))."\r\n\r\n".$text;
+				}
+			}
+
+			return $out;
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			$this->disconnect();
+			return null;
+		}
+	}
+
+	/**
 	 * Headers of one mail (BODY.PEEK[HEADER]: the mail stays unread), for the checks of the sender (lot W5 1.15.0)
 	 *
 	 * @param string $folder   Folder path

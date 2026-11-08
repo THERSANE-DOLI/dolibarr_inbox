@@ -1555,7 +1555,11 @@
 				+ '</tbody></table>';
 		}
 		html += '</section>';
+		html += '<div class="ibx-js-ftbox-holder"></div>';
 		box.innerHTML = html;
+		if (isAdmin()) {
+			tabSyncFulltext($('.ibx-js-ftbox-holder', box), account);
+		}
 		const now = $('.ibx-js-now', box);
 		now.addEventListener('click', async () => {
 			if (now.getAttribute('aria-disabled') === 'true') {
@@ -1736,6 +1740,7 @@
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
+			+ '<section class="ibx-section ibx-js-searchsettings"></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxGlobalTags') + '</h2><p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
 		// Look: accent (offered colours or another one), accent of the dark theme, greys; preview and page at once
 		const look = $('.ibx-js-look', main);
@@ -1821,6 +1826,128 @@
 			}
 		}));
 		tabTags($('.ibx-js-tags', main), null);
+		renderSearchSettings($('.ibx-js-searchsettings', main));
+	}
+
+	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------
+	/**
+	 * Section of Settings > General: off by default; address, master key (never sent back), prefix; test; on (the
+	 * key of inbox is created, limited to the indexes of the prefix) or off (every index of the prefix removed)
+	 */
+	async function renderSearchSettings(sec) {
+		let s;
+		try {
+			s = await api('fulltext', 'get');
+		} catch (err) {
+			sec.replaceChildren(errorBox(err, () => renderSearchSettings(sec)));
+			return;
+		}
+		const on = !!s.enabled;
+		sec.innerHTML = '<h2 class="ibx-section__title">' + th('InboxSectionSearch') + '</h2><p class="ibx-section__help">' + th('InboxMeiliHelp') + '</p>'
+			+ '<div class="ibx-form">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>' + (on ? '<span class="ibx-status ibx-status--ok">' + th('InboxMeiliOn') + '</span>' : '<span class="ibx-status">' + th('InboxMeiliOff') + '</span>')
+			+ '<div class="ibx-formrow__help">' + th(on ? 'InboxMeiliOnHelp' : 'InboxMeiliOffHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ft-url">' + th('InboxMeiliUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="url" id="ft-url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:7700" value="' + esc(s.url) + '"' + (on ? ' readonly' : '') + '>'
+			+ '<div class="ibx-formrow__help">' + th('InboxMeiliUrlHelp') + '</div><div class="ibx-notice ibx-notice--warning ibx-js-ftremote"' + (s.local ? ' hidden' : '') + '>' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxMeiliRemote') + '</div></div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ft-key">' + th('InboxMeiliKey') + '</label><div><input class="ibx-field ibx-field--medium" type="password" id="ft-key" autocomplete="new-password" spellcheck="false" placeholder="' + (s.has_key ? th('InboxMeiliKeyKept') : '') + '"' + (on ? ' readonly' : '') + '>'
+			+ '<div class="ibx-formrow__help">' + th('InboxMeiliKeyHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ft-prefix">' + th('InboxMeiliPrefix') + '</label><div><input class="ibx-field ibx-field--narrow" type="text" id="ft-prefix" autocomplete="off" spellcheck="false" pattern="[a-z][a-z0-9]{1,29}" value="' + esc(s.prefix) + '"' + (on ? ' readonly' : '') + '>'
+			+ '<div class="ibx-formrow__help">' + th('InboxMeiliPrefixHelp') + '</div></div></div>'
+			+ '<div class="ibx-js-ftresult" role="status"></div>'
+			+ '</div><div class="ibx-formfoot" style="border-top:0">'
+			+ (on ? '<span class="ibx-formfoot__spacer"></span><button type="button" class="ibx-btn ibx-btn--danger ibx-js-ftoff">' + th('InboxMeiliDisable') + '</button>'
+				: '<button type="button" class="ibx-btn ibx-js-fttest">' + th('InboxMeiliTest') + '</button><span class="ibx-formfoot__spacer"></span><button type="button" class="ibx-btn ibx-btn--primary ibx-js-fton">' + th('InboxMeiliEnable') + '</button>')
+			+ '</div>';
+		const result = $('.ibx-js-ftresult', sec);
+		const values = () => ({ url: $('#ft-url', sec).value.trim(), key: $('#ft-key', sec).value, prefix: $('#ft-prefix', sec).value.trim() });
+		const showResult = (ok, text) => {
+			result.innerHTML = '<div class="ibx-notice ibx-notice--' + (ok ? 'success' : 'error') + '">' + ic(ok ? 'check' : 'warning') + '<div class="ibx-notice__text">' + esc(text) + '</div></div>';
+		};
+		const test = $('.ibx-js-fttest', sec);
+		if (test) {
+			test.addEventListener('click', async () => {
+				test.setAttribute('aria-disabled', 'true');
+				try {
+					const r = await post('fulltext', 'test', values());
+					$('.ibx-js-ftremote', sec).hidden = r.local !== false;
+					showResult(r.ok, r.ok ? t('InboxMeiliTestOk', r.version) : r.error);
+				} catch (err) {
+					showResult(false, err.message);
+				}
+				test.removeAttribute('aria-disabled');
+			});
+		}
+		const enable = $('.ibx-js-fton', sec);
+		if (enable) {
+			enable.addEventListener('click', async () => {
+				enable.setAttribute('aria-disabled', 'true');
+				try {
+					await post('fulltext', 'enable', values());
+					toast(t('InboxMeiliEnabled'));
+					renderSearchSettings(sec);
+				} catch (err) {
+					showResult(false, err.message);
+					enable.removeAttribute('aria-disabled');
+				}
+			});
+		}
+		const off = $('.ibx-js-ftoff', sec);
+		if (off) {
+			off.addEventListener('click', async () => {
+				const ok = await confirmDialog({ title: t('InboxMeiliDisableTitle'), text: t('InboxMeiliDisableText', s.prefix), confirm: t('InboxMeiliDisable'), danger: true });
+				if (!ok) {
+					return;
+				}
+				try {
+					await post('fulltext', 'disable', { confirm: 1 });
+					toast(t('InboxMeiliDisabled'));
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+				renderSearchSettings(sec);
+			});
+		}
+	}
+
+	/** Sync tab of a mailbox, admin only, when Meilisearch is on: index this mailbox, progress, error */
+	async function tabSyncFulltext(holder, account) {
+		let st;
+		try {
+			st = await api('fulltext', 'account', { id: account.id });
+		} catch (err) {
+			holder.innerHTML = '';
+			return;
+		}
+		if (!st.enabled) {
+			holder.innerHTML = '';
+			return;
+		}
+		const pct = st.total ? Math.min(100, Math.round(100 * st.sent / st.total)) : 0;
+		holder.innerHTML = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionSearch') + '</h2><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMeiliIndexBox') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-ftbox" role="switch" aria-checked="' + (st.on ? 'true' : 'false') + '" aria-label="' + th('InboxMeiliIndexBox') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxMeiliIndexBoxHelp') + '</div></div></div>'
+			+ (st.on ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMeiliProgress') + '</span><div>'
+				+ '<progress max="100" value="' + pct + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxMeiliProgress') + '"></progress> '
+				+ th('InboxSyncIndexedOf', st.sent.toLocaleString(), st.total.toLocaleString())
+				+ ' <span class="ibx-status' + (st.state === 'ready' ? ' ibx-status--ok' : ' ibx-status--warning') + '">' + th('InboxMeiliState_' + (st.state || 'indexing')) + '</span>'
+				+ (st.error ? '<div class="ibx-formrow__error">' + esc(st.error) + '</div>' : '') + '</div></div>' : '')
+			+ '</div></section>';
+		const sw = $('.ibx-js-ftbox', holder);
+		sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
+			if (!on && !(await confirmDialog({ title: t('InboxMeiliIndexOffTitle'), text: t('InboxMeiliIndexOffText'), confirm: t('InboxMeiliIndexOff'), danger: true }))) {
+				return;
+			}
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				await post('fulltext', 'account_set', { id: account.id, on: on ? 1 : 0 });
+				toast(t(on ? 'InboxMeiliIndexOnDone' : 'InboxMeiliIndexOffDone'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			tabSyncFulltext(holder, account);
+		});
 	}
 
 	// ---------- My account ----------

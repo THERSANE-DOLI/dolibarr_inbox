@@ -24,6 +24,7 @@
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxtextsearch.class.php');
+dol_include_once('/inbox/class/inboxfulltext.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(false);
@@ -144,12 +145,47 @@ function inboxListTextIds(array &$query, $scope, $scopeId, array $readable)
 	$query['text_ids'] = $search->load($user, InboxTextSearch::key($user, $query, $scope, $scopeId), $readable);
 }
 
+/**
+ * Meilisearch (lot W7 1.20.0): the words searched in the indexes of the mailboxes of the scope that are indexed; the
+ * mails found join the list (rows read again through the index: rights and filters), most relevant first when the
+ * list is in its default order
+ *
+ * @param array<string,mixed> $query    Parsed query, text_ids / rank / sort changed
+ * @param int[]               $accounts Mailboxes of the scope (readable)
+ * @return array{ready:int[],error:bool,relevance:bool,crops:array<int,string>}
+ */
+function inboxListFulltext(array &$query, array $accounts)
+{
+	global $db;
+
+	$out = array('ready' => array(), 'error' => false, 'relevance' => false, 'crops' => array());
+	if (empty($query['words']) || !InboxFulltext::enabled()) {
+		return $out;
+	}
+	$ft = new InboxFulltext($db);
+	$res = $ft->search($accounts, $query['words']);
+	$out['ready'] = $res['ready'];
+	$out['error'] = $res['error'];
+	if ($res['ids']) {
+		$query['text_ids'] = array_merge((array) ($query['text_ids'] ?? array()), $res['ids']);
+		$query['rank'] = $res['ids'];
+		if (($query['sort'] ?? 'date') === 'date' && ($query['dir'] ?? 'desc') === 'desc') {
+			$query['sort'] = 'relevance';
+			$out['relevance'] = true;
+		}
+		$out['crops'] = $res['crops'];
+	}
+
+	return $out;
+}
+
 switch ($action) {
 	case 'ids':
 		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
 		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
 		$query = inboxListQuery();
 		inboxListTextIds($query, 'folder', (int) $folder->rowid, $readable);
+		inboxListFulltext($query, array((int) $folder->fk_account));
 		$engine = new InboxSearchSql($db);
 		$ids = array();
 		$cursor = '';
@@ -179,6 +215,7 @@ switch ($action) {
 		}
 		$query = inboxListQuery();
 		inboxListTextIds($query, $scope === 'all' ? 'all' : ($scope === 'account' ? 'account' : 'folder'), $scope === 'all' ? 0 : ($scope === 'account' ? (int) $folder->fk_account : (int) $folder->rowid), $readable);
+		$fulltext = inboxListFulltext($query, $accounts);
 		$engine = new InboxSearchSql($db);
 		$start = microtime(true);
 		// Conversations: one line per thread, when the list is sorted by date (a search lists the mails one by one)
@@ -200,6 +237,14 @@ switch ($action) {
 		// page is not missed)
 		$page['stamp'] = ($scope !== 'all' && $scope !== 'account') ? inboxListStamp((int) $folder->rowid) : '';
 		// The pills of the search field
+		// Meilisearch: mailboxes fully indexed (their text needs no deep search), error, order, crops of the rows shown
+		$page['fulltext'] = array('ready' => $fulltext['ready'], 'error' => $fulltext['error'], 'relevance' => $fulltext['relevance']);
+		$page['crops'] = new stdClass();
+		foreach ($page['rows'] as $r) {
+			if (isset($fulltext['crops'][(int) $r['id']])) {
+				$page['crops']->{(int) $r['id']} = $fulltext['crops'][(int) $r['id']];
+			}
+		}
 		$page['query'] = array_intersect_key($inboxTypedQuery, array_flip(array('words', 'from', 'to', 'subject', 'tag', 'before', 'after', 'attachment', 'unread')));
 		inboxAjaxReply($page);
 		// no break

@@ -71,6 +71,18 @@ class InboxSearchSql implements InboxSearchEngine
 		$sortKey = isset($query['sort'], self::SORTS[$query['sort']]) ? $query['sort'] : 'date';
 		$expr = self::SORTS[$sortKey];
 		$desc = !isset($query['dir']) || $query['dir'] !== 'asc';
+		$rank = array_slice(array_values(array_unique(array_filter(array_map('intval', (array) ($query['rank'] ?? array()))))), 0, self::TEXT_IDS_MAX);
+		if (($query['sort'] ?? '') === 'relevance' && $rank) {
+			// Order of Meilisearch first (lot W7 1.20.0), then the other mails, the last arrived first: one number per
+			// row, unique, so the cursor stays exact
+			$case = "CASE m.rowid";
+			foreach ($rank as $i => $id) {
+				$case .= " WHEN ".$id." THEN ".($i + 1);
+			}
+			$sortKey = 'relevance';
+			$expr = "((".$case." ELSE ".(count($rank) + 1)." END) * 10000000000 - m.rowid)";
+			$desc = false;
+		}
 		$p = $this->db->prefix();
 
 		$where = $this->where($accountIds, (int) $folderId, $query);
@@ -83,7 +95,7 @@ class InboxSearchSql implements InboxSearchEngine
 		}
 		$after = $this->decodeCursor($cursor);
 		if ($after !== null) {
-			$value = $sortKey === 'size' ? (string) ((int) $after[0]) : "'".$this->db->escape((string) $after[0])."'";
+			$value = in_array($sortKey, array('size', 'relevance'), true) ? (string) ((int) $after[0]) : "'".$this->db->escape((string) $after[0])."'";
 			$op = $desc ? '<' : '>';
 			$where[] = "(".$expr." ".$op." ".$value." OR (".$expr." = ".$value." AND m.rowid ".$op." ".((int) $after[1])."))";
 		}

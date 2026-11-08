@@ -166,6 +166,16 @@ interface InboxConnectorInterface
 	public function searchText($folder, array $words, array $options = array());
 
 	/**
+	 * Start of several mails (headers and the first bytes of the body), read only, to index their text (lot W7 1.20.0)
+	 *
+	 * @param string   $folder    Folder path
+	 * @param string[] $remoteIds Remote identifiers
+	 * @param int      $max       Bytes of the body at most
+	 * @return array<string,string>|null remote_id => raw start of the mail (mails gone left out), null on error
+	 */
+	public function fetchStarts($folder, array $remoteIds, $max = 131072);
+
+	/**
 	 * Set or remove flags (lot W4)
 	 *
 	 * @param string   $folder    Folder path
