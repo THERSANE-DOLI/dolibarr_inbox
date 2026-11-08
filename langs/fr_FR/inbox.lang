@@ -1803,3 +1803,5 @@ InboxErrorHostNotAllowed = Le serveur %s n'est pas autorisé par la configuratio
 InboxPrintFailed = Le mail n'a pas pu être imprimé.
 InboxNotifAccessSelf = %s s'est donné un accès à une boîte
 InboxNotifType_access_self = Accès à une boîte que l'on se donne soi-même
+InboxPasswordWhyTitle = Pourquoi ressaisir le mot de passe ?
+InboxPasswordWhyText = Un mot de passe enregistré n'est envoyé qu'au serveur pour lequel il a été saisi. Vous avez modifié : %s. Si la nouvelle valeur était erronée ou posée par quelqu'un d'autre, le mot de passe partirait vers un serveur qui n'est pas le vôtre. Le ressaisir confirme que vous savez où il va.

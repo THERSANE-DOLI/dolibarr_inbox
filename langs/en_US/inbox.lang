@@ -1803,3 +1803,5 @@ InboxErrorHostNotAllowed = The server %s is not allowed by the setup.
 InboxPrintFailed = The mail could not be printed.
 InboxNotifAccessSelf = %s gave himself an access to a mailbox
 InboxNotifType_access_self = Self-given access to a mailbox
+InboxPasswordWhyTitle = Why type the password again?
+InboxPasswordWhyText = A stored password is only sent to the server it was typed for. You changed: %s. If the new value were wrong or set by someone else, the password would leave for a server that is not yours. Typing it again confirms that you know where it goes.

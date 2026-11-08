@@ -1803,3 +1803,5 @@ InboxErrorHostNotAllowed = El servidor %s no está permitido por la configuraci�
 InboxPrintFailed = No se pudo imprimir el correo.
 InboxNotifAccessSelf = %s se ha dado un acceso a un buzón
 InboxNotifType_access_self = Acceso a un buzón dado a sí mismo
+InboxPasswordWhyTitle = ¿Por qué escribir de nuevo la contraseña?
+InboxPasswordWhyText = Una contraseña guardada solo se envía al servidor para el que se escribió. Ha modificado: %s. Si el nuevo valor fuera erróneo o lo hubiera puesto otra persona, la contraseña saldría hacia un servidor que no es el suyo. Escribirla de nuevo confirma que sabe adónde va.

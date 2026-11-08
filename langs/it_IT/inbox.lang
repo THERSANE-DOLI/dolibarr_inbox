@@ -1803,3 +1803,5 @@ InboxErrorHostNotAllowed = Il server %s non è autorizzato dalla configurazione.
 InboxPrintFailed = Impossibile stampare la mail.
 InboxNotifAccessSelf = %s si è dato un accesso a una casella
 InboxNotifType_access_self = Accesso a una casella dato a se stessi
+InboxPasswordWhyTitle = Perché digitare di nuovo la password?
+InboxPasswordWhyText = Una password salvata viene inviata solo al server per cui è stata digitata. Hai modificato: %s. Se il nuovo valore fosse errato o impostato da qualcun altro, la password partirebbe verso un server che non è il tuo. Digitarla di nuovo conferma che sai dove va.

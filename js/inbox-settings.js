@@ -604,6 +604,11 @@
 			const moved = list => list.some(k => String(v[k] ?? '') !== String(initial[k] ?? ''));
 			const sides = [['imap', a.has_imap_password, moved(secretFields.imap) || (!!v.smtp_same_credentials && moved(secretFields.smtp))],
 				['smtp', a.has_smtp_password, !v.smtp_same_credentials && moved(secretFields.smtp)]];
+			// What changed, in the words of the form: the explanation names it
+			const names = { imap_host: 'InboxImapHost', imap_port: 'InboxImapPort', imap_encryption: 'InboxEncryption', imap_auth_mode: 'InboxImapAuthMode',
+				oauth_service: 'InboxOAuthService', imap_login: 'InboxImapLogin', imap_validate_cert: 'InboxValidateCert', smtp_host: 'InboxSmtpHost',
+				smtp_port: 'InboxSmtpPort', smtp_encryption: 'InboxEncryption', smtp_login: 'InboxSmtpLogin', smtp_same_credentials: 'InboxSmtpSameCredentials' };
+			const changedOf = list => Array.from(new Set(list.filter(k => String(v[k] ?? '') !== String(initial[k] ?? '')).map(k => t(names[k]).toLowerCase())));
 			sides.forEach(([side, kept, again]) => {
 				const input = form[side + '_password'];
 				if (!input || !kept) {
@@ -611,7 +616,18 @@
 				}
 				input.placeholder = again ? t('InboxPasswordAgain') : t('InboxPasswordKept');
 				input.required = again;
-				input.closest('.ibx-formrow').classList.toggle('is-invalid', again && input.value === '');
+				const row = input.closest('.ibx-formrow');
+				row.classList.toggle('is-invalid', again && input.value === '');
+				// Why the password is asked again: shown on an info icon beside the label (a reflex of security, not a bug)
+				const label = $('.ibx-formrow__label', row);
+				const tip = $('.ibx-infotip', label);
+				if (tip) {
+					tip.remove();
+				}
+				if (again) {
+					const fields = changedOf(side === 'imap' ? secretFields.imap.concat(v.smtp_same_credentials ? secretFields.smtp : []) : secretFields.smtp);
+					label.insertAdjacentHTML('beforeend', ' ' + I.infotip(t('InboxPasswordWhyTitle'), t('InboxPasswordWhyText', fields.join(', '))));
+				}
 			});
 		};
 		form.addEventListener('input', askAgain);

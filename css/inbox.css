@@ -1819,3 +1819,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-rp__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s3); padding: var(--ibx-s2) var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); border-top: 1px solid var(--ibx-border); background: var(--ibx-bg-pane); }
 .ibx-rp__foot > span { flex: 1 1 100%; display: flex; align-items: center; gap: var(--ibx-s1); }
 .ibx-rp__foot a { color: var(--ibx-accent); }
+/* Info icon with its explanation (why a password is asked again...) */
+.ibx-infotip { position: relative; display: inline-flex; vertical-align: middle; }
+.ibx-infotip__btn { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; padding: 0; color: var(--ibx-accent); background: none; border: 0; border-radius: 50%; cursor: help; }
+.ibx-infotip__btn:hover, .ibx-infotip__btn[aria-expanded="true"] { background: var(--ibx-accent-soft); }
+.ibx-infotip__btn .ibx-icon { width: 1rem; height: 1rem; }
+.ibx-infotip__pop { position: absolute; z-index: 60; top: calc(100% + 0.375rem); left: -0.5rem; width: max-content; max-width: min(20rem, calc(100vw - 2rem)); display: grid; gap: 0.25rem;
+	padding: var(--ibx-s2) var(--ibx-s3); font-size: var(--ibx-fs-sm); font-weight: 400; line-height: 1.45; color: var(--ibx-text); text-align: left; white-space: normal;
+	background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-infotip.is-end .ibx-infotip__pop { left: auto; right: -0.5rem; }
+.ibx-infotip__pop[hidden] { display: none; }

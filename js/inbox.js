@@ -566,7 +566,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope, setTitleCount,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,
@@ -586,6 +586,79 @@
 			n.remove();
 		}
 	}))).observe(alerts, { childList: true });
+
+	// ---------- Explanation on an info icon (popover) ----------
+	/**
+	 * A small « i » that explains (why a password is asked again...): the text opens on hover, keyboard focus or a
+	 * click (a phone has no hover), closes on leaving, Escape or a click elsewhere; read by the screen readers
+	 * (aria-describedby). infotip(title, text) gives the markup; the events are bound once for the whole page.
+	 */
+	let tipSeq = 0;
+	function infotip(title, text) {
+		const id = 'ibx-tip' + (++tipSeq);
+		return '<span class="ibx-infotip"><button type="button" class="ibx-infotip__btn" aria-label="' + esc(title) + '" aria-describedby="' + id + '" aria-expanded="false">' + ic('info') + '</button>'
+			+ '<span class="ibx-infotip__pop" role="tooltip" id="' + id + '" hidden><b>' + esc(title) + '</b><span>' + esc(text) + '</span></span></span>';
+	}
+	(() => {
+		const show = (tip, on) => {
+			const pop = tip.querySelector('.ibx-infotip__pop');
+			const btn = tip.querySelector('.ibx-infotip__btn');
+			if (!pop || !btn) {
+				return;
+			}
+			pop.hidden = !on;
+			btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+			if (on) {
+				// Kept inside the window: aligned on the right when the icon is near the right edge
+				const r = btn.getBoundingClientRect();
+				tip.classList.toggle('is-end', r.left > window.innerWidth - 300);
+			}
+		};
+		const closeAll = except => document.querySelectorAll('.ibx-infotip').forEach(t => {
+			if (t !== except) {
+				show(t, false);
+			}
+		});
+		document.addEventListener('pointerover', e => {
+			const tip = e.target.closest && e.target.closest('.ibx-infotip');
+			if (tip && e.pointerType !== 'touch') {
+				closeAll(tip);
+				show(tip, true);
+			}
+		});
+		document.addEventListener('pointerout', e => {
+			const tip = e.target.closest && e.target.closest('.ibx-infotip');
+			if (tip && !(e.relatedTarget && tip.contains(e.relatedTarget)) && !tip.classList.contains('is-pinned')) {
+				show(tip, false);
+			}
+		});
+		document.addEventListener('focusin', e => {
+			const tip = e.target.closest && e.target.closest('.ibx-infotip');
+			closeAll(tip);
+			if (tip) {
+				show(tip, true);
+			}
+		});
+		document.addEventListener('click', e => {
+			const btn = e.target.closest && e.target.closest('.ibx-infotip__btn');
+			if (!btn) {
+				document.querySelectorAll('.ibx-infotip.is-pinned').forEach(t => t.classList.remove('is-pinned'));
+				closeAll(null);
+				return;
+			}
+			const tip = btn.closest('.ibx-infotip');
+			const on = !tip.classList.contains('is-pinned');
+			tip.classList.toggle('is-pinned', on);
+			closeAll(tip);
+			show(tip, on);
+		});
+		document.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && document.querySelector('.ibx-infotip__pop:not([hidden])')) {
+				document.querySelectorAll('.ibx-infotip.is-pinned').forEach(t => t.classList.remove('is-pinned'));
+				closeAll(null);
+			}
+		});
+	})();
 
 	// ---------- Tooltips ----------
 	/**
