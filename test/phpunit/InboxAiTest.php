@@ -122,6 +122,9 @@ class InboxAiTest extends InboxImapTestCase
 			$this->assertStringNotContainsStringIgnoringCase($bad, $html, $bad);
 		}
 		$this->assertSame('<p>Ligne 1<br>Ligne 2</p><p>Paragraphe &lt;b&gt;</p>', str_replace("\n", '', InboxAi::clean("Ligne 1\nLigne 2\n\nParagraphe <b>")), 'plain text: paragraphs, escaped');
+		// HTML with line breaks between the blocks (as the services write it): none left, the spaces of the text kept
+		$html = InboxAi::clean("<p>Bonjour,</p>\n\n<p>Je vous <b>informe</b> que :</p>\n<ul>\n  <li>un ;</li>\n  <li>deux.</li>\n</ul>\n");
+		$this->assertSame('<p>Bonjour,</p><p>Je vous <b>informe</b> que :</p><ul><li>un ;</li><li>deux.</li></ul>', $html);
 	}
 
 	/**
@@ -143,7 +146,7 @@ class InboxAiTest extends InboxImapTestCase
 		$this->assertContains((int) $a->id, $ai->accountsFor($this->admin));
 
 		$html = $ai->run($this->admin, (int) $a->id, 'rephrase', array('text' => 'texte à reformuler', 'style' => 'shorter'));
-		$this->assertSame('<p>Proposition </p>', str_replace("\n", '', (string) $html));
+		$this->assertSame('<p>Proposition</p>', (string) $html);
 		$this->assertSame('textrephraser', $this->calls[0][1], 'the key the class of Dolibarr reads');
 		// The journal: the call, never its text
 		$log = $this->db->getRow("SELECT detail, subject FROM ".$this->db->prefix()."inbox_action_log WHERE action = 'ai' AND fk_account = ".((int) $a->id)." ORDER BY rowid DESC");

@@ -1958,3 +1958,4 @@ InboxDictationMineNone = Aucun accord donné pour la dictée vocale.
 InboxDictationRevoke = Retirer l'accord
 InboxDictationRevoked = Accord retiré
 InboxSelectedWord = sélectionnés
+InboxDictateIntoField = dans « %s »

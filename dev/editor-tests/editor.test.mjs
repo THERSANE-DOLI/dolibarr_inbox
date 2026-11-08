@@ -150,3 +150,17 @@ test('voice typing: text inserted as text (apostrophe kept, a tag stays text)', 
 	assert.doesNotMatch(ed.getHtml(), /<strong>|<b>vrai/, 'no formatting from what was said');
 	assert.doesNotMatch(ed.getText(), /&#39;/);
 });
+
+test('HTML with line breaks between blocks (an answer of the AI): no empty paragraph, no empty bullet', async () => {
+	const { ed } = await editorWith('<p></p>');
+	ed.replaceRange(null, null, '<p>Bonjour,</p>\n\n<p>Je vous <strong>informe</strong> que :</p>\n<ul>\n  <li><p>un ;</p></li>\n  <li>deux.</li>\n</ul>\n\n<p>Cordialement,</p>\n');
+	const html = ed.getHtml();
+	assert.doesNotMatch(html, /<p><\/p>/, 'no empty paragraph');
+	assert.doesNotMatch(html, /<li><p><\/p><\/li>/, 'no empty bullet');
+	assert.equal((html.match(/<li>/g) || []).length, 2);
+	assert.match(html, /Je vous <strong>informe<\/strong> que/, 'the spaces around an inline element kept');
+	ed.focus('end');
+	ed.insertHtml('\n<p>Encore</p>\n\n');
+	assert.doesNotMatch(ed.getHtml(), /<p><\/p>/);
+});
+

@@ -299,7 +299,21 @@ class InboxAi
 		// No picture from elsewhere in a proposal
 		$res = preg_replace('#<img\b[^>]*>#i', '', (string) $res);
 
-		return InboxMailBuilder::cleanHtml((string) $res);
+		return self::tightBlocks(InboxMailBuilder::cleanHtml((string) $res));
+	}
+
+	/**
+	 * The line breaks between blocks removed (« </p>\n\n<p> », « <ul>\n<li> »): a browser ignores them, an editor
+	 * makes empty paragraphs and empty bullets of them. The spaces between words and inline elements are kept.
+	 *
+	 * @param string $html HTML
+	 * @return string
+	 */
+	public static function tightBlocks($html)
+	{
+		$blocks = 'p|div|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tfoot|tr|td|th|br|hr';
+
+		return trim((string) preg_replace(array('#(<(?:/?(?:'.$blocks.'))\b[^>]*>)\s+#i', '#\s+(<(?:/?(?:'.$blocks.'))\b[^>]*>)#i'), '$1', (string) $html));
 	}
 
 	/**

@@ -19,7 +19,8 @@ const UA = {
  * @param {object} o ua, speech (false: none), brave, consents, accounts, post (function)
  */
 function page(o = {}) {
-	const dom = new JSDOM('<!DOCTYPE html><body><div id="dlg"><button data-cmd="dictate" aria-pressed="false"></button><div class="ibx-js-dictbar" hidden></div></div></body>',
+	const dom = new JSDOM('<!DOCTYPE html><body><div id="dlg"><button data-cmd="dictate" aria-pressed="false"></button><div class="ibx-js-dictbar" hidden></div>'
+		+ '<textarea class="ibx-js-aiprompt" aria-label="Consigne"></textarea><div class="ibx-js-editor" tabindex="0"></div></div></body>',
 		{ runScripts: 'outside-only' });
 	const w = dom.window;
 	// The identity of the browser as the page reads it
@@ -201,3 +202,31 @@ test('a mailbox no longer allowed while dictating: stopped', () => {
 	assert.equal(p.writing.rec, null);
 	assert.equal(p.button().hidden, true);
 });
+
+test('the words go where the cursor is: the instruction of the AI, then back to the mail', () => {
+	const p = page({ consents: { google: 1 } });
+	p.D.paintButton(p.writing, 5);
+	const prompt = p.writing.dlg.querySelector('.ibx-js-aiprompt');
+	prompt.value = 'Réponds';
+	prompt.focus();
+	prompt.setSelectionRange(7, 7);
+	// The click on the microphone keeps the cursor in the field
+	const down = new p.w.MouseEvent('mousedown', { bubbles: true, cancelable: true });
+	p.button().dispatchEvent(down);
+	assert.equal(down.defaultPrevented, true);
+	p.D.toggle(p.writing, 5);
+	assert.match(p.bar().textContent, /InboxDictateIntoField\(Consigne\)/, 'the bar says where the words go');
+	let typed = 0;
+	prompt.addEventListener('input', () => typed++);
+	say(p.log.recs[0], "que c'est d'accord", true);
+	assert.equal(prompt.value, "Réponds que c'est d'accord ", 'in the instruction, spaced after the word, apostrophes kept');
+	assert.equal(typed, 1, 'the field is told');
+	assert.equal(p.writing.html, '', 'nothing in the mail');
+	assert.equal(p.writing.changes, 0);
+	// The cursor back in the text of the mail: the next words go there
+	p.writing.dlg.querySelector('.ibx-js-editor').focus();
+	say(p.log.recs[0], 'Bonjour', true);
+	assert.equal(p.writing.html, 'Bonjour ');
+	assert.equal(prompt.value, "Réponds que c'est d'accord ");
+});
+

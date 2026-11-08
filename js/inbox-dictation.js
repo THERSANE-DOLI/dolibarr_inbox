@@ -20,8 +20,11 @@
  * dev/editor-tests (a fake recognition).
  *
  * A writing w gives: w.dlg (its window, with the button [data-cmd="dictate"] and the bar .ibx-js-dictbar),
- * w.editor (insertHtml, focus), w.data.dictation ({accounts, consents} of ajax/compose.php open), w.changed(),
- * w.closed. The module keeps w.rec (recognition running) and w.recStopped.
+ * w.editor (insertText, focus), w.data.dictation ({accounts, consents} of ajax/compose.php open), w.changed(),
+ * w.closed. The module keeps w.rec (recognition running), w.recStopped and w.dictField.
+ *
+ * The words go where the cursor is (1.28.3): a text field of the writing (the instruction of the AI...) when it
+ * has the focus, else the text of the mail. The microphone button never takes the focus from that field.
  */
 (function () {
 	'use strict';
@@ -63,6 +66,11 @@
 		const b = $('[data-cmd="dictate"]', w.dlg);
 		if (!b) {
 			return;
+		}
+		if (!b.dataset.keepFocus) {
+			// A click on the microphone leaves the cursor in the field where it is (where the words will go)
+			b.dataset.keepFocus = '1';
+			b.addEventListener('mousedown', e => e.preventDefault());
 		}
 		const ok = !!(speech() && w.data.dictation && w.data.dictation.accounts.includes(account));
 		b.hidden = !ok;
@@ -108,17 +116,71 @@
 	}
 
 	/**
+	 * A text field of the writing that can get the words (textarea, text input), else null (the text of the mail)
+	 * @param {object} w Writing
+	 * @param {Element|null} el Element
+	 * @returns {HTMLInputElement|HTMLTextAreaElement|null}
+	 */
+	function fieldOf(w, el) {
+		if (!el || !w.dlg.contains(el) || el.disabled || el.readOnly) {
+			return null;
+		}
+		if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['text', 'search', ''].includes((el.getAttribute('type') || '').toLowerCase()))) {
+			return el;
+		}
+		return null;
+	}
+
+	/**
+	 * Words put in a text field at its caret, a space first after a word; the field told (its own listeners)
+	 * @param {HTMLInputElement|HTMLTextAreaElement} f Field
+	 * @param {string} text Text
+	 */
+	function intoField(f, text) {
+		const startPos = f.selectionStart ?? f.value.length;
+		const endPos = f.selectionEnd ?? startPos;
+		const before = f.value.slice(Math.max(0, startPos - 1), startPos);
+		const value = (before !== '' && !/\s/.test(before) ? ' ' : '') + text;
+		f.setRangeText(value, startPos, endPos, 'end');
+		f.dispatchEvent(new Event('input', { bubbles: true }));
+	}
+
+	/** The bar says where the words go */
+	function paintTarget(w) {
+		const where = $('.ibx-js-dictwhere', w.dlg);
+		if (where) {
+			where.textContent = w.dictField ? ' · ' + t('InboxDictateIntoField', w.dictField.getAttribute('aria-label') || (w.dictField.labels && w.dictField.labels[0] ? w.dictField.labels[0].textContent : '') || w.dictField.placeholder || '') : '';
+		}
+	}
+
+	/**
 	 * @param {object} w Writing
 	 * @param {{SR: Function, provider: string}} sp Recognition and receiver
 	 */
 	function start(w, sp) {
+		// Where the words go: the field that has the cursor, else the text of the mail; it follows the cursor after
+		w.dictField = fieldOf(w, document.activeElement);
+		if (!w.dictFollow) {
+			w.dictFollow = e => {
+				if (!w.rec) {
+					return;
+				}
+				if (e.target.closest && e.target.closest('.ibx-js-editor, .ibx-compose__editor')) {
+					w.dictField = null;
+				} else if (fieldOf(w, e.target)) {
+					w.dictField = e.target;
+				}
+				paintTarget(w);
+			};
+			w.dlg.addEventListener('focusin', w.dictFollow);
+		}
 		const rec = new sp.SR();
 		rec.lang = (I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-');
 		rec.continuous = true;
 		rec.interimResults = true;
 		const bar = $('.ibx-js-dictbar', w.dlg);
 		const b = $('[data-cmd="dictate"]', w.dlg);
-		bar.innerHTML = '<span class="ibx-dict__dot" aria-hidden="true"></span><b>' + th('InboxDictateOn') + '</b><span class="ibx-muted"> · ' + esc(t('InboxDictateProvider_' + sp.provider)) + '</span>'
+		bar.innerHTML = '<span class="ibx-dict__dot" aria-hidden="true"></span><b>' + th('InboxDictateOn') + '</b><span class="ibx-muted"> · ' + esc(t('InboxDictateProvider_' + sp.provider)) + '<span class="ibx-js-dictwhere"></span></span>'
 			+ '<span class="ibx-dict__interim ibx-ellipsis ibx-js-dictinterim"></span>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictstop">' + ic('close') + ' ' + th('InboxDictateStop') + '</button>';
 		$('.ibx-js-dictstop', bar).addEventListener('click', () => stop(w));
@@ -131,9 +193,11 @@
 			for (let i = e.resultIndex; i < e.results.length; i++) {
 				const text = e.results[i][0].transcript;
 				if (e.results[i].isFinal) {
-					// At the cursor, as typed text: never read as HTML (Ctrl+Z takes it back)
+					// At the cursor, as typed text: never read as HTML (Ctrl+Z takes it back); in the field that has it
 					const clean = text.trim();
-					if (clean) {
+					if (clean && w.dictField && w.dictField.isConnected) {
+						intoField(w.dictField, clean + ' ');
+					} else if (clean) {
 						w.editor.insertText(clean + ' ', true);
 						w.changed();
 					}
@@ -182,7 +246,12 @@
 			toast(t('InboxDictateNoMic'), { error: true });
 			return;
 		}
-		w.editor.focus();
+		paintTarget(w);
+		if (w.dictField) {
+			w.dictField.focus();
+		} else {
+			w.editor.focus();
+		}
 	}
 
 	/**

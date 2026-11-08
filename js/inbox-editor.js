@@ -369,6 +369,9 @@
 			}
 			return /^\s*</.test(text) && /<\/(p|div|ul|ol|li|h[1-6]|table|tr|td|blockquote|strong|b|em|i|u|a|span)>/i.test(text) ? text : '';
 		};
+		/** Line breaks between blocks removed: the editor would make empty paragraphs and bullets of them (1.28.3) */
+		const tightBlocks = html => String(html || '').replace(/(<\/?(?:p|div|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tfoot|tr|td|th|br|hr)\b[^>]*>)\s+/gi, '$1')
+			.replace(/\s+(<\/?(?:p|div|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tfoot|tr|td|th|br|hr)\b[^>]*>)/gi, '$1').trim();
 		const ACTIVE = { bold: 'bold', italic: 'italic', underline: 'underline', strike: 'strike', bulletList: 'bulletList', orderedList: 'orderedList', quote: 'blockquote', link: 'link', heading: 'heading' };
 		return {
 			name: 'tiptap',
@@ -441,7 +444,7 @@
 			},
 			insertHtml(html) {
 				if (editor) {
-					chain().insertContent(html).run();
+					chain().insertContent(tightBlocks(html)).run();
 				}
 			},
 			/** A variable of a template put at the cursor */
@@ -585,6 +588,7 @@
 				if (!editor) {
 					return;
 				}
+				html = tightBlocks(html);
 				if (from === null || from === undefined) {
 					editor.chain().focus().selectAll().insertContent(html).run();
 					return;

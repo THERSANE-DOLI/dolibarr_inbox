@@ -1958,3 +1958,4 @@ InboxDictationMineNone = Nessun consenso dato per la dettatura vocale.
 InboxDictationRevoke = Ritira il consenso
 InboxDictationRevoked = Consenso ritirato
 InboxSelectedWord = selezionati
+InboxDictateIntoField = in « %s »
