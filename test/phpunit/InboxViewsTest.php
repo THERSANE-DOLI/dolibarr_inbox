@@ -115,5 +115,12 @@ class InboxViewsTest extends InboxTestCase
 		$this->assertGreaterThan(0, $params->set($u, 'unified_exclude', '[12,15]'));
 		$this->assertSame(array(12, 15), json_decode($params->get($u, 'unified_exclude'), true));
 		$this->assertLessThan(0, $params->set($u, 'views_shown', 'not json'));
+		// One mailbox at a time (1.30.0): automatic by default (narrow screen), all or single chosen
+		$this->assertSame('auto', $params->get($u, 'tree_mode'));
+		$this->assertGreaterThan(0, $params->set($u, 'tree_mode', 'single'));
+		$this->assertSame('single', $params->get($u, 'tree_mode'));
+		$this->assertLessThan(0, $params->set($u, 'tree_mode', 'bogus'));
+		$this->assertGreaterThan(0, $params->set($u, 'tree_box', '42'));
+		$this->assertLessThan(0, $params->set($u, 'tree_box', '-1'));
 	}
 }

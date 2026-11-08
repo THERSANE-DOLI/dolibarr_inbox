@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: one mailbox at a time in the panel of the folders :   1.30.0
+  - My account > Mailboxes in the panel: automatic (every mailbox on a large screen, one at a time on a phone), every
+    mailbox, or one at a time.
+  - one at a time: a selector on top of the folders (icon, name, unread of the mailbox); open, the list of the
+    mailboxes in the panel; the mailbox chosen is kept; its menu by a right click; the unified views stay above.
+  - a mail dragged over the selector opens the list, over a mailbox of it shows that mailbox: the mail is dropped
+    in one of its folders. A folder of another mailbox opened (link, notification) shows its mailbox.
 - FIX: foot of a card in a unified view: the tags first (never cut nor on two lines), the name of the mailbox gives way down to its icon, its name in the title :   1.29.1
 - NEW: unified views on top of the panel of the folders :   1.29.0
   - section « Views »: Unified inbox, Unread, Starred, Assigned to me; Sent and Drafts of every mailbox offered,

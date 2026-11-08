@@ -40,6 +40,9 @@
 		scope: 'folder',
 		// Unified view open (1.29.0): inbox, unread, flagged, mine, sent, drafts ('' = a folder); scope is then « view »
 		view: '',
+		// One mailbox at a time (1.30.0): the mailbox shown, the list of the mailboxes open under the selector
+		box: 0,
+		pickOpen: false,
 		q: '',
 		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false },
 		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
@@ -285,6 +288,14 @@
 		}
 		const filter = ($('.ibx-js-folderfilter', pane) || {}).value || '';
 		const needle = filter.trim().toLowerCase();
+		if (singleBox()) {
+			const a = shownBox();
+			const manyOne = a.folders.length > 15;
+			$('.ibx-js-folderfilterbox', pane).hidden = !manyOne;
+			body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + viewsHtml() + boxPickerHtml(a)
+				+ branch(a, 0, 0, needle) + '</ul>';
+			return;
+		}
 		const many = S.accounts.reduce((n, a) => n + a.folders.length, 0) > 15;
 		const filterBox = $('.ibx-js-folderfilterbox', pane);
 		filterBox.hidden = !many;
@@ -311,6 +322,78 @@
 			html += '</li>';
 		});
 		body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + viewsHtml() + html + '</ul>';
+	}
+
+	// ---------- One mailbox at a time (1.30.0, analyse-navigation-vues.md §2) ----------
+	/** The panel shows one mailbox: chosen in My account, or automatic (on a narrow screen) */
+	function singleBox() {
+		const mode = params.tree_mode || 'auto';
+		return S.accounts.length > 1 && (mode === 'single' || (mode === 'auto' && isPhone()));
+	}
+	/** The mailbox shown: the one chosen before, else the one of the folder open, else the first */
+	function shownBox() {
+		let a = S.accounts.find(x => x.id === S.box);
+		if (!a) {
+			const e = currentFolder();
+			a = (e && e.account) || S.accounts.find(x => x.id === +(params.tree_box || 0)) || S.accounts[0];
+			S.box = a.id;
+		}
+		return a;
+	}
+	function boxUnread(a) {
+		return a.folders.filter(f => f.role === 'inbox').reduce((n, f) => n + f.unread, 0);
+	}
+	/**
+	 * Selector of the mailbox, on top of its folders: its icon, its name, its unread; open, the list of the mailboxes
+	 * in the panel (not a floating menu: a mail dragged over a mailbox 600 ms opens it, to be dropped in a folder)
+	 */
+	function boxPickerHtml(a) {
+		const inError = !!a.error;
+		const progress = a.state === 'first_sync' && a.progress && a.progress.total ? Math.min(99, Math.floor(100 * a.progress.indexed / a.progress.total)) : -1;
+		const quotaPct = a.quota && a.quota.limit ? Math.round(100 * a.quota.used / a.quota.limit) : 0;
+		const n = boxUnread(a);
+		let html = '<li class="ibx-boxpick__li"><div class="ibx-boxpick__wrap"><div class="ibx-boxpick' + (inError ? ' has-error' : '') + '" data-account="' + a.id + '">'
+			+ '<button type="button" class="ibx-boxpick__btn" data-boxpick-toggle aria-expanded="' + S.pickOpen + '" aria-haspopup="true" title="' + esc(a.email) + '">'
+			+ (inError ? ic('warning', 'ibx-tree__icon') : lookIcon(a.icon || 'account', a.color, 'ibx-tree__icon'))
+			+ '<span class="ibx-boxpick__name ibx-ellipsis">' + esc(accountName(a)) + '</span>'
+			+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '')
+			+ ic(S.pickOpen ? 'chevron-up' : 'chevron-down', 'ibx-boxpick__caret') + '<span class="ibx-sr-only"> ' + th('InboxBoxChange') + '</span></button>'
+			+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
+			+ '</div>';
+		const notes = (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '')
+			+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '');
+		if (S.pickOpen) {
+			html += '<ul class="ibx-boxpick__list" aria-label="' + th('InboxBoxChange') + '">' + S.accounts.map(x => {
+				const c = boxUnread(x);
+				return '<li><button type="button" class="ibx-boxpick__item" data-boxpick="' + x.id + '"' + (x.id === a.id ? ' aria-current="true"' : '') + ' title="' + esc(x.email) + '">'
+					+ (x.error ? ic('warning', 'ibx-tree__icon') : lookIcon(x.icon || 'account', x.color, 'ibx-tree__icon'))
+					+ '<span class="ibx-ellipsis">' + esc(accountName(x)) + '</span>' + (c ? '<span class="ibx-count">' + c + '</span>' : '') + '</button></li>';
+			}).join('') + '</ul>';
+		}
+		return html + '</div>' + notes + '</li>';
+	}
+	/**
+	 * Show another mailbox; open its inbox unless a mail is being dragged (it is dropped in one of its folders)
+	 * @param {number} id Mailbox
+	 * @param {boolean} dragging A mail is dragged
+	 */
+	function chooseBox(id, dragging) {
+		const a = S.accounts.find(x => x.id === id);
+		if (!a) {
+			return;
+		}
+		S.pickOpen = false;
+		S.box = id;
+		saveParam('tree_box', String(id));
+		renderTree();
+		const inbox = a.folders.find(f => f.role === 'inbox') || a.folders.find(f => f.selectable);
+		if (!dragging && inbox && !(S.scope === 'folder' && (S.folders.get(S.folderId) || {}).account === a)) {
+			openFolder(inbox.id);
+		}
+		const btn = $('[data-boxpick-toggle]', S.el);
+		if (btn && !dragging) {
+			btn.focus();
+		}
 	}
 
 	// ---------- Unified views (1.29.0, analyse-navigation-vues.md) ----------
@@ -524,6 +607,21 @@
 			if (err) {
 				e.stopPropagation();
 				accountErrorDialog(S.accounts.find(a => a.id === +err.dataset.account));
+				return;
+			}
+			const pickToggle = e.target.closest('[data-boxpick-toggle]');
+			if (pickToggle) {
+				S.pickOpen = !S.pickOpen;
+				renderTree();
+				const again = $('[data-boxpick-toggle]', S.el);
+				if (again) {
+					again.focus();
+				}
+				return;
+			}
+			const pick = e.target.closest('[data-boxpick]');
+			if (pick) {
+				chooseBox(+pick.dataset.boxpick, false);
 				return;
 			}
 			const vmenu = e.target.closest('.ibx-js-viewsmenu');
@@ -4208,6 +4306,25 @@
 			if (!S.drag) {
 				return;
 			}
+			// One mailbox at a time: hovering the selector opens the list, hovering a mailbox of it shows that mailbox
+			const pick = e.target.closest('[data-boxpick], [data-boxpick-toggle]');
+			if (pick) {
+				const pkey = 'p' + (pick.dataset.boxpick || 'list');
+				$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
+				dragTip('');
+				if (hover.id !== pkey) {
+					clearTimeout(hover.timer);
+					hover = { id: pkey, timer: setTimeout(() => {
+						if (pick.dataset.boxpick) {
+							chooseBox(+pick.dataset.boxpick, true);
+						} else if (!S.pickOpen) {
+							S.pickOpen = true;
+							renderTree();
+						}
+					}, 600) };
+				}
+				return;
+			}
 			const row = e.target.closest('[data-folder], [data-account]');
 			$$('.is-droptarget', tree).forEach(x => x !== row && x.classList.remove('is-droptarget'));
 			if (!row) {
@@ -6217,6 +6334,12 @@
 		if (row && S.el.contains(row)) {
 			return at => mailMenu(+row.dataset.mail, at);
 		}
+		// One mailbox at a time (1.30.0): the selector and the mailboxes of its list have the menu of the mailbox
+		const picked = target.closest('[data-boxpick]') || target.closest('.ibx-boxpick[data-account]');
+		if (picked && S.el.contains(picked)) {
+			const pa = S.accounts.find(x => x.id === +(picked.dataset.boxpick || picked.dataset.account));
+			return pa && (pa.level === 'manage' || S.admin) ? at => accountMenu(pa.id, at) : null;
+		}
 		// The unified views (1.29.0): the same menu as « ⋯ », with the view right clicked first
 		const view = target.closest('[data-view]');
 		if (view && S.el.contains(view)) {
@@ -6318,6 +6441,12 @@
 			renderTree();
 		}
 		S.folderRole = entry.folder.role;
+		// One mailbox at a time: a folder of another mailbox (a link, a notification) shows its mailbox
+		if (singleBox() && S.box !== entry.account.id) {
+			S.box = entry.account.id;
+			S.pickOpen = false;
+			renderTree();
+		}
 		Dolibarr.executeHook('inbox:folder:open', { role: entry.folder.role, account: entry.account.id, el: S.el });
 		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
 		let unfolded = S.collapsed.delete('a' + entry.account.id);
@@ -7191,7 +7320,28 @@
 			document.addEventListener('keydown', e => onKey(e, false));
 			window.addEventListener('pagehide', () => leaveFolder(true));
 			// Crossing the phone width: table or cards again
-			window.matchMedia('(max-width: 63.9375rem)').addEventListener('change', () => renderList());
+			window.matchMedia('(max-width: 63.9375rem)').addEventListener('change', () => {
+				renderList();
+				// « Automatic »: one mailbox at a time on a narrow screen, all of them on a large one
+				renderTree();
+			});
+			document.addEventListener('click', e => {
+				if (S.pickOpen && !(e.target.closest && e.target.closest('.ibx-boxpick__wrap'))) {
+					S.pickOpen = false;
+					renderTree();
+				}
+			});
+			$('.ibx-pane--folders', el).addEventListener('keydown', e => {
+				if (e.key === 'Escape' && S.pickOpen) {
+					e.stopPropagation();
+					S.pickOpen = false;
+					renderTree();
+					const b = $('[data-boxpick-toggle]', S.el);
+					if (b) {
+						b.focus();
+					}
+				}
+			});
 			document.addEventListener('visibilitychange', () => {
 				if (!document.hidden) {
 					poll();

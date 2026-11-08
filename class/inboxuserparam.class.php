@@ -116,6 +116,9 @@ class InboxUserParam
 			'dictation_consent' => array('', 'json'),
 			// Unified views (1.29.0): the ones shown in the section « Views », the mailboxes left out of them
 			'views_shown' => array('["inbox","unread","flagged","mine"]', 'json'),
+			// One mailbox at a time (1.30.0): auto (on a narrow screen), all, single; the mailbox shown
+			'tree_mode' => array('auto', array('auto', 'all', 'single')),
+			'tree_box' => array('0', 'int:0:2147483647'),
 			'unified_exclude' => array('[]', 'json'),
 		);
 	}

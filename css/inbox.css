@@ -1964,3 +1964,22 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 @media (prefers-reduced-motion: reduce) { .ibx-section.is-flash { animation: none; outline: 2px solid var(--ibx-accent); outline-offset: 0.5rem; } }
 
 .ibx-section[data-section] { scroll-margin-top: var(--ibx-s5); }
+/* One mailbox at a time (1.30.0): the selector on top of the folders, the list of the mailboxes in the panel */
+.ibx-boxpick__li { list-style: none; margin: var(--ibx-s1) 0 var(--ibx-s2); }
+.ibx-boxpick { display: flex; align-items: center; gap: var(--ibx-s1); }
+.ibx-boxpick__btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; padding: var(--ibx-s1) var(--ibx-s2);
+	font: inherit; font-weight: 600; color: var(--ibx-text); text-align: left; background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); cursor: pointer; }
+.ibx-boxpick__btn:hover { border-color: var(--ibx-accent); }
+.ibx-boxpick__btn:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+.ibx-boxpick__name { flex: 1; min-width: 0; }
+.ibx-boxpick__caret { flex: none; width: 1rem; height: 1rem; color: var(--ibx-text-muted); }
+.ibx-boxpick__wrap { position: relative; }
+/* Over the folders (they stay under it): the mailbox shown does not change before a choice */
+.ibx-boxpick__list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 0.25rem); max-height: 60vh; overflow: auto; list-style: none; margin: 0; padding: var(--ibx-s1);
+	background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-boxpick__item { width: 100%; display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; padding: var(--ibx-s1) var(--ibx-s2); font: inherit; color: var(--ibx-text); text-align: left; background: none; border: 0; border-radius: var(--ibx-radius); cursor: pointer; }
+.ibx-boxpick__item:hover, .ibx-boxpick__item:focus-visible { background: var(--ibx-bg-sunken); outline: none; }
+.ibx-boxpick__item[aria-current="true"] { font-weight: 600; background: var(--ibx-accent-softer); }
+.ibx-boxpick__item .ibx-ellipsis { flex: 1; min-width: 0; }
+@media (pointer: coarse) { .ibx-boxpick__btn, .ibx-boxpick__item { min-height: 2.75rem; } }
+
