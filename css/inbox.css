@@ -1833,3 +1833,25 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
 .ibx-infotip.is-end .ibx-infotip__pop { left: auto; right: -0.5rem; }
 .ibx-infotip__pop[hidden] { display: none; }
+/* Import of the mailboxes by QR codes (1.24.0) */
+.ibx-qr__zone { display: grid; justify-items: center; gap: var(--ibx-s2); padding: var(--ibx-s5, 1.5rem) var(--ibx-s4); margin-bottom: var(--ibx-s3); text-align: center;
+	border: 2px dashed var(--ibx-border-strong); border-radius: var(--ibx-radius); background: var(--ibx-bg-pane); }
+.ibx-qr__zone[hidden] { display: none; }
+.ibx-qr__zone:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-qr__zone.is-over { border-color: var(--ibx-accent); background: var(--ibx-accent-softer); }
+.ibx-qr__icon { width: 2.5rem; height: 2.5rem; color: var(--ibx-text-muted); }
+.ibx-qr__title { font-weight: 600; }
+.ibx-qr__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--ibx-s2); margin-top: var(--ibx-s2); }
+.ibx-notice .ibx-qr__actions { justify-content: flex-start; }
+.ibx-qr__video { width: min(100%, 24rem); border-radius: var(--ibx-radius); background: #000; }
+.ibx-qr__codes { display: grid; gap: var(--ibx-s1); margin: 0 0 var(--ibx-s3); padding: 0; list-style: none; }
+.ibx-qr__codes:empty { display: none; }
+.ibx-qr__codes li { display: flex; align-items: center; gap: var(--ibx-s2); }
+.ibx-qr__codes .ibx-icon { color: var(--ibx-success); }
+.ibx-qr__manage { margin-bottom: var(--ibx-s2); }
+.ibx-qr__tablewrap { overflow-x: auto; }
+.ibx-qr__table tr.is-off td { color: var(--ibx-text-muted); }
+.ibx-qr__owner { margin-top: var(--ibx-s1); }
+.ibx-qr__owner[hidden] { display: none; }
+.ibx-qr__table td.is-invalid .ibx-qr__owner .ibx-field { border-color: var(--ibx-danger); }
+

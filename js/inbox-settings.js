@@ -32,7 +32,6 @@
 	const rights = I.rights;
 	const isAdmin = () => !!rights().account_admin;
 
-	let importSources = null;
 
 	/** Skeleton while loading (state "loading", interface §9) */
 	function skeleton(lines) {
@@ -130,20 +129,11 @@
 		const link = (id, icon, key) => '<a class="ibx-navlink" href="#/settings/' + id + '"' + (page === id ? ' aria-current="page"' : '') + '>' + ic(icon) + ' ' + th(key) + '</a>';
 		nav.innerHTML = '<div class="ibx-settings__navtitle">' + th('InboxSettings') + '</div>'
 			+ link('accounts', 'inbox', 'InboxNavAccounts')
-			+ (isAdmin() && importSources && importSources.length ? link('import', 'download', 'InboxNavImport') : '')
+			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
 			+ '<div class="ibx-settings__navgroup">' + th('InboxNavPersonal') + '</div>'
 			+ link('me', 'account', 'InboxNavMe')
 			+ link('notifications', 'bell', 'InboxNavNotifications');
-		if (isAdmin() && importSources === null) {
-			importSources = [];
-			api('import', 'sources').then(r => {
-				importSources = r.sources;
-				if (importSources.length) {
-					renderNav(el, page);
-				}
-			}).catch(() => {});
-		}
 	}
 
 	// Helpers of the pages, for the shared modules (js/inbox-rules.js)
@@ -164,7 +154,7 @@
 		}
 		const rows = data.accounts;
 		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavAccounts') + '</h1>'
-			+ (isAdmin() && importSources && importSources.length ? '<a class="ibx-btn" href="#/settings/import">' + ic('download') + ' ' + th('InboxImportButton') + '</a>' : '')
+			+ (isAdmin() ? '<a class="ibx-btn" href="#/settings/import">' + ic('download') + ' ' + th('InboxImportButton') + '</a>' : '')
 			+ (isAdmin() ? '<a class="ibx-btn ibx-btn--primary" href="#/settings/accounts/new">' + ic('plus') + ' ' + th('InboxNewAccount') + '</a>' : '')
 			+ '</div>';
 		if (!isAdmin()) {
@@ -1727,19 +1717,19 @@
 			main.replaceChildren(errorBox(err, () => renderImport(main)));
 			return;
 		}
-		let html = '<div class="ibx-page"><a class="ibx-page__back" href="#/settings/accounts">' + ic('chevron-left') + ' ' + th('InboxNavAccounts') + '</a><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavImport') + '</h1></div>'
-			+ '<p class="ibx-page__intro">' + th('InboxImportIntro') + '</p>';
-		if (!sources.length) {
-			html += '<div class="ibx-notice">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxImportNoSource') + '</div></div></div>';
-			main.innerHTML = html;
-			return;
-		}
-		html += '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-source">' + th('InboxImportSource') + '</label><div><select class="ibx-field ibx-field--medium" id="f-source">' + sources.map(s => '<option value="' + esc(s.code) + '">' + esc(s.label) + '</option>').join('') + '</select></div></div>'
+		// The sources declared by modules first (the default one); Thunderbird (QR codes of « Export for mobile »)
+		// always there, last
+		const all = sources.concat([{ code: '', label: t('InboxImportSourceQr') }]);
+		main.innerHTML = '<div class="ibx-page"><a class="ibx-page__back" href="#/settings/accounts">' + ic('chevron-left') + ' ' + th('InboxNavAccounts') + '</a><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavImport') + '</h1></div>'
+			+ '<div class="ibx-formrow"' + (sources.length ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-source">' + th('InboxImportSource') + '</label><div><select class="ibx-field ibx-field--medium" id="f-source">' + all.map(s => '<option value="' + esc(s.code) + '">' + esc(s.label) + '</option>').join('') + '</select></div></div>'
 			+ '<div class="ibx-js-importlist" style="margin-top:1rem"></div></div>';
-		main.innerHTML = html;
 		const sel = $('#f-source', main);
 		const listBox = $('.ibx-js-importlist', main);
 		const load = async () => {
+			if (!sel.value) {
+				I.importQr.render(listBox);
+				return;
+			}
 			listBox.innerHTML = skeleton(3);
 			let accounts;
 			try {
@@ -1749,10 +1739,10 @@
 				return;
 			}
 			if (!accounts.length) {
-				listBox.innerHTML = '<div class="ibx-notice ibx-notice--info">' + ic('check') + '<div class="ibx-notice__text">' + th('InboxImportNothing') + '</div></div>';
+				listBox.innerHTML = '<p class="ibx-page__intro">' + th('InboxImportIntro') + '</p><div class="ibx-notice ibx-notice--info">' + ic('check') + '<div class="ibx-notice__text">' + th('InboxImportNothing') + '</div></div>';
 				return;
 			}
-			listBox.innerHTML = '<table class="ibx-table"><thead><tr><th><input type="checkbox" class="ibx-js-all" checked aria-label="' + th('InboxSelectAll') + '"></th><th>' + th('InboxAccount') + '</th><th>' + th('InboxImportWhat') + '</th></tr></thead><tbody>'
+			listBox.innerHTML = '<p class="ibx-page__intro">' + th('InboxImportIntro') + '</p><table class="ibx-table"><thead><tr><th><input type="checkbox" class="ibx-js-all" checked aria-label="' + th('InboxSelectAll') + '"></th><th>' + th('InboxAccount') + '</th><th>' + th('InboxImportWhat') + '</th></tr></thead><tbody>'
 				+ accounts.map(a => '<tr><td><input type="checkbox" name="email" value="' + esc(a.email) + '" checked aria-label="' + esc(a.email) + '"></td><td><b>' + esc(a.label || a.email) + '</b><div class="ibx-muted">' + esc(a.email) + '</div></td>'
 					+ '<td>' + esc(t(a.type === 'personal' ? 'InboxTypePersonal' : 'InboxTypeShared')) + ' · ' + (a.imap_host ? esc(a.imap_host) : '<span class="ibx-status ibx-status--warning">' + th('InboxImportNoServer') + '</span>')
 					+ ' · ' + esc(t(a.imap_auth_mode === 'master' ? 'InboxAuthMaster' : (a.has_password ? 'InboxImportWithPassword' : 'InboxImportNoPassword'))) + '</td></tr>').join('')

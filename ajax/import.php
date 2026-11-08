@@ -18,15 +18,16 @@
 /**
  * \file    inbox/ajax/import.php
  * \ingroup inbox
- * \brief   Import of mailboxes from the sources declared by other modules (admins of the mailboxes)
+ * \brief   Import of mailboxes: sources declared by other modules, QR codes of Thunderbird (admins of the mailboxes)
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxaccountimport.class.php');
 dol_include_once('/inbox/class/inboxservertester.class.php');
+dol_include_once('/inbox/class/inboxthunderbirdqr.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart($action === 'run');
+inboxAjaxStart(in_array($action, array('run', 'qr_read', 'qr_import'), true));
 inboxAjaxNeedAdmin();
 $import = new InboxAccountImport($db);
 
@@ -71,6 +72,46 @@ switch ($action) {
 			}
 		}
 		inboxAjaxReply(array('report' => $report, 'tests' => $tests));
+		// no break
+
+	case 'qr_read':
+		// Texts of the QR codes « Export for mobile » (the image never leaves the browser): checked here, kept encrypted
+		// in session; the passwords never go back to the browser
+		$texts = inboxAjaxParam('codes', 'none');
+		$qr = new InboxThunderbirdQr($db);
+		$read = is_array($texts) ? $qr->parseAll(array_values($texts)) : null;
+		if ($read === null) {
+			inboxAjaxError($langs->transnoentities('InboxQrError'.ucfirst($qr->error ? $qr->error : 'invalid')), 422);
+		}
+		inboxAjaxReply(array('token' => $qr->keep($read['accounts']), 'end' => $read['end'], 'read' => $read['read'], 'complete' => $read['complete'],
+			'accounts' => $qr->forClient($read['accounts'])));
+		// no break
+
+	case 'qr_import':
+		$qr = new InboxThunderbirdQr($db);
+		// One import per reading: a second click does not create twice
+		$accounts = $qr->take((string) inboxAjaxParam('qr_token', 'aZ09'));
+		$choices = inboxAjaxParam('choices', 'none');
+		if ($accounts === null || !is_array($choices)) {
+			inboxAjaxError($langs->transnoentities('InboxQrErrorExpired'), 410);
+		}
+		$tester = new InboxServerTester($db);
+		$giveManage = (bool) inboxAjaxParam('give_manage', 'int');
+		$results = array();
+		foreach ($choices as $choice) {
+			$i = is_array($choice) && isset($choice['index']) ? (int) $choice['index'] : -1;
+			if (isset($accounts[$i]) && is_array($accounts[$i])) {
+				$type = isset($choice['type']) ? (string) $choice['type'] : '';
+				$owner = isset($choice['owner']) ? (int) $choice['owner'] : 0;
+				$row = $qr->importAccount($accounts[$i], $type, $owner, $giveManage, $user, $tester);
+				if ($row !== null && $row['state'] === 'error' && $row['message'] !== '') {
+					$row['message'] = inboxAjaxTransErrors(explode(', ', $row['message']));
+				}
+				$results[] = $row;
+			}
+		}
+		InboxAccess::clearCache();
+		inboxAjaxReply(array('results' => array_values(array_filter($results))));
 		// no break
 
 	default:

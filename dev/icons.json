@@ -75,6 +75,8 @@
 		"done": ["circle-check", "outline"],
 		"mail-opened": ["mail-opened", "outline"],
 		"info": ["info-circle", "outline"],
+		"qrcode": ["qrcode", "outline"],
+		"camera": ["camera", "outline"],
 		"warning": ["alert-triangle", "outline"],
 		"check": ["check", "outline"],
 		"event-new": ["calendar-plus", "outline"],

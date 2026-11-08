@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: import of the mailboxes from the QR codes « Export for mobile » of Thunderbird :   1.24.0
+  - Settings > Import, source « Thunderbird (QR code) » after the sources of the modules (the first one stays the
+    default), always offered to the administrators of the mailboxes: a capture pasted (Ctrl+V), dropped or chosen,
+    or the camera; several codes followed (« code 1 of 3 »).
+  - the image is decoded in the browser (BarcodeDetector, else jsQR 1.4.0 embedded) and never sent; the texts of the
+    codes are checked by the server (format version 1, every value), kept encrypted in session 15 minutes, the
+    passwords never sent back to the browser.
+  - choice of the accounts (all checked except the ones already in inbox; POP3, NTLM... skipped with their reason),
+    shared or personal (owner proposed: the user with the address, else me; any user searched), « give me the
+    Manage access » checked.
+  - mailboxes with a password tested then enabled; without password or with OAuth: created inactive, to complete;
+    identities created; reminder to delete the capture and button to empty the clipboard.
 - FIX: security audit of 2026-11-08 :   1.23.1
   - a received mail could run a script through « Print »: comments and raw text elements removed from the mails, no
     tag in their CSS, printing from a hidden frame with the protections of the reading; links: web addresses only.
