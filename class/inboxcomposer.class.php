@@ -272,7 +272,7 @@ class InboxComposer
 			$out['subject'] = $message->subject;
 			$out['receipt'] = $h('Disposition-Notification-To') !== '' ? 1 : 0;
 			$identityId = (int) $h('X-Inbox-Identity');
-			$parts = self::splitDraft($message->bodyHtml !== '' ? $message->bodyHtml : nl2br(dol_escape_htmltag($message->bodyText)));
+			$parts = self::splitDraft($message->bodyHtml !== '' ? self::inlinePictures($message) : nl2br(dol_escape_htmltag($message->bodyText)));
 			$out['html'] = $parts['body'];
 			$out['signature_off'] = $parts['signature'] === '' ? 1 : 0;
 			if ($parts['quote'] !== '') {
@@ -306,7 +306,7 @@ class InboxComposer
 				}
 			}
 			$out['subject'] = (string) $message->subject;
-			$parts = self::splitDraft($message->bodyHtml !== '' ? $message->bodyHtml : nl2br(dol_escape_htmltag($message->bodyText)));
+			$parts = self::splitDraft($message->bodyHtml !== '' ? self::inlinePictures($message) : nl2br(dol_escape_htmltag($message->bodyText)));
 			$out['html'] = $parts['body'];
 			foreach ($message->getFileAttachments() as $a) {
 				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
@@ -1047,6 +1047,31 @@ class InboxComposer
 
 		return '<div class="inbox-quote"><p>'.dol_escape_htmltag($langs->transnoentities('InboxQuoteHeader', $date, $who)).'</p>'
 			.'<blockquote type="cite" style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">'.$body.'</blockquote></div>';
+	}
+
+	/**
+	 * HTML of a mail taken back in the editor (draft, edit as new): its pictures (cid:, parts of the mail) put back
+	 * as data:, as when they were pasted; the browser cannot show a cid: and they would be lost at the next save
+	 *
+	 * @param InboxMessage $message Mail
+	 * @return string HTML
+	 */
+	public static function inlinePictures($message)
+	{
+		$pictures = array();
+		foreach ($message->attachments as $a) {
+			if ((string) $a['cid'] !== '' && preg_match('#^image/(png|jpeg|gif|webp)$#i', (string) $a['mime']) && strlen((string) $a['content']) <= 5 * 1048576) {
+				$pictures[strtolower(trim((string) $a['cid'], '<>'))] = 'data:'.strtolower((string) $a['mime']).';base64,'.base64_encode((string) $a['content']);
+			}
+		}
+		if (!$pictures) {
+			return (string) $message->bodyHtml;
+		}
+
+		return (string) preg_replace_callback('#(\bsrc\s*=\s*)(["\']?)cid:([^"\'\s>]+)\2#i', function ($m) use ($pictures) {
+			$cid = strtolower(trim(rawurldecode($m[3]), '<>'));
+			return isset($pictures[$cid]) ? $m[1].'"'.$pictures[$cid].'"' : $m[0];
+		}, (string) $message->bodyHtml);
 	}
 
 	/**

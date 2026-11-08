@@ -1859,4 +1859,18 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bounce__line + .ibx-bounce__line { margin-top: var(--ibx-s1); }
 .ibx-bounce__server { font-size: var(--ibx-fs-sm); font-weight: 400; overflow-wrap: anywhere; }
 .ibx-js-bouncego { margin-top: var(--ibx-s1); font-weight: 400; }
+/* Pictures of the writing (1.25.1): corners to resize, shown on the picture selected or hovered */
+.ibx-editor__content [data-resize-container] { max-width: 100%; vertical-align: bottom; }
+.ibx-editor__content [data-resize-container] img { max-width: 100%; }
+.ibx-editor__content [data-resize-container].ProseMirror-selectednode img { outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+.ibx-editor__content [data-resize-handle] { z-index: 2; width: 0.75rem; height: 0.75rem; background: var(--ibx-accent); border: 2px solid var(--ibx-bg); border-radius: 2px; opacity: 0; transition: opacity .12s; }
+.ibx-editor__content [data-resize-container]:hover [data-resize-handle], .ibx-editor__content [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+.ibx-editor__content [data-resize-state="true"] [data-resize-handle] { opacity: 1; }
+.ibx-editor__content [data-resize-handle="top-left"] { transform: translate(-50%, -50%); cursor: nwse-resize; }
+.ibx-editor__content [data-resize-handle="bottom-right"] { transform: translate(50%, 50%); cursor: nwse-resize; }
+.ibx-editor__content [data-resize-handle="top-right"] { transform: translate(50%, -50%); cursor: nesw-resize; }
+.ibx-editor__content [data-resize-handle="bottom-left"] { transform: translate(-50%, 50%); cursor: nesw-resize; }
+.ibx-bubble[hidden] { display: none; }
+.ibx-tbtn--text { width: auto; min-width: 2.5rem; padding: 0 0.375rem; font-size: var(--ibx-fs-sm); }
+.ibx-tbtn--danger { color: var(--ibx-danger); }
 

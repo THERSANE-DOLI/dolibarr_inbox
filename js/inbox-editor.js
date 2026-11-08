@@ -96,6 +96,58 @@
 			tableMerge: () => chain().mergeOrSplit().run(),
 			tableHeader: () => chain().toggleHeaderRow().run(),
 			tableHeaderColumn: () => chain().toggleHeaderColumn().run(),
+			imageDelete: () => chain().deleteSelection().run(),
+		};
+		// ---------- Pictures (1.25.1): the one selected, its size kept as width / height (read by every mail software) ----------
+		const currentImage = () => {
+			const sel = editor ? editor.state.selection : null;
+			return sel && sel.node && sel.node.type.name === 'image' ? { node: sel.node, pos: sel.from } : null;
+		};
+		const imageElement = pos => {
+			const dom = editor.view.nodeDOM(pos);
+			return dom ? (dom.tagName === 'IMG' ? dom : dom.querySelector('img')) : null;
+		};
+		/** The picture selected: alt, size, natural size; null when none */
+		const imageInfo = () => {
+			const im = currentImage();
+			if (!im) {
+				return null;
+			}
+			const el = imageElement(im.pos);
+			return { alt: im.node.attrs.alt || '', width: im.node.attrs.width || (el ? el.offsetWidth : 0), naturalWidth: el ? el.naturalWidth : 0, naturalHeight: el ? el.naturalHeight : 0 };
+		};
+		/**
+		 * Change the picture selected: {width} (px, the height follows the proportions; 0 = its own size), {alt}
+		 * @param {object} p
+		 */
+		const imageProps = p => {
+			const im = currentImage();
+			if (!im) {
+				return;
+			}
+			const attrs = {};
+			const el = imageElement(im.pos);
+			if (p.width !== undefined) {
+				const w = Math.round(+p.width || 0);
+				const ratio = el && el.naturalWidth ? el.naturalHeight / el.naturalWidth : 0;
+				attrs.width = w > 0 ? w : null;
+				attrs.height = w > 0 && ratio ? Math.round(w * ratio) : null;
+				// The view of a resizable picture does not follow its size attributes: drawn here
+				if (el) {
+					el.style.width = attrs.width ? attrs.width + 'px' : '';
+					el.style.height = attrs.height ? attrs.height + 'px' : '';
+				}
+			}
+			if (p.alt !== undefined) {
+				attrs.alt = String(p.alt).trim();
+			}
+			editor.chain().focus().setNodeSelection(im.pos).updateAttributes('image', attrs).run();
+		};
+		/** Box of the picture selected on the screen */
+		const imageBox = () => {
+			const im = currentImage();
+			const el = im ? imageElement(im.pos) : null;
+			return el ? el.getBoundingClientRect() : null;
 		};
 		// ---------- Tables: attributes written as inline styles ----------
 		const px = v => (parseInt(v, 10) || null);
@@ -330,7 +382,8 @@
 							heading: { levels: [2, 3, 4] },
 							link: { openOnClick: false, autolink: true, protocols: ['mailto', 'tel'], HTMLAttributes: { rel: 'noopener noreferrer', target: null } },
 						}),
-						T.Image.configure({ inline: true, allowBase64: true }),
+						// Corners to resize, the proportions kept (1.25.1)
+						T.Image.configure({ inline: true, allowBase64: true, resize: { enabled: true, directions: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], minWidth: 24, minHeight: 16, alwaysPreserveAspectRatio: true } }),
 						T.Placeholder.configure({ placeholder: o.placeholder || '' }),
 						// What the mail software understand: inline colours, alignment, simple tables
 						T.TextStyle, T.Color, T.BackgroundColor,
@@ -500,7 +553,7 @@
 					listeners[ev].push(fn);
 				}
 			},
-			tableStyle, tableInfo, tableProps, cellInfo, cellProps,
+			tableStyle, tableInfo, tableProps, cellInfo, cellProps, imageInfo, imageProps, imageBox,
 			getCapabilities() {
 				return { tables: true, images: true, headings: true, colors: true, align: true, variables: true };
 			},

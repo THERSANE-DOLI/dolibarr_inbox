@@ -1282,10 +1282,99 @@
 		const items = (w.editor.isActive('table') ? tableItems(w).concat([{ sep: true }]) : []).concat(formatItems(w, x, y), [{ sep: true }, { note: t('InboxBrowserMenuSpellHint') }]);
 		popMenu(pointAnchor(w, x, y), items, { x, y });
 	}
+	/** Text of a picture for who does not see it (screen readers, pictures blocked by the mail software) */
+	function imageAltDialog(w) {
+		const info = w.editor.imageInfo();
+		if (!info) {
+			return;
+		}
+		dialog({
+			title: t('InboxImageAlt'),
+			body: '<label class="ibx-formrow__label" for="ibx-img-alt">' + th('InboxImageAltLabel') + '</label><input id="ibx-img-alt" class="ibx-field" type="text" autocomplete="off" maxlength="250" value="' + esc(info.alt) + '">'
+				+ '<p class="ibx-formrow__help">' + th('InboxImageAltHelp') + '</p>',
+			actions: [{ label: t('InboxSave'), primary: true, run: d => w.editor.imageProps({ alt: $('#ibx-img-alt', d).value }) }],
+			onOpen: d => $('#ibx-img-alt', d).focus(),
+		});
+	}
+	/**
+	 * Small bar over the picture selected (1.25.1): sizes from its own one, alignment of its line, text for who does
+	 * not see it, removal; the corners of the picture resize it by the mouse
+	 */
+	function imageBubble(w) {
+		const ed = w.editor;
+		const info = !w.sourceMode && !w.closed && ed.imageInfo ? ed.imageInfo() : null;
+		let bar = w.imgBubble;
+		if (!info || !w.dlg.contains(document.activeElement)) {
+			if (bar) {
+				bar.hidden = true;
+			}
+			return false;
+		}
+		if (!bar) {
+			bar = document.createElement('div');
+			bar.className = 'ibx-bubble ibx-bubble--image';
+			bar.setAttribute('role', 'toolbar');
+			bar.setAttribute('aria-label', t('InboxImageToolbar'));
+			bar.innerHTML = [25, 50, 75, 100].map(p => '<button type="button" class="ibx-tbtn ibx-tbtn--text" data-size="' + p + '" aria-pressed="false" title="' + esc(t('InboxImageSizeOf', p + ' %')) + '">' + p + ' %</button>').join('')
+				+ '<span class="ibx-compose__sep" aria-hidden="true"></span>'
+				+ [['left', 'fmt-align-left', 'InboxFmtAlign_left'], ['center', 'fmt-align-center', 'InboxFmtAlign_center'], ['right', 'fmt-align-right', 'InboxFmtAlign_right']]
+					.map(x => '<button type="button" class="ibx-tbtn" data-align="' + x[0] + '" aria-pressed="false" title="' + esc(t(x[2])) + '" aria-label="' + esc(t(x[2])) + '">' + ic(x[1]) + '</button>').join('')
+				+ '<span class="ibx-compose__sep" aria-hidden="true"></span>'
+				+ '<button type="button" class="ibx-tbtn" data-act="alt" title="' + esc(t('InboxImageAlt')) + '" aria-label="' + esc(t('InboxImageAlt')) + '">' + ic('rename') + '</button>'
+				+ '<button type="button" class="ibx-tbtn ibx-tbtn--danger" data-act="delete" title="' + esc(t('InboxImageDelete')) + '" aria-label="' + esc(t('InboxImageDelete')) + '">' + ic('delete') + '</button>';
+			// The picture stays selected: a click on the bar never takes the focus from the text
+			bar.addEventListener('mousedown', e => e.preventDefault());
+			bar.addEventListener('click', e => {
+				const b = e.target.closest('button');
+				if (!b) {
+					return;
+				}
+				const cur = ed.imageInfo();
+				if (b.dataset.size && cur) {
+					const p = +b.dataset.size;
+					ed.imageProps({ width: p === 100 || !cur.naturalWidth ? 0 : Math.round(cur.naturalWidth * p / 100) });
+				} else if (b.dataset.align) {
+					ed.exec('align', b.dataset.align);
+				} else if (b.dataset.act === 'alt') {
+					imageAltDialog(w);
+					return;
+				} else if (b.dataset.act === 'delete') {
+					ed.exec('imageDelete');
+				}
+				w.changed();
+				setTimeout(() => imageBubble(w), 0);
+			});
+			w.dlg.appendChild(bar);
+			w.imgBubble = bar;
+		}
+		// The size and the alignment of now pressed
+		const pct = info.naturalWidth ? Math.round(info.width / info.naturalWidth * 100) : 0;
+		$$('[data-size]', bar).forEach(b => b.setAttribute('aria-pressed', String(Math.abs(pct - +b.dataset.size) <= 1)));
+		$$('[data-align]', bar).forEach(b => b.setAttribute('aria-pressed', String(ed.isActive('align', b.dataset.align))));
+		bar.hidden = false;
+		const box = ed.imageBox();
+		if (!box) {
+			bar.hidden = true;
+			return false;
+		}
+		const win = w.dlg.getBoundingClientRect();
+		const top = box.top - win.top - bar.offsetHeight - 6;
+		bar.style.left = Math.max(4, Math.min((box.left + box.right) / 2 - win.left - bar.offsetWidth / 2, win.width - bar.offsetWidth - 4)) + 'px';
+		bar.style.top = (top < 40 ? Math.min(box.bottom - win.top + 6, win.height - bar.offsetHeight - 60) : top) + 'px';
+		return true;
+	}
+
 	/** Small bar over the selected text: the formatting at hand, the menu of the browser (spelling) stays */
 	function bubble(w) {
 		let bar = w.bubble;
 		const ed = w.editor;
+		// A picture selected has its own bar
+		if (imageBubble(w)) {
+			if (bar) {
+				bar.hidden = true;
+			}
+			return;
+		}
 		const show = !w.sourceMode && !w.closed && ed.hasSelection && ed.hasSelection() && w.dlg.contains(document.activeElement) && document.activeElement.closest('.ibx-compose__editor');
 		if (!show) {
 			if (bar) {
@@ -2036,7 +2125,7 @@
 				al.dataset.align = now;
 				al.innerHTML = ic('fmt-align-' + now);
 			}
-			if (w.bubble && !w.bubble.hidden) {
+			if ((w.bubble && !w.bubble.hidden) || (w.imgBubble && !w.imgBubble.hidden)) {
 				bubble(w);
 			}
 			$$('.ibx-compose__tools [aria-pressed]:not([data-cmd="source"]):not(.ibx-splitbtn__main)', dlg).forEach(b => b.setAttribute('aria-pressed', String(w.editor.isActive(b.dataset.cmd))));

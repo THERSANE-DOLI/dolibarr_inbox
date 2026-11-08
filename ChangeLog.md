@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a draft or « edit as new » reopened showed its pasted pictures no more (cid: put back as data:, size kept) :   1.25.3
+- FIX: pictures of the writing: corners to resize them (proportions kept), bar on the picture selected (25 to 100 %
+  of its size, alignment, alternative text, removal) :   1.25.2
+- FIX: number of drafts in grey beside the Drafts folder (count of the server, sending later left out) :   1.25.1
 - NEW: delivery reports of the mails sent (DSN) :   1.25.0
   - the standard report (multipart/report, delivery-status: Postfix, Exim, Gmail, Exchange, OVH) read per recipient:
     « Not delivered to x: this address does not exist », mailbox full, domain unknown, refused, too big, temporary;

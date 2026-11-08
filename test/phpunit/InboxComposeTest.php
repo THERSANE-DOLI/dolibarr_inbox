@@ -239,7 +239,9 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
 		$typed = array('identity' => $identity, 'to' => 'jean@client.invalid', 'subject' => 'ZzCompose draft', 'html' => '<p>Version 1</p>', 'signature' => 1, 'receipt' => 1);
 		$this->assertNotNull($c->saveDraft($this->admin, $open['token'], $typed), $c->error);
-		$typed['html'] = '<p>Version 2</p>';
+		// A picture pasted (data:), resized: a part of the mail (cid:) in the draft
+		$png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+		$typed['html'] = '<p>Version 2</p><p><img src="data:image/png;base64,'.$png.'" width="120" height="40"></p>';
 		$this->assertNotNull($c->saveDraft($this->admin, $open['token'], $typed), $c->error);
 		$this->assertCount(1, $this->onServerSubject('INBOX.Drafts', 'ZzCompose draft'), 'the previous version removed');
 
@@ -253,6 +255,11 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertSame($identity, $again['identity']);
 		$this->assertSame('jean@client.invalid', $again['to'][0]['email']);
 		$this->assertStringContainsString('Version 2', $again['html']);
+		// The picture comes back in the text, with its size, and not as an attachment (1.25.2)
+		$this->assertStringContainsString('src="data:image/png;base64,'.$png.'"', $again['html']);
+		$this->assertStringContainsString('width="120"', $again['html']);
+		$this->assertStringNotContainsString('cid:', $again['html']);
+		$this->assertCount(0, $again['attachments'] ?? array());
 		$this->assertStringNotContainsString('Service devis', $again['html'], 'the signature is not in the text');
 		$this->assertSame(1, $again['receipt']);
 		$this->assertTrue($c->close($this->admin, $again['token'], true));

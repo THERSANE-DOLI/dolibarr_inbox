@@ -369,6 +369,9 @@
 				// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
 				+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
 				+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
+				// Drafts: how many wait, in grey (they are not unread); the count of the server, the mails sending
+				// later (queue of inbox) left out (1.25.1)
+				+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
 				+ '</li>';
