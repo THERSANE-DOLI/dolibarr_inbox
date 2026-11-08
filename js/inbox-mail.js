@@ -1286,8 +1286,9 @@
 		if (!e) {
 			return '';
 		}
-		return '<span class="ibx-boxof ibx-muted">' + lookIcon(e.account.icon || 'account', e.account.color, 'ibx-boxof__icon')
-			+ '<span class="ibx-ellipsis">' + esc(boxLabel(r)) + '</span></span>';
+		// Its name in a title (shown after a moment of hover): the name gives way to the tags, the icon stays
+		return '<span class="ibx-boxof ibx-muted" title="' + esc(boxLabel(r)) + '">' + lookIcon(e.account.icon || 'account', e.account.color, 'ibx-boxof__icon')
+			+ '<span class="ibx-boxof__name ibx-ellipsis">' + esc(boxLabel(r)) + '</span></span>';
 	}
 
 	function hasFilter() {

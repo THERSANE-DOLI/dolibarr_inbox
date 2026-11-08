@@ -1,5 +1,6 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: foot of a card in a unified view: the tags first (never cut nor on two lines), the name of the mailbox gives way down to its icon, its name in the title :   1.29.1
 - NEW: unified views on top of the panel of the folders :   1.29.0
   - section « Views »: Unified inbox, Unread, Starred, Assigned to me; Sent and Drafts of every mailbox offered,
     hidden by default; the views shown chosen in its « ⋯ » menu or by a right click (on a view: open, hide it).

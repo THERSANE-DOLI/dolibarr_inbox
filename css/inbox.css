@@ -1953,6 +1953,11 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Mailbox of a mail in a list of several mailboxes (1.29.0): its icon in its colour, then its name */
 .ibx-boxof { display: inline-flex; align-items: center; gap: var(--ibx-s1); min-width: 0; max-width: 100%; vertical-align: middle; }
 .ibx-boxof__icon { flex: none; width: 0.875rem; height: 0.875rem; }
+/* In the foot of a card the tags come first: never cut nor on two lines; the name of the mailbox gives way, down to
+   its icon alone (its name in the title) */
+.ibx-mailcard__foot > .ibx-tag { flex: none; white-space: nowrap; }
+.ibx-mailcard__foot > .ibx-boxof { flex: 1 1 auto; min-width: 1rem; }
+.ibx-boxof__name { flex: 1 1 auto; min-width: 0; }
 /* A section pointed at from a menu: its background lit, then fading (1.29.0) */
 .ibx-section.is-flash { animation: ibx-flash 2.4s ease-out; border-radius: var(--ibx-radius); }
 @keyframes ibx-flash { 0%, 25% { background: var(--ibx-accent-soft); box-shadow: 0 0 0 0.5rem var(--ibx-accent-soft); } 100% { background: transparent; box-shadow: 0 0 0 0.5rem transparent; } }
