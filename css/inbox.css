@@ -711,7 +711,12 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-dialog { width: min(32rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); font-family: var(--ibx-font); font-size: var(--ibx-fs-md); }
 .ibx-dialog--wide { width: min(48rem, calc(100vw - 2rem)); }
 .ibx-dialog::backdrop { background: rgba(16, 32, 40, .45); }
+/* Open: head and foot kept in view, only the body scrolls (a long dialog never hides its title nor its buttons) */
+.ibx-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
+.ibx-dialog__head, .ibx-dialog__foot { flex: none; }
+.ibx-dialog__body { flex: 1 1 auto; min-height: 0; }
 .ibx-dialog__head { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s3) var(--ibx-s4); border-bottom: 1px solid var(--ibx-border); }
+.ibx-dialog__close { margin: calc(-1 * var(--ibx-s1)) calc(-1 * var(--ibx-s2)) calc(-1 * var(--ibx-s1)) 0; color: var(--ibx-text-muted); }
 .ibx-dialog__title { flex: 1; margin: 0; font-size: var(--ibx-fs-lg); font-weight: 600; }
 .ibx-dialog__body { padding: var(--ibx-s4); overflow: auto; }
 .ibx-dialog__foot { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s3) var(--ibx-s4); border-top: 1px solid var(--ibx-border); }
@@ -1796,6 +1801,21 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-rule__sum b { color: var(--ibx-text); font-weight: 600; }
 .ibx-rule__acts { display: flex; gap: var(--ibx-s1); }
 .ibx-rules-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin-top: var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+/* Installation guide of Meilisearch (1.32.0): parts to open, steps, commands to copy */
+.ibx-guide, .ibx-guide__body, .ibx-guide__steps { grid-template-columns: minmax(0, 1fr); }
+.ibx-guide { display: grid; gap: var(--ibx-s3); }
+.ibx-guide p { margin: 0; }
+.ibx-guide__part { border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-guide__part > summary { padding: var(--ibx-s2) var(--ibx-s3); font-weight: 600; cursor: pointer; }
+.ibx-guide__body { display: grid; gap: var(--ibx-s3); padding: 0 var(--ibx-s3) var(--ibx-s3); }
+.ibx-guide__steps { display: grid; gap: var(--ibx-s3); margin: 0; padding-left: 1.25rem; }
+.ibx-guide__steps > li { min-width: 0; }
+.ibx-guide__steps > li > p { margin-bottom: var(--ibx-s1); }
+.ibx-guide__note { color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); }
+.ibx-guide__then { margin: var(--ibx-s2) 0 0; font-size: var(--ibx-fs-body); }
+.ibx-codeblock { position: relative; }
+.ibx-codeblock > pre { margin: 0; padding: var(--ibx-s3); padding-right: 6.5rem; overflow-x: auto; font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-sm); background: var(--ibx-bg-pane); border-radius: var(--ibx-radius); }
+.ibx-codeblock > .ibx-btn { position: absolute; top: var(--ibx-s2); right: var(--ibx-s2); }
 .ibx-rules-script { margin: 0; white-space: pre-wrap; font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-sm); background: var(--ibx-bg-pane); padding: var(--ibx-s3); border-radius: var(--ibx-radius); max-height: 60vh; overflow: auto; }
 .ibx-ruled { display: grid; gap: var(--ibx-s4); }
 .ibx-ruled__block { border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-lg); padding: var(--ibx-s3); display: grid; gap: var(--ibx-s2); }

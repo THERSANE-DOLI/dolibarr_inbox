@@ -263,11 +263,18 @@
 		const dlg = document.createElement('dialog');
 		dlg.className = 'ibx-dialog' + (o.wide ? ' ibx-dialog--wide' : '');
 		dlg.setAttribute('aria-labelledby', 'ibx-dlg-title');
-		dlg.innerHTML = '<div class="ibx-dialog__head"><h2 class="ibx-dialog__title" id="ibx-dlg-title">' + esc(o.title) + '</h2></div>'
+		// Head and foot always in view, the body scrolls; a cross in the head unless it must be answered. Without
+		// action (a dialog to read), one « Close » on the right instead of « Cancel » on the left
+		const readOnly = !(o.actions || []).length;
+		const cancel = '<button type="button" class="ibx-btn ibx-js-cancel' + (readOnly ? ' ibx-btn--primary' : '') + '">' + th(readOnly ? 'InboxCloseWindow' : 'InboxCancel') + '</button>';
+		dlg.innerHTML = '<div class="ibx-dialog__head"><h2 class="ibx-dialog__title" id="ibx-dlg-title">' + esc(o.title) + '</h2>'
+			+ (o.noCancel ? '' : '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-dialog__close ibx-js-cancel" aria-label="' + th('InboxCloseWindow') + '" title="' + th('InboxCloseWindow') + '">' + ic('close') + '</button>')
+			+ '</div>'
 			+ '<div class="ibx-dialog__body">' + (o.body || '') + '</div>'
 			+ '<div class="ibx-dialog__foot">'
-			+ (o.noCancel ? '' : '<button type="button" class="ibx-btn ibx-js-cancel">' + th('InboxCancel') + '</button>')
+			+ (o.noCancel || readOnly ? '' : cancel)
 			+ '<span class="ibx-formfoot__spacer"></span>'
+			+ (!o.noCancel && readOnly ? cancel : '')
 			+ (o.actions || []).map((a, i) => '<button type="button" class="ibx-btn' + (a.primary ? ' ibx-btn--primary' : '') + (a.danger ? ' ibx-btn--danger' : '') + '" data-i="' + i + '">' + esc(a.label) + '</button>').join('')
 			+ '</div>';
 		document.body.appendChild(dlg);

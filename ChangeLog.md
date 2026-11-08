@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: Settings > General > Search, a guide to install Meilisearch :   1.33.0
+  - « How to install Meilisearch? » opens examples to adapt, after a warning: Docker Compose (advised), a quick try
+    with docker run, without Docker (program and systemd service), on another machine; then what to fill in the page.
+  - Each command copied by a button; the master key kept in a file only root can read, listening on 127.0.0.1.
+  - Every dialog: its title and its buttons stay in view, only its content scrolls; a cross at the top right closes
+    it (not on the dialogs that must be answered); a dialog only to read has one « Close » on the right.
+
 - NEW: Settings > General and My account, their sections in the menu :   1.32.0
   - Under the page open in the menu, its sections, each with its icon (also before the title of its section).
     General: Look, Defaults, Pictures of the senders, AI, Voice typing, Search, Global tags. My account: Reading,

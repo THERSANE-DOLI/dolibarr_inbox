@@ -2064,6 +2064,68 @@
 	}
 
 	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------
+	/** Version of Meilisearch tested with inbox, in the examples of the installation guide */
+	const MEILI_VERSION = 'v1.54.3';
+
+	/**
+	 * Installation guide of Meilisearch (1.32.0): examples to adapt (Docker Compose, a quick try, binary and systemd,
+	 * another machine), then what to fill in this page; a warning first, each command copied by a button
+	 */
+	function meiliGuide() {
+		const v = MEILI_VERSION;
+		const code = text => '<div class="ibx-codeblock"><pre>' + esc(text) + '</pre><button type="button" class="ibx-btn ibx-btn--sm ibx-js-copycode">' + ic('copy') + ' ' + th('InboxCopy') + '</button></div>';
+		const step = (key, text) => '<li><p>' + th(key) + '</p>' + code(text) + '</li>';
+		const part = (key, open, inner) => '<details class="ibx-guide__part"' + (open ? ' open' : '') + '><summary>' + th(key) + '</summary><div class="ibx-guide__body">' + inner + '</div></details>';
+		const keyLine = file => 'KEY=$(openssl rand -base64 32 | tr -d \'/+=\')\necho "MEILI_MASTER_KEY=$KEY" | sudo tee ' + file + ' >/dev/null\nsudo chmod 600 ' + file;
+		const body = '<div class="ibx-guide">'
+			+ '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxMeiliGuideWarn') + '</div></div>'
+			+ '<p>' + th('InboxMeiliGuideIntro') + '</p>'
+			+ part('InboxMeiliGuideDocker', true, '<ol class="ibx-guide__steps">'
+				+ step('InboxMeiliGuideStepKey', 'sudo mkdir -p /opt/meilisearch && cd /opt/meilisearch\n' + keyLine('.env'))
+				+ step('InboxMeiliGuideStepCompose', '# /opt/meilisearch/docker-compose.yml\nservices:\n  meilisearch:\n    image: getmeili/meilisearch:' + v + '\n    restart: unless-stopped\n    environment:\n      MEILI_ENV: production\n      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}\n      MEILI_NO_ANALYTICS: "true"\n    ports:\n      - "127.0.0.1:7700:7700"   # this server only, never Internet\n    volumes:\n      - meili_data:/meili_data\n\nvolumes:\n  meili_data:')
+				+ step('InboxMeiliGuideStepStart', 'cd /opt/meilisearch\nsudo docker compose up -d\ncurl -s http://127.0.0.1:7700/health   # {"status":"available"}\nsudo cat .env                          # the master key, for this page')
+				+ '</ol><p class="ibx-guide__note">' + th('InboxMeiliGuideVersion', v) + '</p>')
+			+ part('InboxMeiliGuideTry', false, '<p>' + th('InboxMeiliGuideTryText') + '</p>'
+				+ code('docker run -d --name meili-test -p 127.0.0.1:7700:7700 \\\n  -e MEILI_MASTER_KEY=a-test-key-of-at-least-16-bytes \\\n  -e MEILI_NO_ANALYTICS=true \\\n  getmeili/meilisearch:' + v + '\n\n# Afterwards\ndocker rm -f meili-test'))
+			+ part('InboxMeiliGuideBinary', false, '<ol class="ibx-guide__steps">'
+				+ step('InboxMeiliGuideStepBinary', '# Linux x86_64; other systems: github.com/meilisearch/meilisearch/releases\nsudo useradd --system --home-dir /var/lib/meilisearch --create-home meilisearch\nsudo curl -fL -o /usr/local/bin/meilisearch \\\n  https://github.com/meilisearch/meilisearch/releases/download/' + v + '/meilisearch-linux-amd64\nsudo chmod 755 /usr/local/bin/meilisearch')
+				+ step('InboxMeiliGuideStepService', '# /etc/systemd/system/meilisearch.service\n[Unit]\nDescription=Meilisearch\nAfter=network.target\n\n[Service]\nUser=meilisearch\nWorkingDirectory=/var/lib/meilisearch\nEnvironmentFile=/etc/meilisearch.env\nExecStart=/usr/local/bin/meilisearch --env production --no-analytics \\\n  --http-addr 127.0.0.1:7700 --db-path /var/lib/meilisearch/data\nRestart=on-failure\n\n[Install]\nWantedBy=multi-user.target')
+				+ step('InboxMeiliGuideStepKeyStart', keyLine('/etc/meilisearch.env') + '\nsudo systemctl daemon-reload\nsudo systemctl enable --now meilisearch\ncurl -s http://127.0.0.1:7700/health   # {"status":"available"}\nsudo cat /etc/meilisearch.env          # the master key, for this page')
+				+ '</ol>')
+			+ part('InboxMeiliGuideRemote', false, '<p>' + th('InboxMeiliGuideRemoteText') + '</p>')
+			+ '<h3 class="ibx-guide__then">' + th('InboxMeiliGuideThen') + '</h3><p>' + th('InboxMeiliGuideThenText') + '</p>'
+			+ '</div>';
+		const dlg = dialog({ title: t('InboxMeiliGuideTitle'), wide: true, body });
+		dlg.addEventListener('click', async ev => {
+			const b = ev.target.closest('.ibx-js-copycode');
+			if (!b) {
+				return;
+			}
+			const text = $('pre', b.parentElement).textContent;
+			try {
+				await navigator.clipboard.writeText(text);
+			} catch (err) {
+				// No clipboard API outside https: the text selected, for Ctrl+C
+				const range = document.createRange();
+				range.selectNodeContents($('pre', b.parentElement));
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+				said(b, 'InboxCodeSelected');
+				return;
+			}
+			said(b, 'InboxCodeCopied');
+		});
+		// Said in the button (a toast would be under the dialog), then back to « Copy »
+		function said(b, key) {
+			b.innerHTML = ic('check') + ' ' + th(key);
+			clearTimeout(b.again);
+			b.again = setTimeout(() => {
+				b.innerHTML = ic('copy') + ' ' + th('InboxCopy');
+			}, 2000);
+		}
+	}
+
 	/**
 	 * Section of Settings > General: off by default; address, master key (never sent back), prefix; test; on (the
 	 * key of inbox is created, limited to the indexes of the prefix) or off (every index of the prefix removed)
@@ -2077,7 +2139,8 @@
 			return;
 		}
 		const on = !!s.enabled;
-		sec.innerHTML = sectionTitle(GENERAL_SECTIONS, 'search') + '<p class="ibx-section__help">' + th('InboxMeiliHelp') + '</p>'
+		sec.innerHTML = sectionTitle(GENERAL_SECTIONS, 'search') + '<p class="ibx-section__help">' + th('InboxMeiliHelp')
+			+ ' <button type="button" class="ibx-linkbtn ibx-js-ftguide">' + th('InboxMeiliGuideLink') + '</button></p>'
 			+ '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>' + (on ? '<span class="ibx-status ibx-status--ok">' + th('InboxMeiliOn') + '</span>' : '<span class="ibx-status">' + th('InboxMeiliOff') + '</span>')
 			+ '<div class="ibx-formrow__help">' + th(on ? 'InboxMeiliOnHelp' : 'InboxMeiliOffHelp') + '</div></div></div>'
@@ -2092,6 +2155,7 @@
 			+ (on ? '<span class="ibx-formfoot__spacer"></span><button type="button" class="ibx-btn ibx-btn--danger ibx-js-ftoff">' + th('InboxMeiliDisable') + '</button>'
 				: '<button type="button" class="ibx-btn ibx-js-fttest">' + th('InboxMeiliTest') + '</button><span class="ibx-formfoot__spacer"></span><button type="button" class="ibx-btn ibx-btn--primary ibx-js-fton">' + th('InboxMeiliEnable') + '</button>')
 			+ '</div>';
+		$('.ibx-js-ftguide', sec).addEventListener('click', meiliGuide);
 		const result = $('.ibx-js-ftresult', sec);
 		const values = () => ({ url: $('#ft-url', sec).value.trim(), key: $('#ft-key', sec).value, prefix: $('#ft-prefix', sec).value.trim() });
 		// The key kept is only used for the address it was kept with (audit INBX-003): another address asks it again
