@@ -60,6 +60,13 @@ function inboxAccountFromInput(InboxAccount $account)
 	if ((int) $account->fk_user_owner <= 0) {
 		$account->fk_user_owner = null;
 	}
+	// Copy of the mails sent (1.26.0): kept in the settings of the connector
+	if (inboxAjaxHas('sent_copy')) {
+		$mode = (string) inboxAjaxParam('sent_copy', 'aZ09');
+		$config = $account->getConnectorConfig();
+		$config['sent_copy'] = in_array($mode, array('auto', 'inbox', 'server'), true) ? $mode : 'auto';
+		$account->setConnectorConfig($config);
+	}
 	// A password field left empty keeps the stored password; it is never sent back to the browser
 	$imapPassword = (string) inboxAjaxParam('imap_password', 'none');
 	if ($imapPassword !== '') {

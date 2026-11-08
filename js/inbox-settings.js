@@ -557,6 +557,8 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSmtpCredentials') + '</span><div><label class="ibx-check"><input type="checkbox" name="smtp_same_credentials"' + (a.smtp_same_credentials ? ' checked' : '') + '> ' + th('InboxSmtpSameCredentials') + '</label></div></div>'
 			+ field('smtp_login', t('InboxSmtpLogin'), a.smtp_login, { hidden: !!a.smtp_same_credentials, autocomplete: 'off', placeholder: t('InboxLoginDefault'), cls: 'ibx-field--medium' })
 			+ '<div class="ibx-formrow" data-field="smtp_password"' + (a.smtp_same_credentials ? ' hidden' : '') + '><label class="ibx-formrow__label" for="f-smtp_password">' + th('InboxPassword') + '</label><div><input class="ibx-field ibx-field--medium" id="f-smtp_password" name="smtp_password" type="password" autocomplete="new-password" placeholder="' + (a.has_smtp_password ? th('InboxPasswordKept') : '') + '"></div></div>'
+			// Copy of the mails sent (1.26.0): some sending servers file it themselves
+			+ field('sent_copy', t('InboxSentCopy'), (a.connector_config && a.connector_config.sent_copy) || 'auto', { options: [['auto', t('InboxSentCopy_auto')], ['inbox', t('InboxSentCopy_inbox')], ['server', t('InboxSentCopy_server')]], help: t('InboxSentCopyHelp'), cls: 'ibx-field--medium' })
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMore') + '</h2><div class="ibx-form">'
 			+ field('sieve_port', t('InboxSievePort'), a.sieve_port, { type: 'number', min: 0, max: 65535, inputmode: 'numeric', help: t('InboxSievePortHelp'), cls: 'ibx-field--narrow' })
@@ -1087,9 +1089,11 @@
 	async function templateDialog(account, list, id, done) {
 		let tp = { id: 0, label: '', subject: '', html: '', private: 0, active: 1, accounts: [account.id] };
 		let keys;
+		let langs = [];
 		try {
 			const r = id ? await api('template', 'get', { template: id }) : await api('template', 'keys', {});
 			keys = r.keys;
+			langs = r.langs || [];
 			if (id) {
 				tp = r.template;
 			}
@@ -1111,6 +1115,14 @@
 			+ '<label class="ibx-sr-only" for="ibx-tpl-var">' + th('InboxVarInsert') + '</label><select class="ibx-field ibx-field--medium ibx-js-var" id="ibx-tpl-var"><option value="">' + th('InboxVarInsert') + '</option>' + keys.map(k => '<option value="' + esc(k) + '">' + esc(k) + '</option>').join('') + '</select></div>'
 			+ '<div class="ibx-tpledit__editor ibx-js-tpleditor" aria-labelledby="ibx-tpl-body-label"></div>'
 			+ '<div class="ibx-formrow__help">' + th('InboxTemplateBodyHelp') + '</div></div></div>'
+			// Language (1.26.0): the values of the variables (dates, amounts, labels) are written in it
+			+ field('lang', t('InboxTemplateLang'), tp.lang || '', { options: [['', t('InboxTemplateLangAny')]].concat(langs.map(l => [l.code, l.label])), help: t('InboxTemplateLangHelp'), cls: 'ibx-field--medium' })
+			// Preview for a recipient (1.26.0): the subject and the text filled as the writing would fill them
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-tpl-prevto">' + th('InboxTemplatePreview') + '</label><div>'
+			+ '<div class="ibx-inline"><input class="ibx-field ibx-field--medium" id="ibx-tpl-prevto" type="email" inputmode="email" autocomplete="off" spellcheck="false" placeholder="' + th('InboxTemplatePreviewTo') + '">'
+			+ '<button type="button" class="ibx-btn ibx-js-tplprev">' + ic('open') + ' ' + th('InboxTemplatePreviewRun') + '</button></div>'
+			+ '<div class="ibx-formrow__help">' + th('InboxTemplatePreviewHelp') + '</div>'
+			+ '<div class="ibx-tpledit__preview ibx-js-tplprevbox" hidden></div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxOptions') + '</span><div><label class="ibx-check"><input type="checkbox" name="active"' + (tp.active ? ' checked' : '') + '> ' + th('InboxTemplateActive') + '</label></div></div>'
 			+ '</form>';
 		let editor = null;
@@ -1132,7 +1144,7 @@
 					return false;
 				}
 				try {
-					await post('template', 'save', { template: tp.id, label, subject: f.elements.subject.value, html: editor ? editor.getHtml() : tp.html, private: w === 'me' ? 1 : 0, accounts, active: f.elements.active.checked ? 1 : 0 });
+					await post('template', 'save', { template: tp.id, label, subject: f.elements.subject.value, html: editor ? editor.getHtml() : tp.html, private: w === 'me' ? 1 : 0, accounts, active: f.elements.active.checked ? 1 : 0, lang: f.elements.lang.value });
 				} catch (err) {
 					toast(err.message, { error: true });
 					return false;
@@ -1162,6 +1174,30 @@
 				editor.insertVariable(e.target.value, '');
 				e.target.value = '';
 				editor.focus();
+			}
+		});
+		// Preview: in the mailbox of the tab, for the recipient typed (or none: the variables of the company and the user)
+		const prevBox = $('.ibx-js-tplprevbox', dlg);
+		const runPreview = async () => {
+			const f = $('form', dlg);
+			prevBox.hidden = false;
+			prevBox.innerHTML = '<p class="ibx-muted">' + th('InboxTemplatePreviewLoading') + '</p>';
+			let r;
+			try {
+				r = (await post('template', 'preview', { account: account.id, to: $('#ibx-tpl-prevto', dlg).value.trim(), lang: f.elements.lang.value, subject: f.elements.subject.value, html: editor.getHtml() })).preview;
+			} catch (err) {
+				prevBox.innerHTML = '<p class="ibx-formrow__error">' + esc(err.message) + '</p>';
+				return;
+			}
+			// Cleaned by the allow list of the mails on the server (no script, no event, no remote style)
+			prevBox.innerHTML = '<div class="ibx-tpledit__prevsubject"><span class="ibx-muted">' + th('InboxSubject') + ' :</span> <b>' + esc(r.subject) + '</b></div><div class="ibx-tpledit__prevbody"></div>';
+			$('.ibx-tpledit__prevbody', prevBox).innerHTML = r.html;
+		};
+		$('.ibx-js-tplprev', dlg).addEventListener('click', runPreview);
+		$('#ibx-tpl-prevto', dlg).addEventListener('keydown', e => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				runPreview();
 			}
 		});
 	}

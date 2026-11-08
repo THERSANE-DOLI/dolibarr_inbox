@@ -1873,4 +1873,38 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bubble[hidden] { display: none; }
 .ibx-tbtn--text { width: auto; min-width: 2.5rem; padding: 0 0.375rem; font-size: var(--ibx-fs-sm); }
 .ibx-tbtn--danger { color: var(--ibx-danger); }
+/* Preview of a template (1.26.0) */
+.ibx-tpledit__preview { margin-top: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg-pane); }
+.ibx-tpledit__preview[hidden] { display: none; }
+.ibx-tpledit__prevsubject { padding-bottom: var(--ibx-s2); margin-bottom: var(--ibx-s2); border-bottom: 1px solid var(--ibx-border); }
+.ibx-tpledit__prevbody { max-height: 20rem; overflow: auto; overflow-wrap: anywhere; }
+.ibx-tpledit__prevbody img { max-width: 100%; height: auto; }
+/* Answer at hand in the foot of the reading, on the line of the attachments (1.26.0) */
+.ibx-attbar { container-type: inline-size; }
+.ibx-quickreply { display: flex; flex: none; gap: var(--ibx-s1); }
+.ibx-quickreply .ibx-btn { gap: var(--ibx-s1); }
+.ibx-attbar__head .ibx-quickreply + .ibx-attbar__toggle { margin-left: var(--ibx-s2); padding-left: var(--ibx-s3); border-left: 1px solid var(--ibx-border); border-radius: 0; }
+.ibx-convo > .ibx-convo__foot { order: 5; margin-top: auto; }
+.ibx-attbar .ibx-js-saveall { flex: none; gap: var(--ibx-s1); }
+/* The count and the size never break; the names give way first */
+.ibx-attbar__toggle > b, .ibx-attbar__toggle > span:not(.ibx-attbar__names) { flex: none; white-space: nowrap; }
+.ibx-attbar__toggle { overflow: hidden; }
+@container (max-width: 44rem) { .ibx-quickreply__label { display: none; } }
+@container (max-width: 34rem) {
+	.ibx-attbar__names, .ibx-attbar__savelabel { display: none; }
+}
+/* Narrow (under about 420 px): two clean lines, the answers above, the attachments under them */
+@container (max-width: 26rem) {
+	.ibx-attbar__head { flex-wrap: wrap; row-gap: var(--ibx-s1); }
+	.ibx-attbar__head > .ibx-quickreply { flex: 1 0 100%; }
+	.ibx-attbar__head .ibx-quickreply + .ibx-attbar__toggle { margin-left: 0; padding-left: var(--ibx-s1); border-left: 0; }
+}
+/* Answers alone (no attachment): the buttons at their full size, with their names while there is room */
+.ibx-attbar--answers .ibx-quickreply { gap: var(--ibx-s2); }
+.ibx-attbar--answers .ibx-btn { height: 2rem; padding: 0 var(--ibx-s3); font-size: var(--ibx-fs-body); }
+@container (max-width: 44rem) { .ibx-attbar--answers .ibx-quickreply__label { display: inline; } }
+@container (max-width: 20rem) { .ibx-attbar--answers .ibx-quickreply__label { display: none; } }
+/* Fingers: targets of 44 px */
+@media (pointer: coarse) { .ibx-attbar .ibx-btn { height: 2.75rem; min-width: 2.75rem; justify-content: center; } }
+@media print { .ibx-quickreply, .ibx-convo__foot { display: none; } }
 

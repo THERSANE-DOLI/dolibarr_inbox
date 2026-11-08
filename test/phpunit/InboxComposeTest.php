@@ -212,6 +212,20 @@ class InboxComposeTest extends InboxImapTestCase
 		// The writing is gone: sending it again is refused
 		$this->assertNull($c->send($this->admin, $open['token'], array('identity' => $identity, 'to' => 'x@inbox-test.invalid')));
 		$this->assertSame('not_found', $c->errorCode);
+
+		// A forward: the keyword $Forwarded on the server and in the index, not \Answered (1.26.0)
+		$m2 = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE message_id = 'm2".self::MARK."'");
+		$fwd = $c->open($this->admin, 'forward', (int) $m2->rowid);
+		$this->assertNotNull($fwd, $c->errorCode.' '.$c->error);
+		$this->assertNotNull($c->send($this->admin, $fwd['token'], array('identity' => $identity, 'to' => 'loin@inbox-test.invalid', 'subject' => 'ZzCompose fwd',
+			'html' => '<p>Pour info</p>', 'quote' => 1, 'signature' => 0)), $c->errorCode.' '.$c->error);
+		$uids = $this->onServer('INBOX.ZzActA', 'm2');
+		$flags = $this->flagsOnServer('INBOX.ZzActA', $uids[0]);
+		$this->assertStringContainsString('$Forwarded', $flags);
+		$this->assertStringNotContainsString('Answered', $flags);
+		$row = $this->db->getRow("SELECT answered, keywords FROM ".$p."inbox_mail WHERE rowid = ".((int) $m2->rowid));
+		$this->assertSame(0, (int) $row->answered);
+		$this->assertStringContainsString('$Forwarded', (string) $row->keywords);
 	}
 
 	/**
@@ -406,6 +420,18 @@ class InboxComposeTest extends InboxImapTestCase
 		$other = $tpl->save($this->admin, array('label' => 'ZzTpl elsewhere', 'subject' => 'x', 'html' => '<p>x</p>', 'accounts' => array(999999)));
 		$this->assertGreaterThan(0, $other);
 
+		// Language and preview of a template (1.26.0)
+		$this->assertSame($id, $tpl->save($this->admin, array('id' => $id, 'label' => 'ZzTpl hello', 'subject' => 'ZzCompose __CONTACT_FIRSTNAME__', 'accounts' => array((int) $a->id),
+			'html' => '<p>Bonjour <span data-inbox-var="CONTACT_FIRSTNAME"></span> de __THIRDPARTY_NAME__</p>', 'lang' => 'de_DE')));
+		$this->assertSame('de_DE', $tpl->get($this->admin, $id)['lang']);
+		$this->assertSame($id, $tpl->save($this->admin, array('id' => $id, 'label' => 'ZzTpl hello', 'subject' => 'ZzCompose __CONTACT_FIRSTNAME__', 'accounts' => array((int) $a->id),
+			'html' => '<p>Bonjour <span data-inbox-var="CONTACT_FIRSTNAME"></span> de __THIRDPARTY_NAME__</p>', 'lang' => "fr_FR' OR 1")));
+		$this->assertSame('', $tpl->get($this->admin, $id)['lang'], 'a bad language is not kept');
+		$prev = $tpl->preview($this->admin, (int) $a->id, 'jean@client-tpl.invalid', '', 'Pour __CONTACT_FIRSTNAME__', '<p>Bonjour <span data-inbox-var="CONTACT_FIRSTNAME"></span><img src=x onerror=alert(1)></p>');
+		$this->assertSame('Pour Jean', $prev['subject']);
+		$this->assertStringContainsString('Jean', $prev['html']);
+		$this->assertStringNotContainsString('onerror', $prev['html'], 'cleaned as a mail');
+
 		// Offered in the mailbox it is attached to only; values of the first recipient
 		$c = new InboxComposer($this->db);
 		$open = $c->open($this->admin, 'new', 0, (int) $a->id);
@@ -483,6 +509,19 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertNotNull($res, $c->errorCode.' '.$c->error);
 		$this->assertSame('Pour inboxtest_piece', $res['subject']);
 		$this->assertStringContainsString('>inboxtest_piece</span>', $res['html']);
+
+		// A template for every type (1.26.0): offered, used with the variables of the piece or without a piece
+		$this->db->query("INSERT INTO ".$p."c_email_templates (entity, type_template, label, private, active, enabled, topic, content, joinfiles) VALUES (1, 'all', 'ZzTpl all', 0, 1, '1', 'Bonjour __THIRDPARTY_NAME__', 'Texte pour tous', 0)");
+		$allId = (int) $this->db->last_insert_id($p.'c_email_templates');
+		$groups = $c->templates($this->admin, $open['token'], $identity);
+		$all = array_values(array_filter($groups, function ($g) {
+			return $g['type'] === 'all';
+		}));
+		$this->assertContains($allId, array_column($all[0]['templates'], 'id'));
+		$res = $c->applyTemplate($this->admin, $open['token'], $allId, $identity, 'societe:'.$socid, '');
+		$this->assertNotNull($res, $c->errorCode.' '.$c->error);
+		$this->assertSame('Bonjour inboxtest_piece', $res['subject']);
+		$this->assertNotNull($c->applyTemplate($this->admin, $open['token'], $allId, $identity, '', ''), 'without a piece');
 
 		// Documents of the piece: listed, attached; nothing outside its folder
 		$dir = $conf->societe->multidir_output[1].'/'.$socid;

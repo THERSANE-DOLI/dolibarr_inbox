@@ -735,6 +735,42 @@ class InboxAccount extends CommonObject
 	}
 
 	/**
+	 * Who puts the copy of a mail sent in Sent (1.26.0): « auto » (default), « inbox », « server ». Some sending
+	 * servers file the copy themselves (Gmail, Microsoft 365): a copy by inbox would be a second one.
+	 *
+	 * @return string auto, inbox or server
+	 */
+	public function getSentCopyMode()
+	{
+		$config = $this->getConnectorConfig();
+		$mode = isset($config['sent_copy']) ? (string) $config['sent_copy'] : 'auto';
+
+		return in_array($mode, array('auto', 'inbox', 'server'), true) ? $mode : 'auto';
+	}
+
+	/**
+	 * @return bool The sending server files the copy in Sent itself (inbox does not put one)
+	 */
+	public function sentCopyByServer()
+	{
+		$mode = $this->getSentCopyMode();
+		if ($mode !== 'auto') {
+			return $mode === 'server';
+		}
+
+		return self::serverKeepsSent($this->getSmtpHost());
+	}
+
+	/**
+	 * @param string $host Sending server
+	 * @return bool A server known to file the copy of what it sends in Sent
+	 */
+	public static function serverKeepsSent($host)
+	{
+		return (bool) preg_match('/(^|\.)(gmail\.com|googlemail\.com|office365\.com|outlook\.com)$/i', trim((string) $host, " .[]"));
+	}
+
+	/**
 	 * @return array<string,mixed> Settings of the connector
 	 */
 	public function getConnectorConfig()

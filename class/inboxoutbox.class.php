@@ -245,7 +245,10 @@ class InboxOutbox
 		$composer = new InboxComposer($this->db);
 		$roles = array('sent' => $composer->roleFolder($account, 'sent'), 'drafts' => $composer->roleFolder($account, 'drafts'));
 		$sentCopy = 0;
-		if ($roles['sent'] !== '') {
+		if ($account->sentCopyByServer()) {
+			// The sending server filed the copy itself (1.26.0): a copy by inbox would be a second one
+			$sentCopy = 2;
+		} elseif ($roles['sent'] !== '') {
 			$sentCopy = $connector->importRaw($roles['sent'], $raw, array('\\Seen')) !== null ? 1 : 0;
 			if (!$sentCopy) {
 				dol_syslog(__METHOD__.' copy in Sent failed: '.$connector->getError(), LOG_WARNING);
@@ -253,8 +256,10 @@ class InboxOutbox
 		}
 		$this->db->query("UPDATE ".$p."inbox_outbox SET sent_copy = ".$sentCopy." WHERE rowid = ".((int) $id));
 		$source = $actions['source'] ?? null;
-		if ($source && !in_array($source['mode'], array('forward', 'forward_attach'), true) && (int) ($source['mail'] ?? 0) > 0) {
-			$composer->markAnswered($author, $source, (int) $account->id === (int) $source['account'] ? $connector : null);
+		if ($source && (int) ($source['mail'] ?? 0) > 0) {
+			// Answered: \Answered; forwarded: the keyword $Forwarded, the one Thunderbird and the other software read
+			$forward = in_array($source['mode'], array('forward', 'forward_attach'), true);
+			$composer->markAnswered($author, $source, (int) $account->id === (int) $source['account'] ? $connector : null, $forward);
 		}
 		if (!empty($actions['draft'])) {
 			$composer->removeDraft($actions['draft'], $connector, (int) $account->id, $author);

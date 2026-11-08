@@ -115,6 +115,15 @@ class InboxTemplates
 			." OR EXISTS (SELECT 1 FROM ".$p."inbox_template_account as ta2 WHERE ta2.fk_template = t.rowid AND ta2.fk_account = ".((int) $accountId)."))"
 			." ORDER BY t.private, t.position, t.label LIMIT 200");
 		$groups[] = array('type' => self::TYPE, 'kind' => $langs->transnoentities('InboxTemplatesOfMailbox'), 'templates' => self::rowsView($rows), 'pieces' => array_values($linked));
+		// Templates of Dolibarr for every type (1.26.0): offered in every writing, with the variables of a linked piece
+		$rows = $this->db->getRows("SELECT t.rowid, t.label, t.lang, t.private, t.module FROM ".$p."c_email_templates as t WHERE t.type_template = 'all'"
+			." AND t.active = 1".$this->visibleSql($user)." ORDER BY t.position, t.lang, t.label LIMIT 200");
+		$rows = array_filter(is_array($rows) ? $rows : array(), function ($r) {
+			return empty($r->module) || isModEnabled((string) $r->module);
+		});
+		if ($rows) {
+			$groups[] = array('type' => 'all', 'kind' => $langs->transnoentities('InboxTemplatesAllTypes'), 'templates' => self::rowsView($rows), 'pieces' => array_values($linked));
+		}
 		$byType = array();
 		foreach ($linked as $pc) {
 			if (isset(self::PIECE_TYPES[$pc['type']])) {
@@ -173,6 +182,10 @@ class InboxTemplates
 		}
 		if (!empty($t->module) && !isModEnabled((string) $t->module)) {
 			return null;
+		}
+		// For every type: usable with or without a piece (1.26.0)
+		if ((string) $t->type_template === 'all') {
+			return $t;
 		}
 
 		return $pieceType !== '' && (self::PIECE_TYPES[$pieceType] ?? '') === (string) $t->type_template ? $t : null;
@@ -287,6 +300,40 @@ class InboxTemplates
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Preview of a template being written (1.26.0): its subject and its text filled for a recipient, in a mailbox,
+	 * in a language, as the writing would fill them
+	 *
+	 * @param User   $user      User
+	 * @param int    $accountId Mailbox (its default identity signs), 0 for none
+	 * @param string $to        Recipient
+	 * @param string $lang      Language ('' = the one of the user)
+	 * @param string $subject   Subject of the template
+	 * @param string $html      Text of the template (as the editor gives it)
+	 * @return array{subject:string,html:string}
+	 */
+	public function preview(User $user, $accountId, $to, $lang, $subject, $html)
+	{
+		$ctx = array('to' => (string) $to, 'lang' => preg_match('/^[a-z]{2,3}_[A-Z]{2,3}$/', (string) $lang) ? (string) $lang : '');
+		$access = new InboxAccess($this->db);
+		if ($accountId > 0 && $access->getLevel($user, (int) $accountId) !== InboxAccess::LEVEL_NONE) {
+			require_once __DIR__.'/inboxidentity.class.php';
+			$account = new InboxAccount($this->db);
+			if ($account->fetch((int) $accountId) > 0) {
+				$ctx['mailbox'] = (string) $account->email;
+				$ids = (new InboxIdentity($this->db))->listForAccount((int) $accountId, true);
+				if ($ids) {
+					$ctx['identity'] = array('name' => (string) $ids[0]->name, 'email' => (string) $ids[0]->email, 'signature' => (string) $ids[0]->signature);
+				}
+			}
+		}
+		$values = $this->values($user, $ctx);
+		// As a writing shows it: the variables with their value (an HTML value, a signature, kept), then cleaned
+		$content = self::toEditor(self::fromEditor((string) $html), $values);
+
+		return array('subject' => self::fill(InboxMimeParser::clean((string) $subject), $values), 'html' => InboxMailBuilder::cleanHtml($content));
 	}
 
 	/**
@@ -558,15 +605,18 @@ class InboxTemplates
 		}
 		$subject = dol_trunc(InboxMimeParser::clean((string) ($data['subject'] ?? '')), 998, 'right', 'UTF-8', 1);
 		$content = self::fromEditor((string) ($data['html'] ?? ''));
+		// Language of the template (1.26.0): '' = every language, else a code of Dolibarr (fr_FR)
+		$lang = (string) ($data['lang'] ?? '');
+		$lang = preg_match('/^[a-z]{2,3}_[A-Z]{2,3}$/', $lang) ? $lang : '';
 		$active = array_key_exists('active', $data) ? (!empty($data['active']) ? 1 : 0) : 1;
 		$this->db->begin();
 		if ($id > 0) {
 			$ok = $this->db->query("UPDATE ".$p."c_email_templates SET label = '".$this->db->escape($label)."', topic = '".$this->db->escape($subject)."', content = '".$this->db->escape($content)."',"
-				." private = ".$private.", fk_user = ".($private ? (int) $user->id : "NULL").", active = ".$active." WHERE rowid = ".$id);
+				." private = ".$private.", fk_user = ".($private ? (int) $user->id : "NULL").", active = ".$active.", lang = '".$this->db->escape($lang)."' WHERE rowid = ".$id);
 		} else {
 			$pos = (int) $this->db->getRow("SELECT MAX(position) as m FROM ".$p."c_email_templates WHERE type_template = '".self::TYPE."'")->m;
 			$ok = $this->db->query("INSERT INTO ".$p."c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, topic, content)"
-				." VALUES (".((int) $conf->entity).", 'inbox', '".self::TYPE."', '', ".$private.", ".($private ? (int) $user->id : "NULL").", '".$this->db->idate(dol_now())."', '".$this->db->escape($label)."', ".($pos + 1).", ".$active.", '1',"
+				." VALUES (".((int) $conf->entity).", 'inbox', '".self::TYPE."', '".$this->db->escape($lang)."', ".$private.", ".($private ? (int) $user->id : "NULL").", '".$this->db->idate(dol_now())."', '".$this->db->escape($label)."', ".($pos + 1).", ".$active.", '1',"
 				." '".$this->db->escape($subject)."', '".$this->db->escape($content)."')");
 			$id = $ok ? (int) $this->db->last_insert_id($p.'c_email_templates') : 0;
 		}

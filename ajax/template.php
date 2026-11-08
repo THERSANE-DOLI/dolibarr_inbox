@@ -25,7 +25,7 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxtemplates.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('save', 'delete', 'order'), true));
+inboxAjaxStart(in_array($action, array('save', 'delete', 'order', 'preview'), true));
 $templates = new InboxTemplates($db);
 
 /**
@@ -62,6 +62,23 @@ function inboxTemplateAccounts()
 	return $out;
 }
 
+/**
+ * Languages of Dolibarr, for the language of a template
+ *
+ * @return array<int,array{code:string,label:string}>
+ */
+function inboxTemplateLangs()
+{
+	global $langs;
+
+	$out = array();
+	foreach ($langs->get_available_languages(DOL_DOCUMENT_ROOT, 0, 0) as $code => $label) {
+		$out[] = array('code' => (string) $code, 'label' => (string) $label);
+	}
+
+	return $out;
+}
+
 switch ($action) {
 	case 'list':
 		// Tab Templates of a mailbox: managers of the mailbox
@@ -74,10 +91,10 @@ switch ($action) {
 		if ($res === null) {
 			inboxTemplateFail($templates);
 		}
-		inboxAjaxReply(array('template' => $res, 'keys' => InboxTemplates::keys(), 'accounts' => inboxTemplateAccounts()));
+		inboxAjaxReply(array('template' => $res, 'keys' => InboxTemplates::keys(), 'accounts' => inboxTemplateAccounts(), 'langs' => inboxTemplateLangs()));
 		// no break
 	case 'keys':
-		inboxAjaxReply(array('keys' => InboxTemplates::keys(), 'accounts' => inboxTemplateAccounts()));
+		inboxAjaxReply(array('keys' => InboxTemplates::keys(), 'accounts' => inboxTemplateAccounts(), 'langs' => inboxTemplateLangs()));
 		// no break
 	case 'save':
 		$accounts = inboxAjaxParam('accounts', 'none');
@@ -89,6 +106,7 @@ switch ($action) {
 			'html' => (string) inboxAjaxParam('html', 'none'),
 			'private' => (int) inboxAjaxParam('private', 'int'),
 			'active' => inboxAjaxHas('active') ? (int) inboxAjaxParam('active', 'int') : 1,
+			'lang' => (string) inboxAjaxParam('lang', 'aZ09'),
 			'accounts' => is_array($accounts) ? $accounts : array(),
 		));
 		if (!$id) {
@@ -101,6 +119,12 @@ switch ($action) {
 			inboxTemplateFail($templates);
 		}
 		inboxAjaxReply(array('ok' => 1));
+		// no break
+	case 'preview':
+		// The template being written, filled for a recipient (1.26.0): nothing saved, nothing sent
+		$res = $templates->preview($user, (int) inboxAjaxParam('account', 'int'), (string) inboxAjaxParam('to', 'email'), (string) inboxAjaxParam('lang', 'aZ09'),
+			(string) inboxAjaxParam('subject', 'none'), (string) inboxAjaxParam('html', 'none'));
+		inboxAjaxReply(array('preview' => $res));
 		// no break
 	case 'order':
 		$ids = inboxAjaxParam('ids', 'none');

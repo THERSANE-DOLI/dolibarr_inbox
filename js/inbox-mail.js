@@ -636,6 +636,10 @@
 		return h + '</div>';
 	}
 
+	/** Forwarded (keyword $Forwarded, set by inbox or by another software) */
+	function forwarded(row) {
+		return (row.tags || []).some(k => String(k).toLowerCase() === '$forwarded');
+	}
 	function tagsHtml(row) {
 		const entry = S.folders.get(row.folder);
 		const defs = entry ? entry.account.tags : [];
@@ -810,7 +814,7 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
@@ -1052,7 +1056,7 @@
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
-					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? ic('reply') : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
+					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? ic('reply') : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
 					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
 					+ '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
@@ -4666,7 +4670,8 @@
 				+ '<span class="ibx-convo__snippet ibx-ellipsis ibx-muted">' + esc(m.snippet || m.subject || '') + '</span>'
 				+ (m.attachments ? ic('attachment', 'ibx-faint') : '') + '<span class="ibx-convo__date ibx-muted" title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></button>'
 				+ '<div class="ibx-convo__body" hidden></div></section>').join('')
-			+ '</article>';
+			+ '<section class="ibx-attbar ibx-attbar--answers ibx-convo__foot" aria-label="' + th('InboxQuickReply') + '"><div class="ibx-attbar__head">' + quickReplyHtml(last.id, '') + '</div></section></article>';
+		bindQuickReply(pane);
 		hydrateAvatars(pane);
 		loadDolibar($('.ibx-js-dolibar', pane));
 		$$('.ibx-js-expand', pane).forEach(b => b.addEventListener('click', () => {
@@ -4748,6 +4753,25 @@
 		}
 	}
 
+	/**
+	 * Answer at hand at the bottom of the mail read (1.26.0): reply, reply to all, forward, without going back up.
+	 * Not for a draft (it is edited), nor without a sending identity.
+	 */
+	function quickReplyHtml(mailId, role) {
+		if (role === 'drafts' || !I.ctx('INBOX_CAN_SEND', false)) {
+			return '';
+		}
+		// The names hide on a narrow pane (container query): the buttons keep them as title and accessible name
+		return '<div class="ibx-quickreply" role="group" aria-label="' + th('InboxQuickReply') + '">'
+			+ [['reply', 'reply', 'InboxReply'], ['replyall', 'reply-all', 'InboxReplyAll'], ['forward', 'forward', 'InboxForward']]
+				.map(x => '<button type="button" class="ibx-btn ibx-btn--sm" data-qr="' + x[0] + '" data-mail="' + mailId + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '">'
+					+ ic(x[1]) + '<span class="ibx-quickreply__label">' + th(x[2]) + '</span></button>').join('')
+			+ '</div>';
+	}
+	function bindQuickReply(root) {
+		$$('[data-qr]', root).forEach(b => b.addEventListener('click', () => I.compose({ mode: b.dataset.qr, mail: +b.dataset.mail })));
+	}
+
 	function renderMail(m) {
 		const pane = readPane();
 		S.blocks = { [m.id]: m };
@@ -4756,8 +4780,9 @@
 		pane.innerHTML = '<article class="ibx-reading" aria-label="' + esc(m.subject || t('InboxNoSubject')) + '">'
 			+ '<header class="ibx-readhead">' + headHtml(m) + (signed ? '<div class="ibx-readhead__line">' + signed + '</div>' : '') + '</header>'
 			+ dolibarSlot(m.id, false)
-			+ mailBodyHtml(m, {}) + '</article>';
+			+ mailBodyHtml(m, { quick: true }) + '</article>';
 		bindActions(pane);
+		bindQuickReply(pane);
 		bindMail(m, pane);
 		hydrateAvatars(pane);
 		loadDolibar($('.ibx-js-dolibar', pane));
@@ -4827,16 +4852,22 @@
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
 		const open = params.attachments_open === '1';
+		const quick = opts.quick ? quickReplyHtml(m.id, m.folder_role) : '';
 		m.fold = !!opts.fold;
 		return (banners ? '<div class="ibx-readbanners">' + banners + '</div>' : '')
 			+ '<div class="ibx-readbody">' + (m.security && m.security.encrypted ? '' : '<iframe class="ibx-mailframe ibx-js-frame" title="' + th('InboxMailBody') + '"'
-				+ ' sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" loading="eager" src="' + bodyUrl(m, m.body.images) + '"></iframe>') + '</div>'
-			+ (files ? '<section class="ibx-attbar' + (opts.inline ? ' ibx-attbar--inline' : '') + '" aria-label="' + th('InboxAttachments') + '"><div class="ibx-attbar__head">'
-				+ '<button type="button" class="ibx-attbar__toggle ibx-js-atttoggle" aria-expanded="' + open + '">' + ic(open ? 'chevron-down' : 'chevron-right') + ic('attachment')
+				+ ' sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" loading="eager" src="' + bodyUrl(m, m.body.images) + '"></iframe>')
+			+ '</div>'
+			// Foot of the reading, stuck at the bottom (1.26.0): the answer at hand, then the attachments on the same line
+			+ ((files || quick) ? '<section class="ibx-attbar' + (opts.inline ? ' ibx-attbar--inline' : '') + (files ? '' : ' ibx-attbar--answers') + '" aria-label="' + th(files ? 'InboxAttachments' : 'InboxQuickReply') + '"><div class="ibx-attbar__head">'
+				+ quick
+				+ (files ? '<button type="button" class="ibx-attbar__toggle ibx-js-atttoggle" aria-expanded="' + open + '">' + ic(open ? 'chevron-down' : 'chevron-right') + ic('attachment')
 				+ '<b>' + th('InboxAttachmentsCount', files) + '</b> <span class="ibx-muted">' + esc(size(total)) + '</span>'
 				+ '<span class="ibx-attbar__names ibx-ellipsis ibx-muted">' + esc(att.map(a => a.name).join(', ')) + '</span></button>'
-				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-saveall">' + ic('download-all') + ' ' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '</button></div>'
-				+ '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div></section>' : '');
+				// Its name hides on a narrow pane: kept as title and accessible name
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-saveall" title="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '" aria-label="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '">'
+				+ ic('download-all') + '<span class="ibx-attbar__savelabel">' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '</span></button>' : '') + '</div>'
+				+ (files ? '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div>' : '') + '</section>' : '');
 	}
 
 	function banner(type, icon, html) {

@@ -47,6 +47,30 @@ class InboxAccountTest extends InboxTestCase
 	}
 
 	/**
+	 * Copy of the mails sent (1.26.0): automatic for the servers that file it themselves, or chosen
+	 *
+	 * @return void
+	 */
+	public function testSentCopyMode()
+	{
+		$a = $this->box();
+		$this->assertSame('auto', $a->getSentCopyMode());
+		$this->assertFalse($a->sentCopyByServer(), 'local server: inbox files the copy');
+		$a->smtp_host = 'smtp.gmail.com';
+		$this->assertTrue($a->sentCopyByServer());
+		$a->smtp_host = 'smtp.office365.com';
+		$this->assertTrue($a->sentCopyByServer());
+		$this->assertFalse(InboxAccount::serverKeepsSent('notgmail.com.example.invalid'));
+		$a->setConnectorConfig(array('sent_copy' => 'inbox'));
+		$this->assertFalse($a->sentCopyByServer(), 'chosen: by inbox');
+		$a->smtp_host = 'mail.example.invalid';
+		$a->setConnectorConfig(array('sent_copy' => 'server'));
+		$this->assertTrue($a->sentCopyByServer(), 'chosen: by the server');
+		$a->setConnectorConfig(array('sent_copy' => 'bogus'));
+		$this->assertSame('auto', $a->getSentCopyMode());
+	}
+
+	/**
 	 * CA-06: the array for the browser has no password and no encrypted value
 	 *
 	 * @return void

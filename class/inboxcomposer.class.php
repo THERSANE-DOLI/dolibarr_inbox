@@ -1520,14 +1520,16 @@ class InboxComposer
 	}
 
 	/**
-	 * The mail answered marked \Answered on the server, checked, then in the index (P8)
+	 * The mail answered marked \Answered on the server, checked, then in the index (P8); a mail forwarded gets the
+	 * keyword $Forwarded instead (1.26.0)
 	 *
 	 * @param User                         $user      User
 	 * @param array<string,mixed>          $source    Mail answered
 	 * @param InboxConnectorInterface|null $connector Connector of its mailbox (null: opened here)
+	 * @param bool                         $forward   The mail was forwarded
 	 * @return void
 	 */
-	public function markAnswered(User $user, array $source, $connector)
+	public function markAnswered(User $user, array $source, $connector, $forward = false)
 	{
 		$access = new InboxAccess($this->db);
 		if ($access->getLevel($user, (int) $source['account']) === InboxAccess::LEVEL_NONE) {
@@ -1542,7 +1544,18 @@ class InboxComposer
 			}
 			$connector = $own;
 		}
-		if ($connector && $connector->setFlags((string) $source['folder'], array((string) $source['remote_id']), array('\\Answered'), array())) {
+		if ($forward) {
+			if ($connector && $connector->can(InboxConnectorInterface::CAP_TAGS)
+				&& $connector->setTags((string) $source['folder'], array((string) $source['remote_id']), array('$Forwarded'), array())) {
+				$row = $this->db->getRow("SELECT keywords FROM ".$this->db->prefix()."inbox_mail WHERE rowid = ".((int) $source['mail']));
+				$keywords = is_object($row) ? array_filter(explode(' ', (string) $row->keywords)) : array();
+				if (!in_array('$Forwarded', $keywords, true)) {
+					$keywords[] = '$Forwarded';
+					$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET keywords = '".$this->db->escape(dol_trunc(implode(' ', $keywords), 1024, 'right', 'UTF-8', 1))."'"
+						." WHERE rowid = ".((int) $source['mail']));
+				}
+			}
+		} elseif ($connector && $connector->setFlags((string) $source['folder'], array((string) $source['remote_id']), array('\\Answered'), array())) {
 			$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET answered = 1 WHERE rowid = ".((int) $source['mail']));
 		}
 		if ($own) {

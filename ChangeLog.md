@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: gaps of the writing (lot W6) closed :   1.26.0
+  - a mail forwarded gets the keyword $Forwarded on the server (read by the other mail software), shown in the list.
+  - copy in Sent: automatic, by inbox or by the sending server (some servers file it themselves: no second copy).
+  - templates of Dolibarr « for every type » offered in the writing, with or without a linked piece.
+  - with several recipients, the one whose name fills the variables of a template is chosen.
+  - editor of a template: language (values of the variables written in it) and preview for a recipient.
+  - answer at hand at the bottom of the mail read and of a conversation (reply, reply to all, forward).
 - FIX: a draft or « edit as new » reopened showed its pasted pictures no more (cid: put back as data:, size kept) :   1.25.3
 - FIX: pictures of the writing: corners to resize them (proportions kept), bar on the picture selected (25 to 100 %
   of its size, alignment, alternative text, removal) :   1.25.2

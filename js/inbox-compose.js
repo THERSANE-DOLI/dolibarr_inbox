@@ -1438,6 +1438,18 @@
 		const to = w.to.get();
 		return to.length ? to[0].email : '';
 	}
+	/** Recipients that may fill the variables: À then Cc, each address once */
+	function varRecipients(w) {
+		const seen = new Set();
+		return w.to.get().concat(w.cc.get()).filter(r => r.email && !seen.has(r.email.toLowerCase()) && seen.add(r.email.toLowerCase()));
+	}
+	/** Recipient of the variables (1.26.0): the one chosen while still a recipient, else the first À */
+	function refTo(w) {
+		if (w.varTo && varRecipients(w).some(r => r.email.toLowerCase() === w.varTo.toLowerCase())) {
+			return w.varTo;
+		}
+		return firstTo(w);
+	}
 	async function templateMenu(w, anchor) {
 		const identity = +$('.ibx-js-from', w.dlg).value;
 		if (!w.templates || w.templates.identity !== identity) {
@@ -1453,7 +1465,7 @@
 			if (!g.templates.length) {
 				return;
 			}
-			items.push({ header: g.type === 'inbox_send' ? t('InboxTemplatesOfMailbox') : t('InboxTemplatesOfPiece', g.kind) });
+			items.push({ header: g.type === 'inbox_send' ? t('InboxTemplatesOfMailbox') : (g.type === 'all' ? t('InboxTemplatesAllTypes') : t('InboxTemplatesOfPiece', g.kind)) });
 			g.templates.forEach(tp => items.push({ label: tp.label + (tp.lang ? ' (' + tp.lang.slice(0, 2) + ')' : ''), icon: tp.private ? 'user-circle' : 'template', run: () => useTemplate(w, g, tp) }));
 		});
 		if (!items.length) {
@@ -1467,7 +1479,7 @@
 		const piece = g.pieces.length ? g.pieces[0].type + ':' + g.pieces[0].id : '';
 		let res;
 		try {
-			res = await post('compose', 'template', { compose: w.token, id: tp.id, identity: +$('.ibx-js-from', w.dlg).value, piece, to: firstTo(w) });
+			res = await post('compose', 'template', { compose: w.token, id: tp.id, identity: +$('.ibx-js-from', w.dlg).value, piece, to: refTo(w) });
 		} catch (err) {
 			toast(err.message, { error: true });
 			return;
@@ -1487,7 +1499,7 @@
 			subj.closest('.ibx-cfield').toggleAttribute('data-filled', true);
 			$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
 		}
-		w.tpl = { id: res.id, lang: res.lang, piece: res.piece, pieces: g.pieces, kind: g.kind, subjectRaw: res.subject_raw, subject: subj.value, to: firstTo(w), identity: +$('.ibx-js-from', w.dlg).value };
+		w.tpl = { id: res.id, lang: res.lang, piece: res.piece, pieces: g.pieces, kind: g.kind, subjectRaw: res.subject_raw, subject: subj.value, to: refTo(w), identity: +$('.ibx-js-from', w.dlg).value };
 		if (res.attached) {
 			w.attachments.push(res.attached);
 			paintAttachments(w);
@@ -1504,18 +1516,35 @@
 	function paintVars(w) {
 		const box = $('.ibx-js-vars', w.dlg);
 		const tpl = w.tpl;
-		if (!tpl || !w.editor.variables || !w.editor.variables().length || tpl.pieces.length < 2) {
+		const people = varRecipients(w);
+		w.varsListKey = people.map(r => r.email).join(',');
+		if (!tpl || !w.editor.variables || !w.editor.variables().length || (tpl.pieces.length < 2 && people.length < 2)) {
 			box.hidden = true;
 			box.innerHTML = '';
 			return;
 		}
 		box.hidden = false;
-		box.innerHTML = ic('variable') + '<label for="' + w.id + '-vars">' + th('InboxVarsOf') + '</label>'
-			+ '<select class="ibx-field ibx-field--medium ibx-js-varpiece" id="' + w.id + '-vars">' + tpl.pieces.map(pc => '<option value="' + esc(pc.type + ':' + pc.id) + '"' + (pc.type + ':' + pc.id === tpl.piece ? ' selected' : '') + '>' + esc(pc.kind + ' ' + pc.ref) + '</option>').join('') + '</select>';
-		$('.ibx-js-varpiece', box).addEventListener('change', e => {
-			tpl.piece = e.target.value;
-			varsFollow(w, true);
-		});
+		const current = refTo(w);
+		// The piece and, with several recipients, the one whose name fills the variables (1.26.0)
+		box.innerHTML = ic('variable')
+			+ (tpl.pieces.length >= 2 ? '<label for="' + w.id + '-vars">' + th('InboxVarsOf') + '</label>'
+				+ '<select class="ibx-field ibx-field--medium ibx-js-varpiece" id="' + w.id + '-vars">' + tpl.pieces.map(pc => '<option value="' + esc(pc.type + ':' + pc.id) + '"' + (pc.type + ':' + pc.id === tpl.piece ? ' selected' : '') + '>' + esc(pc.kind + ' ' + pc.ref) + '</option>').join('') + '</select>' : '')
+			+ (people.length >= 2 ? '<label for="' + w.id + '-varto">' + th('InboxVarsRecipient') + '</label>'
+				+ '<select class="ibx-field ibx-field--medium ibx-js-varto" id="' + w.id + '-varto">' + people.map(r => '<option value="' + esc(r.email) + '"' + (r.email === current ? ' selected' : '') + '>' + esc(r.name ? r.name + ' <' + r.email + '>' : r.email) + '</option>').join('') + '</select>' : '');
+		const pieceSel = $('.ibx-js-varpiece', box);
+		if (pieceSel) {
+			pieceSel.addEventListener('change', e => {
+				tpl.piece = e.target.value;
+				varsFollow(w, true);
+			});
+		}
+		const toSel = $('.ibx-js-varto', box);
+		if (toSel) {
+			toSel.addEventListener('change', e => {
+				w.varTo = e.target.value;
+				varsFollow(w, true);
+			});
+		}
 	}
 	/** The chips follow the first recipient, the piece chosen and the identity (asked again only when one changed) */
 	function varsFollow(w, force) {
@@ -1523,7 +1552,11 @@
 		if (!tpl || !w.editor || !w.editor.variables) {
 			return;
 		}
-		const to = firstTo(w);
+		// The list of the recipients changed: the choice of the one of the variables follows
+		if (varRecipients(w).map(r => r.email).join(',') !== w.varsListKey) {
+			paintVars(w);
+		}
+		const to = refTo(w);
 		const identity = +$('.ibx-js-from', w.dlg).value;
 		if (!force && to === tpl.to && identity === tpl.identity) {
 			return;
@@ -2086,7 +2119,7 @@
 		// A draft with variables of a template: they follow the recipient again (piece: the newest linked one)
 		if (w.editor.variables && w.editor.variables().length) {
 			const linked = d.linked || [];
-			w.tpl = { id: 0, lang: '', piece: linked.length ? linked[0].type + ':' + linked[0].id : '', pieces: linked, kind: '', subjectRaw: '', subject: null, to: firstTo(w), identity: +$('.ibx-js-from', dlg).value };
+			w.tpl = { id: 0, lang: '', piece: linked.length ? linked[0].type + ':' + linked[0].id : '', pieces: linked, kind: '', subjectRaw: '', subject: null, to: refTo(w), identity: +$('.ibx-js-from', dlg).value };
 			paintVars(w);
 		}
 		if (w.editor.on) {
