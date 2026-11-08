@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: invitations and read receipts :   1.22.0
+  - an invitation (Outlook, Google...) is shown as a card above the mail: when (in your time zone, and the one of the
+    organizer), where, organizer, attendees, recurrence, events of your agenda at the same time.
+  - Accept, Maybe, Decline: the answer goes to the organizer (unless unchecked, with an optional comment) and the
+    event goes in your agenda of Dolibarr (unless unchecked), linked to the mail.
+  - an update received offers to move the event of the agenda; a cancel offers to mark it cancelled (never removed).
+  - read receipt asked by a mail: « Send the receipt » or « Ignore », never automatic; handled once for good (keyword
+    $MDNSent, as Thunderbird); refused when asked to another address than the sender; My account: never send.
 - NEW: unread counter and notifications of the browser :   1.21.0
   - unread mails of the inbox folders on the icon of the tab (badge up to 99+), in its title, on the icon of the
     installed application and in the top bar of the other pages of Dolibarr (envelope with the number).

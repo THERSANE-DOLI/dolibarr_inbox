@@ -336,7 +336,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -1967,6 +1967,8 @@
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionReading') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_mode">' + th('InboxReadMode') + '</label><div>' + opt('read_mode', ['immediate', 'delay', 'manual'], p.read_mode) + '<div class="ibx-formrow__help">' + th('InboxReadModeHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" data-param="read_delay" id="me-read_delay" value="' + esc(p.read_delay) + '"> ' + th('InboxSeconds') + '</div></div>'
+			// Read receipts asked (lot W8 1.22.0): never sent without a click
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-mdn_mode">' + th('InboxMdnMode') + '</label><div>' + opt('mdn_mode', ['ask', 'never'], p.mdn_mode) + '<div class="ibx-formrow__help">' + th('InboxMdnModeHelp') + '</div></div></div>'
 			+ '</div></section>';
 		if (data.mailboxes.length) {
 			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxReadPerMailbox') + '</h2><p class="ibx-section__help">' + th('InboxReadPerMailboxHelp') + '</p><table class="ibx-table"><tbody>'

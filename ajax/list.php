@@ -297,16 +297,36 @@ switch ($action) {
 
 	case 'suggest':
 		// Suggestions of the search panel (lot W7 1.19.0): known senders and third parties of the readable mailboxes
+		// kind (1.22.0): from = after de:, to = after à: (the recipients of the mails, then the people of Dolibarr)
 		$text = trim((string) inboxAjaxParam('q', 'alphanohtml'));
-		$out = array('senders' => array(), 'socs' => array());
+		$kind = (string) inboxAjaxParam('kind', 'aZ09');
+		$out = array('senders' => array(), 'socs' => array(), 'people' => array());
 		if (mb_strlen($text, 'UTF-8') >= 2 && $readable) {
 			$like = "'%".$db->escape($db->escapeforlike(mb_substr($text, 0, 100, 'UTF-8')))."%'";
 			$in = implode(',', $readable);
-			$rows = $db->getRows("SELECT m.from_email, MAX(m.from_name) AS from_name, COUNT(m.rowid) AS n FROM ".$db->prefix()."inbox_mail as m"
-				." WHERE m.fk_account IN (".$in.") AND m.from_email <> '' AND (m.from_name LIKE ".$like." OR m.from_email LIKE ".$like.")"
-				." GROUP BY m.from_email ORDER BY n DESC LIMIT 4");
+			if ($kind === 'to') {
+				$rows = $db->getRows("SELECT a.email AS from_email, MAX(a.name) AS from_name, COUNT(a.rowid) AS n FROM ".$db->prefix()."inbox_mail_address as a"
+					." INNER JOIN ".$db->prefix()."inbox_mail as m ON m.rowid = a.fk_mail WHERE m.fk_account IN (".$in.") AND a.type IN ('to', 'cc')"
+					." AND (a.name LIKE ".$like." OR a.email LIKE ".$like.") GROUP BY a.email ORDER BY n DESC LIMIT 5");
+			} else {
+				$rows = $db->getRows("SELECT m.from_email, MAX(m.from_name) AS from_name, COUNT(m.rowid) AS n FROM ".$db->prefix()."inbox_mail as m"
+					." WHERE m.fk_account IN (".$in.") AND m.from_email <> '' AND (m.from_name LIKE ".$like." OR m.from_email LIKE ".$like.")"
+					." GROUP BY m.from_email ORDER BY n DESC LIMIT ".($kind === 'from' ? 5 : 4));
+			}
 			foreach (is_array($rows) ? $rows : array() as $r) {
-				$out['senders'][] = array('email' => (string) $r->from_email, 'name' => (string) $r->from_name, 'n' => (int) $r->n);
+				$out['senders'][] = array('email' => strtolower((string) $r->from_email), 'name' => (string) $r->from_name, 'n' => (int) $r->n);
+			}
+			if ($kind === 'from' || $kind === 'to') {
+				// Then the contacts, third parties and users of Dolibarr the user may see (as the recipients of a writing)
+				dol_include_once('/inbox/class/inboxcomposer.class.php');
+				$composer = new InboxComposer($db);
+				$known = array_column($out['senders'], 'email');
+				foreach ($composer->recipients($user, $text) as $r) {
+					if ($r['kind'] !== 'recent' && !in_array($r['email'], $known, true) && count($out['people']) < 5) {
+						$out['people'][] = array('email' => $r['email'], 'name' => $r['name'], 'detail' => $r['detail']);
+					}
+				}
+				inboxAjaxReply($out);
 			}
 			$rows = $db->getRows("SELECT s.rowid, s.nom FROM ".$db->prefix()."societe as s WHERE s.entity IN (".getEntity('societe').") AND s.nom LIKE ".$like
 				." AND EXISTS (SELECT m.rowid FROM ".$db->prefix()."inbox_mail as m WHERE m.fk_soc = s.rowid AND m.fk_account IN (".$in."))"

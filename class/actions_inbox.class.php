@@ -108,7 +108,7 @@ class ActionsInbox
 		// display, not the attribute hidden: .badge of the theme forces its display
 		$out .= '<span class="badge badge-danger inbox-topbar__badge" style="position:relative;top:-0.6em;left:-0.4em;font-size:0.65em'.($count > 0 ? '' : ';display:none').'">'.($count > 99 ? '99+' : $count).'</span>';
 		$out .= '</a></div>';
-		$out .= '<script src="'.dol_escape_htmltag(dol_buildpath('/inbox/js/inbox-topbar.js', 1).'?v='.((int) @filemtime(dol_buildpath('/inbox/js/inbox-topbar.js', 0)))).'" defer></script>';
+		$out .= '<script'.(function_exists('getNonce') ? ' nonce="'.getNonce().'"' : '').' src="'.dol_escape_htmltag(dol_buildpath('/inbox/js/inbox-topbar.js', 1).'?v='.((int) @filemtime(dol_buildpath('/inbox/js/inbox-topbar.js', 0)))).'" defer></script>';
 		$this->resprints = $out;
 
 		return 0;

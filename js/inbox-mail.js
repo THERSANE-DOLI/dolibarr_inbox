@@ -1194,7 +1194,13 @@
 
 	/** Words typed (the operators typed in the field are not words) */
 	function sxWords() {
-		return S.q.split(/\s+/).filter(w => w && !/^[^\s:"]+:\S/.test(w));
+		return sxFreeWords(S.q);
+	}
+	/** Words of a search, without its operators (« de: » still waiting for its value is not a word either) */
+	function sxFreeWords(q) {
+		const typed = sxLastOp(q || '');
+		const free = (typed ? typed.prefix : (q || '')).replace(/[^\s:"]+:"[^"]*"/g, ' ');
+		return free.split(/\s+/).filter(w => w && !/^[^\s:"]+:\S/.test(w) && !sxLastOp(w));
 	}
 
 	/** Criteria of the panel as operators in English, sent beside the typed text (qx) */
@@ -1261,16 +1267,18 @@
 	function sxRecent() {
 		try {
 			const list = JSON.parse(localStorage.getItem(sxRecentKey()) || '[]');
-			return Array.isArray(list) ? list : [];
+			// Old entries kept while typing (« de: », « de:alice ») left out
+			return Array.isArray(list) ? list.filter(x => x && (sxFreeWords(x.q).length || (x.chips || []).length || x.soc)) : [];
 		} catch (e) {
 			return [];
 		}
 	}
 	function sxRemember() {
-		if (S.q === '' && !S.chips.length && !S.soc) {
+		const q = sxFreeWords(S.q).join(' ');
+		if (q === '' && !S.chips.length && !S.soc) {
 			return;
 		}
-		const item = { q: S.q, chips: S.chips, soc: S.soc };
+		const item = { q, chips: S.chips, soc: S.soc };
 		const label = sxRecentLabel(item);
 		const list = [item].concat(sxRecent().filter(x => sxRecentLabel(x) !== label)).slice(0, 6);
 		try {
@@ -1289,7 +1297,10 @@
 		if (!box) {
 			return;
 		}
-		const chips = S.chips.map((c, i) => ({ html: esc(c.label || c.v), rm: () => S.chips.splice(i, 1) }));
+		const chips = S.chips.map((c, i) => ({ html: esc(c.label || c.v), rm: () => S.chips.splice(i, 1), edit: SX_OPS.some(x => x.op === c.op) ? () => {
+			S.chips.splice(i, 1);
+			sxEditPill(sxPillText(c));
+		} : null }));
 		if (S.soc) {
 			chips.push({ html: esc(t('InboxSxSoc', S.soc.name)), rm: () => {
 				S.soc = null;
@@ -1313,7 +1324,12 @@
 				S.tag = '';
 			} });
 		}
-		box.innerHTML = chips.map((c, i) => '<span class="ibx-sx__pill">' + c.html + '<button type="button" data-rm="' + i + '" aria-label="' + th('InboxSxRemove') + '" title="' + th('InboxSxRemove') + '">' + ic('close') + '</button></span>').join('');
+		box.innerHTML = chips.map((c, i) => '<span class="ibx-sx__pill">' + (c.edit ? '<button type="button" class="ibx-sx__pilltext" data-edit="' + i + '" title="' + th('InboxSxEditPill') + '">' + c.html + '</button>' : c.html)
+			+ '<button type="button" data-rm="' + i + '" aria-label="' + th('InboxSxRemove') + '" title="' + th('InboxSxRemove') + '">' + ic('close') + '</button></span>').join('');
+		$$('[data-edit]', box).forEach(b => b.addEventListener('click', e => {
+			e.stopPropagation();
+			chips[+b.dataset.edit].edit();
+		}));
 		$$('[data-rm]', box).forEach(b => b.addEventListener('click', e => {
 			e.stopPropagation();
 			chips[+b.dataset.rm].rm();
@@ -1353,11 +1369,229 @@
 		sxRenderChips();
 	}
 
+	/**
+	 * Operators of the field (InboxSearchQuery on the server): the English name always works, plus the one of the
+	 * language of the user. Value operators (de:dupont) and flags (pj:oui), with an example of value.
+	 */
+	const SX_OPS = [
+		{ op: 'from', key: 'InboxSearchOpFrom', ex: 'dupont' }, { op: 'to', key: 'InboxSearchOpTo', ex: 'compta' },
+		{ op: 'subject', key: 'InboxSearchOpSubject', ex: 'devis' }, { op: 'after', key: 'InboxSearchOpAfter', ex: '01/10/2026' },
+		{ op: 'before', key: 'InboxSearchOpBefore', ex: '31/10/2026' }, { op: 'tag', key: 'InboxSearchOpTag', ex: '' },
+	];
+	const SX_FLAGS = [{ op: 'attachment', key: 'InboxSearchOpAttachment', en: 'has:attachment' }, { op: 'unread', key: 'InboxSearchOpUnread', en: 'is:unread' }];
+	/** Name of an operator as the user types it (its translation, else the English one) */
+	function sxOpName(o) {
+		const tr = t(o.key);
+		return (tr && tr !== o.key ? tr : (o.en || o.op)).toLowerCase();
+	}
+	/** Last token typed when it is an operator: { op, value, prefix (the text before it) } */
+	function sxLastOp(text) {
+		const re = /(^|\s)([^\s:"]+):/g;
+		let found = null;
+		let m;
+		while ((m = re.exec(text)) !== null) {
+			const name = m[2].toLowerCase();
+			const o = SX_OPS.find(x => x.op === name || sxOpName(x) === name);
+			if (o) {
+				found = { o, start: m.index + m[1].length, valueAt: m.index + m[0].length };
+			}
+		}
+		if (!found) {
+			return null;
+		}
+		let value = text.slice(found.valueAt);
+		let closed = false;
+		if (value.startsWith('"')) {
+			// In quotes: closed by the second quote, nothing after it
+			const end = value.indexOf('"', 1);
+			if (end >= 0 && value.slice(end + 1).trim() !== '') {
+				return null;
+			}
+			closed = end >= 0;
+			value = value.slice(1, end >= 0 ? end : undefined);
+		} else if (!SX_TEXT_OPS.includes(found.o.op) && /\s/.test(value)) {
+			// A date has no space: the operator is behind, the words after are a search
+			return null;
+		} else if (['from', 'to'].includes(found.o.op) && /^[^\s@]+@[^\s@]+\.[^\s@]+\s/.test(value)) {
+			// A whole address then a space: the address is the value, the words after are a search
+			return null;
+		}
+		return { o: found.o, value, closed, prefix: text.slice(0, found.start) };
+	}
+	/** Operators whose value may hold spaces (until Enter or Tab) */
+	const SX_TEXT_OPS = ['from', 'to', 'subject', 'tag'];
+	/** Last word typed when it is a flag (pj:oui, non-lu): its filter */
+	function sxLastFlag(text) {
+		const m = /(^|\s)(\S+)$/.exec(text);
+		if (!m) {
+			return null;
+		}
+		const w = m[2].toLowerCase();
+		const f = SX_FLAGS.find(x => w === sxOpName(x) || w === x.en || (x.op === 'attachment' && w === 'pj:oui'));
+		return f ? { f, prefix: text.slice(0, m.index + m[1].length) } : null;
+	}
+	function sxValidDate(v) {
+		return /^\d{4}(-\d{1,2}(-\d{1,2})?)?$/.test(v) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v);
+	}
+	const SX_LABELS = { from: 'InboxSxFrom', to: 'InboxSxTo', subject: 'InboxSxSubject', after: 'InboxSxAfter', before: 'InboxSxBefore' };
+	/** What the operator typed becomes: a pill (or the tag filter); null when its value is not complete or valid */
+	function sxPillOf(typed) {
+		const v = typed.value.trim();
+		if (!v) {
+			return null;
+		}
+		const op = typed.o.op;
+		if ((op === 'after' || op === 'before') && !sxValidDate(v)) {
+			return null;
+		}
+		if (op === 'tag') {
+			const d = sxTagDefs().find(x => x.label.toLowerCase() === v.toLowerCase() || x.keyword.toLowerCase() === v.toLowerCase());
+			return d ? { tag: d.keyword } : null;
+		}
+		return { op, v, label: t(SX_LABELS[op], v) };
+	}
+	/** Operator typed turned into a pill (Enter, Tab, space after a date, closing quote) */
+	function sxCommitOp(typed) {
+		const pill = typed ? sxPillOf(typed) : null;
+		if (!pill) {
+			return false;
+		}
+		sxTakeOp(typed.prefix, () => {
+			if (pill.tag) {
+				S.tag = pill.tag;
+			} else {
+				S.chips.push(pill);
+			}
+		});
+		return true;
+	}
+	/**
+	 * Enter or Tab: every operator complete in the field becomes its pill (also a text pasted at once), the operator
+	 * being typed included; what is left is the search
+	 * @return {boolean} Something became a pill
+	 */
+	function sxCommitAll() {
+		const input = $('.ibx-js-search', S.el);
+		let text = input.value;
+		const pills = [];
+		const flags = [];
+		const typed = sxLastOp(text);
+		const last = typed ? sxPillOf(typed) : null;
+		if (last) {
+			pills.push(last);
+			text = typed.prefix;
+		}
+		text = text.replace(/(^|\s)([^\s:"]+):(?:"([^"]*)"|(\S+))/g, (all, sp, name, quoted, raw) => {
+			const o = SX_OPS.find(x => x.op === name.toLowerCase() || sxOpName(x) === name.toLowerCase());
+			const pill = o ? sxPillOf({ o, value: quoted !== undefined ? quoted : raw }) : null;
+			if (!pill) {
+				return all;
+			}
+			pills.push(pill);
+			return sp;
+		});
+		text = text.split(/\s+/).filter(w => {
+			const f = w ? sxLastFlag(w) : null;
+			if (f) {
+				flags.push(f.f.op);
+			}
+			return w && !f;
+		}).join(' ');
+		if (!pills.length && !flags.length) {
+			return false;
+		}
+		sxTakeOp(text, () => {
+			pills.forEach(pill => {
+				if (pill.tag) {
+					S.tag = pill.tag;
+				} else {
+					S.chips.push(pill);
+				}
+			});
+			flags.forEach(f => {
+				S.filters[f] = true;
+			});
+		});
+		return true;
+	}
+	function sxCommitFlag(flag) {
+		if (!flag) {
+			return false;
+		}
+		sxTakeOp(flag.prefix, () => {
+			S.filters[flag.f.op] = true;
+		});
+		return true;
+	}
+	/** Text of a pill put back in the field to be corrected */
+	function sxPillText(c) {
+		const name = sxOpName(SX_OPS.find(x => x.op === c.op) || { op: c.op, key: '' });
+		return name + ':' + (/\s/.test(String(c.v)) && !SX_TEXT_OPS.includes(c.op) ? '"' + c.v + '"' : c.v);
+	}
+	function sxEditPill(text) {
+		const input = $('.ibx-js-search', S.el);
+		const v = input.value.replace(/\s+$/, '');
+		input.value = (v ? v + ' ' : '') + text;
+		S.sx.text = input.value;
+		S.q = sxQuery(input.value);
+		sxChanged();
+		input.focus();
+		input.setSelectionRange(input.value.length, input.value.length);
+	}
+	/**
+	 * Text sent to the server: an operator still being typed with spaces is sent in quotes, so that the list shows
+	 * what the pill will be (« sujet:bon de commande » = the subject holds « bon de commande »)
+	 */
+	function sxQuery(value) {
+		const typed = sxLastOp(value);
+		if (typed && SX_TEXT_OPS.includes(typed.o.op) && !typed.closed && /\s/.test(typed.value.trim())) {
+			return (typed.prefix + sxOpName(typed.o) + ':"' + typed.value.trim().replace(/"/g, '') + '"').trim();
+		}
+		return value.trim();
+	}
+	/** The operator typed replaced by a criterion of the panel (pill) */
+	function sxTakeOp(prefix, apply) {
+		const input = $('.ibx-js-search', S.el);
+		input.value = prefix.replace(/\s+$/, '') + (prefix.trim() ? ' ' : '');
+		S.q = sxQuery(input.value);
+		S.sx.text = input.value;
+		S.sx.active = -1;
+		apply();
+		sxChanged();
+		input.focus();
+	}
+	/** An operator clicked in the panel goes into the field, ready for its value */
+	function sxInsertOp(token) {
+		const input = $('.ibx-js-search', S.el);
+		const v = input.value.replace(/\s+$/, '');
+		input.value = (v ? v + ' ' : '') + token;
+		input.focus();
+		input.dispatchEvent(new Event('input'));
+	}
+
+	/** The list of the operators unfolded or not, kept in this browser */
+	function sxOpsShown() {
+		try {
+			return localStorage.getItem('inbox.search.ops') === '1';
+		} catch (e) {
+			return false;
+		}
+	}
+	function sxOpsToggle() {
+		try {
+			localStorage.setItem('inbox.search.ops', sxOpsShown() ? '0' : '1');
+		} catch (e) {
+			// private window: folded again next time
+		}
+	}
+
 	/** Senders and third parties of the readable mailboxes that match the text typed */
 	let sxSugTimer = 0;
 	function sxSuggest() {
 		clearTimeout(sxSugTimer);
-		const text = S.sx.text.trim();
+		// After de: or à:, the senders of the value only; after another operator, nothing to suggest
+		const typed = sxLastOp(S.sx.text);
+		const text = typed ? (['from', 'to'].includes(typed.o.op) ? typed.value.trim() : '') : S.sx.text.trim();
 		if (text.length < 2) {
 			S.sx.sug = null;
 			return;
@@ -1365,9 +1599,10 @@
 		sxSugTimer = setTimeout(async () => {
 			const seq = ++S.sx.sugSeq;
 			try {
-				const res = await api('list', 'suggest', { q: text }, { method: 'POST' });
+				const kind = typed && ['from', 'to'].includes(typed.o.op) ? typed.o.op : '';
+				const res = await api('list', 'suggest', { q: text, kind }, { method: 'POST' });
 				if (seq === S.sx.sugSeq) {
-					S.sx.sug = { text, senders: res.senders || [], socs: res.socs || [] };
+					S.sx.sug = { text, kind, senders: res.senders || [], socs: res.socs || [], people: res.people || [] };
 					sxRenderPanel();
 				}
 			} catch (e) {
@@ -1384,6 +1619,10 @@
 			return;
 		}
 		sx.classList.toggle('is-open', S.sx.open);
+		const backdrop = $('.ibx-js-sxbackdrop', S.el);
+		if (backdrop) {
+			backdrop.hidden = !S.sx.open;
+		}
 		input.setAttribute('aria-expanded', S.sx.open ? 'true' : 'false');
 		panel.hidden = !S.sx.open;
 		if (!S.sx.open) {
@@ -1412,8 +1651,49 @@
 		h += '<div class="ibx-sx__sec"><p class="ibx-sx__label" id="ibx-sxwhere">' + th('InboxSxWhere') + '</p><div class="ibx-btngroup" role="group" aria-labelledby="ibx-sxwhere">'
 			+ scopes.map(([v, k]) => '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-sxscope="' + v + '" aria-pressed="' + (S.scope === v) + '">' + th(k) + '</button>').join('') + '</div></div>';
 
-		// Suggestions
-		if (text.length >= 2) {
+		// Operator typed (de:, sujet:...): what to type after it, or the senders of the value
+		const typed = sxLastOp(S.sx.text);
+		if (typed) {
+			const o = typed.o;
+			const name = sxOpName(o);
+			let sug = '';
+			const value = typed.value.trim();
+			const pill = sxPillOf(typed);
+			if (pill && !pill.tag) {
+				sug += opt(o.op === 'from' || o.op === 'to' ? 'user-circle' : (o.op === 'subject' ? 'fmt-heading' : 'agenda'), esc(pill.label), th('InboxSxEnterToAdd'), () => sxCommitOp(typed));
+			}
+			let waiting = '';
+			if (['from', 'to'].includes(o.op) && value.length >= 2) {
+				const s = S.sx.sug && S.sx.sug.text === value && S.sx.sug.kind === o.op ? S.sx.sug : null;
+				const key = o.op === 'from' ? 'InboxSxFrom' : 'InboxSxTo';
+				const pick = x => () => sxTakeOp(typed.prefix, () => S.chips.push({ op: o.op, v: x.email, label: t(key, x.name || x.email) }));
+				if (!s) {
+					waiting = '<p class="ibx-sx__note ibx-muted">' + th('InboxSxLooking') + '</p>';
+				} else {
+					// In the mails first (with their count), then the people of Dolibarr who never wrote yet
+					s.senders.forEach(x => {
+						sug += opt('user-circle', th(key, x.name || x.email), esc(x.email) + ' · ' + th('InboxSxMailsCount', x.n), pick(x));
+					});
+					s.people.forEach(x => {
+						sug += opt('contact-card', th(key, x.name || x.email), esc(x.email + (x.detail ? ' · ' + x.detail : '')), pick(x));
+					});
+					if (!s.senders.length && !s.people.length) {
+						waiting = '<p class="ibx-sx__note ibx-muted">' + th('InboxSxNoAddress', value) + '</p>';
+					}
+				}
+			}
+			if (o.op === 'tag') {
+				sxTagDefs().filter(d => !value || d.label.toLowerCase().includes(value.toLowerCase()) || d.keyword.toLowerCase().includes(value.toLowerCase())).slice(0, 6).forEach(d => {
+					sug += opt('tag', th('InboxSxTag', d.label), '', () => sxTakeOp(typed.prefix, () => {
+						S.tag = d.keyword;
+					}));
+				});
+			}
+			const example = name + ':' + (o.op === 'tag' ? ((sxTagDefs()[0] || {}).label || '...') : o.ex);
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxOpsTyped', name + ':') + '</p>'
+				+ '<p class="ibx-sx__note">' + ic('info') + '<span>' + th('InboxSxOpHelp_' + o.op, example) + '</span></p>'
+				+ (sug ? '<ul class="ibx-sx__opts" role="listbox" aria-label="' + th('InboxSxSuggestions') + '">' + sug + '</ul>' : '') + waiting + '</div>';
+		} else if (text.length >= 2) {
 			let sug = '';
 			const low = text.toLowerCase();
 			const s = S.sx.sug && S.sx.sug.text === text ? S.sx.sug : { senders: [], socs: [] };
@@ -1474,10 +1754,23 @@
 				+ '<ul class="ibx-sx__opts" role="listbox" aria-label="' + th('InboxSxRecent') + '">' + recent.map(x => opt('search', esc(sxRecentLabel(x)), '', () => sxApplyRecent(x))).join('') + '</ul></div>';
 		}
 
+		// The operators that work at the keyboard, unfolded by the link of the foot; a click puts one in the field
+		const showOps = sxOpsShown();
+		if (showOps && text === '') {
+			h += '<div class="ibx-sx__sec" id="ibx-sxops"><p class="ibx-sx__label">' + th('InboxSxOps') + '</p><div class="ibx-sx__ops">'
+				+ SX_OPS.map(o => '<button type="button" class="ibx-sx__op" data-sxop="' + esc(sxOpName(o)) + ':" title="' + th('InboxSxOpDesc_' + o.op) + '"><code>' + esc(sxOpName(o)) + ':</code> '
+					+ th('InboxSxOpDesc_' + o.op) + '</button>').join('')
+				+ SX_FLAGS.map(o => '<button type="button" class="ibx-sx__op" data-sxop="' + esc(sxOpName(o)) + ' " title="' + th('InboxSxOpDesc_' + o.op) + '"><code>' + esc(sxOpName(o)) + '</code> '
+					+ th('InboxSxOpDesc_' + o.op) + '</button>').join('')
+				+ '</div></div>';
+		}
+
 		h += '<div class="ibx-sx__foot ibx-desktoponly-phone"><span><kbd class="ibx-kbd">↑</kbd> <kbd class="ibx-kbd">↓</kbd> ' + th('InboxSxKeysChoose') + '</span>'
 			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysValidate') + '</span>'
 			+ (words.length ? '<span><kbd class="ibx-kbd">Ctrl+' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysDeep') + '</span>' : '')
-			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEscape') + '</kbd> ' + th('InboxSxKeysClose') + '</span><span>' + th('InboxSxKeysOps') + '</span></div>';
+			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEscape') + '</kbd> ' + th('InboxSxKeysClose') + '</span>'
+			+ (text === '' ? '<button type="button" class="ibx-sx__opsbtn ibx-js-sxops" aria-expanded="' + showOps + '" aria-controls="ibx-sxops">' + ic(showOps ? 'chevron-down' : 'chevron-right') + ' ' + th('InboxSxOpsToggle') + '</button>' : '')
+			+ '</div>';
 
 		panel.innerHTML = h;
 		S.sx.opts = opts;
@@ -1522,7 +1815,7 @@
 			return;
 		}
 		clearTimeout(S.sx.timer);
-		S.q = $('.ibx-js-search', S.el).value.trim();
+		S.q = sxQuery($('.ibx-js-search', S.el).value);
 		const accounts = deepAccounts();
 		const deep = { key: deepKey(), accounts, done: 0, running: true, stopped: false, incomplete: [], unsupported: [], failed: [] };
 		S.deep = deep;
@@ -1634,6 +1927,25 @@
 			}
 		});
 		input.addEventListener('input', () => {
+			const v = input.value;
+			if (input.selectionStart === v.length) {
+				const typed = sxLastOp(v);
+				if (typed && typed.closed && sxCommitOp(typed)) {
+					return;
+				}
+				if (/\s$/.test(v)) {
+					const before = v.replace(/\s+$/, '');
+					const t2 = sxLastOp(before);
+					// A date, or a whole address after de: / à: (an address has no space): the pill at once
+					const address = t2 && ['from', 'to'].includes(t2.o.op) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t2.value);
+					if (t2 && (!SX_TEXT_OPS.includes(t2.o.op) || address) && sxCommitOp(t2)) {
+						return;
+					}
+					if (sxCommitFlag(sxLastFlag(before))) {
+						return;
+					}
+				}
+			}
 			S.sx.text = input.value;
 			S.sx.active = -1;
 			sxSuggest();
@@ -1642,7 +1954,7 @@
 			sxRenderChips();
 			clearTimeout(S.sx.timer);
 			S.sx.timer = setTimeout(() => {
-				S.q = input.value.trim();
+				S.q = sxQuery(input.value);
 				if (S.q === '' && S.scope !== 'folder' && !hasFilter() && currentFolder()) {
 					S.scope = 'folder';
 				}
@@ -1656,7 +1968,7 @@
 		input.addEventListener('keydown', e => {
 			if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
 				e.preventDefault();
-				S.q = input.value.trim();
+				S.q = sxQuery(input.value);
 				startDeep();
 				return;
 			}
@@ -1684,10 +1996,18 @@
 					S.sx.opts[S.sx.active]();
 					return;
 				}
+				// An operator being typed becomes its pill, the panel stays open for the rest of the search
+				if (sxCommitAll()) {
+					return;
+				}
 				clearTimeout(S.sx.timer);
-				S.q = input.value.trim();
+				S.q = sxQuery(input.value);
 				sxClose();
 				loadList();
+				return;
+			}
+			if (e.key === 'Tab' && !e.shiftKey && sxCommitAll()) {
+				e.preventDefault();
 				return;
 			}
 			if (e.key === 'Escape') {
@@ -1700,8 +2020,8 @@
 				return;
 			}
 			if (e.key === 'Backspace' && input.value === '' && S.chips.length) {
-				S.chips.pop();
-				sxChanged();
+				e.preventDefault();
+				sxEditPill(sxPillText(S.chips.pop()));
 			}
 		});
 		sx.addEventListener('keydown', e => {
@@ -1728,6 +2048,12 @@
 				sxChanged();
 			} else if (o && S.sx.opts[+o.dataset.opt]) {
 				S.sx.opts[+o.dataset.opt]();
+			} else if (e.target.closest('.ibx-js-sxops')) {
+				sxOpsToggle();
+				sxRenderPanel();
+				input.focus();
+			} else if (e.target.closest('[data-sxop]')) {
+				sxInsertOp(e.target.closest('[data-sxop]').dataset.sxop);
 			} else if (e.target.closest('.ibx-js-sxrecentclear')) {
 				try {
 					localStorage.removeItem(sxRecentKey());
@@ -4278,6 +4604,10 @@
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-unsubscribe"' + (why ? ' aria-disabled="true" title="' + esc(why) + '"' : '') + '>' + th('InboxUnsubscribe') + '</button>'
 				+ (u.mailto && !u.oneclick ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyAddress', u.mailto) + '</button>' : '') + '</div>';
 		}
+		// Invitation and read receipt (lot W8 1.22.0, js/inbox-invite.js)
+		if (I.mailExtrasHtml) {
+			banners += I.mailExtrasHtml(m, opts);
+		}
 		if (m.body.remote && !m.body.images) {
 			banners += '<div class="ibx-banner ibx-banner--info ibx-js-imagesbar">' + ic('remote-blocked') + '<div class="ibx-banner__text">' + th('InboxRemoteBlocked')
 				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '') + '</div>'
@@ -4363,6 +4693,9 @@
 		const frame = $('.ibx-js-frame', pane);
 		if (frame) {
 			frame.addEventListener('load', () => frameReady(frame, m));
+		}
+		if (I.bindMailExtras) {
+			I.bindMailExtras(m, pane);
 		}
 		const notJunk = $('.ibx-js-notjunk', pane);
 		if (notJunk) {
@@ -6096,7 +6429,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
 			// Search field opening into a panel (lot W7 1.19.0)
-			+ '<div class="ibx-toolbar"><div class="ibx-sx-holder"><div class="ibx-sx ibx-js-sx"><div class="ibx-sx__row ibx-js-sxrow">' + ic('search')
+			+ '<div class="ibx-toolbar"><div class="ibx-sx-holder"><div class="ibx-sx-backdrop ibx-js-sxbackdrop" hidden></div><div class="ibx-sx ibx-js-sx"><div class="ibx-sx__row ibx-js-sxrow">' + ic('search')
 			+ '<span class="ibx-sx__pills ibx-js-sxpills"></span>'
 			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'
 			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd ibx-js-sxkbd">Ctrl+Maj+K</kbd>'

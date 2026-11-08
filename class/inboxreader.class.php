@@ -30,6 +30,7 @@ require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
+require_once __DIR__.'/inboxreceipt.class.php';
 
 /**
  * A mail of the index read for a user: the row must be in a mailbox the user may read (else « not found », never
@@ -203,10 +204,30 @@ class InboxReader
 			'sender_check' => $this->senderCheck($raw),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
+			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
+			'invite' => $this->inviteView($user, $message),
+			'receipt' => InboxReceipt::view($this, $headers, $params->get($user, 'mdn_mode')),
 			'read_mode' => $params->get($user, 'read_mode', (int) $this->row->fk_account),
 			'read_delay' => (int) $params->get($user, 'read_delay', (int) $this->row->fk_account),
 			'can_flag' => true,
 		);
+	}
+
+	/**
+	 * @param User         $user    User
+	 * @param InboxMessage $message Mail parsed
+	 * @return array<string,mixed>|null Card of the invitation, null when none (or unreadable: the mail is still shown)
+	 */
+	protected function inviteView(User $user, InboxMessage $message)
+	{
+		require_once __DIR__.'/inboxinvite.class.php';
+		try {
+			$invite = new InboxInvite($this->db);
+			return $invite->view($user, $this, $message);
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__.' '.$e->getMessage(), LOG_WARNING);
+			return null;
+		}
 	}
 
 	/**

@@ -58,6 +58,9 @@ class InboxMessage
 	/** @var string Message-ID this mail answers, without the angle brackets */
 	public $inReplyTo = '';
 
+	/** @var string Invitation in the body (text/calendar part, not an attachment), lot W8 1.22.0 */
+	public $calendar = '';
+
 	/** @var string Text body (the HTML one converted when the mail has no text part) */
 	public $bodyText = '';
 

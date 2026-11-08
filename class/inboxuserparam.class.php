@@ -110,6 +110,8 @@ class InboxUserParam
 			'browser_notify' => array('0', 'int:0:1'),
 			'new_mail_notify' => array('auto', array('auto', '1', '0')),
 			'notif_channels' => array('', 'json'),
+			// Read receipts asked by the mails (1.22.0): ask each time, or never send (the question is not shown)
+			'mdn_mode' => array('ask', array('ask', 'never')),
 		);
 	}
 

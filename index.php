@@ -110,6 +110,7 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" 
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-notify.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-editor.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-invite.js').'" defer></script>'."\n";
 print '</head>'."\n";
 print '<body>'."\n";
 // Empty shell: the rail and the spaces are built by inbox.js (nothing works without JavaScript, said plainly)

@@ -93,8 +93,17 @@ class InboxMimeParser
 		$html = '';
 		foreach ($structure->parts as $part) {
 			$content = self::decode($part);
-			$isAttachment = $part->isAttachment() || ($part->filename !== null && $part->filename !== '') || ($part->name !== null && $part->name !== '');
+			$named = ($part->filename !== null && $part->filename !== '') || ($part->name !== null && $part->name !== '');
+			$isAttachment = $part->isAttachment() || $named;
 			$subtype = strtolower((string) $part->subtype);
+			if (!$named && stripos((string) $part->content_type, 'text/calendar') === 0) {
+				// Invitation of Outlook, Google... (the library takes it for an attachment): read by InboxInvite, never
+				// shown as the text of the mail nor as a file
+				if ($message->calendar === '') {
+					$message->calendar = self::toUtf8($content, (string) $part->charset);
+				}
+				continue;
+			}
 			if (!$isAttachment && (int) $part->type === \Webklex\PHPIMAP\IMAP::MESSAGE_TYPE_TEXT) {
 				$content = self::toUtf8($content, (string) $part->charset);
 				if ($subtype === 'html') {
