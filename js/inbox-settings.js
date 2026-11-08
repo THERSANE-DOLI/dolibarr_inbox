@@ -2139,7 +2139,7 @@
 	}
 
 	// ---------- My account ----------
-	async function renderMe(main) {
+	async function renderMe(main, parts) {
 		main.innerHTML = skeleton();
 		let data;
 		try {
@@ -2173,6 +2173,18 @@
 				+ '</tbody></table></section>';
 		}
 		// Voice typing (1.28.0): the receivers of the voice agreed to, each one withdrawn here
+		// Unified views (1.29.0): the mailboxes they gather, each one can be left out
+		if (data.mailboxes.length > 1) {
+			let out = [];
+			try {
+				out = JSON.parse(p.unified_exclude || '[]').map(Number);
+			} catch (e) {
+				out = [];
+			}
+			html += '<section class="ibx-section" data-section="unified"><h2 class="ibx-section__title">' + th('InboxUnifiedSection') + '</h2><p class="ibx-section__help">' + th('InboxUnifiedHelp') + '</p>'
+				+ '<div class="ibx-form ibx-js-unified">' + data.mailboxes.map(m => '<label class="ibx-check"><input type="checkbox" value="' + m.id + '"' + (out.includes(m.id) ? '' : ' checked') + '> '
+					+ esc(m.label && m.label !== m.email ? m.label + ' <' + m.email + '>' : m.email) + '</label>').join('') + '</div></section>';
+		}
 		html += '<section class="ibx-section ibx-js-mydictation" hidden></section>';
 		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionDisplay') + '</h2><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-view">' + th('InboxView') + '</label><div>' + opt('view', ['cards', 'table'], p.view) + '<div class="ibx-formrow__help">' + th('InboxViewHelp') + '</div></div></div>'
@@ -2197,6 +2209,34 @@
 			+ '</div></section></div>';
 		main.innerHTML = html;
 		myDictation($('.ibx-js-mydictation', main));
+		// Come from a menu that points at a section (#/settings/me/unified): brought into view, its background lit
+		// then fading, so the eye finds it (1.29.0)
+		const target = parts && parts[0] ? $('[data-section="' + parts[0].replace(/[^a-z]/g, '') + '"]', main) : null;
+		if (target) {
+			target.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+			target.classList.remove('is-flash');
+			void target.offsetWidth;
+			target.classList.add('is-flash');
+			// Removed after the fading (also without animation: the outline of the reduced motion goes too)
+			setTimeout(() => target.classList.remove('is-flash'), 2600);
+			const first = $('input, select, button', target);
+			if (first) {
+				first.focus({ preventScroll: true });
+			}
+		}
+		const unified = $('.ibx-js-unified', main);
+		if (unified) {
+			unified.addEventListener('change', async () => {
+				const out = $$('input[type="checkbox"]', unified).filter(c => !c.checked).map(c => +c.value);
+				try {
+					const r = await post('userparam', 'set', { param: 'unified_exclude', value: JSON.stringify(out) });
+					Dolibarr.executeHook('inbox:params:changed', r.params);
+					toast(t('InboxSaved'));
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			});
+		}
 		const mailto = $('.ibx-js-mailto', main);
 		if (mailto) {
 			mailto.addEventListener('click', () => {

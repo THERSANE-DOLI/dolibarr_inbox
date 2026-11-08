@@ -25,6 +25,7 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxtextsearch.class.php');
 dol_include_once('/inbox/class/inboxfulltext.class.php');
+dol_include_once('/inbox/class/inboxuserparam.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 // The calls that write (presence, synchronisation, results of a search in the text) need POST and the token (audit INBX-017)
@@ -180,6 +181,16 @@ function inboxListFulltext(array &$query, array $accounts)
 	return $out;
 }
 
+/** Unified views (1.29.0): what each one lists, on top of what the user types */
+const INBOX_LIST_VIEWS = array(
+	'inbox' => array('roles' => array('inbox')),
+	'unread' => array('unread' => true, 'not_roles' => array('trash', 'junk', 'sent', 'drafts')),
+	'flagged' => array('flagged' => true, 'not_roles' => array('trash', 'junk')),
+	'mine' => array('mine' => true),
+	'sent' => array('roles' => array('sent')),
+	'drafts' => array('roles' => array('drafts')),
+);
+
 switch ($action) {
 	case 'ids':
 		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
@@ -201,11 +212,28 @@ switch ($action) {
 		// no break
 
 	case 'page':
-		// scope: folder (default), account (every folder of the mailbox of the folder), all (every mailbox)
+		// scope: folder (default), account (every folder of the mailbox of the folder), all (every mailbox), view (a
+		// unified view: every mailbox read and not left out by the user, filtered by the role of the folders, 1.29.0)
 		$scope = (string) inboxAjaxParam('scope', 'aZ09');
 		$folderId = (int) inboxAjaxParam('folder', 'int');
 		$accounts = $readable;
-		if ($scope !== 'all') {
+		$view = '';
+		if ($scope === 'view') {
+			$view = (string) inboxAjaxParam('view', 'aZ09');
+			if (!isset(INBOX_LIST_VIEWS[$view])) {
+				inboxAjaxError('Unknown view', 400);
+			}
+			$params = new InboxUserParam($db);
+			$out = json_decode((string) $params->get($user, 'unified_exclude'), true);
+			$accounts = array_values(array_diff($readable, array_map('intval', is_array($out) ? $out : array())));
+			if (!$accounts) {
+				// Every mailbox left out of the views: nothing to list
+				inboxAjaxReply(array('rows' => array(), 'next' => '', 'total' => 0, 'threads' => false, 'people' => (object) array(), 'stamp' => '',
+					'query' => array(), 'fulltext' => array('ready' => array(), 'error' => false, 'relevance' => false), 'crops' => (object) array()));
+			}
+			$scope = 'all';
+			$folderId = 0;
+		} elseif ($scope !== 'all') {
 			$folder = inboxListFolder($folderId, $readable);
 			$accounts = array((int) $folder->fk_account);
 			if ($scope === 'account') {
@@ -215,6 +243,12 @@ switch ($action) {
 			$folderId = 0;
 		}
 		$query = inboxListQuery();
+		if ($view !== '') {
+			$query = array_merge($query, INBOX_LIST_VIEWS[$view]);
+			if (!empty($query['mine'])) {
+				$query['mine'] = (int) $user->id;
+			}
+		}
 		inboxListTextIds($query, $scope === 'all' ? 'all' : ($scope === 'account' ? 'account' : 'folder'), $scope === 'all' ? 0 : ($scope === 'account' ? (int) $folder->fk_account : (int) $folder->rowid), $readable);
 		$fulltext = inboxListFulltext($query, $accounts);
 		$engine = new InboxSearchSql($db);

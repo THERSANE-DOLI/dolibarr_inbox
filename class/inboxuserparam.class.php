@@ -114,6 +114,9 @@ class InboxUserParam
 			'mdn_mode' => array('ask', array('ask', 'never')),
 			// Voice typing (1.28.0): receivers of the voice the user agreed to (provider => date), written by InboxDictation
 			'dictation_consent' => array('', 'json'),
+			// Unified views (1.29.0): the ones shown in the section « Views », the mailboxes left out of them
+			'views_shown' => array('["inbox","unread","flagged","mine"]', 'json'),
+			'unified_exclude' => array('[]', 'json'),
 		);
 	}
 

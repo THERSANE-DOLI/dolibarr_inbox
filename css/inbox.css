@@ -1945,4 +1945,17 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-dict__interim { flex: 1; min-width: 0; font-style: italic; color: var(--ibx-text-muted); }
 @keyframes ibx-dict-pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .ibx-dict__dot { animation: none; } }
+/* Unified views on top of the tree (1.29.0) */
+.ibx-tree__row--views .ibx-js-viewsmenu { margin-left: auto; opacity: 0; }
+.ibx-tree__row--views:hover .ibx-js-viewsmenu, .ibx-tree__row--views:focus-within .ibx-js-viewsmenu { opacity: 1; }
+@media (hover: none) { .ibx-tree__row--views .ibx-js-viewsmenu { opacity: 1; } }
+.ibx-tree__icon--view { color: var(--ibx-accent); }
+/* Mailbox of a mail in a list of several mailboxes (1.29.0): its icon in its colour, then its name */
+.ibx-boxof { display: inline-flex; align-items: center; gap: var(--ibx-s1); min-width: 0; max-width: 100%; vertical-align: middle; }
+.ibx-boxof__icon { flex: none; width: 0.875rem; height: 0.875rem; }
+/* A section pointed at from a menu: its background lit, then fading (1.29.0) */
+.ibx-section.is-flash { animation: ibx-flash 2.4s ease-out; border-radius: var(--ibx-radius); }
+@keyframes ibx-flash { 0%, 25% { background: var(--ibx-accent-soft); box-shadow: 0 0 0 0.5rem var(--ibx-accent-soft); } 100% { background: transparent; box-shadow: 0 0 0 0.5rem transparent; } }
+@media (prefers-reduced-motion: reduce) { .ibx-section.is-flash { animation: none; outline: 2px solid var(--ibx-accent); outline-offset: 0.5rem; } }
 
+.ibx-section[data-section] { scroll-margin-top: var(--ibx-s5); }

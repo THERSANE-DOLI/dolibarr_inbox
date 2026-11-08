@@ -38,6 +38,8 @@
 		folders: new Map(), // id => {folder, account}
 		folderId: 0,
 		scope: 'folder',
+		// Unified view open (1.29.0): inbox, unread, flagged, mine, sent, drafts ('' = a folder); scope is then « view »
+		view: '',
 		q: '',
 		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false },
 		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
@@ -245,7 +247,7 @@
 		S.accounts.forEach(a => a.folders.forEach(f => S.folders.set(f.id, { folder: f, account: a })));
 		S.icons = res.icons || [];
 		// Folded state of the folders and mailboxes that are gone: forgotten (the setting does not grow)
-		const known = new Set(S.accounts.map(a => 'a' + a.id).concat(Array.from(S.folders.keys(), id => 'f' + id)));
+		const known = new Set(S.accounts.map(a => 'a' + a.id).concat(Array.from(S.folders.keys(), id => 'f' + id), ['views']));
 		const stale = Array.from(S.collapsed).filter(k => !known.has(k));
 		if (stale.length && S.accounts.length) {
 			stale.forEach(k => S.collapsed.delete(k));
@@ -308,7 +310,124 @@
 			}
 			html += '</li>';
 		});
-		body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + html + '</ul>';
+		body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + viewsHtml() + html + '</ul>';
+	}
+
+	// ---------- Unified views (1.29.0, analyse-navigation-vues.md) ----------
+	const VIEWS = [['inbox', 'inbox'], ['unread', 'unread'], ['flagged', 'star'], ['mine', 'user-circle'], ['sent', 'sent'], ['drafts', 'drafts']];
+	function viewsShown() {
+		try {
+			const v = JSON.parse(params.views_shown || '[]');
+			return Array.isArray(v) ? v : [];
+		} catch (e) {
+			return ['inbox', 'unread', 'flagged', 'mine'];
+		}
+	}
+	function viewsExcluded() {
+		try {
+			const v = JSON.parse(params.unified_exclude || '[]');
+			return Array.isArray(v) ? v.map(Number) : [];
+		} catch (e) {
+			return [];
+		}
+	}
+	/** Unread of a view, from the counters of the folders already known (no call): inbox and unread only */
+	function viewCount(key) {
+		const out = new Set(viewsExcluded());
+		let n = 0;
+		S.folders.forEach(({ folder: f, account: a }) => {
+			if (out.has(a.id)) {
+				return;
+			}
+			if ((key === 'inbox' && f.role === 'inbox') || (key === 'unread' && !['trash', 'junk', 'sent', 'drafts'].includes(f.role))) {
+				n += f.unread || 0;
+			}
+		});
+		return n;
+	}
+	function viewsHtml() {
+		const shown = viewsShown();
+		const list = VIEWS.filter(([k]) => shown.includes(k));
+		if (!list.length) {
+			return '';
+		}
+		const open = !S.collapsed.has('views');
+		return '<li role="treeitem" aria-expanded="' + open + '" aria-level="1"><div class="ibx-tree__row ibx-tree__row--account ibx-tree__row--views" style="--ibx-depth:0" data-section="views">'
+			+ '<button type="button" class="ibx-tree__twisty" data-toggle="views" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '" tabindex="-1">' + ic(open ? 'chevron-down' : 'chevron-right') + '</button>'
+			+ ic('folders', 'ibx-tree__icon') + '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxViews') + '</span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-viewsmenu" title="' + th('InboxViewsChoose') + '" aria-label="' + th('InboxViewsChoose') + '" aria-haspopup="menu">' + ic('more') + '</button></div>'
+			+ (open ? '<ul role="group">' + list.map(([k, icon]) => {
+				const n = ['inbox', 'unread'].includes(k) ? viewCount(k) : 0;
+				const sel = S.scope === 'view' && S.view === k;
+				return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-view="' + k + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
+					+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic(icon, 'ibx-tree__icon ibx-tree__icon--view')
+					+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_' + k) + '</span>'
+					+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
+			}).join('') + '</ul>' : '') + '</li>';
+	}
+	/** A view shown or hidden; the view open and hidden: back to the last folder */
+	function setViewShown(k, on) {
+		const shown = viewsShown();
+		const next = on ? VIEWS.map(([x]) => x).filter(x => x === k || shown.includes(x)) : shown.filter(x => x !== k);
+		saveParam('views_shown', JSON.stringify(next));
+		if (S.scope === 'view' && !next.includes(S.view)) {
+			const e = currentFolder();
+			if (e) {
+				openFolder(e.folder.id);
+			}
+		}
+		renderTree();
+	}
+	/**
+	 * Menu of the views (« ⋯ » of the section, right click on the section or on a view): on a view, open it and hide
+	 * it first; then the views shown (check boxes) and the mailboxes included (My account)
+	 * @param {HTMLElement} anchor Button or row
+	 * @param {object} [at] Position of a right click
+	 * @param {string} [key] The view right clicked
+	 */
+	function viewsMenu(anchor, at, key) {
+		const shown = viewsShown();
+		const own = key ? [
+			{ header: t('InboxView_' + key) },
+			{ icon: 'mail-opened', label: t('InboxOpen'), run: () => openView(key) },
+			{ icon: 'folders-hide', label: t('InboxViewHide'), run: () => setViewShown(key, false) },
+			{ sep: true },
+		] : [];
+		menu(anchor, own.concat([{ header: t('InboxViewsChoose') }], VIEWS.map(([k, icon]) => ({ icon, label: t('InboxView_' + k), checked: shown.includes(k), run: () => setViewShown(k, !shown.includes(k)) })),
+			[{ sep: true }, { icon: 'settings', label: t('InboxViewsMailboxes'), run: () => I.go('#/settings/me/unified') }]), at);
+	}
+	/** A unified view: every mailbox read (not left out), the folders of its role; each mail in its own mailbox */
+	async function openView(key, keepRoute) {
+		if (!VIEWS.some(([k]) => k === key)) {
+			return;
+		}
+		if (S.folderId) {
+			leaveFolder(false);
+		}
+		S.view = key;
+		S.scope = 'view';
+		if (S.deep) {
+			stopDeep(true);
+		}
+		S.selected.clear();
+		S.anchor = 0;
+		S.stamp = '';
+		$$('[data-folder]', S.el).forEach(r => {
+			r.setAttribute('aria-selected', 'false');
+			r.setAttribute('tabindex', '-1');
+		});
+		$$('[data-view]', S.el).forEach(r => {
+			const on = r.dataset.view === key;
+			r.setAttribute('aria-selected', on ? 'true' : 'false');
+			r.setAttribute('tabindex', on ? '0' : '-1');
+		});
+		if (!keepRoute) {
+			history.replaceState(null, '', '#/mail/view/' + key);
+		}
+		S.mobile('list');
+		showNothing();
+		renderListHead();
+		await loadList();
 	}
 
 	/**
@@ -407,9 +526,24 @@
 				accountErrorDialog(S.accounts.find(a => a.id === +err.dataset.account));
 				return;
 			}
+			const vmenu = e.target.closest('.ibx-js-viewsmenu');
+			if (vmenu) {
+				e.stopPropagation();
+				viewsMenu(vmenu);
+				return;
+			}
+			const vrow = e.target.closest('[data-view]');
+			if (vrow) {
+				openView(vrow.dataset.view);
+				return;
+			}
 			const row = e.target.closest('[data-folder]');
 			if (row && !row.classList.contains('is-disabled')) {
 				openFolder(+row.dataset.folder);
+			} else if (e.target.closest('[data-section="views"]')) {
+				S.collapsed.delete('views');
+				saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+				renderTree();
 			} else if (e.target.closest('[data-account]')) {
 				const id = +e.target.closest('[data-account]').dataset.account;
 				const key = 'a' + id;
@@ -422,11 +556,16 @@
 		});
 		// Arrows in the tree (role tree): up / down between visible folders, left / right fold
 		pane.addEventListener('keydown', e => {
-			const row = e.target.closest('[data-folder]');
+			const row = e.target.closest('[data-folder], [data-view]');
 			if (!row) {
 				return;
 			}
-			const rows = $$('[data-folder]', pane);
+			if (row.dataset.view && (e.key === 'Enter' || e.key === ' ')) {
+				openView(row.dataset.view);
+				e.preventDefault();
+				return;
+			}
+			const rows = $$('[data-folder], [data-view]', pane);
 			const i = rows.indexOf(row);
 			let target = null;
 			if (e.key === 'ArrowDown') {
@@ -497,6 +636,9 @@
 	// ---------- List ----------
 	function listQuery(cursor) {
 		const q = { folder: S.folderId, scope: S.scope, q: S.q, sort: params.list_sort || 'date:desc', cursor: cursor || '', limit: 200, threads: params.conversation === '0' ? 0 : 1 };
+		if (S.scope === 'view') {
+			q.view = S.view;
+		}
 		Object.keys(S.filters).forEach(k => {
 			if (S.filters[k]) {
 				q[k] = 1;
@@ -819,7 +961,7 @@
 		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
-		box: { label: 'InboxMailboxFolder', width: '22%', cell: r => '<td class="ibx-muted">' + esc(boxLabel(r)) + '</td>' },
+		box: { label: 'InboxMailboxFolder', width: '22%', cell: r => '<td class="ibx-muted">' + boxHtml(r) + '</td>' },
 		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
 	};
 	const DEFAULT_COLUMNS = ['flag', 'att', 'from', 'subject', 'tags', 'assign', 'date'];
@@ -839,7 +981,7 @@
 		if (!cols.some(c => c.id === 'subject')) {
 			cols.splice(Math.min(cols.length, 3), 0, { id: 'subject' });
 		}
-		if (S.scope === 'all' && !cols.some(c => c.id === 'box')) {
+		if ((S.scope === 'all' || S.scope === 'view') && !cols.some(c => c.id === 'box')) {
 			cols.splice(cols.findIndex(c => c.id === 'subject') + 1, 0, { id: 'box', auto: true });
 		}
 		return cols;
@@ -1062,8 +1204,10 @@
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
 						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
-					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + assigneesHtml(r.assignees, 'ibx-mailcard__assign') + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
-					+ (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '')
+					// The people assigned last: pushed to the right (margin-left: auto), they never move the rest
+					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
+					+ (S.scope === 'all' || S.scope === 'view' ? ' ' + boxHtml(r) : '')
+					+ assigneesHtml(r.assignees, 'ibx-mailcard__assign')
 					+ '</span>'
 					+ '</div>'
 					+ threadChildren(r, 'cards', null);
@@ -1136,6 +1280,15 @@
 		const e = S.folders.get(r.folder);
 		return e ? accountName(e.account) + ' / ' + folderName(e.folder) : '';
 	}
+	/** Mailbox of a mail in a list of several mailboxes: its icon in its colour (as in the panel), then « mailbox / folder » */
+	function boxHtml(r) {
+		const e = S.folders.get(r.folder);
+		if (!e) {
+			return '';
+		}
+		return '<span class="ibx-boxof ibx-muted">' + lookIcon(e.account.icon || 'account', e.account.color, 'ibx-boxof__icon')
+			+ '<span class="ibx-ellipsis">' + esc(boxLabel(r)) + '</span></span>';
+	}
 
 	function hasFilter() {
 		return S.q !== '' || Object.values(S.filters).some(Boolean) || S.chips.length > 0 || !!S.soc || S.tag !== '' || S.period !== '';
@@ -1148,7 +1301,7 @@
 				+ (canDeep() ? '<div>' + th('InboxDeepNotSearched') + '</div><div><button type="button" class="ibx-btn ibx-btn--primary ibx-js-deep">' + ic('search') + ' ' + th('InboxDeepSearchRun', sxWords().join(' ')) + '</button></div>' : '')
 				+ '<div class="ibx-inline"><button type="button" class="ibx-btn ibx-js-clear">' + th('InboxClearFilter') + '</button>'
 				+ (S.scope === 'folder' ? '<button type="button" class="ibx-btn ibx-js-scope" data-scope="account">' + th('InboxSearchWholeBox') + '</button>' : '')
-				+ (S.scope !== 'all' && S.accounts.length > 1 ? '<button type="button" class="ibx-btn ibx-js-scope" data-scope="all">' + th('InboxSearchAllBoxes') + '</button>' : '') + '</div></div>';
+				+ (S.scope !== 'all' && S.scope !== 'view' && S.accounts.length > 1 ? '<button type="button" class="ibx-btn ibx-js-scope" data-scope="all">' + th('InboxSearchAllBoxes') + '</button>' : '') + '</div></div>';
 		}
 		if (!f) {
 			return '<div class="ibx-empty">' + ic('folder', 'ibx-empty__icon') + '<div>' + th('InboxPickFolder') + '</div></div>';
@@ -1201,6 +1354,8 @@
 			name = t('InboxWholeBox', accountName(f.account));
 		} else if (S.scope === 'all') {
 			name = t('InboxAllBoxes');
+		} else if (S.scope === 'view') {
+			name = t('InboxView_' + S.view);
 		}
 		title.innerHTML = esc(name) + ' <span class="ibx-muted">· ' + th('InboxMailsCount', (S.total || 0).toLocaleString(locale())) + '</span>';
 		$('.ibx-js-view', S.el).innerHTML = ic(params.view === 'table' ? 'view-cards' : 'view-table');
@@ -2225,7 +2380,9 @@
 		const f = currentFolder();
 		const pane = readPane();
 		pane.innerHTML = '<div class="ibx-empty">' + ic('mail-opened', 'ibx-empty__icon')
-			+ (f ? '<div class="ibx-empty__title">' + esc(folderName(f.folder)) + '</div><div>' + th('InboxSyncUnread', f.folder.unread) + '</div>' : '')
+			// A unified view: its name and, for the inbox and the unread, its unread mails (1.29.0)
+			+ (S.scope === 'view' ? '<div class="ibx-empty__title">' + th('InboxView_' + S.view) + '</div>' + (['inbox', 'unread'].includes(S.view) ? '<div>' + th('InboxSyncUnread', viewCount(S.view)) + '</div>' : '')
+				: (f ? '<div class="ibx-empty__title">' + esc(folderName(f.folder)) + '</div><div>' + th('InboxSyncUnread', f.folder.unread) + '</div>' : ''))
 			+ '<div class="ibx-shortcuts"><span><kbd class="ibx-kbd">↑</kbd> <kbd class="ibx-kbd">↓</kbd> ' + th('InboxKeyNav') + '</span>'
 			+ '<span><kbd class="ibx-kbd">N</kbd> ' + th('InboxKeyNextUnread') + '</span>'
 			+ '<span><kbd class="ibx-kbd">?</kbd> ' + th('InboxKeyHelp') + '</span></div></div>';
@@ -2238,7 +2395,8 @@
 		const n = S.selected.size;
 		// The actions with their names here, where there is room (the bar of the list keeps them short)
 		readPane().innerHTML = '<div class="ibx-empty ibx-multi">' + ic('multi', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSelectedCount', n) + '</div>'
-			+ (S.next && n >= S.rows.length ? '<button type="button" class="ibx-btn ibx-js-allfolder">' + th('InboxSelectWholeFolder', (S.total || 0).toLocaleString(locale())) + '</button>' : '')
+			// « The whole folder »: a folder only (a unified view is not a folder)
+			+ (S.next && n >= S.rows.length && S.scope !== 'view' ? '<button type="button" class="ibx-btn ibx-js-allfolder">' + th('InboxSelectWholeFolder', (S.total || 0).toLocaleString(locale())) + '</button>' : '')
 			+ '<div class="ibx-multi__actions" role="toolbar" aria-label="' + th('InboxBulkActions') + '">' + bulkActions(Array.from(S.selected)).map(a => bulkButton(a, '', false)).join('') + '</div>'
 			+ '<div class="ibx-muted">' + th('InboxBulkHint') + '</div></div>';
 		$('.ibx-multi__actions', readPane()).addEventListener('click', onBulkClick);
@@ -6058,6 +6216,15 @@
 		if (row && S.el.contains(row)) {
 			return at => mailMenu(+row.dataset.mail, at);
 		}
+		// The unified views (1.29.0): the same menu as « ⋯ », with the view right clicked first
+		const view = target.closest('[data-view]');
+		if (view && S.el.contains(view)) {
+			return at => viewsMenu(view, at, view.dataset.view);
+		}
+		const views = target.closest('[data-section="views"]');
+		if (views && S.el.contains(views)) {
+			return at => viewsMenu(views, at);
+		}
 		const folder = target.closest('[data-folder]');
 		if (folder && S.el.contains(folder)) {
 			return at => folderMenu(+folder.dataset.folder, at);
@@ -6161,6 +6328,11 @@
 			renderTree();
 		}
 		S.scope = 'folder';
+		S.view = '';
+		$$('[data-view]', S.el).forEach(r => {
+			r.setAttribute('aria-selected', 'false');
+			r.setAttribute('tabindex', '-1');
+		});
 		// A deep search done elsewhere does not apply to this folder
 		if (S.deep && S.deep.key !== deepKey()) {
 			stopDeep(true);
@@ -6376,6 +6548,10 @@
 			});
 			if (treeChanged) {
 				renderTree();
+				// A unified view follows the mails that arrive or change in its mailboxes
+				if (S.scope === 'view' && S.q === '') {
+					await loadList(true);
+				}
 			}
 			if (st.open && st.open.folder === S.folderId) {
 				if (st.open.stamp !== S.stamp && S.scope === 'folder' && S.q === '') {
@@ -6958,7 +7134,8 @@
 		icon: 'mail',
 		label: () => t('InboxSpaceMail'),
 		async render(el, route) {
-			const wanted = +(route.parts[0] || 0);
+			const wantedView = route.parts[0] === 'view' ? String(route.parts[1] || '') : '';
+			const wanted = wantedView ? 0 : +(route.parts[0] || 0);
 			// #/mail/<folder>/<mail>: a mail opened from another page (tab « Mails » of a card of Dolibarr)
 			if (wanted && +(route.parts[1] || 0)) {
 				S.goto = { folder: wanted, mail: +route.parts[1] };
@@ -6969,7 +7146,9 @@
 				}
 			}
 			if (S.el === el) {
-				if (wanted && wanted !== S.folderId && S.folders.has(wanted)) {
+				if (wantedView && (S.scope !== 'view' || S.view !== wantedView)) {
+					openView(wantedView, true);
+				} else if (wanted && wanted !== S.folderId && S.folders.has(wanted)) {
 					openFolder(wanted, true);
 				}
 				return;
@@ -6998,6 +7177,10 @@
 			}
 			if (S.goto && await runGoto()) {
 				// Opened from a notification of the bell
+			} else if (wantedView && VIEWS.some(([k]) => k === wantedView)) {
+				// A unified view as start (its address kept); the first folder known for the actions of the page
+				S.folderId = start;
+				openView(wantedView, true);
 			} else if (start) {
 				openFolder(start, !!wanted);
 			} else {

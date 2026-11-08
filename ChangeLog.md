@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: unified views on top of the panel of the folders :   1.29.0
+  - section « Views »: Unified inbox, Unread, Starred, Assigned to me; Sent and Drafts of every mailbox offered,
+    hidden by default; the views shown chosen in its « ⋯ » menu or by a right click (on a view: open, hide it).
+  - each mail of a view says its mailbox and is read, answered, archived or moved in it; the unread of the unified
+    inbox and of the unread view from the counters already known; a view follows the mails that arrive.
+  - My account > Unified views: every mailbox by default, each one can be left out (it stays in the panel).
+  - address of a view (#/mail/view/inbox) kept on reload.
+  - in a list of several mailboxes, each mail shows the icon of its mailbox in its colour, then « mailbox / folder ».
+  - « Mailboxes in the views… » leads to the section of My account, brought into view and lit for a moment.
 - FIX: HTML put in the writing (answer of the AI, template) without the line breaks between its blocks: no more empty paragraphs and empty bullets :   1.28.4
 - FIX: voice typing goes where the cursor is (the instruction of the AI, the subject...), the microphone button keeps the cursor there; the bar says where the words go :   1.28.3
 - FIX: voice typing: apostrophes no more written « &#39; » (text inserted as text, never as HTML), a space before a sentence that follows a word; voice typing in its own file js/inbox-dictation.js, tested in jsdom (dev/editor-tests) :   1.28.2

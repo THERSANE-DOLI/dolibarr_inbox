@@ -271,6 +271,18 @@ class InboxSearchSql implements InboxSearchEngine
 		if (!empty($query['attachment'])) {
 			$where[] = "m.has_attachments = 1";
 		}
+		// Unified views (1.29.0): folders of these roles only, or never of those
+		$roleList = function ($roles) {
+			return implode(',', array_map(function ($r) {
+				return "'".$this->db->escape((string) $r)."'";
+			}, (array) $roles));
+		};
+		if (!empty($query['roles'])) {
+			$where[] = "f.role IN (".$roleList($query['roles']).")";
+		}
+		if (!empty($query['not_roles'])) {
+			$where[] = "(f.role IS NULL OR f.role NOT IN (".$roleList($query['not_roles'])."))";
+		}
 		if (!empty($query['soc'])) {
 			$where[] = "m.fk_soc = ".((int) $query['soc']);
 		}
