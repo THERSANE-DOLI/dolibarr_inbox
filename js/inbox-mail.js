@@ -469,7 +469,8 @@
 		const n = v.show_count ? (S.vcounts[v.id] || 0) : 0;
 		const shared = !v.mine ? '<span class="ibx-vview__shared" title="' + esc(t('InboxViewSharedBy', v.owner)) + '">' + ic('multi') + '<span class="ibx-sr-only"> ' + esc(t('InboxViewSharedBy', v.owner)) + '</span></span>'
 			: (v.shares && v.shares.length ? '<span class="ibx-vview__shared" title="' + esc(t('InboxViewSharedWith', v.shares.map(s => s.name).join(', '))) + '">' + ic('multi') + '</span>' : '');
-		return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-vview="' + v.id + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
+		// My views are put in order by dragging them (1.34.0); on a phone by their menu
+		return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-vview="' + v.id + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '"' + (v.mine && !isPhone() ? ' draggable="true"' : '') + '>'
 			+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + lookIcon(v.icon || 'folder-heart', v.color || '', 'ibx-tree__icon')
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(v.label) + '</span>' + shared
 			+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
@@ -606,6 +607,15 @@
 		if (v.editable) {
 			items.push({ icon: 'rename', label: t('InboxViewEdit'), run: () => vviewDialog(v, false) });
 		}
+		// Order of my views (1.34.0): the same as by dragging them, for the keyboard and the phone
+		const mine = S.vviews.filter(x => x.mine);
+		const at2 = mine.indexOf(v);
+		if (v.mine && at2 > 0) {
+			items.push({ icon: 'chevron-up', label: t('InboxMoveUp'), run: () => moveVview(id, at2 - 1) });
+		}
+		if (v.mine && at2 >= 0 && at2 < mine.length - 1) {
+			items.push({ icon: 'chevron-down', label: t('InboxMoveDown'), run: () => moveVview(id, at2 + 1) });
+		}
 		if (!v.mine) {
 			items.push({ icon: 'copy', label: t('InboxViewCopy'), run: () => vviewCall('copy', { id }, t('InboxViewCopied')) });
 			items.push({ icon: 'folders-hide', label: t('InboxViewHide'), run: () => vviewCall('hide', { id, hide: 1 }, '') });
@@ -617,6 +627,23 @@
 			} });
 		}
 		menu(anchor, items, at);
+	}
+	/** One of my views put at a place among my views (the views shared with me stay after them): shown at once, kept */
+	function moveVview(id, to) {
+		const mine = S.vviews.filter(x => x.mine);
+		const from = mine.findIndex(x => x.id === id);
+		if (from < 0 || from === to) {
+			return;
+		}
+		const [v] = mine.splice(from, 1);
+		mine.splice(Math.max(0, Math.min(to, mine.length)), 0, v);
+		S.vviews = mine.concat(S.vviews.filter(x => !x.mine));
+		renderTree();
+		const row = $('[data-vview="' + id + '"]', S.el);
+		if (row && document.activeElement && document.activeElement.closest('.ibx-pane--folders')) {
+			row.focus();
+		}
+		vviewCall('order', { ids: mine.map(x => x.id) }, '');
 	}
 	async function vviewCall(action, data, done) {
 		try {
@@ -4675,6 +4702,63 @@
 			S.drag = null;
 			dragTip('');
 			$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
+		});
+		// My views dragged among my views (1.34.0): a line shows where it goes
+		const vline = () => $$('.is-dropbefore, .is-dropafter', tree).forEach(x => x.classList.remove('is-dropbefore', 'is-dropafter'));
+		const vplace = e => {
+			const row = e.target.closest && e.target.closest('[data-vview]');
+			const v = row && S.vviews.find(x => x.id === +row.dataset.vview);
+			if (!v || !v.mine) {
+				return null;
+			}
+			const r = row.getBoundingClientRect();
+			return { row, id: v.id, after: e.clientY > r.top + r.height / 2 };
+		};
+		tree.addEventListener('dragstart', e => {
+			const row = e.target.closest && e.target.closest('[data-vview][draggable="true"]');
+			if (!row) {
+				return;
+			}
+			S.vdrag = +row.dataset.vview;
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', $('.ibx-tree__label', row).textContent);
+		});
+		tree.addEventListener('dragover', e => {
+			if (!S.vdrag) {
+				return;
+			}
+			vline();
+			const p = vplace(e);
+			if (!p) {
+				e.dataTransfer.dropEffect = 'none';
+				return;
+			}
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+			if (p.id !== S.vdrag) {
+				p.row.classList.add(p.after ? 'is-dropafter' : 'is-dropbefore');
+			}
+		});
+		tree.addEventListener('drop', e => {
+			if (!S.vdrag) {
+				return;
+			}
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			const id = S.vdrag;
+			const p = vplace(e);
+			S.vdrag = 0;
+			vline();
+			if (!p || p.id === id) {
+				return;
+			}
+			const mine = S.vviews.filter(x => x.mine && x.id !== id);
+			const to = mine.findIndex(x => x.id === p.id) + (p.after ? 1 : 0);
+			moveVview(id, to);
+		});
+		tree.addEventListener('dragend', () => {
+			S.vdrag = 0;
+			vline();
 		});
 		let hover = { id: 0, timer: 0 };
 		tree.addEventListener('dragover', e => {

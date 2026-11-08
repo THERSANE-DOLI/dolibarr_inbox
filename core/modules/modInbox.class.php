@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.33.0';
+		$this->version = '1.35.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 

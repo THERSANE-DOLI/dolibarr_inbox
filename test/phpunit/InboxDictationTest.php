@@ -104,4 +104,74 @@ class InboxDictationTest extends InboxTestCase
 		$conf->global->INBOX_DICTATION_ENABLED = '0';
 		$this->assertSame(array(), $d->accountsFor($writer));
 	}
+
+	/**
+	 * Transcription server (1.35.0): the engine told to the writing, the consent to a server bound to its host
+	 *
+	 * @return void
+	 */
+	public function testTranscriptionServer()
+	{
+		global $conf;
+
+		$keep = array();
+		foreach (array('INBOX_DICTATION_ENGINE', 'INBOX_WHISPER_URL', 'INBOX_WHISPER_STAMP') as $k) {
+			$keep[$k] = $conf->global->$k ?? null;
+		}
+		try {
+			unset($conf->global->INBOX_DICTATION_ENGINE, $conf->global->INBOX_WHISPER_URL, $conf->global->INBOX_WHISPER_STAMP);
+			$this->assertSame('browser', InboxDictation::engine()['engine'], 'the browser by default');
+			$conf->global->INBOX_DICTATION_ENGINE = 'server';
+			$this->assertSame('browser', InboxDictation::engine()['engine'], 'the server without address: the browser');
+
+			$conf->global->INBOX_WHISPER_URL = 'http://127.0.0.1:8000/v1';
+			$this->assertSame(array('engine' => 'server', 'host' => '127.0.0.1', 'local' => true), InboxDictation::engine());
+			$conf->global->INBOX_WHISPER_URL = 'https://10.0.0.5:8000/v1';
+			$this->assertTrue(InboxDictation::engine()['local'], 'private network');
+			$conf->global->INBOX_WHISPER_URL = 'https://8.8.8.8/v1';
+			$this->assertFalse(InboxDictation::engine()['local'], 'the voice leaves the network');
+
+			// The consent to the server counts for its host of then: another host (stamp) asks it again
+			$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+			$writer = $this->user('dictserver');
+			$access = new InboxAccess($this->db);
+			$access->grant($this->admin, $a->id, $writer->id, 0, InboxAccess::LEVEL_SEND);
+			InboxAccess::clearCache();
+			$d = new InboxDictation($this->db);
+			$this->assertTrue($d->consent($writer, 'server', (int) $a->id));
+			$this->assertArrayHasKey('server', $d->consents($writer));
+			$conf->global->INBOX_WHISPER_STAMP = (string) (dol_now() + 5);
+			$this->assertArrayNotHasKey('server', $d->consents($writer), 'given to the former host');
+			$this->assertTrue($d->consent($writer, 'google', (int) $a->id));
+			$this->assertSame(array('google'), array_keys($d->consents($writer)), 'the other receivers are not touched');
+		} finally {
+			foreach ($keep as $k => $v) {
+				if ($v === null) {
+					unset($conf->global->$k);
+				} else {
+					$conf->global->$k = $v;
+				}
+			}
+		}
+	}
+
+	/**
+	 * The client of the server: the key never in an error, the models read from an OpenAI answer
+	 *
+	 * @return void
+	 */
+	public function testWhisperClient()
+	{
+		dol_include_once('/inbox/class/inboxwhisper.class.php');
+		$this->assertSame('api.openai.com', InboxWhisper::hostOf('https://API.openai.com/v1'));
+		$c = new InboxWhisper('ftp://x/v1', 'sk-secret');
+		$this->assertNull($c->models());
+		$this->assertSame('No address', $c->error);
+		// Nothing listens there: an error, without the key
+		$c = new InboxWhisper('http://127.0.0.1:9/v1', 'sk-secret');
+		$c->timeout = 2;
+		$this->assertNull($c->transcribe(__FILE__, 'audio/webm', 'fr', 'whisper-1'));
+		$this->assertNotSame('', $c->error);
+		$this->assertStringNotContainsString('sk-secret', $c->error);
+	}
 }

@@ -62,10 +62,65 @@ function page(o = {}) {
 		$: (sel, root) => (root || w.document).querySelector(sel),
 		$$: (sel, root) => Array.from((root || w.document).querySelectorAll(sel)),
 	} } };
+	// Recording for the transcription server: a fake microphone whose level the test sets, a fake recorder, a clock
+	// and a 100 ms tick run by the test
+	const sound = { level: 0, now: 1000, tick: null, tracks: 0, uploads: [] };
+	if (o.record !== false) {
+		w.navigator.mediaDevices = { getUserMedia: async () => {
+			if (o.micRefused) {
+				throw Object.assign(new Error('no'), { name: 'NotAllowedError' });
+			}
+			return { getTracks: () => [{ stop: () => sound.tracks++ }] };
+		} };
+		w.MediaRecorder = class {
+			static isTypeSupported(m) {
+				return m.startsWith('audio/webm');
+			}
+			constructor() {
+				this.state = 'inactive';
+				this.mimeType = 'audio/webm;codecs=opus';
+			}
+			start() {
+				this.state = 'recording';
+			}
+			stop() {
+				this.state = 'inactive';
+				this.ondataavailable({ data: new w.Blob(['voice'], { type: this.mimeType }) });
+				this.onstop();
+			}
+		};
+		w.AudioContext = class {
+			createAnalyser() {
+				return { fftSize: 0, getFloatTimeDomainData: buf => buf.fill(sound.level) };
+			}
+			createMediaStreamSource() {
+				return { connect() {} };
+			}
+			close() {
+				return Promise.resolve();
+			}
+		};
+	}
+	w.Date.now = () => sound.now;
+	w.setInterval = fn => {
+		sound.tick = fn;
+		return 1;
+	};
+	w.clearInterval = () => {
+		sound.tick = null;
+	};
+	w.Dolibarr.tools.inbox.upload = (ep, act, fields, file) => {
+		const call = { ep, act, fields, file };
+		sound.uploads.push(call);
+		return new Promise((resolve, reject) => {
+			call.resolve = resolve;
+			call.reject = reject;
+		});
+	};
 	w.eval(code);
 	const writing = {
 		dlg: w.document.getElementById('dlg'),
-		data: { dictation: { accounts: o.accounts || [5], consents: o.consents || {} } },
+		data: { dictation: Object.assign({ accounts: o.accounts || [5], consents: o.consents || {} }, o.server ? { engine: 'server', host: o.server.host, local: o.server.local } : {}) },
 		html: '', changes: 0, closed: false,
 		// The editor gets plain text (insertText): what is said is never read as HTML
 		editor: { insertText(x, spaced) {
@@ -78,7 +133,7 @@ function page(o = {}) {
 			writing.changes++;
 		},
 	};
-	return { w, D: w.Dolibarr.tools.inbox.dictation, writing, log, bar: () => writing.dlg.querySelector('.ibx-js-dictbar'), button: () => writing.dlg.querySelector('[data-cmd="dictate"]') };
+	return { w, sound, D: w.Dolibarr.tools.inbox.dictation, writing, log, bar: () => writing.dlg.querySelector('.ibx-js-dictbar'), button: () => writing.dlg.querySelector('[data-cmd="dictate"]') };
 }
 
 /** The recognition « says » a sentence */
@@ -230,3 +285,117 @@ test('the words go where the cursor is: the instruction of the AI, then back to 
 	assert.equal(prompt.value, "Réponds que c'est d'accord ");
 });
 
+
+/** The voice for some ticks of 100 ms at a level (0.2: speech, 0: silence) */
+function speak(p, level, ms) {
+	p.sound.level = level;
+	for (let i = 0; i < ms / 100; i++) {
+		p.sound.now += 100;
+		p.sound.tick();
+	}
+}
+const settle = () => new Promise(r => setTimeout(r, 0));
+
+test('server: shown in a browser without recognition (Firefox) when it can record; hidden when it cannot', () => {
+	const p = page({ speech: false, ua: UA.firefox, server: { local: true, host: 'whisper.lan' } });
+	p.D.paintButton(p.writing, 5);
+	assert.equal(p.button().hidden, false);
+	const q = page({ speech: false, record: false, server: { local: true, host: 'whisper.lan' } });
+	q.D.paintButton(q.writing, 5);
+	assert.equal(q.button().hidden, true);
+});
+
+test('server on the private network: agreed to all the same (biometric data), told it stays inside', async () => {
+	const p = page({ server: { local: true, host: '127.0.0.1' } });
+	p.D.toggle(p.writing, 5);
+	assert.equal(p.log.dialogs.length, 1, 'the voice is a biometric data: asked even inside the network');
+	assert.match(p.log.dialogs[0].body, /InboxDictateConsentServerLocalText\(127\.0\.0\.1\)/);
+	assert.equal(p.sound.tick, null, 'nothing recorded before the consent');
+	await p.log.dialogs[0].actions[0].run();
+	assert.equal(p.log.posts[0].data.provider, 'server');
+	await settle();
+	assert.equal(typeof p.sound.tick, 'function');
+});
+
+test('server: a pause after speech sends the piece, the text comes as text', async () => {
+	const p = page({ consents: { server: 1 }, server: { local: true, host: '127.0.0.1' } });
+	p.D.toggle(p.writing, 5);
+	await settle();
+	assert.equal(p.log.dialogs.length, 0, 'agreed before');
+	assert.match(p.bar().textContent, /InboxDictateProvider_serverlocal\(127\.0\.0\.1\)/);
+	speak(p, 0, 2000);
+	assert.equal(p.sound.uploads.length, 0, 'silence alone: nothing sent');
+	speak(p, 0.2, 1500);
+	speak(p, 0, 500);
+	assert.equal(p.sound.uploads.length, 0, 'a short breath does not cut');
+	speak(p, 0, 400);
+	assert.equal(p.sound.uploads.length, 1, 'the pause cuts the sentence');
+	const up = p.sound.uploads[0];
+	assert.equal(up.ep + '/' + up.act, 'dictation/transcribe');
+	assert.equal(up.fields.account, 5);
+	assert.equal(up.file.type, 'audio/webm');
+	assert.match(p.bar().textContent, /InboxDictateWriting/);
+	up.resolve({ text: ' Bonjour <b>Jean</b>. ' });
+	await settle();
+	await settle();
+	assert.equal(p.writing.html, 'Bonjour <b>Jean</b>. ', 'as text, never HTML');
+	assert.doesNotMatch(p.bar().textContent, /InboxDictateWriting/);
+});
+
+test('server: the texts come back in the order they were said, a long sentence cut at 20 s', async () => {
+	const p = page({ consents: { server: 1 }, server: { local: true, host: 'whisper.lan' } });
+	p.D.toggle(p.writing, 5);
+	await settle();
+	speak(p, 0.2, 21000);
+	assert.equal(p.sound.uploads.length, 1, 'cut at 20 s even without a pause');
+	speak(p, 0.2, 1000);
+	speak(p, 0, 900);
+	assert.equal(p.sound.uploads.length, 2);
+	p.sound.uploads[1].resolve({ text: 'deux' });
+	await settle();
+	assert.equal(p.writing.html, '', 'the second waits for the first');
+	p.sound.uploads[0].resolve({ text: 'un' });
+	await settle();
+	await settle();
+	await settle();
+	assert.equal(p.writing.html, 'un deux ');
+});
+
+test('server outside the network: named before the first dictation, the consent kept for « server »', async () => {
+	const p = page({ server: { local: false, host: 'api.openai.com' } });
+	p.D.toggle(p.writing, 5);
+	assert.equal(p.log.dialogs.length, 1);
+	assert.match(p.log.dialogs[0].body, /InboxDictateConsentServerText\(InboxDictateProvider_server\(api\.openai\.com\)\)/);
+	assert.equal(p.sound.tick, null, 'nothing recorded before the consent');
+	await p.log.dialogs[0].actions[0].run();
+	assert.equal(p.log.posts[0].data.provider + '/' + p.log.posts[0].data.account, 'server/5');
+	await settle();
+	assert.equal(typeof p.sound.tick, 'function', 'recording once agreed');
+});
+
+test('server: stop lets the microphone go, the last sentence still sent; an error said once', async () => {
+	const p = page({ consents: { server: 1 }, server: { local: true, host: 'whisper.lan' } });
+	p.D.toggle(p.writing, 5);
+	await settle();
+	speak(p, 0.2, 800);
+	p.D.toggle(p.writing, 5);
+	assert.equal(p.sound.tracks, 1, 'microphone released');
+	assert.equal(p.writing.rec, null);
+	assert.equal(p.button().getAttribute('aria-pressed'), 'false');
+	assert.equal(p.sound.uploads.length, 1, 'what was said before the stop is sent');
+	assert.equal(p.bar().hidden, false, 'the bar waits for the text');
+	p.sound.uploads[0].reject(Object.assign(new Error('down'), { status: 502 }));
+	await settle();
+	await settle();
+	await settle();
+	assert.deepEqual(p.log.toasts, [{ m: 'down', error: true }]);
+	assert.equal(p.bar().hidden, true);
+});
+
+test('server: microphone refused, said and nothing kept running', async () => {
+	const p = page({ micRefused: true, consents: { server: 1 }, server: { local: true, host: 'whisper.lan' } });
+	p.D.toggle(p.writing, 5);
+	await settle();
+	assert.equal(p.writing.rec, null);
+	assert.deepEqual(p.log.toasts, [{ m: 'InboxDictateNoMic', error: true }]);
+});

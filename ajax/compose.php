@@ -92,7 +92,7 @@ switch ($action) {
 		$res['ai'] = array('accounts' => $ai->accountsFor($user), 'mail' => InboxAi::mailAllowed() ? 1 : 0);
 		// Voice typing (1.28.0): the mailboxes it may be used from, and the receivers of the voice already agreed to
 		$dictation = new InboxDictation($db);
-		$res['dictation'] = array('accounts' => $dictation->accountsFor($user), 'consents' => (object) $dictation->consents($user));
+		$res['dictation'] = array('accounts' => $dictation->accountsFor($user), 'consents' => (object) $dictation->consents($user)) + InboxDictation::engine();
 		inboxAjaxReply($res);
 		break;
 	case 'ai':

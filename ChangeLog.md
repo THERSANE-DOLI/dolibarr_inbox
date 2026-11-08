@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: voice typing by a transcription server (Whisper), besides the speech recognition of the browser :   1.35.0
+  - Settings > General > Voice typing: the engine, the browser or a transcription server (OpenAI compatible address:
+    a Whisper installed on the network, or an online service), its key (never sent back) and model; a test lists
+    its models; a guide installs speaches with Docker (processor or NVIDIA card).
+  - In the writing the voice is recorded and cut at each pause; each sentence goes through Dolibarr to the server and
+    comes back as text, in the order said. Works in every browser, Firefox included.
+  - The voice being a biometric data, the server is named before the first dictation and each user agrees, even
+    for a server of the private network (then told it stays inside); the consent is for its host (another address
+    asks it again), written in the journal, withdrawn in My account.
+
+- NEW: my virtual views put in order by dragging them in the panel :   1.34.0
+  - A line shows where the view goes; the order is kept. The views shared with me stay after mine.
+  - On a phone and with the keyboard: « Move up » and « Move down » in the menu of the view.
+
 - NEW: Settings > General > Search, a guide to install Meilisearch :   1.33.0
   - « How to install Meilisearch? » opens examples to adapt, after a warning: Docker Compose (advised), a quick try
     with docker run, without Docker (program and systemd service), on another machine; then what to fill in the page.

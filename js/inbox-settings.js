@@ -199,7 +199,7 @@
 		const date = ts => new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
 		box.hidden = false;
 		box.innerHTML = sectionTitle(ME_SECTIONS, 'dictation')
-			+ (list.length ? '<ul class="ibx-checklist">' + list.map(([p, ts]) => '<li class="ibx-checklist__item">' + ic('mic') + '<div>' + th('InboxDictationMineGiven', t('InboxDictateProvider_' + p), date(ts)) + '</div>'
+			+ (list.length ? '<ul class="ibx-checklist">' + list.map(([p, ts]) => '<li class="ibx-checklist__item">' + ic('mic') + '<div>' + th('InboxDictationMineGiven', t(p === 'server' && r.local ? 'InboxDictateProvider_serverlocal' : 'InboxDictateProvider_' + p, r.host || ''), date(ts)) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictrevoke" data-provider="' + esc(p) + '">' + th('InboxDictationRevoke') + '</button></li>').join('') + '</ul>'
 				: '<p class="ibx-section__help">' + th('InboxDictationMineNone') + '</p>');
 		$$('.ibx-js-dictrevoke', box).forEach(b => b.addEventListener('click', async () => {
@@ -1967,7 +1967,7 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxDictationEnabled') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_DICTATION_ENABLED" aria-checked="' + (s.INBOX_DICTATION_ENABLED === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxDictationEnabled') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxDictationEnabledHelp') + '</div></div></div>'
-			+ '</div></section>'
+			+ '</div><div class="ibx-whisper ibx-js-whisper"></div></section>'
 			+ '<section class="ibx-section ibx-js-searchsettings" data-section="search">' + title('search') + '</section>'
 			+ '<section class="ibx-section" data-section="tags">' + title('tags') + '<p class="ibx-section__help">' + th('InboxGlobalTagsHelp') + '</p><div class="ibx-js-tags"></div></section></div>';
 		// Look: accent (offered colours or another one), accent of the dark theme, greys; preview and page at once
@@ -2054,6 +2054,7 @@
 			}
 		}));
 		tabTags($('.ibx-js-tags', main), null);
+		renderWhisperSettings($('.ibx-js-whisper', main));
 		const searchDone = renderSearchSettings($('.ibx-js-searchsettings', main));
 		// The section on screen lit in the menu (and the chips); a section asked by the route brought into view once
 		// the page is complete (the search settings come later and move what is below them)
@@ -2064,6 +2065,48 @@
 	}
 
 	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------
+	// ---------- Installation guides (1.33.0): parts to open, steps, commands copied by a button ----------
+	const guideCode = text => '<div class="ibx-codeblock"><pre>' + esc(text) + '</pre><button type="button" class="ibx-btn ibx-btn--sm ibx-js-copycode">' + ic('copy') + ' ' + th('InboxCopy') + '</button></div>';
+	const guideStep = (key, text) => '<li><p>' + th(key) + '</p>' + guideCode(text) + '</li>';
+	const guidePart = (key, open, inner) => '<details class="ibx-guide__part"' + (open ? ' open' : '') + '><summary>' + th(key) + '</summary><div class="ibx-guide__body">' + inner + '</div></details>';
+
+	/**
+	 * The guide in a dialog: a warning first (examples to adapt), the copy said in the button (a toast would be under
+	 * the dialog)
+	 * @param {string} title Title
+	 * @param {string} inner HTML after the warning
+	 */
+	function guideDialog(title, inner) {
+		const dlg = dialog({ title, wide: true, body: '<div class="ibx-guide"><div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxMeiliGuideWarn') + '</div></div>' + inner + '</div>' });
+		const said = (b, key) => {
+			b.innerHTML = ic('check') + ' ' + th(key);
+			clearTimeout(b.again);
+			b.again = setTimeout(() => {
+				b.innerHTML = ic('copy') + ' ' + th('InboxCopy');
+			}, 2000);
+		};
+		dlg.addEventListener('click', async ev => {
+			const b = ev.target.closest('.ibx-js-copycode');
+			if (!b) {
+				return;
+			}
+			const pre = $('pre', b.parentElement);
+			try {
+				await navigator.clipboard.writeText(pre.textContent);
+			} catch (err) {
+				// No clipboard API outside https: the text selected, for Ctrl+C
+				const range = document.createRange();
+				range.selectNodeContents(pre);
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+				said(b, 'InboxCodeSelected');
+				return;
+			}
+			said(b, 'InboxCodeCopied');
+		});
+	}
+
 	/** Version of Meilisearch tested with inbox, in the examples of the installation guide */
 	const MEILI_VERSION = 'v1.54.3';
 
@@ -2073,13 +2116,11 @@
 	 */
 	function meiliGuide() {
 		const v = MEILI_VERSION;
-		const code = text => '<div class="ibx-codeblock"><pre>' + esc(text) + '</pre><button type="button" class="ibx-btn ibx-btn--sm ibx-js-copycode">' + ic('copy') + ' ' + th('InboxCopy') + '</button></div>';
-		const step = (key, text) => '<li><p>' + th(key) + '</p>' + code(text) + '</li>';
-		const part = (key, open, inner) => '<details class="ibx-guide__part"' + (open ? ' open' : '') + '><summary>' + th(key) + '</summary><div class="ibx-guide__body">' + inner + '</div></details>';
+		const code = guideCode;
+		const step = guideStep;
+		const part = guidePart;
 		const keyLine = file => 'KEY=$(openssl rand -base64 32 | tr -d \'/+=\')\necho "MEILI_MASTER_KEY=$KEY" | sudo tee ' + file + ' >/dev/null\nsudo chmod 600 ' + file;
-		const body = '<div class="ibx-guide">'
-			+ '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxMeiliGuideWarn') + '</div></div>'
-			+ '<p>' + th('InboxMeiliGuideIntro') + '</p>'
+		guideDialog(t('InboxMeiliGuideTitle'), '<p>' + th('InboxMeiliGuideIntro') + '</p>'
 			+ part('InboxMeiliGuideDocker', true, '<ol class="ibx-guide__steps">'
 				+ step('InboxMeiliGuideStepKey', 'sudo mkdir -p /opt/meilisearch && cd /opt/meilisearch\n' + keyLine('.env'))
 				+ step('InboxMeiliGuideStepCompose', '# /opt/meilisearch/docker-compose.yml\nservices:\n  meilisearch:\n    image: getmeili/meilisearch:' + v + '\n    restart: unless-stopped\n    environment:\n      MEILI_ENV: production\n      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}\n      MEILI_NO_ANALYTICS: "true"\n    ports:\n      - "127.0.0.1:7700:7700"   # this server only, never Internet\n    volumes:\n      - meili_data:/meili_data\n\nvolumes:\n  meili_data:')
@@ -2093,37 +2134,113 @@
 				+ step('InboxMeiliGuideStepKeyStart', keyLine('/etc/meilisearch.env') + '\nsudo systemctl daemon-reload\nsudo systemctl enable --now meilisearch\ncurl -s http://127.0.0.1:7700/health   # {"status":"available"}\nsudo cat /etc/meilisearch.env          # the master key, for this page')
 				+ '</ol>')
 			+ part('InboxMeiliGuideRemote', false, '<p>' + th('InboxMeiliGuideRemoteText') + '</p>')
-			+ '<h3 class="ibx-guide__then">' + th('InboxMeiliGuideThen') + '</h3><p>' + th('InboxMeiliGuideThenText') + '</p>'
-			+ '</div>';
-		const dlg = dialog({ title: t('InboxMeiliGuideTitle'), wide: true, body });
-		dlg.addEventListener('click', async ev => {
-			const b = ev.target.closest('.ibx-js-copycode');
-			if (!b) {
-				return;
-			}
-			const text = $('pre', b.parentElement).textContent;
-			try {
-				await navigator.clipboard.writeText(text);
-			} catch (err) {
-				// No clipboard API outside https: the text selected, for Ctrl+C
-				const range = document.createRange();
-				range.selectNodeContents($('pre', b.parentElement));
-				const sel = window.getSelection();
-				sel.removeAllRanges();
-				sel.addRange(range);
-				said(b, 'InboxCodeSelected');
-				return;
-			}
-			said(b, 'InboxCodeCopied');
-		});
-		// Said in the button (a toast would be under the dialog), then back to « Copy »
-		function said(b, key) {
-			b.innerHTML = ic('check') + ' ' + th(key);
-			clearTimeout(b.again);
-			b.again = setTimeout(() => {
-				b.innerHTML = ic('copy') + ' ' + th('InboxCopy');
-			}, 2000);
+			+ '<h3 class="ibx-guide__then">' + th('InboxMeiliGuideThen') + '</h3><p>' + th('InboxMeiliGuideThenText') + '</p>');
+	}
+
+	/**
+	 * Installation guide of a transcription server (1.35.0): speaches (Whisper, OpenAI compatible) with Docker, on the
+	 * processor or a NVIDIA card, a service in the cloud, another machine; then what to fill in this page
+	 */
+	function whisperGuide() {
+		const keyLine = 'KEY=$(openssl rand -hex 24)\necho "API_KEY=$KEY" | sudo tee .env >/dev/null\nsudo chmod 600 .env';
+		const compose = image => '# /opt/whisper/docker-compose.yml\nservices:\n  speaches:\n    image: ghcr.io/speaches-ai/speaches:' + image + '\n    restart: unless-stopped\n    environment:\n      API_KEY: ${API_KEY:?set API_KEY in .env}\n    ports:\n      - "127.0.0.1:8000:8000"   # this server only, never Internet\n    volumes:\n      - hf_cache:/home/ubuntu/.cache/huggingface/hub'
+			+ (image.includes('cuda') ? '\n    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: all\n              capabilities: [gpu]' : '') + '\n\nvolumes:\n  hf_cache:';
+		const startLines = model => 'cd /opt/whisper\nsudo docker compose up -d\nKEY=$(sudo sed -n \'s/^API_KEY=//p\' .env)\n# The model, downloaded once\ncurl -s -X POST -H "Authorization: Bearer $KEY" \\\n  http://127.0.0.1:8000/v1/models/' + model + '\n# The model listed\ncurl -s -H "Authorization: Bearer $KEY" http://127.0.0.1:8000/v1/models\nsudo cat .env   # the key, for this page';
+		guideDialog(t('InboxWhisperGuideTitle'), '<p>' + th('InboxWhisperGuideIntro') + '</p>'
+			+ guidePart('InboxWhisperGuideCpu', true, '<ol class="ibx-guide__steps">'
+				+ guideStep('InboxWhisperGuideStepKey', 'sudo mkdir -p /opt/whisper && cd /opt/whisper\n' + keyLine)
+				+ guideStep('InboxWhisperGuideStepCompose', compose('latest-cpu'))
+				+ guideStep('InboxWhisperGuideStepStart', startLines('Systran/faster-whisper-small'))
+				+ '</ol><p class="ibx-guide__note">' + th('InboxWhisperGuideCpuNote') + '</p>')
+			+ guidePart('InboxWhisperGuideGpu', false, '<p>' + th('InboxWhisperGuideGpuText') + '</p>' + guideCode(compose('latest-cuda')) + guideCode(startLines('deepdml/faster-whisper-large-v3-turbo-ct2')))
+			+ guidePart('InboxWhisperGuideCloud', false, '<p>' + th('InboxWhisperGuideCloudText') + '</p>' + guideCode('# OpenAI\nhttps://api.openai.com/v1            model: whisper-1\n# Groq\nhttps://api.groq.com/openai/v1       model: whisper-large-v3-turbo'))
+			+ guidePart('InboxWhisperGuideRemote', false, '<p>' + th('InboxWhisperGuideRemoteText') + '</p>')
+			+ '<h3 class="ibx-guide__then">' + th('InboxMeiliGuideThen') + '</h3><p>' + th('InboxWhisperGuideThenText') + '</p>');
+	}
+
+	/**
+	 * Section Voice typing of Settings > General (1.35.0): the engine (the browser, or a transcription server); for the
+	 * server its address, key (never sent back), model; a test lists the models; saved only once the server answers
+	 * @param {Element} box Holder
+	 */
+	async function renderWhisperSettings(box) {
+		let s;
+		try {
+			s = await api('dictation', 'server_get');
+		} catch (err) {
+			box.replaceChildren(errorBox(err, () => renderWhisperSettings(box)));
+			return;
 		}
+		const server = s.engine === 'server';
+		box.innerHTML = '<div class="ibx-form">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="w-engine-label">' + th('InboxWhisperEngine') + '</span><div class="ibx-stack" role="radiogroup" aria-labelledby="w-engine-label">'
+			+ ['browser', 'server'].map(v => '<label class="ibx-radio ibx-radio--block"><input type="radio" name="w-engine" value="' + v + '"' + ((server ? 'server' : 'browser') === v ? ' checked' : '') + '> <span><b>' + th('InboxWhisperEngine_' + v) + '</b><span class="ibx-formrow__help">' + th('InboxWhisperEngine_' + v + 'Help') + '</span></span></label>').join('')
+			+ '</div></div>'
+			+ '<div class="ibx-js-wserver"' + (server ? '' : ' hidden') + '><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="w-url">' + th('InboxWhisperUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="url" id="w-url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:8000/v1" value="' + esc(s.url) + '">'
+			+ '<div class="ibx-formrow__help">' + th('InboxWhisperUrlHelp') + ' <button type="button" class="ibx-linkbtn ibx-js-wguide">' + th('InboxWhisperGuideLink') + '</button></div>'
+			+ '<div class="ibx-notice ibx-notice--warning ibx-js-wremote"' + (s.local ? ' hidden' : '') + '>' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxWhisperRemote') + '</div></div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="w-key">' + th('InboxWhisperKey') + '</label><div><input class="ibx-field ibx-field--medium" type="password" id="w-key" autocomplete="new-password" spellcheck="false" placeholder="' + (s.has_key ? th('InboxMeiliKeyKept') : '') + '">'
+			+ '<div class="ibx-formrow__help">' + th('InboxWhisperKeyHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="w-model">' + th('InboxWhisperModel') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="w-model" list="w-models" autocomplete="off" spellcheck="false" placeholder="whisper-1" value="' + esc(s.model) + '"><datalist id="w-models"></datalist>'
+			+ '<div class="ibx-formrow__help">' + th('InboxWhisperModelHelp') + '</div></div></div>'
+			+ '<div class="ibx-js-wresult" role="status"></div>'
+			+ '</div><div class="ibx-formfoot" style="border-top:0"><button type="button" class="ibx-btn ibx-js-wtest">' + th('InboxMeiliTest') + '</button><span class="ibx-formfoot__spacer"></span><button type="button" class="ibx-btn ibx-btn--primary ibx-js-wsave">' + th('InboxSave') + '</button></div></div>'
+			+ '</div>';
+		const result = $('.ibx-js-wresult', box);
+		const values = () => ({ url: $('#w-url', box).value.trim(), key: $('#w-key', box).value, model: $('#w-model', box).value.trim() });
+		const showResult = (ok, text) => {
+			result.innerHTML = '<div class="ibx-notice ibx-notice--' + (ok ? 'success' : 'error') + '">' + ic(ok ? 'check' : 'warning') + '<div class="ibx-notice__text">' + esc(text) + '</div></div>';
+		};
+		const busy = async (b, fn) => {
+			if (b.getAttribute('aria-disabled') === 'true') {
+				return;
+			}
+			b.setAttribute('aria-disabled', 'true');
+			try {
+				await fn();
+			} finally {
+				b.removeAttribute('aria-disabled');
+			}
+		};
+		$('.ibx-js-wguide', box).addEventListener('click', whisperGuide);
+		// Back to the browser: at once; the server: its fields, saved by the button
+		$$('[name="w-engine"]', box).forEach(r => r.addEventListener('change', async () => {
+			const toServer = r.value === 'server' && r.checked;
+			$('.ibx-js-wserver', box).hidden = !toServer;
+			if (!toServer && r.checked && server) {
+				try {
+					await post('dictation', 'server_save', { engine: 'browser' });
+					toast(t('InboxWhisperBrowserSaved'));
+					renderWhisperSettings(box);
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			}
+		}));
+		$('.ibx-js-wtest', box).addEventListener('click', ev => busy(ev.currentTarget, async () => {
+			try {
+				const r = await post('dictation', 'server_test', values());
+				$('.ibx-js-wremote', box).hidden = !!r.local;
+				if (!r.ok) {
+					showResult(false, r.error);
+					return;
+				}
+				$('#w-models', box).innerHTML = (r.models || []).map(m => '<option value="' + esc(m) + '">').join('');
+				showResult(true, r.models && r.models.length ? t('InboxWhisperTestOkModels', r.models.length) : t('InboxWhisperTestOk'));
+			} catch (err) {
+				showResult(false, err.message);
+			}
+		}));
+		$('.ibx-js-wsave', box).addEventListener('click', ev => busy(ev.currentTarget, async () => {
+			try {
+				await post('dictation', 'server_save', Object.assign({ engine: 'server' }, values()));
+				toast(t('InboxWhisperSaved'));
+				renderWhisperSettings(box);
+			} catch (err) {
+				showResult(false, err.message);
+			}
+		}));
 	}
 
 	/**

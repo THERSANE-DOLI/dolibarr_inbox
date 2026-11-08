@@ -33,8 +33,11 @@ require_once __DIR__.'/inboxactionlog.class.php';
  */
 class InboxDictation
 {
-	/** Receivers of the voice known from the browser ('browser': not known, « the maker of your browser ») */
-	const PROVIDERS = array('google', 'microsoft', 'apple', 'browser');
+	/**
+	 * Receivers of the voice known from the browser ('browser': not known, « the maker of your browser »), and the
+	 * transcription server chosen by the administrator ('server', 1.35.0)
+	 */
+	const PROVIDERS = array('google', 'microsoft', 'apple', 'browser', 'server');
 
 	/** Parameter of the user holding the consents: provider => date */
 	const PARAM = 'dictation_consent';
@@ -93,13 +96,32 @@ class InboxDictation
 		$params = new InboxUserParam($this->db);
 		$list = json_decode((string) $params->get($user, self::PARAM), true);
 		$out = array();
+		// A consent to the transcription server is for its address of then: another host asks it again
+		$stamp = getDolGlobalInt('INBOX_WHISPER_STAMP');
 		foreach (is_array($list) ? $list : array() as $provider => $date) {
-			if (in_array($provider, self::PROVIDERS, true)) {
+			if (in_array($provider, self::PROVIDERS, true) && ($provider !== 'server' || (int) $date >= $stamp)) {
 				$out[$provider] = (int) $date;
 			}
 		}
 
 		return $out;
+	}
+
+	/**
+	 * What the writing needs to know of the engine (1.35.0): the browser, or the transcription server, its host and
+	 * whether it is on the private network (then no consent: the voice stays inside)
+	 *
+	 * @return array{engine:string,host:string,local:bool}
+	 */
+	public static function engine()
+	{
+		dol_include_once('/inbox/class/inboxwhisper.class.php');
+		if (!InboxWhisper::chosen()) {
+			return array('engine' => 'browser', 'host' => '', 'local' => false);
+		}
+		$url = getDolGlobalString('INBOX_WHISPER_URL');
+
+		return array('engine' => 'server', 'host' => InboxWhisper::hostOf($url), 'local' => InboxMeili::isLocal($url));
 	}
 
 	/**

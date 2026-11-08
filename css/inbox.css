@@ -338,6 +338,10 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-tree__row:hover { background: var(--ibx-bg-hover); }
 .ibx-tree__row[aria-selected="true"] { background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 40%, transparent); }
 .ibx-tree__row.is-droptarget { background: var(--ibx-accent); color: var(--ibx-on-accent); }
+/* A view dragged among the views: the line where it goes (1.34.0) */
+.ibx-tree__row.is-dropbefore { box-shadow: inset 0 2px 0 var(--ibx-accent); }
+.ibx-tree__row.is-dropafter { box-shadow: inset 0 -2px 0 var(--ibx-accent); }
+.ibx-tree__row[data-vview][draggable="true"] { cursor: grab; }
 .ibx-tree__row.is-droptarget .ibx-tree__icon, .ibx-tree__row.is-droptarget .ibx-tree__twisty { color: inherit; }
 .ibx-tree__row.is-droptarget .ibx-count { color: var(--ibx-accent); background: var(--ibx-on-accent); }
 /* Selected states are declared after :hover on purpose: a selected item keeps its colours when hovered */
@@ -1803,6 +1807,12 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-rules-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin-top: var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
 /* Installation guide of Meilisearch (1.32.0): parts to open, steps, commands to copy */
 .ibx-guide, .ibx-guide__body, .ibx-guide__steps { grid-template-columns: minmax(0, 1fr); }
+/* Choices one under the other, each with its help (engine of the voice typing, 1.35.0) */
+.ibx-stack { display: grid; gap: var(--ibx-s2); }
+.ibx-radio--block { display: flex; align-items: flex-start; gap: var(--ibx-s2); }
+.ibx-radio--block > input { margin-top: 0.2em; }
+.ibx-radio--block .ibx-formrow__help { display: block; font-weight: 400; }
+.ibx-whisper { margin-top: var(--ibx-s3); }
 .ibx-guide { display: grid; gap: var(--ibx-s3); }
 .ibx-guide p { margin: 0; }
 .ibx-guide__part { border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
