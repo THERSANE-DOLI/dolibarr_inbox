@@ -44,7 +44,8 @@
 	--ibx-folder-archive: #8a5a2b;
 	--ibx-folder-junk: #c0392b;
 	--ibx-folder-trash: #65656c;
-	--ibx-folder-other: #e9bc0e;
+	--ibx-folder-other: #a78500;
+	--ibx-folder-other-fill: #ffcb00;
 
 	/* Thunderbird tags */
 	--ibx-tag-1: #d63a3a;
@@ -109,7 +110,8 @@
 		--ibx-folder-archive: #d1a26e;
 		--ibx-folder-junk: #ef6f62;
 		--ibx-folder-trash: #a5a5ad;
-		--ibx-folder-other: #f0c430;
+		--ibx-folder-other: #ffd84d;
+		--ibx-folder-other-fill: #ffcb00;
 		--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 	}
 }
@@ -137,7 +139,8 @@
 	--ibx-folder-archive: #d1a26e;
 	--ibx-folder-junk: #ef6f62;
 	--ibx-folder-trash: #a5a5ad;
-	--ibx-folder-other: #f0c430;
+	--ibx-folder-other: #ffd84d;
+	--ibx-folder-other-fill: #ffcb00;
 	--ibx-shadow-float: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .5);
 }
 
@@ -342,6 +345,7 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-tree__icon { width: 1rem; height: 1rem; flex: none; color: var(--ibx-text-muted); }
 /* Icons of the folders and mailboxes: the inside tinted with their colour (30 %), the outline in full */
 .ibx-tree__icon { fill: currentColor; fill-opacity: .2; stroke-width: 1.6; }
+.ibx-tree__icon.ibx-ficon--folder { fill: var(--ibx-folder-other-fill); }
 /* Colour of a folder or mailbox icon: --ibx-ficon-l / -d set on the icon (light / dark variant, kept readable on the
    pane), picked by the theme through a variable only, so that the rules on the colour (drop target) still win */
 .ibx-ficon { --ibx-ficon: var(--ibx-ficon-l, var(--ibx-text-muted)); color: var(--ibx-ficon); }

@@ -215,7 +215,9 @@
 		} else {
 			return svg;
 		}
-		return svg.replace('<svg class="ibx-icon', '<svg style="' + style + '" class="ibx-ficon ibx-icon');
+		// The ordinary folders: their own inside colour (as the folders of the usual mail software)
+		const folder = color === 'var(--ibx-folder-other)' ? ' ibx-ficon--folder' : '';
+		return svg.replace('<svg class="ibx-icon', '<svg style="' + style + '" class="ibx-ficon' + folder + ' ibx-icon');
 	}
 	/** Icon of a folder: the one of its role, else the one chosen, else open / closed; the years of Archives look like it */
 	function folderIcon(f, open, cls) {
