@@ -296,6 +296,9 @@
 		if (n.type === 'box_error') {
 			return t('InboxNotifBoxError');
 		}
+		if (n.type === 'bounce') {
+			return t('InboxNotifBounce', n.detail || '');
+		}
 		if (n.type === 'access_self') {
 			return t('InboxNotifAccessSelf', who);
 		}

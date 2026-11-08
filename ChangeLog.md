@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: delivery reports of the mails sent (DSN) :   1.25.0
+  - the standard report (multipart/report, delivery-status: Postfix, Exim, Gmail, Exchange, OVH) read per recipient:
+    « Not delivered to x: this address does not exist », mailbox full, domain unknown, refused, too big, temporary;
+    the sentence of the remote server in small; « Not delivered yet » (orange) for a delay. Other bounces left as
+    ordinary mails (nothing guessed).
+  - the synchronisation reads the start of the reports only (known from their Content-Type) and links them to the
+    mail sent by its Message-ID (sent by inbox or by another software): red mark in the list, banner on the mail sent
+    with the link to the report, and on the report the link to the mail sent.
+  - bell « Mail not delivered to x » for the author of a sending made by inbox (new type, Settings > Notifications);
+    event « Mail not delivered » added on the pieces where the mail was recorded (inbox or Dolibarr); a report older
+    than 7 days (first indexing) is recorded, never told.
+  - picture of a sender without one: empty answer (204) instead of a 404 in the console of the browser.
 - NEW: import of the mailboxes from the QR codes « Export for mobile » of Thunderbird :   1.24.0
   - Settings > Import, source « Thunderbird (QR code) » after the sources of the modules (the first one stays the
     default), always offered to the administrators of the mailboxes: a capture pasted (Ctrl+V), dropped or chosen,

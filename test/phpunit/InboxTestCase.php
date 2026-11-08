@@ -106,6 +106,9 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%'");
 		$db->query("DELETE FROM ".$p."socpeople WHERE lastname LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."societe WHERE nom LIKE 'inboxtest_%'");
+		// Delivery reports (1.25.0) of the test mails, and the events they added on pieces
+		$db->query("DELETE FROM ".$p."inbox_bounce WHERE message_id LIKE '%inbox-test.invalid%' OR recipient LIKE '%.invalid'");
+		$db->query("DELETE FROM ".$p."actioncomm WHERE code = 'AC_INBOX_BOUNCE' AND label LIKE '%.invalid%'");
 		$db->query("DELETE FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");

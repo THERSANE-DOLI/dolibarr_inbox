@@ -3287,6 +3287,7 @@
 		const e = S.folders.get(r.folder);
 		const legit = r.junk_hint === 'legit' && e && e.folder.role === 'junk';
 		return (legit ? '<span class="ibx-threadmark ibx-junklegit" title="' + th('InboxJunkLegitShort') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxJunkLegitShort') + ' </span></span>' : '')
+			+ (r.bounced ? '<span class="ibx-threadmark ibx-threadmark--bounce" title="' + th('InboxBounced') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxBounced') + ' </span></span>' : '')
 			+ (r.watched ? '<span class="ibx-threadmark ibx-threadmark--watch" title="' + th('InboxThreadWatched') + '">' + ic('watch') + '<span class="ibx-sr-only">' + th('InboxThreadWatched') + ' </span></span>' : '')
 			+ (r.ignored ? '<span class="ibx-threadmark" title="' + th('InboxThreadIgnored') + '">' + ic('ignore') + '<span class="ibx-sr-only">' + th('InboxThreadIgnored') + ' </span></span>' : '');
 	}
@@ -4769,9 +4770,24 @@
 		if (m.security && m.security.encrypted) {
 			banners += banner('warning', 'lock', th('InboxEncrypted'));
 		}
-		if (m.report) {
-			banners += banner('warning', 'warning', '<b>' + th('InboxNotDelivered', (m.report.recipients || []).join(', ')) + '</b>'
-				+ (m.report.reason ? '<br>' + esc(m.report.reason) : (m.report.status ? ' (' + esc(m.report.status) + ')' : '')));
+		// Delivery report (1.25.0): one line per recipient in words; the sentence of the server in small; link to the
+		// mail sent. A mail sent: its failures, link to the report.
+		const bounceLine = (r, key) => '<div class="ibx-bounce__line"><b>' + th(key, r.email) + '</b> : ' + th('InboxBounce_' + r.family)
+			+ (r.status ? ' <span class="ibx-mono ibx-muted">' + esc(r.status) + '</span>' : '')
+			+ (r.diagnostic ? '<div class="ibx-bounce__server ibx-muted">' + esc(r.diagnostic) + '</div>' : '') + '</div>';
+		const gotoLink = (where, key) => where ? '<div><button type="button" class="ibx-linkbtn ibx-js-bouncego" data-folder="' + where.folder + '" data-mail="' + where.mail + '">' + th(key) + '</button></div>' : '';
+		if (m.report && m.report.recipients && m.report.recipients.length) {
+			const failed = m.report.recipients.filter(r => r.action === 'failed');
+			const delayed = m.report.recipients.filter(r => r.action !== 'failed');
+			if (failed.length) {
+				banners += banner('danger', 'warning', failed.map(r => bounceLine(r, 'InboxNotDeliveredTo')).join('') + gotoLink(m.report.sent, 'InboxBounceSeeSent'));
+			}
+			if (delayed.length) {
+				banners += banner('warning', 'send-later', delayed.map(r => bounceLine(r, 'InboxDelayedTo')).join('') + (failed.length ? '' : gotoLink(m.report.sent, 'InboxBounceSeeSent')));
+			}
+		}
+		if (m.bounces && m.bounces.length) {
+			banners += banner('danger', 'warning', m.bounces.map(r => bounceLine(r, 'InboxNotDeliveredTo') + gotoLink(r.report, 'InboxBounceSeeReport')).join(''));
 		}
 		const spoofName = imitatesUs(m);
 		if (spoofName) {
@@ -4892,6 +4908,8 @@
 		if (notJunk) {
 			notJunk.addEventListener('click', () => doJunk([m.id], false));
 		}
+		// Delivery report <-> mail sent (1.25.0)
+		$$('.ibx-js-bouncego', pane).forEach(b => b.addEventListener('click', () => Dolibarr.executeHook('inbox:mail:goto', { folder: +b.dataset.folder, mail: +b.dataset.mail })));
 		const unsub = $('.ibx-js-unsubscribe', pane);
 		if (unsub) {
 			unsub.addEventListener('click', () => unsubscribe(m, unsub));

@@ -297,9 +297,9 @@ class InboxReadingTest extends InboxTestCase
 
 		$this->assertTrue($r->load($this->admin, $this->rowId($a, 'reading-dsn@inbox-test.invalid')));
 		$d = $r->describe($this->admin, $r->raw($this->admin));
-		$this->assertSame(array('nobody@client.example.invalid'), $d['report']['recipients']);
-		$this->assertSame('5.1.1', $d['report']['status']);
-		$this->assertStringContainsString('User unknown', $d['report']['reason']);
+		$this->assertSame('nobody@client.example.invalid', $d['report']['recipients'][0]['email']);
+		$this->assertSame(array('failed', '5.1.1', 'no_user'), array($d['report']['recipients'][0]['action'], $d['report']['recipients'][0]['status'], $d['report']['recipients'][0]['family']));
+		$this->assertStringContainsString('User unknown', $d['report']['recipients'][0]['diagnostic']);
 
 		$this->assertTrue($r->load($this->admin, $this->rowId($a, 'reading-enc@inbox-test.invalid')));
 		$d = $r->describe($this->admin, $r->raw($this->admin));

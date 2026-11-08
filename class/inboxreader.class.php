@@ -177,6 +177,9 @@ class InboxReader
 		}
 		$params = new InboxUserParam($this->db);
 		$auth = self::authResults($headers);
+		require_once __DIR__.'/inboxbounce.class.php';
+		$bounce = new InboxBounce($this->db);
+		$readable = array_keys((new InboxAccess($this->db))->getLevels($user));
 		$allowImages = $remote && $auth['fail'] === false && $this->imagesAllowed($user, (string) $this->row->from_email);
 
 		return array(
@@ -203,7 +206,9 @@ class InboxReader
 			'headers' => $headers,
 			'auth' => $auth,
 			'security' => self::security($raw, $headers, $message),
-			'report' => self::deliveryReport($raw, $headers),
+			// Delivery report (1.25.0): what happened per recipient and where the mail sent is; a mail sent: its failures
+			'report' => $bounce->view($raw, $readable),
+			'bounces' => $bounce->forMail($message->messageId, $readable),
 			'sender_check' => $this->senderCheck($raw),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
@@ -653,39 +658,6 @@ class InboxReader
 			}
 		} elseif (preg_match('/-----BEGIN PGP SIGNED MESSAGE-----/', $message->bodyText)) {
 			$out['signed'] = 'unchecked';
-		}
-
-		return $out;
-	}
-
-	/**
-	 * Report of non delivery (multipart/report; report-type=delivery-status)
-	 *
-	 * @param string                              $raw     Raw mail
-	 * @param array<int,array{0:string,1:string}> $headers Headers
-	 * @return array{recipients:string[],status:string,reason:string}|null
-	 */
-	public static function deliveryReport($raw, array $headers)
-	{
-		$type = strtolower(self::headerValue($headers, 'Content-Type'));
-		if (strpos($type, 'multipart/report') !== 0 || strpos($type, 'delivery-status') === false) {
-			return null;
-		}
-		$body = substr((string) $raw, 0, 262144);
-		$out = array('recipients' => array(), 'status' => '', 'reason' => '');
-		if (preg_match_all('/^Final-Recipient:\s*[^;]*;\s*<?([^\s>]+)>?/mi', $body, $m)) {
-			$out['recipients'] = array_slice(array_values(array_unique(array_map(function ($v) {
-				return InboxMimeParser::clean(strtolower($v));
-			}, $m[1]))), 0, 20);
-		}
-		if (preg_match('/^Status:\s*([245]\.\d{1,3}\.\d{1,3})/mi', $body, $m)) {
-			$out['status'] = $m[1];
-		}
-		if (preg_match('/^Diagnostic-Code:\s*[^;]*;\s*(.+(?:\r?\n[ \t].+)*)/mi', $body, $m)) {
-			$out['reason'] = mb_substr(InboxMimeParser::clean(preg_replace('/\s+/', ' ', $m[1])), 0, 300, 'UTF-8');
-		}
-		if (!$out['recipients'] && $out['status'] === '') {
-			return null;
 		}
 
 		return $out;

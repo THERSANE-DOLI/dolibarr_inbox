@@ -36,7 +36,7 @@ class InboxNotification
 	const MERGE_DELAY = 60;
 
 	/** Types of inbox, listed in Settings > Notifications; the types of other modules follow the defaults */
-	const TYPES = array('assign', 'send_failed', 'box_error', 'rule_redirect', 'access_self');
+	const TYPES = array('assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self');
 
 	/** A notification still unread after this time (s) goes in the summary by mail */
 	const MAIL_AFTER = 900;
@@ -178,6 +178,7 @@ class InboxNotification
 				'actor' => (int) $r->fk_user_actor ? array('id' => (int) $r->fk_user_actor, 'name' => $actor !== '' ? $actor : (string) $r->login) : null,
 				'subject' => is_array($payload) ? (string) ($payload['subject'] ?? '') : '',
 				'text' => is_array($payload) ? (string) ($payload['text'] ?? '') : '',
+				'detail' => is_array($payload) ? (string) ($payload['detail'] ?? '') : '',
 				'account' => (string) ($r->account_email ?: $r->account_label),
 				'date' => (int) $this->db->jdate($r->date_creation),
 				'read' => $r->date_read ? 1 : 0,
@@ -529,6 +530,9 @@ class InboxNotification
 		}
 		if ($n['type'] === 'box_error') {
 			return $langs->transnoentities('InboxNotifBoxError');
+		}
+		if ($n['type'] === 'bounce') {
+			return $langs->transnoentities('InboxNotifBounce', (string) ($n['detail'] ?? ''));
 		}
 		if ($n['type'] === 'access_self') {
 			return $langs->transnoentities('InboxNotifAccessSelf', $n['actor'] ? $n['actor']['name'] : '');

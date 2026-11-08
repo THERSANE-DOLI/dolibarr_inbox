@@ -233,6 +233,10 @@ switch ($action) {
 		dol_include_once('/inbox/class/inboxthreadmark.class.php');
 		$threadMarks = new InboxThreadMark($db);
 		$threadMarks->decorate($user, $page['rows']);
+		// Mails sent not delivered to someone (1.25.0)
+		dol_include_once('/inbox/class/inboxbounce.class.php');
+		$bounces = new InboxBounce($db);
+		$bounces->decorate($page['rows']);
 		$page['ms'] = (int) round((microtime(true) - $start) * 1000);
 		// Version of the folder read with the page: the refresh compares with it (a change made just after the
 		// page is not missed)

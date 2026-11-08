@@ -2165,7 +2165,7 @@
 		const chan = (type, c) => (channels[type] && channels[type][c] !== undefined ? +channels[type][c] === 1 : c === 'b');
 		const sw = (attrs, on, label) => '<button type="button" class="ibx-switch" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '" ' + attrs + '></button>';
 		const newMail = m => (m.params.new_mail_notify === 'auto' ? !!m.personal : m.params.new_mail_notify === '1');
-		const types = ['assign', 'send_failed', 'box_error', 'rule_redirect', 'access_self'];
+		const types = ['assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self'];
 		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavNotifications') + '</h1></div>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionBrowserNotif') + '</h2><div class="ibx-js-browser"></div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionNotifTypes') + '</h2><p class="ibx-section__help">' + th('InboxNotifTypesHelp') + '</p>'

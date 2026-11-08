@@ -277,6 +277,11 @@ class InboxSync
 				$mails->clearFolder($folderId);
 			}
 			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			// Delivery reports among the new mails (1.25.0): their start read (the report comes before the original),
+			// linked to the mail sent; never in Sent or Drafts
+			if (!in_array((string) $f->role, array('sent', 'drafts'), true)) {
+				$this->bounces($connector, (int) $account->id, (string) $f->path, $res['new']);
+			}
 			// Answers in an ignored thread arrive read (1.11.0); never in Sent or Drafts
 			$readNow = 0;
 			if ($mails->lastNewIds && !in_array((string) $f->role, array('sent', 'drafts'), true)) {
@@ -322,6 +327,34 @@ class InboxSync
 		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
 
 		return 1;
+	}
+
+	/**
+	 * Delivery reports among new mails: the start of each read, recorded by InboxBounce
+	 *
+	 * @param InboxConnectorInterface         $connector Connected
+	 * @param int                             $accountId Mailbox
+	 * @param string                          $path      Folder path
+	 * @param array<int,array<string,mixed>>  $new       New mails (common format)
+	 * @return void
+	 */
+	protected function bounces($connector, $accountId, $path, array $new)
+	{
+		$dates = array();
+		foreach ($new as $m) {
+			if (!empty($m['is_report']) && !empty($m['remote_id'])) {
+				$dates[(string) $m['remote_id']] = (int) ($m['date_received'] ?: $m['date_mail']);
+			}
+		}
+		if (!$dates) {
+			return;
+		}
+		require_once __DIR__.'/inboxbounce.class.php';
+		$starts = $connector->fetchStarts($path, array_slice(array_keys($dates), 0, 200), 65536);
+		$bounce = new InboxBounce($this->db);
+		foreach (is_array($starts) ? $starts : array() as $rid => $raw) {
+			$bounce->record($accountId, (string) $raw, $dates[$rid] ?? 0);
+		}
 	}
 
 	/**

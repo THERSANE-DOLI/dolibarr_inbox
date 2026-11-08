@@ -1854,4 +1854,9 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-qr__owner { margin-top: var(--ibx-s1); }
 .ibx-qr__owner[hidden] { display: none; }
 .ibx-qr__table td.is-invalid .ibx-qr__owner .ibx-field { border-color: var(--ibx-danger); }
+/* Delivery reports (1.25.0) */
+.ibx-threadmark--bounce { color: var(--ibx-danger); }
+.ibx-bounce__line + .ibx-bounce__line { margin-top: var(--ibx-s1); }
+.ibx-bounce__server { font-size: var(--ibx-fs-sm); font-weight: 400; overflow-wrap: anywhere; }
+.ibx-js-bouncego { margin-top: var(--ibx-s1); font-weight: 400; }
 

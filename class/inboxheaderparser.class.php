@@ -80,6 +80,10 @@ class InboxHeaderParser
 		if (is_array($bodystructure)) {
 			$out['has_attachments'] = self::hasAttachments($bodystructure) ? 1 : 0;
 		}
+		// Delivery report of a mail sent (1.25.0): read further by the synchronisation, this mail only
+		if (preg_match('/^Content-Type:[ \t]*multipart\/report\b([^\r\n]*(?:\r?\n[ \t][^\r\n]*)*)/mi', $header, $ct) && stripos($ct[1], 'delivery-status') !== false) {
+			$out['is_report'] = 1;
+		}
 
 		return $out;
 	}

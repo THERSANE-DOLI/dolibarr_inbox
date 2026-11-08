@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/avatar.php
  * \ingroup inbox
- * \brief   Picture of the sender of a mail of the index (404: the application shows the initials)
+ * \brief   Picture of the sender of a mail of the index (204 without picture: the application shows the initials)
  *
  * Asked by the row of the mail, never by the address (no address in an URL). reading=1: head of the reading pane,
  * BIMI allowed when this mail passed DMARC (read in the raw mail kept in the cache).
@@ -51,8 +51,8 @@ $pic = $avatar->get((string) $reader->row->from_email, (int) $reader->row->fk_so
 header('Cache-Control: private, max-age=3600');
 header('X-Content-Type-Options: nosniff');
 if (!$pic) {
-	http_response_code(404);
-	header('Content-Type: text/plain');
+	// No picture: an empty answer (the application shows the initials), not an error in the console of the browser
+	http_response_code(204);
 	exit;
 }
 header('Content-Type: '.$pic['type']);
