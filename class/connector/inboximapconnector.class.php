@@ -448,6 +448,65 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
+	 * UID SEARCH CHARSET UTF-8 [SINCE d] [BEFORE d] TEXT w1 TEXT w2 in the folder, read only (EXAMINE). Every word is
+	 * sent as a literal: no quote or bracket typed by the user can change the command.
+	 *
+	 * @param string              $folder  Folder path
+	 * @param string[]            $words   Words
+	 * @param array<string,mixed> $options since, before (timestamps)
+	 * @return string[]|null "uidvalidity:uid"
+	 */
+	public function searchText($folder, array $words, array $options = array())
+	{
+		$this->error = '';
+		$tokens = array('CHARSET', 'UTF-8');
+		foreach (array('since' => 'SINCE', 'before' => 'BEFORE') as $key => $criterion) {
+			if (!empty($options[$key])) {
+				$tokens[] = $criterion;
+				$tokens[] = gmdate('j-M-Y', (int) $options[$key]);
+			}
+		}
+		$n = 0;
+		foreach ($words as $w) {
+			$w = trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string) $w));
+			if ($w === '') {
+				continue;
+			}
+			$w = mb_substr($w, 0, 100, 'UTF-8');
+			$tokens[] = 'TEXT';
+			$tokens[] = array('{'.strlen($w).'}', $w);
+			$n++;
+		}
+		if (!$n) {
+			return array();
+		}
+		if (!self::isSafeFolderPath($folder)) {
+			$this->error = 'Invalid folder';
+			return null;
+		}
+		if (!$this->connect()) {
+			return null;
+		}
+		try {
+			if (!$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$out = array();
+			foreach ($this->searchUids($tokens) as $uid) {
+				$out[] = $this->examinedValidity.':'.$uid;
+			}
+
+			return $out;
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			// A timeout leaves the connection in an unknown state: the next call connects again
+			$this->disconnect();
+			return null;
+		}
+	}
+
+	/**
 	 * Headers of one mail (BODY.PEEK[HEADER]: the mail stays unread), for the checks of the sender (lot W5 1.15.0)
 	 *
 	 * @param string $folder   Folder path

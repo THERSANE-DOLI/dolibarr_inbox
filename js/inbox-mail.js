@@ -40,6 +40,13 @@
 		scope: 'folder',
 		q: '',
 		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false },
+		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
+		chips: [],
+		soc: null,
+		tag: '',
+		period: '',
+		sx: { open: false, active: -1, opts: [], sug: null, sugSeq: 0, text: '', timer: 0 },
+		deep: null,
 		// Names of the people assigned seen in the lists (user => name), and the user (lot W4 1.9.0)
 		people: {},
 		me: +(I.ctx('INBOX_USER_ID', 0) || 0),
@@ -444,6 +451,19 @@
 				q[k] = 1;
 			}
 		});
+		const qx = sxExtra();
+		if (qx) {
+			q.qx = qx;
+		}
+		if (S.soc) {
+			q.soc = S.soc.id;
+		}
+		if (S.tag) {
+			q.tag = S.tag;
+		}
+		if (deepOn()) {
+			q.text = 1;
+		}
 		return q;
 	}
 
@@ -735,7 +755,7 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
@@ -982,7 +1002,7 @@
 					+ '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : '')
-					+ '<span class="ibx-mailcard__foot">' + threadBadge(r) + tagsHtml(r) + assigneesHtml(r.assignees, 'ibx-mailcard__assign') + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
+					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + assigneesHtml(r.assignees, 'ibx-mailcard__assign') + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
 					+ (S.scope === 'all' ? ' <span class="ibx-muted">' + esc(boxLabel(r)) + '</span>' : '')
 					+ '</span>'
 					+ '</div>'
@@ -1058,13 +1078,14 @@
 	}
 
 	function hasFilter() {
-		return S.q !== '' || Object.values(S.filters).some(Boolean);
+		return S.q !== '' || Object.values(S.filters).some(Boolean) || S.chips.length > 0 || !!S.soc || S.tag !== '' || S.period !== '';
 	}
 
 	function emptyList() {
 		const f = currentFolder();
 		if (hasFilter()) {
 			return '<div class="ibx-empty">' + ic('search', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxNoResult') + '</div>'
+				+ (canDeep() ? '<div>' + th('InboxDeepNotSearched') + '</div><div><button type="button" class="ibx-btn ibx-btn--primary ibx-js-deep">' + ic('search') + ' ' + th('InboxDeepSearchRun', sxWords().join(' ')) + '</button></div>' : '')
 				+ '<div class="ibx-inline"><button type="button" class="ibx-btn ibx-js-clear">' + th('InboxClearFilter') + '</button>'
 				+ (S.scope === 'folder' ? '<button type="button" class="ibx-btn ibx-js-scope" data-scope="account">' + th('InboxSearchWholeBox') + '</button>' : '')
 				+ (S.scope !== 'all' && S.accounts.length > 1 ? '<button type="button" class="ibx-btn ibx-js-scope" data-scope="all">' + th('InboxSearchAllBoxes') + '</button>' : '') + '</div></div>';
@@ -1086,8 +1107,13 @@
 		}
 		$$('.ibx-js-scope', body).forEach(b => b.addEventListener('click', () => {
 			S.scope = b.dataset.scope;
-			loadList();
+			sxChanged();
+			renderListHead();
 		}));
+		const deep = $('.ibx-js-deep', body);
+		if (deep) {
+			deep.addEventListener('click', startDeep);
+		}
 	}
 
 	function clearFilters() {
@@ -1096,6 +1122,12 @@
 		Object.keys(S.filters).forEach(k => {
 			S.filters[k] = false;
 		});
+		S.chips = [];
+		S.soc = null;
+		S.tag = '';
+		S.period = '';
+		S.sx.text = '';
+		stopDeep(true);
 		$('.ibx-js-search', S.el).value = '';
 		renderFilters();
 		loadList();
@@ -1114,8 +1146,6 @@
 		$('.ibx-js-view', S.el).innerHTML = ic(params.view === 'table' ? 'view-cards' : 'view-table');
 		$('.ibx-js-view', S.el).title = t(params.view === 'table' ? 'InboxViewCards' : 'InboxViewTable');
 		$('.ibx-js-view', S.el).setAttribute('aria-label', $('.ibx-js-view', S.el).title);
-		const qf = $('.ibx-js-quickfilter', S.el);
-		qf.setAttribute('aria-pressed', params.quick_filter === '1' ? 'true' : 'false');
 		const sortKey = { 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFrom', 'from:desc': 'InboxSortFrom', 'subject:asc': 'InboxSortSubject', 'subject:desc': 'InboxSortSubject', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSize' }[params.list_sort || 'date:desc'];
 		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortKey ? ' · ' + t('InboxSortedBy', t(sortKey)) : '');
 		renderPills();
@@ -1138,18 +1168,561 @@
 		}
 		box.innerHTML = pills.map(p => '<span class="ibx-badge">' + esc(p) + '</span>').join(' ');
 		box.hidden = !pills.length || S.q === '';
-		$('.ibx-searchinfo', S.el).hidden = box.hidden && $('.ibx-js-scopehint', S.el).textContent === '';
+		$('.ibx-js-sxclear', S.el).hidden = !hasFilter();
+		$('.ibx-searchinfo', S.el).hidden = box.hidden && $('.ibx-js-scopehint', S.el).textContent === '' && !hasFilter();
 	}
 
 	function renderFilters() {
-		const bar = $('.ibx-js-filters', S.el);
-		bar.hidden = params.quick_filter !== '1' && !Object.values(S.filters).some(Boolean);
-		$$('[data-filter]', bar).forEach(b => b.setAttribute('aria-pressed', S.filters[b.dataset.filter] ? 'true' : 'false'));
-		// « Include the archived ones »: only for « My mails » out of a folder (a search on the mailbox or on all of them)
-		const archived = $('[data-filter="archived"]', bar);
-		archived.hidden = !S.filters.mine || S.scope === 'folder';
-		const active = Object.values(S.filters).some(Boolean);
-		$('.ibx-js-clearfilters', bar).hidden = !active;
+		sxRenderChips();
+		sxRenderPanel();
+	}
+
+	// ---------- Search panel and deep search (lot W7 1.19.0) ----------
+	// The field opens into a panel: scope, suggestions, filters (shown as pills in the field), the deep search in the
+	// text of the mails (asked, one mailbox after the other on its mail server), recent searches
+
+	/** Words typed (the operators typed in the field are not words) */
+	function sxWords() {
+		return S.q.split(/\s+/).filter(w => w && !/^[^\s:"]+:\S/.test(w));
+	}
+
+	/** Criteria of the panel as operators in English, sent beside the typed text (qx) */
+	function sxExtra() {
+		const out = S.chips.map(c => c.op + ':"' + String(c.v).replace(/"/g, '') + '"');
+		if (S.period) {
+			const d = new Date();
+			d.setHours(0, 0, 0, 0);
+			d.setDate(d.getDate() - ({ today: 0, d7: 7, d30: 30, d365: 365 }[S.period] || 0));
+			out.push('after:' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+		}
+		return out.join(' ');
+	}
+
+	function deepKey() {
+		return JSON.stringify([S.q, sxExtra(), S.scope, S.scope === 'all' ? 0 : S.folderId]);
+	}
+	/** The list asks for the mails found in their text by the deep search of the same search */
+	function deepOn() {
+		return !!(S.deep && S.deep.key === deepKey() && S.deep.done > 0);
+	}
+	function deepAccounts() {
+		if (S.scope === 'all') {
+			return S.accounts.map(a => a.id);
+		}
+		const f = currentFolder();
+		return f ? [f.account.id] : [];
+	}
+	function canDeep() {
+		return sxWords().length > 0 && deepAccounts().length > 0 && !(S.deep && S.deep.key === deepKey());
+	}
+	function accountById(id) {
+		return S.accounts.find(a => a.id === id) || null;
+	}
+
+	/** Tags of the mailboxes of the scope, without duplicates (keyword) */
+	function sxTagDefs() {
+		const seen = new Set();
+		const out = [];
+		deepAccounts().map(accountById).filter(Boolean).forEach(a => (a.tags || []).forEach(d => {
+			if (!seen.has(d.keyword.toLowerCase())) {
+				seen.add(d.keyword.toLowerCase());
+				out.push(d);
+			}
+		}));
+		return out;
+	}
+
+	// Recent searches: per user, in this browser
+	function sxRecentKey() {
+		return 'inbox.search.recent.' + S.me;
+	}
+	function sxRecent() {
+		try {
+			const list = JSON.parse(localStorage.getItem(sxRecentKey()) || '[]');
+			return Array.isArray(list) ? list : [];
+		} catch (e) {
+			return [];
+		}
+	}
+	function sxRemember() {
+		if (S.q === '' && !S.chips.length && !S.soc) {
+			return;
+		}
+		const item = { q: S.q, chips: S.chips, soc: S.soc };
+		const label = sxRecentLabel(item);
+		const list = [item].concat(sxRecent().filter(x => sxRecentLabel(x) !== label)).slice(0, 6);
+		try {
+			localStorage.setItem(sxRecentKey(), JSON.stringify(list));
+		} catch (e) {
+			// private window: nothing kept
+		}
+	}
+	function sxRecentLabel(x) {
+		return [x.q || ''].concat((x.chips || []).map(c => c.label || c.v), x.soc ? [x.soc.name] : []).filter(Boolean).join(' · ');
+	}
+
+	/** Pills in the field: criteria of the panel and filters */
+	function sxRenderChips() {
+		const box = $('.ibx-js-sxpills', S.el);
+		if (!box) {
+			return;
+		}
+		const chips = S.chips.map((c, i) => ({ html: esc(c.label || c.v), rm: () => S.chips.splice(i, 1) }));
+		if (S.soc) {
+			chips.push({ html: esc(t('InboxSxSoc', S.soc.name)), rm: () => {
+				S.soc = null;
+			} });
+		}
+		const names = { unread: 'InboxFilterUnread', flagged: 'InboxFilterFlagged', attachment: 'InboxFilterAttachment', mine: 'InboxFilterMine', archived: 'InboxFilterMineArchived' };
+		Object.keys(names).filter(k => S.filters[k]).forEach(k => chips.push({ html: th(names[k]), rm: () => {
+			S.filters[k] = false;
+			if (k === 'mine') {
+				S.filters.archived = false;
+			}
+		} }));
+		if (S.period) {
+			chips.push({ html: th('InboxSxPeriodPill', t('InboxSxPeriod_' + S.period)), rm: () => {
+				S.period = '';
+			} });
+		}
+		if (S.tag) {
+			const d = sxTagDefs().find(x => x.keyword.toLowerCase() === S.tag.toLowerCase());
+			chips.push({ html: th('InboxSxTag', d ? d.label : S.tag), rm: () => {
+				S.tag = '';
+			} });
+		}
+		box.innerHTML = chips.map((c, i) => '<span class="ibx-sx__pill">' + c.html + '<button type="button" data-rm="' + i + '" aria-label="' + th('InboxSxRemove') + '" title="' + th('InboxSxRemove') + '">' + ic('close') + '</button></span>').join('');
+		$$('[data-rm]', box).forEach(b => b.addEventListener('click', e => {
+			e.stopPropagation();
+			chips[+b.dataset.rm].rm();
+			sxChanged();
+			$('.ibx-js-search', S.el).focus();
+		}));
+		$('.ibx-js-sxkbd', S.el).hidden = S.sx.open || chips.length > 0 || S.q !== '' || isPhone();
+	}
+
+	/** A criterion changed: pills, panel, list */
+	function sxChanged() {
+		if (S.deep && S.deep.key !== deepKey()) {
+			stopDeep(true);
+		}
+		sxRenderChips();
+		sxRenderPanel();
+		loadList();
+	}
+
+	function sxOpen() {
+		if (S.sx.open) {
+			return;
+		}
+		S.sx.open = true;
+		S.sx.active = -1;
+		sxRenderPanel();
+		sxRenderChips();
+	}
+	function sxClose() {
+		if (!S.sx.open) {
+			return;
+		}
+		S.sx.open = false;
+		S.sx.active = -1;
+		sxRemember();
+		sxRenderPanel();
+		sxRenderChips();
+	}
+
+	/** Senders and third parties of the readable mailboxes that match the text typed */
+	let sxSugTimer = 0;
+	function sxSuggest() {
+		clearTimeout(sxSugTimer);
+		const text = S.sx.text.trim();
+		if (text.length < 2) {
+			S.sx.sug = null;
+			return;
+		}
+		sxSugTimer = setTimeout(async () => {
+			const seq = ++S.sx.sugSeq;
+			try {
+				const res = await api('list', 'suggest', { q: text }, { method: 'POST' });
+				if (seq === S.sx.sugSeq) {
+					S.sx.sug = { text, senders: res.senders || [], socs: res.socs || [] };
+					sxRenderPanel();
+				}
+			} catch (e) {
+				// No suggestion: the search itself still works
+			}
+		}, 200);
+	}
+
+	function sxRenderPanel() {
+		const sx = $('.ibx-js-sx', S.el);
+		const panel = $('.ibx-js-sxpanel', S.el);
+		const input = $('.ibx-js-search', S.el);
+		if (!sx) {
+			return;
+		}
+		sx.classList.toggle('is-open', S.sx.open);
+		input.setAttribute('aria-expanded', S.sx.open ? 'true' : 'false');
+		panel.hidden = !S.sx.open;
+		if (!S.sx.open) {
+			input.removeAttribute('aria-activedescendant');
+			return;
+		}
+		const opts = [];
+		const opt = (icon, label, hint, run) => {
+			const i = opts.length;
+			opts.push(run);
+			return '<li class="ibx-sx__opt' + (S.sx.active === i ? ' is-active' : '') + '" role="option" id="ibx-sxo' + i + '" data-opt="' + i + '" aria-selected="' + (S.sx.active === i) + '">' + ic(icon)
+				+ '<span class="ibx-ellipsis">' + label + (hint ? ' <small>' + hint + '</small>' : '') + '</span></li>';
+		};
+		const text = S.sx.text.trim();
+		const f = currentFolder();
+		let h = '';
+
+		// Where
+		const scopes = [];
+		if (f) {
+			scopes.push(['folder', 'InboxScopeFolder'], ['account', 'InboxScopeAccount']);
+		}
+		if (S.accounts.length > 1 || !f) {
+			scopes.push(['all', 'InboxScopeAll']);
+		}
+		h += '<div class="ibx-sx__sec"><p class="ibx-sx__label" id="ibx-sxwhere">' + th('InboxSxWhere') + '</p><div class="ibx-btngroup" role="group" aria-labelledby="ibx-sxwhere">'
+			+ scopes.map(([v, k]) => '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-sxscope="' + v + '" aria-pressed="' + (S.scope === v) + '">' + th(k) + '</button>').join('') + '</div></div>';
+
+		// Suggestions
+		if (text.length >= 2) {
+			let sug = '';
+			const low = text.toLowerCase();
+			const s = S.sx.sug && S.sx.sug.text === text ? S.sx.sug : { senders: [], socs: [] };
+			s.senders.forEach(x => {
+				sug += opt('user-circle', th('InboxSxFrom', x.name || x.email), esc(x.email), () => sxAddChip('from', x.email, t('InboxSxFrom', x.name || x.email)));
+			});
+			s.socs.forEach(x => {
+				sug += opt('company', th('InboxSxSoc', x.name), th('InboxSxSocHint'), () => {
+					S.soc = { id: x.id, name: x.name };
+					sxClearText();
+				});
+			});
+			sxTagDefs().filter(d => d.label.toLowerCase().includes(low) || d.keyword.toLowerCase().includes(low)).slice(0, 3).forEach(d => {
+				sug += opt('tag', th('InboxSxTag', d.label), '', () => {
+					S.tag = d.keyword;
+					sxClearText();
+				});
+			});
+			sug += opt('fmt-heading', th('InboxSxSubject', text), '', () => sxAddChip('subject', text, t('InboxSxSubject', text)));
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxSuggestions') + '</p><ul class="ibx-sx__opts" role="listbox" aria-label="' + th('InboxSxSuggestions') + '">' + sug + '</ul></div>';
+		}
+
+		// Filters
+		const tb = (k, icon, key) => '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-sxfilter="' + k + '" aria-pressed="' + !!S.filters[k] + '">' + ic(icon) + ' ' + th(key) + '</button>';
+		const tags = sxTagDefs();
+		h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxFilters') + '</p><div class="ibx-sx__filters">'
+			+ tb('unread', 'unread', 'InboxFilterUnread') + tb('flagged', 'star', 'InboxFilterFlagged') + tb('attachment', 'attachment', 'InboxFilterAttachment') + tb('mine', 'user-circle', 'InboxFilterMine')
+			+ (S.filters.mine && S.scope !== 'folder' ? tb('archived', 'archive', 'InboxFilterMineArchived') : '')
+			+ '<label class="ibx-sx__field">' + th('InboxSxPeriod') + ' <select class="ibx-sx__select' + (S.period ? ' is-set' : '') + '" data-sxsel="period"><option value="">' + th('InboxSxPeriodAll') + '</option>'
+			+ ['today', 'd7', 'd30', 'd365'].map(p => '<option value="' + p + '"' + (S.period === p ? ' selected' : '') + '>' + th('InboxSxPeriod_' + p) + '</option>').join('') + '</select></label>'
+			+ (tags.length ? '<label class="ibx-sx__field">' + th('InboxSxTagLabel') + ' <select class="ibx-sx__select' + (S.tag ? ' is-set' : '') + '" data-sxsel="tag"><option value="">' + th('InboxSxPeriodAll') + '</option>'
+				+ tags.map(d => '<option value="' + esc(d.keyword) + '"' + (S.tag.toLowerCase() === d.keyword.toLowerCase() ? ' selected' : '') + '>' + esc(d.label) + '</option>').join('') + '</select></label>' : '')
+			+ '</div></div>';
+
+		// Text of the mails
+		const words = sxWords();
+		if (words.length && canDeep()) {
+			const i = opts.length;
+			opts.push(startDeep);
+			const names = deepAccounts().map(id => accountById(id)).filter(Boolean).map(accountName).join(', ');
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxText') + '</p>'
+				+ '<div class="ibx-sx__deep' + (S.sx.active === i ? ' is-active' : '') + '" role="option" id="ibx-sxo' + i + '" data-opt="' + i + '" aria-selected="' + (S.sx.active === i) + '">' + ic('search')
+				+ '<strong>' + th('InboxDeepSearchRun', words.join(' ')) + '</strong>'
+				+ '<small>' + th('InboxDeepSearchHint', names + (S.scope === 'folder' && f ? ' (' + folderName(f.folder) + ')' : '')) + '</small>'
+				+ '<kbd class="ibx-kbd">Ctrl+' + th('InboxSxKeyEnter') + '</kbd></div></div>';
+		}
+
+		// Recent searches
+		const recent = text === '' ? sxRecent() : [];
+		if (recent.length) {
+			h += '<div class="ibx-sx__sec"><p class="ibx-sx__label">' + th('InboxSxRecent') + '<span class="ibx-spacer"></span><button type="button" class="ibx-js-sxrecentclear">' + th('InboxSxRecentClear') + '</button></p>'
+				+ '<ul class="ibx-sx__opts" role="listbox" aria-label="' + th('InboxSxRecent') + '">' + recent.map(x => opt('search', esc(sxRecentLabel(x)), '', () => sxApplyRecent(x))).join('') + '</ul></div>';
+		}
+
+		h += '<div class="ibx-sx__foot ibx-desktoponly-phone"><span><kbd class="ibx-kbd">↑</kbd> <kbd class="ibx-kbd">↓</kbd> ' + th('InboxSxKeysChoose') + '</span>'
+			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysValidate') + '</span>'
+			+ (words.length ? '<span><kbd class="ibx-kbd">Ctrl+' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysDeep') + '</span>' : '')
+			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEscape') + '</kbd> ' + th('InboxSxKeysClose') + '</span><span>' + th('InboxSxKeysOps') + '</span></div>';
+
+		panel.innerHTML = h;
+		S.sx.opts = opts;
+		if (S.sx.active >= opts.length) {
+			S.sx.active = -1;
+		}
+		if (S.sx.active >= 0) {
+			input.setAttribute('aria-activedescendant', 'ibx-sxo' + S.sx.active);
+		} else {
+			input.removeAttribute('aria-activedescendant');
+		}
+	}
+
+	function sxClearText() {
+		const input = $('.ibx-js-search', S.el);
+		input.value = '';
+		S.q = '';
+		S.sx.text = '';
+		S.sx.active = -1;
+		sxChanged();
+		input.focus();
+	}
+	function sxAddChip(op, v, label) {
+		S.chips.push({ op, v, label });
+		sxClearText();
+	}
+	function sxApplyRecent(x) {
+		const input = $('.ibx-js-search', S.el);
+		S.q = x.q || '';
+		S.sx.text = S.q;
+		input.value = S.q;
+		S.chips = (x.chips || []).slice();
+		S.soc = x.soc || null;
+		S.sx.active = -1;
+		sxChanged();
+		input.focus();
+	}
+
+	// Deep search: one mailbox after the other, the list read again after each one
+	async function startDeep() {
+		if (!canDeep()) {
+			return;
+		}
+		clearTimeout(S.sx.timer);
+		S.q = $('.ibx-js-search', S.el).value.trim();
+		const accounts = deepAccounts();
+		const deep = { key: deepKey(), accounts, done: 0, running: true, stopped: false, incomplete: [], unsupported: [], failed: [] };
+		S.deep = deep;
+		sxClose();
+		renderDeepbar();
+		for (const id of accounts) {
+			if (S.deep !== deep || !deep.running) {
+				return;
+			}
+			const name = accountById(id) ? accountName(accountById(id)) : String(id);
+			try {
+				const q = listQuery('');
+				const res = await api('list', 'content', { account: id, scope: S.scope, folder: S.folderId, q: q.q, qx: q.qx || '' }, { method: 'POST' });
+				if (res.unsupported) {
+					deep.unsupported.push(name);
+				} else if (!res.complete) {
+					deep.incomplete.push(name);
+				}
+			} catch (err) {
+				deep.failed.push(name + ' : ' + err.message);
+			}
+			if (S.deep !== deep || !deep.running) {
+				return;
+			}
+			deep.done++;
+			renderDeepbar();
+			await loadList(true);
+		}
+		deep.running = false;
+		renderDeepbar();
+		renderList();
+	}
+	function stopDeep(reset) {
+		if (S.deep) {
+			S.deep.running = false;
+			S.deep.stopped = !reset;
+			if (reset) {
+				S.deep = null;
+			}
+		}
+		renderDeepbar();
+	}
+	function renderDeepbar() {
+		const bar = $('.ibx-js-deepbar', S.el);
+		if (!bar) {
+			return;
+		}
+		const d = S.deep;
+		if (!d || d.closed) {
+			bar.hidden = true;
+			return;
+		}
+		bar.hidden = false;
+		bar.classList.toggle('is-done', !d.running);
+		const names = d.accounts.map(id => accountById(id)).filter(Boolean).map(accountName);
+		let html;
+		if (d.running) {
+			const cur = names[Math.min(d.done, names.length - 1)] || '';
+			html = '<span>' + ic('search') + ' ' + th('InboxDeepRunning', cur, String(d.done + 1), String(d.accounts.length)) + '</span>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-deepstop">' + th('InboxDeepStop') + '</button>'
+				+ '<div class="ibx-sx-deepbar__track" role="progressbar" aria-valuemin="0" aria-valuemax="' + d.accounts.length + '" aria-valuenow="' + d.done + '"><div class="ibx-sx-deepbar__fill" style="width:' + Math.round(100 * (d.done + 0.5) / d.accounts.length) + '%"></div></div>';
+		} else {
+			const lines = [];
+			lines.push(d.stopped ? th('InboxDeepStopped') : th('InboxDeepDone', names.join(', ')) + ' <span class="ibx-muted">' + th('InboxDeepExact') + '</span>');
+			d.incomplete.forEach(n => lines.push(ic('warning') + ' ' + th('InboxDeepIncomplete', n)));
+			d.unsupported.forEach(n => lines.push(ic('info') + ' ' + th('InboxDeepUnsupported', n)));
+			d.failed.forEach(n => lines.push(ic('warning') + ' ' + esc(n)));
+			html = '<span>' + (d.stopped ? ic('info') : ic('check')) + ' ' + lines.join('<br>') + '</span>'
+				+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-btn--icon ibx-js-deepclose" aria-label="' + th('InboxCloseWindow') + '" title="' + th('InboxCloseWindow') + '">' + ic('close') + '</button>';
+		}
+		bar.innerHTML = html;
+		const stop = $('.ibx-js-deepstop', bar);
+		if (stop) {
+			stop.addEventListener('click', () => {
+				stopDeep(false);
+				renderList();
+			});
+		}
+		const close = $('.ibx-js-deepclose', bar);
+		if (close) {
+			close.addEventListener('click', () => {
+				d.closed = true;
+				renderDeepbar();
+			});
+		}
+	}
+
+	/** Mark of a row found only in its text */
+	function foundHtml(r) {
+		return r.in_text ? '<span class="ibx-found">' + ic('search') + ' ' + th('InboxFoundInText') + '</span> ' : '';
+	}
+
+	/** Events of the field and of its panel */
+	function bindSearchPanel(el) {
+		const sx = $('.ibx-js-sx', el);
+		const input = $('.ibx-js-search', el);
+		const panel = $('.ibx-js-sxpanel', el);
+		S.sx.text = '';
+		input.addEventListener('focus', sxOpen);
+		$('.ibx-js-sxrow', el).addEventListener('click', e => {
+			if (!e.target.closest('button')) {
+				input.focus();
+				sxOpen();
+			}
+		});
+		input.addEventListener('input', () => {
+			S.sx.text = input.value;
+			S.sx.active = -1;
+			sxSuggest();
+			sxOpen();
+			sxRenderPanel();
+			sxRenderChips();
+			clearTimeout(S.sx.timer);
+			S.sx.timer = setTimeout(() => {
+				S.q = input.value.trim();
+				if (S.q === '' && S.scope !== 'folder' && !hasFilter() && currentFolder()) {
+					S.scope = 'folder';
+				}
+				if (S.deep && S.deep.key !== deepKey()) {
+					stopDeep(true);
+				}
+				sxRenderPanel();
+				loadList();
+			}, 300);
+		});
+		input.addEventListener('keydown', e => {
+			if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+				e.preventDefault();
+				S.q = input.value.trim();
+				startDeep();
+				return;
+			}
+			if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && S.sx.open) {
+				e.preventDefault();
+				const n = S.sx.opts.length;
+				if (n) {
+					S.sx.active = e.key === 'ArrowDown' ? (S.sx.active + 1) % n : (S.sx.active <= 0 ? n - 1 : S.sx.active - 1);
+					sxRenderPanel();
+					const cur = $('#ibx-sxo' + S.sx.active, panel);
+					if (cur) {
+						cur.scrollIntoView({ block: 'nearest' });
+					}
+				}
+				return;
+			}
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				moveSelection(0);
+				return;
+			}
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				if (S.sx.open && S.sx.active >= 0 && S.sx.opts[S.sx.active]) {
+					S.sx.opts[S.sx.active]();
+					return;
+				}
+				clearTimeout(S.sx.timer);
+				S.q = input.value.trim();
+				sxClose();
+				loadList();
+				return;
+			}
+			if (e.key === 'Escape') {
+				e.preventDefault();
+				if (S.sx.open) {
+					sxClose();
+				} else if (input.value || hasFilter()) {
+					clearFilters();
+				}
+				return;
+			}
+			if (e.key === 'Backspace' && input.value === '' && S.chips.length) {
+				S.chips.pop();
+				sxChanged();
+			}
+		});
+		sx.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && e.target !== input) {
+				e.preventDefault();
+				sxClose();
+				input.focus();
+			}
+		});
+		panel.addEventListener('click', e => {
+			const scope = e.target.closest('[data-sxscope]');
+			const filter = e.target.closest('[data-sxfilter]');
+			const o = e.target.closest('[data-opt]');
+			if (scope) {
+				S.scope = scope.dataset.sxscope;
+				sxChanged();
+				renderListHead();
+			} else if (filter) {
+				const k = filter.dataset.sxfilter;
+				S.filters[k] = !S.filters[k];
+				if (!S.filters.mine) {
+					S.filters.archived = false;
+				}
+				sxChanged();
+			} else if (o && S.sx.opts[+o.dataset.opt]) {
+				S.sx.opts[+o.dataset.opt]();
+			} else if (e.target.closest('.ibx-js-sxrecentclear')) {
+				try {
+					localStorage.removeItem(sxRecentKey());
+				} catch (err) {
+					// nothing kept anyway
+				}
+				sxRenderPanel();
+				input.focus();
+			}
+		});
+		panel.addEventListener('change', e => {
+			const sel = e.target.closest('[data-sxsel]');
+			if (sel) {
+				S[sel.dataset.sxsel] = sel.value;
+				sxChanged();
+			}
+		});
+		$('.ibx-js-sxclose', el).addEventListener('click', e => {
+			e.stopPropagation();
+			sxClose();
+			input.blur();
+		});
+		document.addEventListener('mousedown', e => {
+			if (S.sx.open && !sx.contains(e.target)) {
+				sxClose();
+			}
+		});
+		$('.ibx-js-sxclear', el).addEventListener('click', clearFilters);
 	}
 
 	// ---------- Selection ----------
@@ -4809,12 +5382,13 @@
 
 	/** Mails of a correspondent in the whole mailbox */
 	function searchFrom(email) {
-		const search = $('.ibx-js-search', S.el);
-		search.value = t('InboxSearchOpFrom') + ':' + email;
-		S.q = search.value;
+		$('.ibx-js-search', S.el).value = '';
+		S.q = '';
+		S.chips = [{ op: 'from', v: email, label: t('InboxSxFrom', email) }];
 		S.scope = 'account';
 		S.mobile('list');
-		loadList();
+		sxChanged();
+		renderListHead();
 	}
 
 	/** Where a context menu applies: returns a function opening it, or null (the menu of the browser stays) */
@@ -4926,6 +5500,10 @@
 			renderTree();
 		}
 		S.scope = 'folder';
+		// A deep search done elsewhere does not apply to this folder
+		if (S.deep && S.deep.key !== deepKey()) {
+			stopDeep(true);
+		}
 		S.selected.clear();
 		S.anchor = 0;
 		S.stamp = '';
@@ -5482,19 +6060,18 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-back ibx-mobileonly" data-to="folders" aria-label="' + th('InboxFolders') + '">' + ic('chevron-left') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--toggle ibx-js-togglefolders ibx-desktoponly" aria-pressed="false">' + ic('folders-hide') + '</button>'
 			+ '<span class="ibx-pane__title ibx-ellipsis ibx-js-listtitle" role="heading" aria-level="1"></span><span class="ibx-spacer"></span>'
-			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--toggle ibx-js-quickfilter" aria-pressed="false" title="' + th('InboxQuickFilter') + '" aria-label="' + th('InboxQuickFilter') + '">' + ic('quickfilter') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
-			+ '<div class="ibx-toolbar"><label class="ibx-search">' + ic('search') + '<input type="search" class="ibx-field ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false"'
-			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd">Ctrl+Maj+K</kbd></label></div>'
-			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span> <span class="ibx-js-pills" hidden></span></div>'
-			+ '<div class="ibx-filters ibx-js-filters" hidden role="group" aria-label="' + th('InboxQuickFilter') + '">'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="unread" aria-pressed="false">' + ic('unread') + ' ' + th('InboxFilterUnread') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="flagged" aria-pressed="false">' + ic('star') + ' ' + th('InboxFilterFlagged') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="attachment" aria-pressed="false">' + ic('attachment') + ' ' + th('InboxFilterAttachment') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="mine" aria-pressed="false">' + ic('user-circle') + ' ' + th('InboxFilterMine') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle" data-filter="archived" aria-pressed="false" hidden>' + ic('archive') + ' ' + th('InboxFilterMineArchived') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-clearfilters" hidden>' + th('InboxClearFilter') + '</button></div>'
+			// Search field opening into a panel (lot W7 1.19.0)
+			+ '<div class="ibx-toolbar"><div class="ibx-sx-holder"><div class="ibx-sx ibx-js-sx"><div class="ibx-sx__row ibx-js-sxrow">' + ic('search')
+			+ '<span class="ibx-sx__pills ibx-js-sxpills"></span>'
+			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'
+			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd ibx-js-sxkbd">Ctrl+Maj+K</kbd>'
+			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__close ibx-js-sxclose" aria-label="' + th('InboxSxClose') + '" title="' + th('InboxSxClose') + '">' + ic('close') + '</button></div>'
+			+ '<div class="ibx-sx__panel ibx-js-sxpanel" id="ibx-sxpanel" hidden></div></div></div></div>'
+			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span> <span class="ibx-js-pills" hidden></span><span class="ibx-spacer"></span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-sxclear" hidden>' + th('InboxClearSearch') + '</button></div>'
+			+ '<div class="ibx-sx-deepbar ibx-js-deepbar" role="status" hidden></div>'
 			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm">' + th('InboxSyncResume') + '</button></div>'
 			+ '<div class="ibx-banner ibx-banner--info ibx-js-outboxbar" role="status" hidden></div>'
@@ -5588,11 +6165,6 @@
 			renderList();
 			renderListHead();
 		});
-		$('.ibx-js-quickfilter', el).addEventListener('click', () => {
-			saveParam('quick_filter', params.quick_filter === '1' ? '0' : '1');
-			renderFilters();
-			renderListHead();
-		});
 		$('.ibx-js-listmenu', el).addEventListener('click', e => {
 			const cur = params.list_sort || 'date:desc';
 			const opt = (v, k) => ({ label: t(k), checked: cur === v, run: () => setSort(v) });
@@ -5612,48 +6184,7 @@
 				{ label: t('InboxDensity_comfortable'), checked: params.density === 'comfortable', run: () => setDensity('comfortable') },
 			]);
 		});
-		const filters = $('.ibx-js-filters', el);
-		filters.addEventListener('click', e => {
-			const b = e.target.closest('[data-filter]');
-			if (b) {
-				S.filters[b.dataset.filter] = !S.filters[b.dataset.filter];
-				if (!S.filters.mine) {
-					S.filters.archived = false;
-				}
-				renderFilters();
-				loadList();
-			} else if (e.target.closest('.ibx-js-clearfilters')) {
-				Object.keys(S.filters).forEach(k => {
-					S.filters[k] = false;
-				});
-				renderFilters();
-				loadList();
-			}
-		});
-		const search = $('.ibx-js-search', el);
-		let timer = 0;
-		search.addEventListener('input', () => {
-			clearTimeout(timer);
-			timer = setTimeout(() => {
-				S.q = search.value.trim();
-				if (S.q === '' && S.scope !== 'folder') {
-					S.scope = 'folder';
-				}
-				loadList();
-			}, 300);
-		});
-		search.addEventListener('keydown', e => {
-			if (e.key === 'Escape' && search.value) {
-				e.preventDefault();
-				search.value = '';
-				S.q = '';
-				S.scope = 'folder';
-				loadList();
-			} else if (e.key === 'ArrowDown') {
-				e.preventDefault();
-				moveSelection(0);
-			}
-		});
+		bindSearchPanel(el);
 		const listBody = $('.ibx-pane--list .ibx-pane__body', el);
 		// Shift + click: no text selection started by the browser (the range of mails is selected by the click)
 		listBody.addEventListener('mousedown', e => {

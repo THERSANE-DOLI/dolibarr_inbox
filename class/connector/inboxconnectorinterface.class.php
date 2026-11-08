@@ -155,6 +155,17 @@ interface InboxConnectorInterface
 	public function notFound();
 
 	/**
+	 * Mails of a folder whose text contains every word, searched by the mail server (lot W7 1.19.0, capability
+	 * CAP_SERVER_SEARCH), read only. Case is ignored by the server, accents are not.
+	 *
+	 * @param string              $folder  Folder path
+	 * @param string[]            $words   Words, all of them in the mail (headers and text parts)
+	 * @param array<string,mixed> $options since, before (timestamps): only the mails received in this period
+	 * @return string[]|null Remote identifiers found, null on error (getError())
+	 */
+	public function searchText($folder, array $words, array $options = array());
+
+	/**
 	 * Set or remove flags (lot W4)
 	 *
 	 * @param string   $folder    Folder path

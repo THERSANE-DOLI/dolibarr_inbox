@@ -195,6 +195,11 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/mail.php?action=open&id='.$row->rowid)['code'], 'IDOR: a mailbox without access is not found');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id='.$row->rowid)['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=page&folder='.$row->fk_folder)['code']);
+		// Deep search (lot W7 1.19.0): a mailbox without access is never searched on its server
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'all', 'q' => 'raccords'))['code'], 'IDOR: deep search');
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords'))['code']);
+		$sug = $this->call('/custom/inbox/ajax/list.php', array('action' => 'suggest', 'q' => 'dupont'));
+		$this->assertSame(array(), $sug['json']['senders'], 'no sender of a mailbox without access');
 
 		$this->assertGreaterThan(0, $access->grant($this->admin, (int) $a->id, (int) $login->rowid, 0, InboxAccess::LEVEL_READ));
 		$open = $this->call('/custom/inbox/ajax/mail.php?action=open&id='.$row->rowid);
@@ -203,6 +208,13 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$page = $this->call('/custom/inbox/ajax/list.php', array('action' => 'page', 'folder' => (int) $row->fk_folder, 'q' => '"raccords inox"'));
 		$this->assertSame(200, $page['code'], 'a phrase in quotes, sent in the body');
 		$this->assertSame(1, $page['json']['total']);
+		$deep = $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords'));
+		$this->assertSame(200, $deep['code'], $deep['body']);
+		$this->assertTrue($deep['json']['complete']);
+		$this->assertGreaterThanOrEqual(1, $deep['json']['found']);
+		$this->assertSame(400, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'from:dupont'))['code'], 'deep search without a word refused');
+		$sug = $this->call('/custom/inbox/ajax/list.php', array('action' => 'suggest', 'q' => 'dupont'));
+		$this->assertSame('j.dupont@acme.invalid', $sug['json']['senders'][0]['email'] ?? '', 'known sender suggested');
 
 		$ch = curl_init($this->base.'/custom/inbox/ajax/body.php?id='.$row->rowid);
 		curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_COOKIEFILE => $this->cookies));

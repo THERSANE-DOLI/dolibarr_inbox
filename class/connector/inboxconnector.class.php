@@ -143,6 +143,17 @@ abstract class InboxConnector implements InboxConnectorInterface
 
 	/**
 	 * @param string              $folder  Folder
+	 * @param string[]            $words   Words
+	 * @param array<string,mixed> $options Options
+	 * @return null
+	 */
+	public function searchText($folder, array $words, array $options = array())
+	{
+		return $this->unsupported('searchText');
+	}
+
+	/**
+	 * @param string              $folder  Folder
 	 * @param string              $cursor  Cursor
 	 * @param array<string,mixed> $options Options
 	 * @return null

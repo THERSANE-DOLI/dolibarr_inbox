@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: search panel and search in the text of the mails :   1.19.0
+  - the search field opens into a panel: where to search (folder, mailbox, all mailboxes), suggestions (sender,
+    third party, tag, subject), filters (unread, starred, attachment, my mails, period, tag), recent searches.
+  - criteria and filters chosen are pills in the field, removable one by one; the old quick filter bar is gone.
+  - « Search in the text of the mails » (Ctrl+Enter, or from an empty result): the mail server searches the text of
+    each mailbox of the scope, one after the other, with a progress bar and Stop; mails found only by their text are
+    marked. Exact search (case ignored, accents kept), at most 20 s per mailbox; nothing of the text is kept.
 - NEW: mail templates, documents of the linked pieces, redirect, edit as new :   1.18.0
   - templates in the writing: those of the mailbox (tab Templates of a mailbox, or « Save as a template ») and those
     of Dolibarr for the pieces linked to the mail answered (proposal, order, invoice...), with their variables.

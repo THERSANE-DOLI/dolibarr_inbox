@@ -23,6 +23,7 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxsearchsql.class.php');
+dol_include_once('/inbox/class/inboxtextsearch.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(false);
@@ -82,7 +83,25 @@ function inboxListQuery()
 {
 	global $langs, $user;
 
+	global $inboxTypedQuery;
+
 	$query = InboxSearchQuery::parse((string) inboxAjaxParam('q', 'alphanohtml'), $langs);
+	// Pills of the field typed by the user, without the ones chosen in the search panel
+	$inboxTypedQuery = $query;
+	// Criteria chosen in the search panel (lot W7 1.19.0): operators in English, merged with the typed ones
+	$more = InboxSearchQuery::parse((string) inboxAjaxParam('qx', 'alphanohtml'));
+	foreach (array('from', 'to', 'subject', 'tag') as $k) {
+		$query[$k] = array_merge($query[$k], $more[$k]);
+	}
+	foreach (array('attachment', 'unread') as $k) {
+		$query[$k] = $query[$k] || $more[$k];
+	}
+	if ($more['after'] > $query['after']) {
+		$query['after'] = $more['after'];
+	}
+	if ($more['before'] && (!$query['before'] || $more['before'] < $query['before'])) {
+		$query['before'] = $more['before'];
+	}
 	$sort = explode(':', (string) inboxAjaxParam('sort', 'alphanohtml'));
 	$query['sort'] = $sort[0] ?? 'date';
 	$query['dir'] = ($sort[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -105,11 +124,32 @@ function inboxListQuery()
 	return $query;
 }
 
+/**
+ * Rows found in their text by the deep search of the same search, when the list asks for them (text=1)
+ *
+ * @param array<string,mixed> $query    Parsed query, text_ids added
+ * @param string              $scope    folder, account, all
+ * @param int                 $scopeId  Folder, mailbox or 0
+ * @param int[]               $readable Mailboxes the user may read
+ * @return void
+ */
+function inboxListTextIds(array &$query, $scope, $scopeId, array $readable)
+{
+	global $db, $user;
+
+	if ((int) inboxAjaxParam('text', 'int') !== 1 || empty($query['words'])) {
+		return;
+	}
+	$search = new InboxTextSearch($db);
+	$query['text_ids'] = $search->load($user, InboxTextSearch::key($user, $query, $scope, $scopeId), $readable);
+}
+
 switch ($action) {
 	case 'ids':
 		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
 		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
 		$query = inboxListQuery();
+		inboxListTextIds($query, 'folder', (int) $folder->rowid, $readable);
 		$engine = new InboxSearchSql($db);
 		$ids = array();
 		$cursor = '';
@@ -138,6 +178,7 @@ switch ($action) {
 			$folderId = 0;
 		}
 		$query = inboxListQuery();
+		inboxListTextIds($query, $scope === 'all' ? 'all' : ($scope === 'account' ? 'account' : 'folder'), $scope === 'all' ? 0 : ($scope === 'account' ? (int) $folder->fk_account : (int) $folder->rowid), $readable);
 		$engine = new InboxSearchSql($db);
 		$start = microtime(true);
 		// Conversations: one line per thread, when the list is sorted by date (a search lists the mails one by one)
@@ -159,8 +200,77 @@ switch ($action) {
 		// page is not missed)
 		$page['stamp'] = ($scope !== 'all' && $scope !== 'account') ? inboxListStamp((int) $folder->rowid) : '';
 		// The pills of the search field
-		$page['query'] = array_intersect_key($query, array_flip(array('words', 'from', 'to', 'subject', 'tag', 'before', 'after', 'attachment', 'unread')));
+		$page['query'] = array_intersect_key($inboxTypedQuery, array_flip(array('words', 'from', 'to', 'subject', 'tag', 'before', 'after', 'attachment', 'unread')));
 		inboxAjaxReply($page);
+		// no break
+
+	case 'content':
+		// Deep search (lot W7 1.19.0): the text of the mails of ONE mailbox searched by its mail server, within
+		// 20 s; the browser calls the mailboxes one after the other, then reads the list again with text=1
+		$accountId = (int) inboxAjaxParam('account', 'int');
+		$scope = (string) inboxAjaxParam('scope', 'aZ09');
+		if (!in_array($accountId, $readable, true)) {
+			inboxAjaxNotFound();
+		}
+		$folderId = 0;
+		$scopeId = 0;
+		if ($scope === 'all') {
+			$scopeId = 0;
+		} else {
+			$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
+			if ((int) $folder->fk_account !== $accountId) {
+				inboxAjaxNotFound();
+			}
+			$scope = $scope === 'account' ? 'account' : 'folder';
+			$folderId = (int) $folder->rowid;
+			$scopeId = $scope === 'account' ? $accountId : $folderId;
+		}
+		$query = inboxListQuery();
+		if (empty($query['words'])) {
+			inboxAjaxError($langs->transnoentities('InboxDeepSearchNoWords'));
+		}
+		$account = new InboxAccount($db);
+		if ($account->fetch($accountId) <= 0) {
+			inboxAjaxNotFound();
+		}
+		// The session is released: a slow mail server never blocks the other calls of the user
+		session_write_close();
+		$search = new InboxTextSearch($db);
+		$start = microtime(true);
+		$result = $search->run($account, $search->folders($accountId, $scope, $folderId), $query, $start + InboxTextSearch::DEADLINE);
+		$search->save($user, InboxTextSearch::key($user, $query, $scope, $scopeId), $accountId, $result['ids']);
+		inboxAjaxReply(array(
+			'account' => $accountId,
+			'found' => count($result['ids']),
+			'complete' => $result['complete'],
+			'done' => $result['done'],
+			'total' => $result['total'],
+			'unsupported' => $result['unsupported'],
+			'ms' => (int) round((microtime(true) - $start) * 1000),
+		));
+		// no break
+
+	case 'suggest':
+		// Suggestions of the search panel (lot W7 1.19.0): known senders and third parties of the readable mailboxes
+		$text = trim((string) inboxAjaxParam('q', 'alphanohtml'));
+		$out = array('senders' => array(), 'socs' => array());
+		if (mb_strlen($text, 'UTF-8') >= 2 && $readable) {
+			$like = "'%".$db->escape($db->escapeforlike(mb_substr($text, 0, 100, 'UTF-8')))."%'";
+			$in = implode(',', $readable);
+			$rows = $db->getRows("SELECT m.from_email, MAX(m.from_name) AS from_name, COUNT(m.rowid) AS n FROM ".$db->prefix()."inbox_mail as m"
+				." WHERE m.fk_account IN (".$in.") AND m.from_email <> '' AND (m.from_name LIKE ".$like." OR m.from_email LIKE ".$like.")"
+				." GROUP BY m.from_email ORDER BY n DESC LIMIT 4");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$out['senders'][] = array('email' => (string) $r->from_email, 'name' => (string) $r->from_name, 'n' => (int) $r->n);
+			}
+			$rows = $db->getRows("SELECT s.rowid, s.nom FROM ".$db->prefix()."societe as s WHERE s.entity IN (".getEntity('societe').") AND s.nom LIKE ".$like
+				." AND EXISTS (SELECT m.rowid FROM ".$db->prefix()."inbox_mail as m WHERE m.fk_soc = s.rowid AND m.fk_account IN (".$in."))"
+				." ORDER BY s.nom LIMIT 3");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$out['socs'][] = array('id' => (int) $r->rowid, 'name' => (string) $r->nom);
+			}
+		}
+		inboxAjaxReply($out);
 		// no break
 
 	case 'state':

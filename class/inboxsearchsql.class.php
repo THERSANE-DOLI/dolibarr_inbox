@@ -38,6 +38,9 @@ class InboxSearchSql implements InboxSearchEngine
 		'size' => 'm.size',
 	);
 
+	/** Rows found in their text kept for one search (the deep search stops there) */
+	const TEXT_IDS_MAX = 5000;
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -86,7 +89,8 @@ class InboxSearchSql implements InboxSearchEngine
 		}
 		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
 		$sql .= " m.date_received, m.date_mail, m.size, m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc,";
-		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value";
+		$words = $this->wordsCondition($query);
+		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value, ".($words !== '' && $this->textIds($query) ? "CASE WHEN ".$words." THEN 0 ELSE 1 END" : "0")." AS in_text";
 		$sql .= $from." LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc";
 		$sql .= " WHERE ".implode(' AND ', $where);
 		$sql .= " ORDER BY ".$expr." ".($desc ? 'DESC' : 'ASC').", m.rowid ".($desc ? 'DESC' : 'ASC');
@@ -222,12 +226,11 @@ class InboxSearchSql implements InboxSearchEngine
 		$like = function ($col, $value) {
 			return $col." LIKE '%".$this->db->escape($this->db->escapeforlike(InboxHeaderParser::forDb($this->db, (string) $value)))."%'";
 		};
-		foreach ((array) ($query['words'] ?? array()) as $w) {
-			$or = array();
-			foreach (array('m.subject', 'm.from_name', 'm.from_email', 'm.to_text', 'm.cc_text', 'm.snippet') as $col) {
-				$or[] = $like($col, $w);
-			}
-			$where[] = "(".implode(' OR ', $or).")";
+		$words = $this->wordsCondition($query);
+		if ($words !== '') {
+			// Mails found in their text by the deep search (lot W7 1.19.0): found as well, even without the words in the index
+			$textIds = $this->textIds($query);
+			$where[] = $textIds ? "(".$words." OR m.rowid IN (".implode(',', $textIds)."))" : $words;
 		}
 		foreach ((array) ($query['from'] ?? array()) as $w) {
 			$where[] = "(".$like('m.from_name', $w)." OR ".$like('m.from_email', $w).")";
@@ -276,6 +279,35 @@ class InboxSearchSql implements InboxSearchEngine
 		}
 
 		return $where;
+	}
+
+	/**
+	 * Every word in the index (subject, sender, recipients, snippet)
+	 *
+	 * @param array<string,mixed> $query Query
+	 * @return string Condition, '' without words
+	 */
+	protected function wordsCondition(array $query)
+	{
+		$and = array();
+		foreach ((array) ($query['words'] ?? array()) as $w) {
+			$or = array();
+			foreach (array('m.subject', 'm.from_name', 'm.from_email', 'm.to_text', 'm.cc_text', 'm.snippet') as $col) {
+				$or[] = $col." LIKE '%".$this->db->escape($this->db->escapeforlike(InboxHeaderParser::forDb($this->db, (string) $w)))."%'";
+			}
+			$and[] = "(".implode(' OR ', $or).")";
+		}
+
+		return $and ? "(".implode(' AND ', $and).")" : '';
+	}
+
+	/**
+	 * @param array<string,mixed> $query Query (text_ids: rows found in their text by the deep search)
+	 * @return int[]
+	 */
+	protected function textIds(array $query)
+	{
+		return array_slice(array_values(array_unique(array_filter(array_map('intval', (array) ($query['text_ids'] ?? array()))))), 0, self::TEXT_IDS_MAX);
 	}
 
 	/**
@@ -336,6 +368,8 @@ class InboxSearchSql implements InboxSearchEngine
 			'tkey' => (string) ($o->thread_key ?? ''),
 			// Junk: legit (known and authenticated) or imitation (1.15.0)
 			'junk_hint' => (string) ($o->junk_hint ?? ''),
+			// Found only in its text by the deep search (lot W7 1.19.0)
+			'in_text' => (int) ($o->in_text ?? 0),
 		);
 	}
 }
