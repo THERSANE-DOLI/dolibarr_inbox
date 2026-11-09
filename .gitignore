@@ -19,7 +19,6 @@
 # Other
 *.back
 /.editorconfig
-/.gitattributes
 # Analysis documents (local only)
 /analyses
 .phpunit.result.cache
