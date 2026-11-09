@@ -458,4 +458,23 @@ class InboxReadingTest extends InboxTestCase
 		$auth = InboxReader::authResults(array(array('Authentication-Results', 'mx; spf=softfail; dkim=fail; dmarc=none'), array('Authentication-Results', 'forged; dmarc=pass')));
 		$this->assertTrue($auth['fail'], 'only the topmost result counts');
 	}
+
+	/**
+	 * Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin, Rspamd, the topmost header only
+	 *
+	 * @return void
+	 */
+	public function testSpamVerdict()
+	{
+		$sa = InboxReader::spamVerdict(array(array('X-Spam-Status', 'Yes, score=7.4 required=5.0 tests=BAYES_99,URIBL_BLACK autolearn=no version=3.4.6'),
+			array('X-Spam-Status', 'No, score=-5.0 required=5.0')));
+		$this->assertSame(array('engine' => 'spamassassin', 'spam' => true, 'score' => 7.4, 'required' => 5.0, 'tests' => array('BAYES_99', 'URIBL_BLACK')), $sa, 'the « No » written lower by the sender ignored');
+		$rs = InboxReader::spamVerdict(array(array('X-Spamd-Result', 'default: False [3.10 / 15.00]; BAYES_HAM(-3.00)[99.99%]; R_SPF_ALLOW(-0.20)[+ip4:1.2.3.4]')));
+		$this->assertSame('rspamd', $rs['engine']);
+		$this->assertFalse($rs['spam']);
+		$this->assertSame(array(3.1, 15.0), array($rs['score'], $rs['required']));
+		$this->assertSame(array('BAYES_HAM', 'R_SPF_ALLOW'), $rs['tests']);
+		$this->assertTrue(InboxReader::spamVerdict(array(array('X-Spam-Flag', 'YES')))['spam']);
+		$this->assertNull(InboxReader::spamVerdict(array(array('Subject', 'x'))), 'no filter');
+	}
 }

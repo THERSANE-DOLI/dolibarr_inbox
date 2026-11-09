@@ -1,5 +1,20 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: viewer of the attachments bigger, Ctrl+click in a new tab, antivirus shown on the tiles :   1.45.0
+  - a PDF or a picture opens in a large window (90 % of the screen height, full screen on a phone), the PDF at the
+    width of the page; its size and place are kept apart from those of the other viewers.
+  - Ctrl+click, middle click or menu « Open in a new tab » for a PDF or a picture, after the antivirus as for the
+    preview; another kind of file is downloaded.
+  - antivirus run when the mail opens: « Antivirus scan… » on each tile and in the head of the bar, « still
+    running » after 5 s, « Retry » when it fails; a click meanwhile waits for the verdict.
+  - virus: red border and hatching, never dragged; risky file: orange border and hatching, the download asked once
+    more with the reasons; not scanned: dashed border; badges « 1 dangerous », « 2 to check » in the head.
+
+- NEW: verdict of the anti-spam filter of the server shown on the mail :   1.44.0
+  - SpamAssassin and Rspamd headers read (the topmost only, added by the server): banner « judged as junk » with
+    the score, the threshold and up to 3 reasons, button to move the mail to the junk.
+  - rules: « Anti-spam rule » prefilled to move into the junk the mails marked as spam by the server.
+
 - NEW: folders put in order and moved by drag and drop in the panel :   1.43.0
   - on the edge of a brother: put before or after it, in my own order (nothing changes on the server); in the middle
     of a folder or on the mailbox: moved into it on the server (its managers only), undone in the toast.

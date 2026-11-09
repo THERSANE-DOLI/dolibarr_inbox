@@ -117,6 +117,8 @@
 		const savedLine = st.saved ? ic('check') + '<span>' + th('InboxRulesSavedOn', new Date(st.saved * 1000).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' }), st.by) + '</span>' : '';
 		let h = '<p class="ibx-section__help">' + th('InboxRulesHelp') + '</p>' + rulesNotice(st)
 			+ '<div class="ibx-rules-head"><h2 class="ibx-section__title">' + th('InboxTabRules') + ' <span class="ibx-muted">(' + rules.length + ')</span></h2><span class="ibx-spacer"></span>'
+			// The rule of the anti-spam filter of the server, ready to use (1.44.0), when the mailbox has a junk folder
+			+ (ro || !(st.folders || []).some(f => f.role === 'junk') ? '' : '<button type="button" class="ibx-btn ibx-js-rspam" title="' + th('InboxRuleSpamHelp') + '">' + ic('junk') + ' ' + th('InboxRuleSpam') + '</button>')
 			+ (ro ? '' : '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-rnew">' + ic('plus') + ' ' + th('InboxRuleNew') + '</button>') + '</div>';
 		if (!rules.length) {
 			h += '<div class="ibx-empty">' + ic('folder-bolt', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxRulesEmpty') + '</div><div>' + th('InboxRulesEmptyText') + '</div></div>';
@@ -144,6 +146,19 @@
 		const ruleNew = $('.ibx-js-rnew', box);
 		if (ruleNew) {
 			ruleNew.addEventListener('click', () => ruleEditor(account, st, null, list => save(list, t('InboxRuleCreated'))));
+		}
+		// The mails marked spam by the filter of the server (SpamAssassin: X-Spam-Flag, Rspamd: X-Spam) into the junk,
+		// on the server even when inbox is closed; the preview of the editor shows which mails it takes
+		const ruleSpam = $('.ibx-js-rspam', box);
+		if (ruleSpam) {
+			ruleSpam.addEventListener('click', () => {
+				const junk = st.folders.find(f => f.role === 'junk');
+				ruleEditor(account, st, null, list => save(list, t('InboxRuleCreated')), false, {
+					name: t('InboxRuleSpamName'), on: true, all: false, stop: true,
+					conds: [{ f: 'header', h: 'X-Spam-Flag', op: 'contains', v: 'YES' }, { f: 'header', h: 'X-Spam', op: 'contains', v: 'Yes' }],
+					acts: [{ a: 'move', v: junk.path }],
+				});
+			});
 		}
 		$$('[data-edit]', box).forEach(b => b.addEventListener('click', () => ruleEditor(account, st, +b.dataset.edit, list => save(list, t('InboxRuleSaved')), ro)));
 		$$('[data-toggle]', box).forEach(b => b.addEventListener('click', () => {
