@@ -6922,7 +6922,8 @@
 		dlg.className = 'ibx-window';
 		dlg.setAttribute('aria-modal', 'false');
 		const kind = viewerKind(m, o);
-		const g = savedGeometry(kind);
+		// A place kept without a size is the one of a closed window (before 1.48.1): not used
+		const g = savedGeometry(kind).w ? savedGeometry(kind) : {};
 		const n = windows.length;
 		// A PDF or a picture: most of the screen the first time (an A4 page read in its width), else as before
 		const dw = kind === 'doc' ? Math.round(Math.min(1100, window.innerWidth * 0.9)) : 720;
@@ -6968,12 +6969,14 @@
 		dlg.className = 'ibx-window ibx-window--module' + (o.modal ? ' ibx-window--modal' : '');
 		dlg.setAttribute('aria-modal', o.modal ? 'true' : 'false');
 		dlg.setAttribute('aria-label', o.title);
+		// Size kept, always opened in the middle of the screen (1.48.1)
 		const g = savedGeometry(kind);
-		const gw = g.w || Math.round(Math.min(o.modal ? 1100 : 1180, window.innerWidth * (o.modal ? 0.8 : 0.86)));
+		const gw = Math.min(window.innerWidth - 16, g.w || Math.round(Math.min(o.modal ? 1100 : 1180, window.innerWidth * (o.modal ? 0.8 : 0.86))));
+		const gh = Math.min(window.innerHeight - 16, g.h || Math.round(window.innerHeight * (o.modal ? 0.86 : 0.82)));
 		dlg.style.width = gw + 'px';
-		dlg.style.height = (g.h || Math.round(window.innerHeight * (o.modal ? 0.86 : 0.82))) + 'px';
-		dlg.style.left = Math.max(0, Math.min(window.innerWidth - 300, g.x ?? Math.round(window.innerWidth / 2 - gw / 2))) + 'px';
-		dlg.style.top = Math.max(0, Math.min(window.innerHeight - 200, g.y ?? Math.round(window.innerHeight * (o.modal ? 0.05 : 0.08)))) + 'px';
+		dlg.style.height = gh + 'px';
+		dlg.style.left = Math.max(0, Math.round((window.innerWidth - gw) / 2)) + 'px';
+		dlg.style.top = Math.max(0, Math.round((window.innerHeight - gh) / 2)) + 'px';
 		if (isPhone()) {
 			dlg.classList.add('ibx-window--maximized');
 		}
@@ -7310,10 +7313,14 @@
 		front(w);
 	}
 	function saveGeometry(w) {
-		if (w.dlg.classList.contains('ibx-window--maximized')) {
+		if (w.dlg.classList.contains('ibx-window--maximized') || !w.dlg.isConnected || !w.dlg.open) {
 			return;
 		}
 		const r = w.dlg.getBoundingClientRect();
+		// A window closed or reduced has no size: kept, it would open the next one at 0, 0 and empty
+		if (r.width < 100 || r.height < 60) {
+			return;
+		}
 		// Kept per kind (1.45.0): a PDF made big does not make every text window big
 		const all = { doc: savedGeometry('doc'), other: savedGeometry('other'), module: savedGeometry('module'), modal: savedGeometry('modal') };
 		all[w.kind || 'other'] = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
