@@ -75,7 +75,8 @@ class InboxFolder
 	public function syncTree(InboxAccount $account, array $folders)
 	{
 		$p = $this->db->prefix();
-		$roles = $account->getFolderRoles();
+		// Only the roles chosen by hand force a folder; listFolders() decided the others, one folder per role
+		$roles = $account->getChosenRoles();
 		$known = array();
 		foreach ($this->listForAccount((int) $account->id, false) as $row) {
 			$known[$row->path] = $row;

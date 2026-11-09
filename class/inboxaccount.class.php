@@ -726,12 +726,28 @@ class InboxAccount extends CommonObject
 	}
 
 	/**
-	 * @param array<string,string> $roles Role => real folder
+	 * Roles chosen by hand by the administrator (tab Folders), the others being only found by the test of the mailbox:
+	 * a role chosen comes before the mark of the server, a role found after it (1.40.1)
+	 *
+	 * @return array<string,string> Role => real folder
+	 */
+	public function getChosenRoles()
+	{
+		$data = self::decodeJson($this->folder_roles);
+		$chosen = isset($data['_chosen']) && is_array($data['_chosen']) ? array_map('strval', $data['_chosen']) : array();
+
+		return array_intersect_key($this->getFolderRoles(), array_flip($chosen));
+	}
+
+	/**
+	 * @param array<string,string> $roles  Role => real folder
+	 * @param string[]|null        $chosen Roles chosen by hand; null keeps those chosen before
 	 * @return void
 	 */
-	public function setFolderRoles(array $roles)
+	public function setFolderRoles(array $roles, $chosen = null)
 	{
-		$this->folder_roles = json_encode($roles);
+		$chosen = $chosen === null ? array_keys($this->getChosenRoles()) : $chosen;
+		$this->folder_roles = json_encode($roles + array('_chosen' => array_values(array_intersect(array_map('strval', $chosen), array_keys($roles)))));
 	}
 
 	/**

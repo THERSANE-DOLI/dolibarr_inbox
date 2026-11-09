@@ -167,6 +167,20 @@ switch ($action) {
 				}))),
 			);
 		}
+		// Size of the folders (1.40.0), asked by the user: the mails indexed, summed by the database (no IMAP call)
+		if ($accounts && (new InboxUserParam($db))->get($user, 'folder_sizes') === '1') {
+			$bytes = array();
+			$rows = $db->getRows("SELECT fk_folder, SUM(size) as b FROM ".$db->prefix()."inbox_mail WHERE fk_account IN (".implode(',', array_map('intval', array_keys($accounts))).")"
+				." GROUP BY fk_folder LIMIT 100000");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$bytes[(int) $r->fk_folder] = (float) $r->b;
+			}
+			foreach ($list as $i => $a) {
+				foreach ($a['folders'] as $k => $f) {
+					$list[$i]['folders'][$k]['bytes'] = $bytes[(int) $f['id']] ?? 0;
+				}
+			}
+		}
 		// The order chosen by the user in My account (getAccounts gives it); without one, his personal mailbox first,
 		// then the shared ones by label
 		$order = json_decode((string) (new InboxUserParam($db))->get($user, 'accounts_order'), true);

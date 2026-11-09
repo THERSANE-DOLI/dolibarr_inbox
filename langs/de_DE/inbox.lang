@@ -2114,3 +2114,7 @@ InboxTwinMergeFailed = Zusammenführen unmöglich, nichts gelöscht: %s
 InboxTwinNotRemoved = %s Mails verschoben, aber der Ordner konnte nicht gelöscht werden: %s
 InboxJournal_folder_merge = Doppelter Ordner zusammengeführt
 InboxUnreadBelow = %s ungelesen in den Unterordnern
+InboxFoldersDisplay = Anzeige der Ordner
+InboxFolderSizesShow = Größe der Ordner anzeigen
+InboxFolderSizeIndexed = Größe der %s indizierten Mails, von %s
+InboxTwinServerFolder = Ordner des Servers: er wird nicht gelöscht, machen Sie ihn lieber zum Hauptordner.

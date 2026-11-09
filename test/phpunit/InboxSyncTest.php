@@ -360,5 +360,18 @@ class InboxSyncTest extends InboxTestCase
 		$list = array($f('INBOX.Junk'), $f('INBOX.Spam', array('\\junk')));
 		InboxImapConnector::uniqueRoles($list, array('junk' => 'INBOX.Junk'));
 		$this->assertSame(array('INBOX.Junk' => 'junk', 'INBOX.Spam' => ''), array_column($list, 'role', 'path'));
+
+		// A role only found by a test (kept before 1.40.1): after the mark of the server
+		$list = array($f('INBOX.Corbeille'), $f('INBOX.Trash', array('\\trash')));
+		InboxImapConnector::uniqueRoles($list, array(), array('trash' => 'INBOX.Corbeille'));
+		$this->assertSame(array('INBOX.Corbeille' => '', 'INBOX.Trash' => 'trash'), array_column($list, 'role', 'path'));
+
+		// The roles chosen by hand kept apart from those found
+		$a = new InboxAccount($this->db);
+		$a->setFolderRoles(array('trash' => 'INBOX.Corbeille', 'junk' => 'INBOX.Spam'), array('trash'));
+		$this->assertSame(array('trash' => 'INBOX.Corbeille'), $a->getChosenRoles());
+		$this->assertSame(array('trash' => 'INBOX.Corbeille', 'junk' => 'INBOX.Spam'), $a->getFolderRoles());
+		$a->setFolderRoles(array('trash' => 'INBOX.Trash'));
+		$this->assertSame(array('trash' => 'INBOX.Trash'), $a->getChosenRoles(), 'null keeps the roles chosen before');
 	}
 }

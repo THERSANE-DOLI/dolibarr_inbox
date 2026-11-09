@@ -2114,3 +2114,7 @@ InboxTwinMergeFailed = Unione impossibile, nulla eliminato: %s
 InboxTwinNotRemoved = %s mail spostate, ma la cartella non ha potuto essere eliminata: %s
 InboxJournal_folder_merge = Cartella doppia unita
 InboxUnreadBelow = %s non letti nelle sottocartelle
+InboxFoldersDisplay = Visualizzazione delle cartelle
+InboxFolderSizesShow = Mostra la dimensione delle cartelle
+InboxFolderSizeIndexed = Dimensione delle %s mail indicizzate, su %s
+InboxTwinServerFolder = Cartella del server: non si elimina, rendetela piuttosto la cartella principale.

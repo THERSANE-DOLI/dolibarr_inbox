@@ -1160,8 +1160,13 @@
 		const roles = ['sent', 'drafts', 'trash', 'junk', 'archive'];
 		const roleKey = r => 'InboxFolderRole' + r.charAt(0).toUpperCase() + r.slice(1);
 		let html = '<p class="ibx-section__help">' + th('InboxFoldersHelp') + '</p><form class="ibx-form">';
+		// The folder holding each role now (chosen by hand, or found): what the select shows, what « changed » means
+		const chosen = data.chosen || [];
+		const holder = r => (chosen.includes(r) ? data.roles[r] : ((data.folders.find(f => f.role === r) || {}).path || data.roles[r] || ''));
+		const initial = {};
 		roles.forEach(r => {
-			const current = data.roles[r] || '';
+			const current = holder(r);
+			initial[r] = current;
 			html += '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-role-' + r + '">' + th(roleKey(r)) + '</label><div><select class="ibx-field ibx-field--medium" id="f-role-' + r + '" name="role_' + r + '">'
 				+ '<option value="">' + th('InboxFolderNone') + '</option>'
 				+ selectable.map(f => '<option value="' + esc(f.path) + '"' + (f.path === current ? ' selected' : '') + ' title="' + esc(f.path) + '">' + esc(f.label || f.name) + (f.role === r ? ' (' + th('InboxFolderFound') + ')' : '') + '</option>').join('')
@@ -1180,7 +1185,9 @@
 						+ '<td class="ibx-muted">' + (f.total === null || f.total === undefined ? '' : th('InboxTwinMails', f.total)) + '</td>'
 						+ '<td class="ibx-twins__actions"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-twin" data-do="keep">' + th('InboxTwinKeep') + '</button>'
 						+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-twin" data-do="main">' + th('InboxTwinMain') + '</button>'
-						+ (main ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--danger ibx-js-twin" data-do="merge">' + th('InboxTwinMerge') + '</button>' : '') + '</td></tr>';
+						// A folder the server marks for this role is its own: never merged away (removed), made main instead
+						+ (main && !(f.flags || []).includes('\\' + f.twin) ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--danger ibx-js-twin" data-do="merge">' + th('InboxTwinMerge') + '</button>'
+							: (main ? '<span class="ibx-muted ibx-twins__server">' + th('InboxTwinServerFolder') + '</span>' : '')) + '</td></tr>';
 				}).join('') + '</tbody></table>';
 		}
 		box.innerHTML = html;
@@ -1213,7 +1220,10 @@
 		$('form', box).addEventListener('submit', async e => {
 			e.preventDefault();
 			try {
-				await post('account', 'roles', Object.assign({ id: account.id }, formValues(e.target)));
+				const values = formValues(e.target);
+				// Chosen by hand: a role changed here, or chosen before and kept; the others stay found by inbox
+				values.chosen = roles.filter(r => chosen.includes(r) || (values['role_' + r] || '') !== initial[r]).join(',');
+				await post('account', 'roles', Object.assign({ id: account.id }, values));
 				I.changed('account', account.id);
 				toast(t('InboxSaved'));
 			} catch (err) {
