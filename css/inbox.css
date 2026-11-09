@@ -2155,3 +2155,18 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-piece > .ibx-cited__warn { padding-right: 0.375rem; }
 .ibx-picklist__item .ibx-cited__warn { margin-left: auto; }
 .ibx-picklist__item .ibx-cited__warn + .ibx-st { margin-left: var(--ibx-s1); }
+
+/* Blocks of the other modules in the panel and their window (1.47.0, hook inboxMailPanels) */
+.ibx-mpanel__body { flex-direction: column; align-items: stretch; gap: var(--ibx-s1); }
+.ibx-mpanel__badges { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); }
+.ibx-mbadge { padding: 0.0625rem 0.5rem; border-radius: 999px; font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); background: var(--ibx-bg-sunken); }
+.ibx-mbadge--ok { color: var(--ibx-success); background: var(--ibx-success-soft); }
+.ibx-mbadge--warning { color: var(--ibx-warning); background: var(--ibx-warning-soft); }
+.ibx-mbadge--danger { color: var(--ibx-danger); background: var(--ibx-danger-soft); }
+.ibx-mbadge--info { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
+.ibx-mpanel__line { margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-mpanel__line .ibx-spinner { display: inline-block; vertical-align: -0.125rem; }
+.ibx-mpanel .ibx-js-mpanelopen { align-self: flex-start; }
+.ibx-mpanel__links { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); font-size: var(--ibx-fs-sm); }
+.ibx-window--module .ibx-window__body { overflow: hidden; display: flex; }
+.ibx-window__frame { flex: 1; width: 100%; height: 100%; border: 0; background: #fff; }

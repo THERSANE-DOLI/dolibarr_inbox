@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: blocks of other modules in the Dolibarr panel of a mail, their page in a window of inbox :   1.47.0
+  - hook inboxMailPanels: a module declares a block (title, icon, address of its JSON summary inside Dolibarr);
+    the summary is read after the panel (badges, lines, one action, links), again while the module is working.
+  - the action opens the page of the module in a floating window (moved, maximized, reduced, size kept); the page
+    tells inbox when it is done (postMessage, same origin): inbox links the piece, sets or removes tags and
+    archives the mail with its own rights, then refreshes the panel.
+
 - NEW: linking a mail to a piece: status badge, faster search, pieces cited in the mail :   1.46.0
   - status of the pieces as the badge of Dolibarr (short label, colour of its kind, long label in the title), in
     the panel and in « Link ».

@@ -2180,3 +2180,4 @@ InboxCitedUnknownSoc = Geschäftspartner des Absenders unbekannt: zu prüfen
 InboxCitedTheirRef = seine Ref. %s
 InboxPiecesOfSender = Belege des Absenders
 InboxCitedOtherGroup = Genannt, von einem anderen Geschäftspartner
+InboxPanelLoading = Wird geladen…

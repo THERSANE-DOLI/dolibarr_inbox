@@ -170,7 +170,19 @@ switch ($action) {
 				}
 			}
 		}
-		inboxAjaxReply(array('sender' => $sender, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions,
+		// Blocks of the other modules in the panel (1.47.0): a title and the address of their summary (JSON, inside
+		// Dolibarr), read by the panel after it is shown; its action opens a page of the module in a window of inbox
+		$panels = array();
+		if ($hookmanager->executeHooks('inboxMailPanels', $hookParams, $hookObject) >= 0 && is_array($hookmanager->results['panels'] ?? null)) {
+			foreach (array_slice($hookmanager->results['panels'], 0, 3) as $x) {
+				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
+				if ($url !== '' && preg_match('/^[a-z0-9_-]{1,40}$/', (string) ($x['id'] ?? '')) && !empty($x['title']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
+					$panels[] = array('id' => (string) $x['id'], 'title' => dol_trunc((string) $x['title'], 60, 'right', 'UTF-8', 1), 'url' => $url,
+						'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic');
+				}
+			}
+		}
+		inboxAjaxReply(array('sender' => $sender, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId),
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);

@@ -4388,6 +4388,64 @@
 			box.addEventListener('click', e => dolibarClick(box, e));
 		}
 		loadCited(box);
+		loadPanels(box);
+	}
+	/**
+	 * Blocks of the other modules (1.47.0, hook inboxMailPanels): their summary is read after the panel, again while
+	 * the module says it is still working (pending)
+	 * @param {HTMLElement} box Panel
+	 */
+	function loadPanels(box) {
+		const mail = box.dataset.mail;
+		box._panels = box._panels && box._panelsMail === mail ? box._panels : {};
+		box._panelsMail = mail;
+		(box._data.panels || []).forEach(p => loadPanel(box, mail, p, 0));
+	}
+	async function loadPanel(box, mail, p, tries) {
+		let data;
+		try {
+			const res = await fetch(p.url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+			if (!res.ok) {
+				throw new Error(res.statusText || String(res.status));
+			}
+			data = await res.json();
+		} catch (err) {
+			data = { error: err.message || 'Error' };
+		}
+		if (!box.isConnected || box.dataset.mail !== mail) {
+			return;
+		}
+		box._panels[p.id] = data && typeof data === 'object' ? data : { error: 'Error' };
+		const el = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"] .ibx-mpanel__body', box);
+		if (el) {
+			el.innerHTML = panelBody(box._panels[p.id]);
+		}
+		if (data && data.pending && tries < 60) {
+			setTimeout(() => loadPanel(box, mail, p, tries + 1), Math.min(30000, Math.max(2000, +data.retry_ms || 3000)));
+		}
+	}
+	/** An address inside Dolibarr only (the module gives it) */
+	function insideUrl(url) {
+		return typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/' && !/[\s<>"]/.test(url);
+	}
+	/** Summary of a block: badges, lines, one action (window), links; every text escaped */
+	function panelBody(d) {
+		if (!d) {
+			return '<span class="ibx-muted"><span class="ibx-spinner" aria-hidden="true"></span> ' + th('InboxPanelLoading') + '</span>';
+		}
+		if (d.error) {
+			return '<span class="ibx-muted">' + ic('warning') + ' ' + esc(d.error) + '</span>';
+		}
+		const levels = ['ok', 'warning', 'danger', 'info', 'neutral'];
+		const badges = (Array.isArray(d.badges) ? d.badges : []).slice(0, 6).map(b => '<span class="ibx-mbadge ibx-mbadge--' + (levels.includes(b.level) ? b.level : 'neutral') + '">' + esc(b.label) + '</span>').join('');
+		const lines = (Array.isArray(d.lines) ? d.lines : []).slice(0, 4).map(l => '<p class="ibx-mpanel__line">' + esc(l) + '</p>').join('');
+		const a = d.action && insideUrl(d.action.url) ? d.action : null;
+		const links = (Array.isArray(d.links) ? d.links : []).filter(l => insideUrl(l.url)).slice(0, 3)
+			.map(l => '<a class="ibx-linkbtn" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + '</a>').join(' ');
+		return (d.pending ? '<p class="ibx-mpanel__line"><span class="ibx-spinner" aria-hidden="true"></span> ' + esc(d.pending_text || t('InboxPanelLoading')) + '</p>' : '')
+			+ (badges ? '<div class="ibx-mpanel__badges">' + badges + '</div>' : '') + lines
+			+ (a ? '<button type="button" class="ibx-btn ibx-btn--sm' + (a.primary === false ? '' : ' ibx-btn--primary') + ' ibx-js-mpanelopen" data-url="' + esc(a.url) + '" data-title="' + esc(a.title || a.label) + '">' + esc(a.label) + '</button>' : '')
+			+ (links ? '<div class="ibx-mpanel__links">' + links + '</div>' : '');
 	}
 	/**
 	 * Pieces cited in the mail (1.46.0), asked after the panel: the body is read on the server. The ones of another
@@ -4516,6 +4574,8 @@
 					+ '</span></div>' : '')
 				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
 					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
+				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
+					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine, d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
 				+ '</div>'
@@ -4642,6 +4702,11 @@
 		}
 		if (e.target.closest('.ibx-js-linkpiece')) {
 			linkDialog(box);
+			return;
+		}
+		const panelBtn = e.target.closest('.ibx-js-mpanelopen');
+		if (panelBtn && insideUrl(panelBtn.dataset.url)) {
+			openModuleWindow({ mailId, box, url: panelBtn.dataset.url, title: panelBtn.dataset.title, panel: panelBtn.closest('[data-panel]').dataset.panel });
 			return;
 		}
 		const citedBtn = e.target.closest('.ibx-js-linkcited');
@@ -6880,6 +6945,87 @@
 		bindWindow(w);
 	}
 
+	/**
+	 * Page of another module in a window of inbox (1.47.0): the mail stays seen behind. The page tells when it is done
+	 * (postMessage, same origin): inbox then links the piece, sets the tags, archives the mail, with its own rights.
+	 * @param {object} o {mailId, box, url, title, panel}
+	 */
+	function openModuleWindow(o) {
+		const key = 'module:' + o.mailId + ':' + o.panel;
+		const existing = windows.find(w => w.key === key);
+		if (existing) {
+			restore(existing);
+			front(existing);
+			return;
+		}
+		const dlg = document.createElement('dialog');
+		dlg.className = 'ibx-window ibx-window--module';
+		dlg.setAttribute('aria-modal', 'false');
+		dlg.setAttribute('aria-label', o.title);
+		const g = savedGeometry('module');
+		const gw = g.w || Math.round(Math.min(1180, window.innerWidth * 0.86));
+		dlg.style.width = gw + 'px';
+		dlg.style.height = (g.h || Math.round(window.innerHeight * 0.82)) + 'px';
+		dlg.style.left = Math.max(0, Math.min(window.innerWidth - 300, g.x ?? Math.round(window.innerWidth / 2 - gw / 2))) + 'px';
+		dlg.style.top = Math.max(0, Math.min(window.innerHeight - 200, g.y ?? Math.round(window.innerHeight * 0.08))) + 'px';
+		if (isPhone()) {
+			dlg.classList.add('ibx-window--maximized');
+		}
+		dlg.innerHTML = '<div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis">' + esc(o.title) + '</span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmin" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wclose" title="' + th('InboxCloseWindow') + '" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
+			+ '<div class="ibx-window__body"><iframe class="ibx-window__frame" title="' + esc(o.title) + '" src="' + esc(o.url) + '"></iframe></div>';
+		const w = { key, dlg, module: true, title: o.title, mailId: o.mailId, box: o.box, kind: 'module' };
+		w.frame = $('iframe', dlg);
+		windows.push(w);
+		document.body.appendChild(dlg);
+		dlg.show();
+		front(w);
+		bindWindow(w);
+	}
+	/** What a module page in a window says (same origin, from its own frame only) */
+	window.addEventListener('message', async e => {
+		if (e.origin !== window.location.origin || !e.data || e.data.source !== 'inbox-panel') {
+			return;
+		}
+		const w = windows.find(x => x.module && x.frame && x.frame.contentWindow === e.source);
+		if (!w) {
+			return;
+		}
+		const d = e.data;
+		if (d.action === 'close') {
+			closeWindow(w);
+			return;
+		}
+		if (d.action !== 'done') {
+			return;
+		}
+		const ids = [w.mailId];
+		const keyword = k => typeof k === 'string' && /^[\w$-]{1,40}$/.test(k);
+		try {
+			if (d.link && typeof d.link.type === 'string' && /^[a-z_]{1,30}$/.test(d.link.type) && +d.link.id > 0) {
+				await post('dolibarr', 'link', { id: w.mailId, type: d.link.type, element: +d.link.id }).catch(() => null);
+			}
+			const add = (Array.isArray(d.tags && d.tags.add) ? d.tags.add : []).filter(keyword);
+			const remove = (Array.isArray(d.tags && d.tags.remove) ? d.tags.remove : []).filter(keyword);
+			if (add.length || remove.length) {
+				await runAction('tag', ids, { add, remove }, { quiet: true });
+			}
+			if (d.archive === true) {
+				await doArchive(ids, { quiet: true });
+			}
+		} finally {
+			closeWindow(w);
+			if (w.box && w.box.isConnected && +w.box.dataset.mail === w.mailId) {
+				loadDolibar(w.box);
+			}
+			if (d.message) {
+				toast(String(d.message).slice(0, 200));
+			}
+		}
+	});
+
 	function viewerTitle(w) {
 		if (w.source) {
 			return [t('InboxViewSource'), w.mail.subject || ''];
@@ -7047,7 +7193,7 @@
 			w.dock.remove();
 		}
 		windows.splice(windows.indexOf(w), 1);
-		const tileEl = !w.source && S.mail && S.mail.id === w.mail.id ? $('[data-att="' + w.index + '"] .ibx-js-attopen', readPane()) : null;
+		const tileEl = !w.source && !w.module && S.mail && S.mail.id === w.mail.id ? $('[data-att="' + w.index + '"] .ibx-js-attopen', readPane()) : null;
 		if (tileEl) {
 			tileEl.focus();
 		}
@@ -7066,7 +7212,8 @@
 		w.dock = document.createElement('button');
 		w.dock.type = 'button';
 		w.dock.className = 'ibx-dock__item';
-		w.dock.innerHTML = ic(w.source ? 'source' : (KIND_ICON[(w.mail.attachments[w.index] || {}).kind] || 'attachment')) + '<span class="ibx-dock__label ibx-ellipsis">' + esc(viewerTitle(w)[0]) + '</span>';
+		w.dock.innerHTML = w.module ? ic('magic') + '<span class="ibx-dock__label ibx-ellipsis">' + esc(w.title) + '</span>'
+			: ic(w.source ? 'source' : (KIND_ICON[(w.mail.attachments[w.index] || {}).kind] || 'attachment')) + '<span class="ibx-dock__label ibx-ellipsis">' + esc(viewerTitle(w)[0]) + '</span>';
 		w.dock.addEventListener('click', () => restore(w));
 		dockBox().appendChild(w.dock);
 	}
@@ -7086,7 +7233,7 @@
 		}
 		const r = w.dlg.getBoundingClientRect();
 		// Kept per kind (1.45.0): a PDF made big does not make every text window big
-		const all = { doc: savedGeometry('doc'), other: savedGeometry('other') };
+		const all = { doc: savedGeometry('doc'), other: savedGeometry('other'), module: savedGeometry('module') };
 		all[w.kind || 'other'] = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
 		saveParam('windows', JSON.stringify(all));
 	}

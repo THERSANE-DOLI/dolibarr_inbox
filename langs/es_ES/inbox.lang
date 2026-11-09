@@ -2180,3 +2180,4 @@ InboxCitedUnknownSoc = Tercero del remitente desconocido: a verificar
 InboxCitedTheirRef = su ref. %s
 InboxPiecesOfSender = Documentos del remitente
 InboxCitedOtherGroup = Citados, de otro tercero
+InboxPanelLoading = Cargando…
