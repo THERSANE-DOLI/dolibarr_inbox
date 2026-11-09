@@ -978,9 +978,91 @@
 		}
 	}
 
+	/** Order of my folders among their brothers (1.42.0): ids per mailbox, kept for me; the others by name */
+	function folderOrderOf(accountId) {
+		try {
+			const o = JSON.parse(params.folder_order || '{}');
+			return (o && Array.isArray(o[accountId]) ? o[accountId] : []).map(Number);
+		} catch (e) {
+			return [];
+		}
+	}
+	/** Special folders first in their order (rank), then mine in the order I chose, then the others as given */
+	function sortKids(a, kids) {
+		const ord = folderOrderOf(a.id);
+		const at = f => (ord.includes(f.id) ? ord.indexOf(f.id) : 1e9);
+		return kids.slice().sort((x, y) => ((x.rank ?? 9) - (y.rank ?? 9)) || (at(x) - at(y)));
+	}
+	/** An ordinary folder: moved and ordered by hand (a special folder keeps its place) */
+	function movableFolder(f) {
+		return !f.role && !isInboxPath(f) && (f.rank ?? 9) >= 9;
+	}
+	/**
+	 * A folder put before or after a brother, in my order (nothing changes on the server)
+	 * @param {number} id Folder moved
+	 * @param {number} targetId Brother
+	 * @param {boolean} after After it
+	 */
+	function placeFolder(id, targetId, after) {
+		const e = S.folders.get(id);
+		if (!e || id === targetId) {
+			return;
+		}
+		const a = e.account;
+		const brothers = sortKids(a, a.folders.filter(f => f.parent === e.folder.parent && movableFolder(f))).map(f => f.id).filter(x => x !== id);
+		const at = brothers.indexOf(targetId);
+		if (at < 0) {
+			return;
+		}
+		brothers.splice(at + (after ? 1 : 0), 0, id);
+		let o = {};
+		try {
+			o = JSON.parse(params.folder_order || '{}') || {};
+		} catch (err) {
+			o = {};
+		}
+		const known = new Set(a.folders.map(f => f.id));
+		o[a.id] = folderOrderOf(a.id).filter(x => known.has(x) && !brothers.includes(x)).concat(brothers);
+		saveParam('folder_order', JSON.stringify(o));
+		renderTree();
+	}
+	/** The brother before or after a folder in my order, for Move up / Move down */
+	function brotherOf(id, step) {
+		const e = S.folders.get(id);
+		const brothers = e ? sortKids(e.account, e.account.folders.filter(f => f.parent === e.folder.parent && movableFolder(f))) : [];
+		const i = brothers.findIndex(f => f.id === id);
+		return i < 0 ? null : (brothers[i + step] || null);
+	}
+	/**
+	 * A folder put into another one (or at the first level, target 0) on the server: its manager only, undone in the
+	 * toast
+	 * @param {object} f Folder
+	 * @param {number} target Folder target, 0 for the first level
+	 */
+	async function folderMoveInto(f, target) {
+		const from = f.parent || 0;
+		try {
+			await post('folderadmin', 'move', { folder: f.id, target });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		await refreshTree();
+		openPathTo(f.id);
+		renderTree();
+		toast(t('InboxFolderMoved', folderName(f)), { action: t('InboxUndo'), onAction: async () => {
+			try {
+				await post('folderadmin', 'move', { folder: f.id, target: from });
+				await folderDone(t('InboxUndone'), f.id);
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		} });
+	}
+
 	/** Folders under a parent (0 = first level), depth for the indent */
 	function branch(a, parent, depth, needle) {
-		const kids = a.folders.filter(f => f.parent === parent);
+		const kids = sortKids(a, a.folders.filter(f => f.parent === parent));
 		let html = '';
 		kids.forEach(f => {
 			const sub = a.folders.some(x => x.parent === f.id);
@@ -996,7 +1078,7 @@
 			const selected = f.id === S.folderId && S.scope === 'folder';
 			html += '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
 				+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
-				+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '">'
+				+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '"' + (movableFolder(f) && !isPhone() ? ' draggable="true"' : '') + '>'
 				+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
 				// An ordinary folder unfolded on its subfolders is drawn open
 				+ folderIcon(f, open, 'ibx-tree__icon')
@@ -3288,6 +3370,8 @@
 	const MANAGING = new Set(['tag', 'move', 'archive', 'delete', 'junk', 'notjunk']);
 	/** Mails per call (a larger selection goes by batches, decision W4 point 3) */
 	const BATCH = 200;
+	/** From this number of mails an action shows its progress (the user sees the work going on) */
+	const PROGRESS_FROM = 20;
 
 	/** A mail known on screen: row of the list, mail of an unfolded conversation, of the conversation read, or the mail read */
 	function rowOf(id) {
@@ -3378,8 +3462,19 @@
 		const res = await sendAction(what, ids, p);
 		if (!res.count) {
 			restore();
-			toast(res.error || t('InboxErrorServer', ''), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
+			if (!res.stopped) {
+				toast(res.error || t('InboxErrorServer', ''), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
+			}
 			return null;
+		}
+		if (res.stopped) {
+			// Stopped by the user: the mails not reached are back in the list, the part done can be undone
+			loadList(true);
+			if (leaving) {
+				refreshTree();
+			}
+			toast(t('InboxProgressStopped', res.count, ids.length), res.undo.length ? { action: t('InboxUndo'), onAction: () => undoAction(res) } : {});
+			return res;
 		}
 		if (res.error) {
 			// Done in part: the list read again shows the truth, the part done can be undone
@@ -3402,13 +3497,113 @@
 	}
 
 	/** Calls by batches; a move to another mailbox gives back what it had no time for: sent again */
+	/**
+	 * Progress of an action on many mails (from 20, 1.42.0): a card at the bottom with the count and a bar,
+	 * « Reduce » to a pill (the work goes on, even in another folder), « Stop » after the batch running; the page asks
+	 * before being closed meanwhile
+	 * @param {string} label What is done (« Moving to Archives »)
+	 * @param {number} total Mails asked
+	 * @returns {{update: function(number), stopped: function(): boolean, close: function()}}
+	 */
+	function progressBox(label, total) {
+		const el = document.createElement('div');
+		el.className = 'ibx-progress';
+		el.setAttribute('role', 'status');
+		el.setAttribute('aria-live', 'polite');
+		let done = 0;
+		let small = false;
+		let stop = false;
+		const leave = e => {
+			e.preventDefault();
+			e.returnValue = '';
+		};
+		const paint = () => {
+			const pct = total ? Math.min(100, Math.round(100 * done / total)) : 0;
+			el.classList.toggle('is-small', small);
+			el.innerHTML = small
+				? '<button type="button" class="ibx-progress__pill ibx-js-progopen" title="' + esc(label) + '" aria-label="' + esc(label + ' : ' + t('InboxProgressCount', done, total)) + '">' + pct + ' %</button>'
+				: '<div class="ibx-progress__head"><b class="ibx-ellipsis">' + esc(label) + '</b><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-progmin" title="' + th('InboxProgressReduce') + '" aria-label="' + th('InboxProgressReduce') + '">' + ic('minimize') + '</button></div>'
+				+ '<progress max="' + total + '" value="' + done + '"></progress>'
+				+ '<div class="ibx-progress__foot"><span class="ibx-muted">' + (stop ? th('InboxProgressStopping') : th('InboxProgressCount', done.toLocaleString(locale()), total.toLocaleString(locale()))) + '</span>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-progstop"' + (stop ? ' disabled' : '') + '>' + th('InboxProgressStop') + '</button></div>';
+			const min = $('.ibx-js-progmin', el);
+			if (min) {
+				min.addEventListener('click', () => {
+					small = true;
+					paint();
+					$('.ibx-js-progopen', el).focus();
+				});
+			}
+			const open = $('.ibx-js-progopen', el);
+			if (open) {
+				open.addEventListener('click', () => {
+					small = false;
+					paint();
+				});
+			}
+			const halt = $('.ibx-js-progstop', el);
+			if (halt) {
+				halt.addEventListener('click', () => {
+					stop = true;
+					paint();
+				});
+			}
+		};
+		paint();
+		document.body.appendChild(el);
+		window.addEventListener('beforeunload', leave);
+		return {
+			update(n) {
+				done = n;
+				paint();
+			},
+			stopped: () => stop,
+			close() {
+				window.removeEventListener('beforeunload', leave);
+				el.remove();
+			},
+		};
+	}
+	/** Words of the progress of an action */
+	function progressLabel(what, p) {
+		if (what === 'move' && p.folder && S.folders.has(p.folder)) {
+			return t('InboxProgressMove', folderName(S.folders.get(p.folder).folder));
+		}
+		return t({ archive: 'InboxProgressArchive', delete: 'InboxProgressDelete', junk: 'InboxProgressJunk', notjunk: 'InboxProgressNotJunk', tag: 'InboxProgressTag' }[what] || 'InboxProgressOther');
+	}
 	async function sendAction(what, ids, p, undoOf) {
-		const out = { count: 0, undo: [], log: [], ids: {}, error: '' };
+		const out = { count: 0, undo: [], log: [], ids: {}, error: '', stopped: false };
 		let todo = ids.slice();
 		let turns = 0;
-		while (todo.length && turns++ < 500) {
-			const chunk = todo.slice(0, BATCH);
-			todo = todo.slice(BATCH);
+		// From 20 mails: the progress shown (not for an undo, it follows its action)
+		const prog = ids.length >= PROGRESS_FROM && !undoOf ? progressBox(progressLabel(what, p), ids.length) : null;
+		// With a progress: about ten steps (batches of 20 to 200), so that the bar moves
+		const size = prog ? Math.min(BATCH, Math.max(PROGRESS_FROM, Math.ceil(ids.length / 10))) : BATCH;
+		try {
+			while (todo.length && turns++ < 500) {
+				if (prog && prog.stopped()) {
+					out.stopped = true;
+					break;
+				}
+				await sendBatch();
+				if (out.halt) {
+					break;
+				}
+				if (prog) {
+					prog.update(Math.min(ids.length, out.count));
+				}
+			}
+		} finally {
+			if (prog) {
+				prog.close();
+			}
+		}
+		delete out.halt;
+		return out;
+		/** One batch sent; out.halt set when the batches stop */
+		async function sendBatch() {
+			const chunk = todo.slice(0, size);
+			todo = todo.slice(size);
 			const body = Object.assign({ what, ids: chunk }, p);
 			if (p.expand) {
 				body.expand = p.expand.filter(x => chunk.includes(x));
@@ -3421,7 +3616,8 @@
 				res = await post('action', 'run', body);
 			} catch (err) {
 				out.error = err.message;
-				break;
+				out.halt = true;
+				return;
 			}
 			out.count += res.count || 0;
 			out.undo = out.undo.concat(res.undo || []);
@@ -3433,12 +3629,12 @@
 			if (res.rest && res.rest.length) {
 				if (!res.count) {
 					out.error = out.error || res.warning;
-					break;
+					out.halt = true;
+					return;
 				}
 				todo = res.rest.concat(todo);
 			}
 		}
-		return out;
 	}
 
 	async function undoAction(res) {
@@ -4847,6 +5043,95 @@
 		tree.addEventListener('dragend', () => {
 			S.vdrag = 0;
 			vline();
+		});
+		// A folder dragged (1.42.0): on the edge of a brother, put before or after it (my order); in the middle of a
+		// folder or on the mailbox, moved into it on the server (its manager only); never into itself nor elsewhere
+		const fclear = () => $$('.is-dropbefore, .is-dropafter, .is-droptarget', tree).forEach(x => x.classList.remove('is-dropbefore', 'is-dropafter', 'is-droptarget'));
+		const fplace = e => {
+			const d = S.folders.get(S.fdrag);
+			const row = e.target.closest && e.target.closest('[data-folder], [data-account]');
+			if (!d || !row) {
+				return null;
+			}
+			if (row.dataset.account && !row.dataset.folder) {
+				if (+row.dataset.account !== d.account.id) {
+					return { row, why: t('InboxFolderOtherBox') };
+				}
+				return d.account.level !== 'manage' ? { row, why: t('InboxReadOnlyOn', d.account.email) } : (d.folder.parent ? { row, into: 0 } : null);
+			}
+			const e2 = S.folders.get(+row.dataset.folder);
+			if (!e2 || e2.folder.id === d.folder.id) {
+				return null;
+			}
+			if (e2.account.id !== d.account.id) {
+				return { row, why: t('InboxFolderOtherBox') };
+			}
+			const r = row.getBoundingClientRect();
+			const y = (e.clientY - r.top) / r.height;
+			if (e2.folder.parent === d.folder.parent && movableFolder(e2.folder) && (y < 0.25 || y > 0.75)) {
+				return { row, place: e2.folder.id, after: y > 0.75 };
+			}
+			for (let p = e2.folder.id; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
+				if (p === d.folder.id) {
+					return { row, why: t('InboxFolderIntoItself') };
+				}
+			}
+			if (d.account.level !== 'manage') {
+				return { row, why: t('InboxReadOnlyOn', d.account.email) };
+			}
+			return e2.folder.id === d.folder.parent ? null : { row, into: e2.folder.id };
+		};
+		tree.addEventListener('dragstart', e => {
+			const row = e.target.closest && e.target.closest('[data-folder][draggable="true"]');
+			if (!row || S.vdrag) {
+				return;
+			}
+			S.fdrag = +row.dataset.folder;
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', $('.ibx-tree__label', row).textContent);
+		});
+		tree.addEventListener('dragover', e => {
+			if (!S.fdrag) {
+				return;
+			}
+			fclear();
+			const p = fplace(e);
+			if (!p || p.why) {
+				e.dataTransfer.dropEffect = 'none';
+				dragTip(p && p.why ? p.why : '', e.clientX, e.clientY);
+				return;
+			}
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+			dragTip('');
+			p.row.classList.add(p.place ? (p.after ? 'is-dropafter' : 'is-dropbefore') : 'is-droptarget');
+		});
+		tree.addEventListener('drop', e => {
+			if (!S.fdrag) {
+				return;
+			}
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			const d = S.folders.get(S.fdrag);
+			const p = fplace(e);
+			S.fdrag = 0;
+			fclear();
+			dragTip('');
+			if (!d || !p || p.why) {
+				return;
+			}
+			if (p.place) {
+				placeFolder(d.folder.id, p.place, p.after);
+			} else {
+				folderMoveInto(d.folder, p.into);
+			}
+		});
+		tree.addEventListener('dragend', () => {
+			if (S.fdrag) {
+				S.fdrag = 0;
+				fclear();
+				dragTip('');
+			}
 		});
 		let hover = { id: 0, timer: 0 };
 		tree.addEventListener('dragover', e => {
@@ -6498,6 +6783,13 @@
 		items.push({ icon: 'folder-plus', label: t('InboxFolderNewSub'), disabled: !!manage, reason: manage, run: () => folderCreate(e.account, f) });
 		items.push({ icon: 'rename', label: t('InboxFolderRename'), disabled: !!(manage || special), reason: manage || special, run: () => folderRename(f) });
 		items.push({ icon: 'folder-move', label: t('InboxFolderMove'), disabled: !!(manage || special), reason: manage || special, run: () => folderMoveDialog(e.account, f) });
+		// My order of the folders (1.42.0): for the keyboard and the phone, as by dragging
+		if (movableFolder(f)) {
+			const up = brotherOf(f.id, -1);
+			const down = brotherOf(f.id, 1);
+			items.push({ icon: 'chevron-up', label: t('InboxMoveUp'), disabled: !up, run: () => placeFolder(f.id, up.id, false) });
+			items.push({ icon: 'chevron-down', label: t('InboxMoveDown'), disabled: !down, run: () => placeFolder(f.id, down.id, true) });
+		}
 		items.push({ icon: 'delete', label: t('InboxFolderDelete'), danger: true, disabled: !!(manage || special), reason: manage || special, run: () => folderDelete(e.account, f) });
 		if (e.account.level === 'manage' || S.admin) {
 			items.push({ sep: true });
@@ -7621,6 +7913,10 @@
 				if (on === '1') {
 					refreshTree();
 				}
+			} },
+			{ icon: 'undo', label: t('InboxFolderOrderReset'), disabled: (params.folder_order || '{}') === '{}', run: () => {
+				saveParam('folder_order', '{}');
+				renderTree();
 			} },
 		])));
 

@@ -2081,3 +2081,11 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Option of the panel: size of the folders and of the mailbox, after the counters (not on a phone) */
 .ibx-tree__size { flex: none; margin-left: var(--ibx-s1); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 40rem) { .ibx-tree__size { display: none; } }
+
+/* Progress of an action on many mails (1.42.0): a card at the bottom left, reduced to a pill */
+.ibx-progress { position: fixed; left: var(--ibx-s4); bottom: var(--ibx-s5); z-index: 81; display: flex; flex-direction: column; gap: var(--ibx-s2); width: min(22rem, calc(100vw - 2 * var(--ibx-s4))); padding: var(--ibx-s3); background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-progress.is-small { width: auto; padding: 0; background: none; border: 0; box-shadow: none; }
+.ibx-progress__head, .ibx-progress__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--ibx-s2); min-width: 0; }
+.ibx-progress progress { width: 100%; height: 0.5rem; accent-color: var(--ibx-accent); }
+.ibx-progress__pill { min-width: 2.75rem; min-height: 2.75rem; padding: 0 var(--ibx-s3); border: 0; border-radius: 999px; background: var(--ibx-accent); color: var(--ibx-on-accent); font-weight: 700; cursor: pointer; box-shadow: var(--ibx-shadow-float); }
+.ibx-progress__pill:focus-visible { outline: 2px solid var(--ibx-text); outline-offset: 2px; }
