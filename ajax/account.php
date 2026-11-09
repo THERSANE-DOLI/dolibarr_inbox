@@ -277,7 +277,7 @@ switch ($action) {
 			}
 		}
 		$config = $account->getConnectorConfig();
-		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'kept' => array_values((array) ($config['twins_kept'] ?? array()))));
+		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'chosen' => array_keys($account->getChosenRoles()), 'kept' => array_values((array) ($config['twins_kept'] ?? array()))));
 		// no break
 
 	case 'twin':
@@ -318,12 +318,16 @@ switch ($action) {
 		if ($do === 'main') {
 			$roles = $account->getFolderRoles();
 			$roles[(string) $twin['twin']] = $path;
-			$account->setFolderRoles($roles);
+			$account->setFolderRoles($roles, array_merge(array_keys($account->getChosenRoles()), array((string) $twin['twin'])));
 			$account->update($user);
 			inboxAjaxReply(array('ok' => 1));
 		}
 		if ($do !== 'merge' || (int) inboxAjaxParam('confirm', 'int') !== 1) {
 			inboxAjaxError('Unknown action', 400);
+		}
+		// A folder the server marks for this role is its own (often created again by it): never removed (1.40.1)
+		if (in_array('\\'.$twin['twin'], (array) $twin['flags'], true)) {
+			inboxAjaxError($langs->transnoentities('InboxTwinServerFolder'), 422);
 		}
 		$moved = $connector->moveAll($path, (string) $main['path']);
 		if ($moved === null) {
@@ -351,7 +355,9 @@ switch ($action) {
 				$roles[$role] = $path;
 			}
 		}
-		$account->setFolderRoles($roles);
+		// Chosen by hand: the roles the administrator changed (or had chosen), the others stay found (1.40.1)
+		$chosen = array_values(array_intersect(array_filter(explode(',', (string) inboxAjaxParam('chosen', 'aZ09comma'))), array_keys($roles)));
+		$account->setFolderRoles($roles, $chosen);
 		$account->update($user);
 		inboxAjaxReply(array('roles' => $account->getFolderRoles()));
 		// no break

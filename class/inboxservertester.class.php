@@ -276,7 +276,8 @@ class InboxServerTester
 			$sql .= " last_error = ".($errors ? "'".$this->db->escape(implode("\n", $errors))."'" : 'NULL');
 			if (!empty($result['server_info'])) {
 				$sql .= ", server_info = '".$this->db->escape((string) json_encode($result['server_info']))."'";
-				$sql .= ", folder_roles = '".$this->db->escape((string) json_encode($result['folder_roles']))."'";
+				// The roles found fill the gaps; those chosen by hand stay marked so (1.40.1)
+				$sql .= ", folder_roles = '".$this->db->escape((string) json_encode($result['folder_roles'] + array('_chosen' => array_keys($account->getChosenRoles()))))."'";
 			}
 			$sql .= ", fk_user_modif = ".((int) $user->id);
 			$sql .= " WHERE rowid = ".((int) $account->id);

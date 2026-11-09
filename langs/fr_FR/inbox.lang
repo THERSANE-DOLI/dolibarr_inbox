@@ -2114,3 +2114,7 @@ InboxTwinMergeFailed = Fusion impossible, rien n'est supprimé : %s
 InboxTwinNotRemoved = %s mails déplacés, mais le dossier n'a pas pu être supprimé : %s
 InboxJournal_folder_merge = Dossier en double fusionné
 InboxUnreadBelow = %s non lus dans les sous-dossiers
+InboxFoldersDisplay = Affichage des dossiers
+InboxFolderSizesShow = Afficher la taille des dossiers
+InboxFolderSizeIndexed = Taille des %s mails indexés, sur %s
+InboxTwinServerFolder = Dossier du serveur : il ne se supprime pas, faites-en plutôt le dossier principal.

@@ -292,7 +292,8 @@ class InboxImapConnector extends InboxConnector
 			$this->error = $this->explainException($e);
 			return null;
 		}
-		$roles = $this->account->getFolderRoles();
+		$roles = $this->account->getChosenRoles();
+		$found = $this->account->getFolderRoles();
 		$out = array();
 		foreach ((array) $items as $path => $item) {
 			$path = (string) $path;
@@ -301,16 +302,21 @@ class InboxImapConnector extends InboxConnector
 			}
 			$flags = array_map('strtolower', array_map('strval', (array) $item['flags']));
 			$role = array_search($path, $roles, true);
+			$role = $role !== false ? (string) $role : self::guessRole($path, $flags);
+			// A role found by a test, on a folder of an unusual name
+			if ($role === '' && ($was = array_search($path, $found, true)) !== false && $was !== 'inbox') {
+				$role = (string) $was;
+			}
 			$out[] = array(
 				'path' => $path,
 				'name' => self::decodeFolderName($path),
 				'delimiter' => (string) $item['delimiter'],
 				'selectable' => !in_array('\\noselect', $flags, true) && !in_array('\\nonexistent', $flags, true),
-				'role' => $role !== false ? (string) $role : self::guessRole($path, $flags),
+				'role' => $role,
 				'flags' => $flags,
 			);
 		}
-		self::uniqueRoles($out, $roles);
+		self::uniqueRoles($out, $roles, $found);
 		self::addLabels($out);
 		usort($out, function ($a, $b) {
 			if (strtoupper($a['path']) === 'INBOX') {
@@ -363,14 +369,15 @@ class InboxImapConnector extends InboxConnector
 	/**
 	 * One folder per role. Several folders may claim one (Spam marked \Junk by the server and Junk created by a mail
 	 * software, Trash and Corbeille): the one chosen by the administrator keeps it, else the one marked by the server,
-	 * else the usual name (English first); the others become ordinary folders, with « twin » = the role they looked
-	 * like (shown as duplicates in the tab Folders of the mailbox)
+	 * else the one found by the test of the mailbox, else the usual name (English first); the others become ordinary
+	 * folders, with « twin » = the role they looked like (shown as duplicates in the tab Folders of the mailbox)
 	 *
 	 * @param array<int,array<string,mixed>> $folders Folders (path, role, flags), changed in place
 	 * @param array<string,string>           $chosen  Roles chosen by the administrator: role => path
+	 * @param array<string,string>           $found   Roles found by the test of the mailbox: role => path
 	 * @return void
 	 */
-	public static function uniqueRoles(array &$folders, array $chosen = array())
+	public static function uniqueRoles(array &$folders, array $chosen = array(), array $found = array())
 	{
 		$first = array('sent' => 'sent', 'drafts' => 'drafts', 'trash' => 'trash', 'junk' => 'junk', 'archive' => 'archive');
 		foreach ($first as $role => $usual) {
@@ -383,7 +390,7 @@ class InboxImapConnector extends InboxConnector
 			if (count($keys) < 2) {
 				continue;
 			}
-			$score = function ($f) use ($role, $usual, $chosen) {
+			$score = function ($f) use ($role, $usual, $chosen, $found) {
 				$name = strtolower((string) preg_replace('/^.*[.\/]/', '', self::decodeFolderName((string) $f['path'])));
 				if (isset($chosen[$role]) && $chosen[$role] === (string) $f['path']) {
 					return 0;
@@ -391,7 +398,10 @@ class InboxImapConnector extends InboxConnector
 				if (in_array('\\'.$role, (array) $f['flags'], true)) {
 					return 1;
 				}
-				return $name === $usual ? 2 : ($role === 'junk' && $name === 'spam' ? 3 : 4);
+				if (isset($found[$role]) && $found[$role] === (string) $f['path']) {
+					return 2;
+				}
+				return $name === $usual ? 3 : ($role === 'junk' && $name === 'spam' ? 4 : 5);
 			};
 			usort($keys, function ($a, $b) use ($folders, $score) {
 				return ($score($folders[$a]) <=> $score($folders[$b])) ?: strcmp((string) $folders[$a]['path'], (string) $folders[$b]['path']);

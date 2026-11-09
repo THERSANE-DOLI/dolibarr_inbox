@@ -124,6 +124,8 @@ class InboxUserParam
 			'unified_exclude' => array('[]', 'json'),
 			// Virtual views (1.31.0): the views shared with the user that he hides
 			'views_hidden' => array('[]', 'json'),
+			// Size of the folders shown in the panel (menu of the panel, 1.40.0)
+			'folder_sizes' => array('0', 'int:0:1'),
 			// Folders with subfolders the user opened in the panel (f<id>), the others closed (1.39.0)
 			'tree_open' => array('[]', 'json'),
 			// Order of the mailboxes of the user, ids (My account, 1.37.0); the others after, by name

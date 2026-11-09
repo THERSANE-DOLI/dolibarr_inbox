@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the folder marked by the server keeps its role over a folder only found by an older test :   1.40.1
+  - the roles chosen by hand in the tab Folders are kept apart from those found by the test of the mailbox; only
+    the first ones come before the mark of the server; the form keeps as chosen only what is changed.
+  - a folder the server marks for a role (often created again by it) is never offered to the merge: made the main
+    folder instead.
+
+- NEW: size of the folders in the panel, an option of its menu :   1.40.0
+  - menu « ... » of the panel of the folders: Show the size of the folders, kept for the user, off by default.
+  - the size of the mails indexed of each folder (« ≈ » when not all are indexed), the space used by the mailbox on
+    the server (quota); summed by the database, no call to the mail server; not on a phone.
+
 - FIX: the panel of the folders follows the order of my mailboxes chosen in My account :   1.39.1
   - without an order chosen: my personal mailbox first, then by name, as before.
 

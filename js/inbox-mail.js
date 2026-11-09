@@ -200,7 +200,19 @@
 		if (bytes < 1048576) {
 			return Math.round(bytes / 1024) + ' Ko';
 		}
-		return (bytes / 1048576).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' Mo';
+		if (bytes < 1073741824) {
+			return (bytes / 1048576).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' Mo';
+		}
+		return (bytes / 1073741824).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' Go';
+	}
+	/** Size of a folder in the panel (option of the panel): its mails indexed, « ≈ » when not all are */
+	function folderSize(f) {
+		if (params.folder_sizes !== '1' || f.bytes === undefined) {
+			return '';
+		}
+		const part = f.indexed < f.total;
+		const text = (part ? '≈ ' : '') + size(f.bytes);
+		return '<span class="ibx-tree__size"' + (part ? ' title="' + th('InboxFolderSizeIndexed', f.indexed, f.total) + '"' : '') + '>' + esc(text) + '</span>';
 	}
 	function initials(name, email) {
 		const src = (name || email || '?').replace(/[<>"]/g, '').trim();
@@ -392,6 +404,8 @@
 				+ (inError ? ic('warning', 'ibx-tree__icon') : lookIcon(a.icon || 'account', a.color, 'ibx-tree__icon'))
 				+ '<span class="ibx-tree__label ibx-ellipsis" title="' + esc(a.email) + '">' + esc(accountName(a)) + '</span>'
 				+ (!open && unread ? '<span class="ibx-count">' + unread + '</span>' : '')
+				// Option of the panel: the space used on the server (quota, in KB)
+				+ (params.folder_sizes === '1' && a.quota ? '<span class="ibx-tree__size" title="' + th('InboxQuotaUsed', size(a.quota.used * 1024), size(a.quota.limit * 1024)) + '">' + esc(size(a.quota.used * 1024)) + '</span>' : '')
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
 				+ '</div>'
 				+ (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '')
@@ -995,6 +1009,7 @@
 				// later (queue of inbox) left out (1.25.1)
 				+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
 				+ (below ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadBelow', below) + '" aria-label="' + th('InboxUnreadBelow', below) + '">+' + below + '</span>' : '')
+				+ folderSize(f)
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
 				+ '</li>';
@@ -7544,6 +7559,7 @@
 		return '<div class="ibx-mailapp" data-folders="open" data-mobile="list">'
 			+ '<section class="ibx-pane ibx-pane--folders" aria-label="' + th('InboxFolders') + '">'
 			+ '<div class="ibx-pane__head"><span class="ibx-pane__title">' + th('InboxSpaceMail') + '</span><span class="ibx-spacer"></span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-treemenu" aria-haspopup="menu" title="' + th('InboxFoldersDisplay') + '" aria-label="' + th('InboxFoldersDisplay') + '">' + ic('more') + '</button>'
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-compose" title="' + th('InboxNewMail') + ' (C)">' + ic('compose') + ' ' + th('InboxNewMail') + '</button>' : '') + '</div>'
 			+ '<div class="ibx-toolbar ibx-js-folderfilterbox" hidden><label class="ibx-search">' + ic('filter') + '<input type="search" class="ibx-field ibx-js-folderfilter" placeholder="' + th('InboxFilterFolders') + '" aria-label="' + th('InboxFilterFolders') + '" autocomplete="off"></label></div>'
 			+ '<div class="ibx-pane__body"><ul class="ibx-tree" aria-busy="true"><li><span class="ibx-skeleton"></span></li><li><span class="ibx-skeleton" style="width:70%"></span></li><li><span class="ibx-skeleton" style="width:50%"></span></li></ul></div></section>'
@@ -7584,6 +7600,27 @@
 	function bindLayout() {
 		const el = S.el;
 		$$('.ibx-js-compose', el).forEach(b => b.addEventListener('click', () => newMail()));
+		// Display of the panel of the folders (1.40.0): the size of the folders, kept for the user
+		$$('.ibx-js-treemenu', el).forEach(b => b.addEventListener('click', () => menu(b, [
+			{ header: t('InboxFoldersDisplay') },
+			{ icon: 'folders', label: t('InboxFolderSizesShow'), checked: params.folder_sizes === '1', run: async () => {
+				const on = params.folder_sizes === '1' ? '0' : '1';
+				params.folder_sizes = on;
+				if (on === '0') {
+					renderTree();
+				}
+				try {
+					await post('userparam', 'set', { param: 'folder_sizes', value: on });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return;
+				}
+				// The sizes come with the tree, once the choice is kept on the server
+				if (on === '1') {
+					refreshTree();
+				}
+			} },
+		])));
 
 		const readPaneEl = $('.ibx-pane--read', el);
 		readPaneEl.addEventListener('dragstart', e => {
