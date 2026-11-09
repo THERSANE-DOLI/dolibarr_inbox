@@ -84,7 +84,58 @@
 	try {
 		(JSON.parse(params.tree_collapsed || '[]') || []).forEach(k => S.collapsed.add(String(k)));
 	} catch (e) {
-		// default: everything open
+		// default: the mailboxes and the views open
+	}
+	// Folders with subfolders: closed until the user opens them (1.39.0), those he opened kept
+	S.opened = new Set();
+	try {
+		(JSON.parse(params.tree_open || '[]') || []).forEach(k => S.opened.add(String(k)));
+	} catch (e) {
+		// default: closed
+	}
+	/** A row of the tree open: a folder when the user opened it, a mailbox or the views unless he closed them */
+	function isOpen(key) {
+		return key.charAt(0) === 'f' ? S.opened.has(key) : !S.collapsed.has(key);
+	}
+	/**
+	 * A row of the tree opened or closed, kept in the settings of the user unless asked otherwise
+	 * @param {string} key f<folder>, a<mailbox>, views
+	 * @param {boolean} open Open
+	 * @param {boolean} keep Kept (false: a drag hovering a folder)
+	 * @returns {boolean} Changed
+	 */
+	function setOpen(key, open, keep = true) {
+		if (isOpen(key) === open) {
+			return false;
+		}
+		if (key.charAt(0) === 'f') {
+			S.opened[open ? 'add' : 'delete'](key);
+			if (keep) {
+				saveParam('tree_open', JSON.stringify(Array.from(S.opened)));
+			}
+		} else {
+			S.collapsed[open ? 'delete' : 'add'](key);
+			if (keep) {
+				saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+			}
+		}
+		return true;
+	}
+	/** The mailbox and the parents of a folder opened: the user sees where he is */
+	function openPathTo(folderId) {
+		const e = S.folders.get(folderId);
+		if (!e) {
+			return false;
+		}
+		let changed = setOpen('a' + e.account.id, true);
+		for (let p = e.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
+			changed = setOpen('f' + p, true) || changed;
+		}
+		return changed;
+	}
+	/** Unread of the subfolders of a folder (Sent and Drafts left out), told on it when it is closed */
+	function unreadBelow(a, id) {
+		return a.folders.filter(f => f.parent === id).reduce((n, f) => n + (f.role !== 'sent' && f.role !== 'drafts' ? f.unread || 0 : 0) + unreadBelow(a, f.id), 0);
 	}
 
 	/** Save a setting of the user (silent: a lost setting is not worth an error) */
@@ -252,7 +303,9 @@
 			order = [];
 		}
 		const at = a => (order.includes(a.id) ? order.indexOf(a.id) : Infinity);
-		(S.accounts || []).sort((a, b) => (at(a) - at(b)) || String(a.label || a.email).localeCompare(String(b.label || b.email)));
+		// Without an order: the personal mailbox first, then by name (as the server gives them)
+		const mine = a => (order.length ? 0 : (a.personal ? 0 : 1));
+		(S.accounts || []).sort((a, b) => (mine(a) - mine(b)) || (at(a) - at(b)) || String(a.label || a.email).localeCompare(String(b.label || b.email)));
 	}
 	async function loadTree() {
 		// The virtual views with the tree (never blocking it)
@@ -277,6 +330,11 @@
 		if (stale.length && S.accounts.length) {
 			stale.forEach(k => S.collapsed.delete(k));
 			saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+		}
+		const staleOpen = Array.from(S.opened).filter(k => !known.has(k));
+		if (staleOpen.length && S.accounts.length) {
+			staleOpen.forEach(k => S.opened.delete(k));
+			saveParam('tree_open', JSON.stringify(Array.from(S.opened)));
 		}
 		adaptTags();
 	}
@@ -918,7 +976,9 @@
 			if (!matches && !subHtml) {
 				return;
 			}
-			const open = sub && (!S.collapsed.has(key) || needle !== '');
+			const open = sub && (isOpen(key) || needle !== '');
+			// Closed: the unread of its subfolders told on it, apart from its own (nothing hidden)
+			const below = sub && !open ? unreadBelow(a, f.id) : 0;
 			const selected = f.id === S.folderId && S.scope === 'folder';
 			html += '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
 				+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
@@ -934,6 +994,7 @@
 				// Drafts: how many wait, in grey (they are not unread); the count of the server, the mails sending
 				// later (queue of inbox) left out (1.25.1)
 				+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
+				+ (below ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadBelow', below) + '" aria-label="' + th('InboxUnreadBelow', below) + '">+' + below + '</span>' : '')
 				+ '</div>'
 				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
 				+ '</li>';
@@ -954,12 +1015,7 @@
 			if (toggle) {
 				e.stopPropagation();
 				const key = toggle.dataset.toggle;
-				if (S.collapsed.has(key)) {
-					S.collapsed.delete(key);
-				} else {
-					S.collapsed.add(key);
-				}
-				saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+				setOpen(key, !isOpen(key));
 				renderTree();
 				return;
 			}
@@ -4810,8 +4866,7 @@
 			if (hover.id !== key) {
 				clearTimeout(hover.timer);
 				hover = { id: key, timer: setTimeout(() => {
-					if (S.collapsed.has(key)) {
-						S.collapsed.delete(key);
+					if (setOpen(key, true, false)) {
 						renderTree();
 					}
 				}, 600) };
@@ -6472,12 +6527,8 @@
 		toast(text);
 		await refreshTree();
 		if (folderId && S.folders.has(folderId)) {
-			const e = S.folders.get(folderId);
 			// Its parents unfolded: the folder is seen where it is now
-			for (let p = e.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
-				S.collapsed.delete('f' + p);
-			}
-			S.collapsed.delete('a' + e.account.id);
+			openPathTo(folderId);
 			renderTree();
 		}
 	}
@@ -6927,12 +6978,7 @@
 		}
 		Dolibarr.executeHook('inbox:folder:open', { role: entry.folder.role, account: entry.account.id, el: S.el });
 		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
-		let unfolded = S.collapsed.delete('a' + entry.account.id);
-		for (let p = entry.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
-			unfolded = S.collapsed.delete('f' + p) || unfolded;
-		}
-		if (unfolded) {
-			saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
+		if (openPathTo(id)) {
 			renderTree();
 		}
 		leaveVview();

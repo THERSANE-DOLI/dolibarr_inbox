@@ -27,7 +27,7 @@ dol_include_once('/inbox/class/inboxidentity.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles'), true);
+$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -269,7 +269,76 @@ switch ($action) {
 		if ($folders === null) {
 			inboxAjaxError($connector ? $connector->getError() : $error, 502);
 		}
-		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles()));
+		// Duplicates of a special folder (1.38.0): their number of mails, for the choice of the administrator
+		foreach ($folders as $k => $f) {
+			if (!empty($f['twin'])) {
+				$status = $connector->folderStatus((string) $f['path']);
+				$folders[$k]['total'] = is_array($status) ? (int) $status['total'] : null;
+			}
+		}
+		$config = $account->getConnectorConfig();
+		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'kept' => array_values((array) ($config['twins_kept'] ?? array()))));
+		// no break
+
+	case 'twin':
+		// A duplicate of a special folder (Junk beside Spam, Corbeille beside Trash): made the folder of its role, kept
+		// as an ordinary folder, or merged into the folder of its role (its mails moved there, then removed)
+		inboxAjaxNeedAdmin();
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'), true);
+		$path = (string) inboxAjaxParam('path', 'none');
+		$do = (string) inboxAjaxParam('do', 'aZ09');
+		$error = '';
+		$connector = InboxConnectorFactory::forAccount($db, $account, $error);
+		$folders = $connector ? $connector->listFolders() : null;
+		if ($folders === null) {
+			inboxAjaxError($connector ? $connector->getError() : $error, 502);
+		}
+		$twin = null;
+		$main = null;
+		foreach ($folders as $f) {
+			if ((string) $f['path'] === $path && !empty($f['twin'])) {
+				$twin = $f;
+			}
+		}
+		foreach ($twin ? $folders : array() as $f) {
+			if ((string) $f['role'] === (string) $twin['twin']) {
+				$main = $f;
+			}
+		}
+		if (!$twin || !$main) {
+			inboxAjaxError($langs->transnoentities('InboxErrorFolderNotFound'), 404);
+		}
+		if ($do === 'keep') {
+			$config = $account->getConnectorConfig();
+			$config['twins_kept'] = array_values(array_unique(array_merge((array) ($config['twins_kept'] ?? array()), array($path))));
+			$account->setConnectorConfig($config);
+			$account->update($user);
+			inboxAjaxReply(array('ok' => 1));
+		}
+		if ($do === 'main') {
+			$roles = $account->getFolderRoles();
+			$roles[(string) $twin['twin']] = $path;
+			$account->setFolderRoles($roles);
+			$account->update($user);
+			inboxAjaxReply(array('ok' => 1));
+		}
+		if ($do !== 'merge' || (int) inboxAjaxParam('confirm', 'int') !== 1) {
+			inboxAjaxError('Unknown action', 400);
+		}
+		$moved = $connector->moveAll($path, (string) $main['path']);
+		if ($moved === null) {
+			inboxAjaxError($langs->transnoentities('InboxTwinMergeFailed', $connector->getError()), 502);
+		}
+		if (!$connector->deleteFolder($path)) {
+			inboxAjaxError($langs->transnoentities('InboxTwinNotRemoved', $moved, $connector->getError()), 502);
+		}
+		dol_include_once('/inbox/class/inboxfolder.class.php');
+		$after = $connector->listFolders();
+		if (is_array($after)) {
+			(new InboxFolder($db))->syncTree($account, $after);
+		}
+		InboxActionLog::add($db, $user, (int) $account->id, 'folder_merge', array((object) array('subject' => '')), $path, (string) $main['path'], 0, (string) $moved);
+		inboxAjaxReply(array('moved' => $moved));
 		// no break
 
 	case 'roles':

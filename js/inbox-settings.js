@@ -1168,7 +1168,48 @@
 				+ '</select>' + (current ? '' : '<div class="ibx-formrow__help">' + th('InboxFolderMissing') + '</div>') + '</div></div>';
 		});
 		html += '<div class="ibx-formfoot"><span class="ibx-muted">' + th('InboxFoldersCount', data.folders.length) + '</span><span class="ibx-formfoot__spacer"></span><button type="submit" class="ibx-btn ibx-btn--primary">' + th('InboxSave') + '</button></div></form>';
+		// Duplicates of a special folder (1.38.0): one folder per role, the others ordinary; the administrator chooses
+		const kept = data.kept || [];
+		const twins = data.folders.filter(f => f.twin && !kept.includes(f.path));
+		const mainOf = role => data.folders.find(f => f.role === role);
+		if (twins.length) {
+			html += '<h3 class="ibx-section__title ibx-twins__title">' + ic('warning') + ' ' + th('InboxTwinsTitle') + '</h3><p class="ibx-section__help">' + th('InboxTwinsHelp') + '</p>'
+				+ '<table class="ibx-table ibx-twins"><tbody>' + twins.map(f => {
+					const main = mainOf(f.twin);
+					return '<tr data-path="' + esc(f.path) + '"><td><b>' + esc(f.label || f.name) + '</b><div class="ibx-muted">' + esc(t('InboxTwinOf', t(roleKey(f.twin)), main ? (main.label || main.name) : '')) + '</div></td>'
+						+ '<td class="ibx-muted">' + (f.total === null || f.total === undefined ? '' : th('InboxTwinMails', f.total)) + '</td>'
+						+ '<td class="ibx-twins__actions"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-twin" data-do="keep">' + th('InboxTwinKeep') + '</button>'
+						+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-twin" data-do="main">' + th('InboxTwinMain') + '</button>'
+						+ (main ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--danger ibx-js-twin" data-do="merge">' + th('InboxTwinMerge') + '</button>' : '') + '</td></tr>';
+				}).join('') + '</tbody></table>';
+		}
 		box.innerHTML = html;
+		$$('.ibx-js-twin', box).forEach(b => b.addEventListener('click', async () => {
+			const tr = b.closest('tr');
+			const f = twins.find(x => x.path === tr.dataset.path);
+			const main = mainOf(f.twin);
+			const req = { id: account.id, path: f.path, do: b.dataset.do };
+			if (b.dataset.do === 'merge') {
+				if (!await confirmDialog({ title: t('InboxTwinMergeTitle', f.label || f.name), text: t('InboxTwinMergeText', f.total || 0, main.label || main.name), confirm: t('InboxTwinMerge'), danger: true })) {
+					return;
+				}
+				req.confirm = 1;
+			}
+			$$('button', tr).forEach(x => {
+				x.disabled = true;
+			});
+			try {
+				const r = await post('account', 'twin', req);
+				I.changed('account', account.id);
+				toast(b.dataset.do === 'merge' ? t('InboxTwinMerged', r.moved) : t('InboxSaved'));
+				tabFolders(box, account);
+			} catch (err) {
+				toast(err.message, { error: true });
+				$$('button', tr).forEach(x => {
+					x.disabled = false;
+				});
+			}
+		}));
 		$('form', box).addEventListener('submit', async e => {
 			e.preventDefault();
 			try {

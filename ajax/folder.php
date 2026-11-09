@@ -28,6 +28,7 @@ dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxtag.class.php');
 dol_include_once('/inbox/class/inboxnewmarks.class.php');
 dol_include_once('/inbox/class/inboxlook.class.php');
+dol_include_once('/inbox/class/inboxuserparam.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('look', 'lookreset'), true));
@@ -166,10 +167,14 @@ switch ($action) {
 				}))),
 			);
 		}
-		// Personal mailbox first, then the shared ones by label
-		usort($list, function ($a, $b) {
-			return (int) $b['personal'] <=> (int) $a['personal'] ?: strcasecmp($a['label'] ?: $a['email'], $b['label'] ?: $b['email']);
-		});
+		// The order chosen by the user in My account (getAccounts gives it); without one, his personal mailbox first,
+		// then the shared ones by label
+		$order = json_decode((string) (new InboxUserParam($db))->get($user, 'accounts_order'), true);
+		if (!is_array($order) || !$order) {
+			usort($list, function ($a, $b) {
+				return (int) $b['personal'] <=> (int) $a['personal'] ?: strcasecmp($a['label'] ?: $a['email'], $b['label'] ?: $b['email']);
+			});
+		}
 		inboxAjaxReply(array('accounts' => $list, 'admin' => (bool) $user->hasRight('inbox', 'account', 'admin'), 'icons' => InboxLook::choices()));
 		// no break
 
