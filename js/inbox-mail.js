@@ -4387,12 +4387,60 @@
 			box._bound = true;
 			box.addEventListener('click', e => dolibarClick(box, e));
 		}
+		loadCited(box);
+	}
+	/**
+	 * Pieces cited in the mail (1.46.0), asked after the panel: the body is read on the server. The ones of another
+	 * thirdparty are never suggested here, only in « Link » with a warning.
+	 * @param {HTMLElement} box Panel
+	 */
+	async function loadCited(box) {
+		const mail = box.dataset.mail;
+		let res;
+		try {
+			res = await api('dolibarr', 'cited', { id: +mail });
+		} catch (err) {
+			return;
+		}
+		if (!box.isConnected || box.dataset.mail !== mail || !box._data) {
+			return;
+		}
+		box._cited = res.cited || [];
+		if (box._cited.length) {
+			paintDolibar(box);
+		}
+	}
+	/** Cited piece of another thirdparty, or of a writer not known: why it may not be the right one */
+	function citedWarning(box, x) {
+		const d = box._data;
+		const writer = d && d.sender.soc && d.sender.soc.readable ? d.sender.soc.ref : '';
+		if (x.match === 'other') {
+			return writer ? t('InboxCitedOtherSoc', x.label || '?', writer) : t('InboxCitedOtherSocNoName', x.label || '?');
+		}
+		return x.match === 'unknown' ? t('InboxCitedUnknownSoc') : '';
+	}
+	function citedWarnHtml(text) {
+		return text ? ' <span class="ibx-cited__warn" title="' + esc(text) + '">' + ic('warning') + '<span class="ibx-sr-only">' + esc(text) + '</span></span>' : '';
+	}
+	/**
+	 * Status of a piece as the badge of Dolibarr (1.46.0): its short label, the colour of its kind (status0 to status9),
+	 * the long label in the title; a plain grey label when the kind is unknown
+	 * @param {object} d Piece {status, status_short, status_type}
+	 * @returns {string} html
+	 */
+	function statusBadge(d) {
+		const label = d.status_short || d.status;
+		if (!label) {
+			return '';
+		}
+		const type = Number.isInteger(d.status_type) && d.status_type >= 0 && d.status_type <= 9 ? d.status_type : -1;
+		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
 	}
 	/** A piece as a pill: icon, ref, thirdparty, status, link to its card; « not accessible » without anything else */
-	function pieceHtml(d, unlink) {
+	function pieceHtml(d, unlink, warn) {
 		const inner = d.readable
 			? '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener" title="' + esc(d.kind + ' ' + (d.ref || '') + (d.status ? ' · ' + d.status : '')) + '">'
-				+ ic(d.icon) + '<b>' + esc(d.ref || '') + '</b>' + (d.label ? ' <span class="ibx-muted">' + esc(d.label) + '</span>' : '') + (d.status ? ' <span class="ibx-piece__status">' + esc(d.status) + '</span>' : '') + '</a>'
+				+ ic(d.icon) + '<b>' + esc(d.ref || '') + '</b>' + (d.label ? ' <span class="ibx-muted">' + esc(d.label) + '</span>' : '') + statusBadge(d) + '</a>' + citedWarnHtml(warn || '')
 			: '<span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span>';
 		return '<span class="ibx-piece"' + (d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '') + '>' + inner + (unlink ? '<button type="button" class="ibx-piece__x ibx-js-unlink" data-link="' + unlink + '" title="' + th('InboxUnlink') + '" aria-label="' + esc(t('InboxUnlinkPiece', d.ref || d.kind)) + '">' + ic('close') + '</button>' : '') + '</span>';
 	}
@@ -4444,8 +4492,16 @@
 			if (d.sender.user) {
 				sender.push('<span class="ibx-piece"><span class="ibx-piece__link">' + ic('account') + esc(t('InboxDolibarrUser', d.sender.user.name)) + '</span></span>');
 			}
-			const pieces = d.links.map(l => pieceHtml(l, l.link)).concat(d.extra.map(x => pieceHtml(x, 0)));
+			const cited = box._cited || [];
+			const citedOf = x => cited.find(c => c.type === x.type && c.id === x.id);
+			const linkedKeys = new Set(d.links.map(l => l.type + ':' + l.id).concat(d.extra.map(x => x.type + ':' + x.id)));
+			// A piece linked though cited for another thirdparty keeps its warning
+			const pieces = d.links.map(l => {
+				const c = citedOf(l);
+				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '');
+			}).concat(d.extra.map(x => pieceHtml(x, 0)));
 			const canWrite = !!d.level;
+			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			html += '<div class="ibx-dolibar__body">'
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
 				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>') + '</span></div>'
@@ -4453,6 +4509,11 @@
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
 					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
+				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
+					+ suggest.map(c => '<span class="ibx-cited__item">' + pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '')
+						+ (c.theirs ? ' <span class="ibx-muted ibx-cited__theirs">' + esc(t('InboxCitedTheirRef', c.cited)) + '</span>' : '')
+						+ ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '">' + ic('link') + ' ' + th('InboxLink') + '</button></span>').join('')
+					+ '</span></div>' : '')
 				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
 					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
@@ -4581,6 +4642,19 @@
 		}
 		if (e.target.closest('.ibx-js-linkpiece')) {
 			linkDialog(box);
+			return;
+		}
+		const citedBtn = e.target.closest('.ibx-js-linkcited');
+		if (citedBtn) {
+			// A piece cited in the mail, of the thirdparty of the writer: linked in one click
+			citedBtn.disabled = true;
+			try {
+				await post('dolibarr', 'link', { id: mailId, type: citedBtn.dataset.type, element: +citedBtn.dataset.id });
+			} catch (err) {
+				citedBtn.disabled = false;
+				return;
+			}
+			loadDolibar(box);
 			return;
 		}
 		if (e.target.closest('.ibx-js-createpiece')) {
@@ -4715,7 +4789,11 @@
 		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc.id : 0;
 		const dlg = dialog({
 			title: opts.attach ? t('InboxAttachToTitle', opts.attach.a.name) : t('InboxLinkPieceTitle'),
-			body: '<input type="search" class="ibx-field ibx-js-piecesearch" autocomplete="off" placeholder="' + th('InboxSearchPiece') + '" aria-label="' + th('InboxSearchPiece') + '">'
+			body: '<div class="ibx-linksearch">'
+				+ '<span class="ibx-linksearch__field"><input type="search" class="ibx-field ibx-js-piecesearch" autocomplete="off" placeholder="' + th('InboxSearchPiece') + '" aria-label="' + th('InboxSearchPiece') + '">'
+				+ '<span class="ibx-spinner ibx-linksearch__spin" aria-hidden="true" hidden></span></span>'
+				+ '<button type="button" class="ibx-btn ibx-js-extend" aria-haspopup="menu">' + th('InboxSearchExtend') + ' ' + ic('chevron-down') + '</button></div>'
+				+ '<div class="ibx-linksearch__state ibx-muted" role="status"></div>'
 				+ '<div class="ibx-picklist ibx-js-piecelist" role="listbox" aria-label="' + th('InboxPiecesLinked') + '"></div>',
 			actions: [{ label: opts.attach ? t('InboxAttach') : t('InboxLink'), primary: true, run: async dl => {
 				const cur = $('[aria-selected="true"]', dl);
@@ -4735,32 +4813,128 @@
 		const list = $('.ibx-js-piecelist', dlg);
 		// To link: the pieces linked already are greyed; to put a file in a piece: every piece may receive it
 		const linked = new Set(opts.attach ? [] : d.links.map(l => l.type + ':' + l.id));
+		const state = $('.ibx-linksearch__state', dlg);
+		const spin = $('.ibx-linksearch__spin', dlg);
+		const extendBtn = $('.ibx-js-extend', dlg);
+		// « Extend to »: types left out by default (the events), unchecked at each opening of the dialog (1.46.0)
+		const extend = new Set();
+		const EXTENDS = [{ type: 'action', icon: 'agenda', label: t('InboxSearchEvents') }];
+		const paintExtend = () => {
+			const on = EXTENDS.filter(x => extend.has(x.type));
+			extendBtn.innerHTML = (on.length ? esc(on.map(x => '+ ' + x.label).join(' ')) : th('InboxSearchExtend')) + ' ' + ic('chevron-down');
+			extendBtn.classList.toggle('is-active', on.length > 0);
+		};
+		// Cited in the mail: first when nothing is typed; the ones of another thirdparty at the bottom, with a warning
+		const cited = box._cited || [];
+		const warnOf = x => {
+			const c = cited.find(y => y.type === x.type && y.id === x.id);
+			return c && c.match !== 'same' ? citedWarning(box, c) : '';
+		};
+		let free = true;
+		const item = x => {
+			const done = linked.has(x.type + ':' + x.id);
+			// Never chosen in advance when cited for another thirdparty: Enter does not link it by mistake
+			const other = cited.some(c => c.type === x.type && c.id === x.id && c.match === 'other');
+			const sel = !done && free && !other;
+			if (sel) {
+				free = false;
+			}
+			return '<div class="ibx-picklist__item" role="option" data-type="' + esc(x.type) + '" data-id="' + x.id + '"' + (done ? ' aria-disabled="true" title="' + th('InboxAlreadyLinked') + '"' : '') + ' aria-selected="' + sel + '">'
+				+ ic(x.icon) + ' <span class="ibx-ellipsis"><b>' + esc(x.ref) + '</b> ' + (x.label ? '<span class="ibx-muted">' + esc(x.label) + '</span> ' : '') + '<span class="ibx-muted">· ' + esc(x.kind) + '</span></span>' + citedWarnHtml(warnOf(x)) + statusBadge(x) + '</div>';
+		};
+		/**
+		 * @param {object[]} pieces Pieces found
+		 * @param {object[]} events Events found (on demand)
+		 * @param {boolean} eventsBusy Events still searched
+		 */
+		const render = (pieces, events, eventsBusy) => {
+			const q = input.value.trim();
+			free = true;
+			let html = '';
+			let last = '';
+			if (q === '' && cited.length) {
+				const first = cited.filter(c => c.match !== 'other');
+				const others = cited.filter(c => c.match === 'other');
+				const keys = new Set(cited.map(c => c.type + ':' + c.id));
+				pieces = pieces.filter(x => !keys.has(x.type + ':' + x.id));
+				if (first.length) {
+					html += '<div class="ibx-picklist__group" role="presentation">' + th('InboxCitedInMail') + '</div>' + first.map(item).join('')
+						+ (pieces.length ? '<div class="ibx-picklist__group" role="presentation">' + th('InboxPiecesOfSender') + '</div>' : '');
+				}
+				if (others.length) {
+					last = '<div class="ibx-picklist__group" role="presentation">' + th('InboxCitedOtherGroup') + '</div>' + others.map(item).join('');
+				}
+			}
+			html += pieces.map(item).join('');
+			html += last;
+			if (extend.has('action')) {
+				html += '<div class="ibx-picklist__group" role="presentation">' + th('InboxSearchEvents') + '</div>'
+					+ (eventsBusy ? '<div class="ibx-picklist__empty ibx-muted"><span class="ibx-spinner" aria-hidden="true"></span> ' + th('InboxSearchingEvents') + '</div>'
+						: events.map(item).join('') || '<div class="ibx-picklist__empty ibx-muted">' + th('InboxNoEventFound') + '</div>');
+			} else if (!pieces.length && !html) {
+				html = '<div class="ibx-muted ibx-picklist__empty">' + (q ? th('InboxNoPieceFor', q) : th(soc ? 'InboxNoPieceFound' : 'InboxTypeToSearch'))
+					+ (q ? ' <button type="button" class="ibx-linkbtn ibx-js-alsoevents">' + th('InboxSearchAlsoEvents') + '</button>' : '') + '</div>';
+			}
+			list.innerHTML = html;
+		};
 		let seq = 0;
 		const load = async () => {
 			const mine = ++seq;
+			const q = input.value.trim();
 			list.setAttribute('aria-busy', 'true');
-			let res;
+			spin.hidden = false;
+			state.textContent = t('InboxSearching');
+			let pieces;
 			try {
-				res = await api('dolibarr', 'search', { q: input.value.trim(), soc });
+				pieces = (await api('dolibarr', 'search', { q, soc })).results;
 			} catch (err) {
-				list.innerHTML = '<div class="ibx-muted ibx-picklist__empty">' + esc(err.message) + '</div>';
+				if (mine !== seq) {
+					return;
+				}
+				spin.hidden = true;
+				list.removeAttribute('aria-busy');
+				state.textContent = '';
+				list.innerHTML = '<div class="ibx-picklist__empty">' + esc(err.message) + ' <button type="button" class="ibx-linkbtn ibx-js-retry">' + th('InboxAttRetry') + '</button></div>';
 				return;
 			}
 			if (mine !== seq) {
 				return;
 			}
+			// The pieces at once; the events (on demand) after, in their own group
+			const withEvents = extend.has('action') && (q !== '' || soc > 0);
+			render(pieces, [], withEvents);
 			list.removeAttribute('aria-busy');
-			let first = true;
-			list.innerHTML = res.results.map(x => {
-				const done = linked.has(x.type + ':' + x.id);
-				const sel = !done && first;
-				if (sel) {
-					first = false;
-				}
-				return '<div class="ibx-picklist__item" role="option" data-type="' + esc(x.type) + '" data-id="' + x.id + '"' + (done ? ' aria-disabled="true" title="' + th('InboxAlreadyLinked') + '"' : '') + ' aria-selected="' + sel + '">'
-					+ ic(x.icon) + ' <span class="ibx-ellipsis"><b>' + esc(x.ref) + '</b> ' + (x.label ? '<span class="ibx-muted">' + esc(x.label) + '</span> ' : '') + '<span class="ibx-muted">· ' + esc(x.kind) + '</span></span></div>';
-			}).join('') || '<div class="ibx-muted ibx-picklist__empty">' + th(input.value.trim() || soc ? 'InboxNoPieceFound' : 'InboxTypeToSearch') + '</div>';
+			if (!withEvents) {
+				spin.hidden = true;
+				state.textContent = '';
+				return;
+			}
+			state.textContent = t('InboxSearchingEvents');
+			let events = [];
+			try {
+				events = (await api('dolibarr', 'search', { q, soc, types: 'action' })).results;
+			} catch (err) {
+				events = [];
+			}
+			if (mine !== seq) {
+				return;
+			}
+			spin.hidden = true;
+			state.textContent = '';
+			render(pieces, events, false);
 		};
+		extendBtn.addEventListener('click', () => {
+			menu(extendBtn, EXTENDS.map(x => ({ icon: x.icon, label: x.label, checked: extend.has(x.type), run: () => {
+				if (extend.has(x.type)) {
+					extend.delete(x.type);
+				} else {
+					extend.add(x.type);
+				}
+				paintExtend();
+				load();
+				input.focus();
+			} })));
+		});
 		let timer = 0;
 		input.addEventListener('input', () => {
 			clearTimeout(timer);
@@ -4781,6 +4955,17 @@
 			}
 		});
 		list.addEventListener('click', e => {
+			if (e.target.closest('.ibx-js-alsoevents')) {
+				extend.add('action');
+				paintExtend();
+				load();
+				input.focus();
+				return;
+			}
+			if (e.target.closest('.ibx-js-retry')) {
+				load();
+				return;
+			}
 			const it = e.target.closest('.ibx-picklist__item');
 			if (it && !it.hasAttribute('aria-disabled')) {
 				$$('[aria-selected="true"]', list).forEach(x => x.setAttribute('aria-selected', 'false'));
@@ -5705,9 +5890,11 @@
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
 			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
 			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
-			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="menuitem" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
+			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="' + (it.checked !== undefined ? 'menuitemcheckbox" aria-checked="' + !!it.checked : 'menuitem') + '" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
-		document.body.appendChild(box);
+		// From a modal dialog (« Extend to » of « Link »): inside it, else the menu is under it and inert
+		const host = anchor && anchor.closest ? anchor.closest('dialog[open]') : null;
+		(host || document.body).appendChild(box);
 		const r = at ? { left: at.x, right: at.x, top: at.y, bottom: at.y } : anchor.getBoundingClientRect();
 		const w = box.offsetWidth;
 		const h = box.offsetHeight;

@@ -29,6 +29,7 @@ dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
+dol_include_once('/inbox/class/inboxcited.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach'), true));
@@ -222,8 +223,35 @@ switch ($action) {
 		inboxAjaxReply(array('name' => $name, 'unscanned' => $verdict['state'] !== InboxAttachmentScan::CLEAN && $verdict['state'] !== InboxAttachmentScan::OFF));
 		// no break
 
+	case 'cited':
+		// Pieces cited in the mail (1.46.0), asked after the panel (the body is read): checked against the thirdparty
+		// of the one who writes; suggestions only
+		$reader = inboxDolibarrMail();
+		$raw = $reader->raw($user);
+		if ($raw === null) {
+			inboxAjaxReply(array('cited' => array(), 'socs' => array()));
+		}
+		$message = InboxMimeParser::parse($raw);
+		$headers = InboxReader::headers($raw);
+		$body = $message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml);
+		$names = array();
+		foreach ($message->attachments as $a) {
+			$names[] = (string) ($a['name'] ?? '');
+		}
+		$others = array();
+		$m = array();
+		if (preg_match_all('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', InboxReader::headerValue($headers, 'To').','.InboxReader::headerValue($headers, 'Cc'), $m)) {
+			$others = $m[0];
+		}
+		$cited = new InboxCited($db);
+		$socs = $cited->writerSocs((string) $reader->row->from_email, $body, $others);
+		inboxAjaxReply(array('cited' => $cited->find($user, (string) $reader->row->subject."\n".$body."\n".implode("\n", $names), $socs), 'socs' => $socs));
+		// no break
+
 	case 'search':
-		inboxAjaxReply(array('results' => $elements->search($user, (string) inboxAjaxParam('q', 'alphanohtml'), (int) inboxAjaxParam('soc', 'int'), 20)));
+		// types: only these (« Extend to »: the events, asked apart so the pieces come first); none = the usual ones
+		$types = array_values(array_intersect(explode(',', (string) inboxAjaxParam('types', 'aZ09comma')), array_keys(InboxElements::TYPES)));
+		inboxAjaxReply(array('results' => $elements->search($user, (string) inboxAjaxParam('q', 'alphanohtml'), (int) inboxAjaxParam('soc', 'int'), 20, $types ?: null)));
 		// no break
 
 	case 'link':
