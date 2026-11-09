@@ -511,6 +511,7 @@ InboxBackToList = Torna all'elenco
 InboxCannotOpen = Impossibile aprire questo file
 InboxClearFilter = Cancella il filtro
 InboxCloseWindow = Chiudi
+InboxWindowCloseDirty = Quanto fatto in questa finestra non è ancora salvato. Chiuderla comunque?
 InboxCollapse = Comprimi
 InboxCorrespondent = Corrispondente
 InboxDensity_comfortable = Densità comoda

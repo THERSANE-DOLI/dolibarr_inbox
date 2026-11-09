@@ -511,6 +511,7 @@ InboxBackToList = Back to the list
 InboxCannotOpen = Cannot open this file
 InboxClearFilter = Clear the filter
 InboxCloseWindow = Close
+InboxWindowCloseDirty = What was done in this window is not saved yet. Close it anyway?
 InboxCollapse = Fold
 InboxCorrespondent = Correspondent
 InboxDensity_comfortable = Comfortable density

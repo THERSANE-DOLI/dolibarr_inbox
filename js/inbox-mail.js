@@ -6948,41 +6948,72 @@
 	/**
 	 * Page of another module in a window of inbox (1.47.0): the mail stays seen behind. The page tells when it is done
 	 * (postMessage, same origin): inbox then links the piece, sets the tags, archives the mail, with its own rights.
-	 * @param {object} o {mailId, box, url, title, panel}
+	 * Such a page may open one window of its own over it (1.48.0, « open »), modal: a dark backdrop puts what is under
+	 * it out of reach; the two pages talk through inbox (« relay »).
+	 * @param {object} o {mailId, box, url, title, panel, modal, opener (window that opens it)}
 	 */
 	function openModuleWindow(o) {
-		const key = 'module:' + o.mailId + ':' + o.panel;
+		const key = o.opener ? o.opener.key + ':child' : 'module:' + o.mailId + ':' + o.panel;
 		const existing = windows.find(w => w.key === key);
 		if (existing) {
+			if (o.opener && existing.frame.getAttribute('src') !== o.url) {
+				existing.frame.src = o.url;
+			}
 			restore(existing);
 			front(existing);
 			return;
 		}
+		const kind = o.modal ? 'modal' : 'module';
 		const dlg = document.createElement('dialog');
-		dlg.className = 'ibx-window ibx-window--module';
-		dlg.setAttribute('aria-modal', 'false');
+		dlg.className = 'ibx-window ibx-window--module' + (o.modal ? ' ibx-window--modal' : '');
+		dlg.setAttribute('aria-modal', o.modal ? 'true' : 'false');
 		dlg.setAttribute('aria-label', o.title);
-		const g = savedGeometry('module');
-		const gw = g.w || Math.round(Math.min(1180, window.innerWidth * 0.86));
+		const g = savedGeometry(kind);
+		const gw = g.w || Math.round(Math.min(o.modal ? 1100 : 1180, window.innerWidth * (o.modal ? 0.8 : 0.86)));
 		dlg.style.width = gw + 'px';
-		dlg.style.height = (g.h || Math.round(window.innerHeight * 0.82)) + 'px';
+		dlg.style.height = (g.h || Math.round(window.innerHeight * (o.modal ? 0.86 : 0.82))) + 'px';
 		dlg.style.left = Math.max(0, Math.min(window.innerWidth - 300, g.x ?? Math.round(window.innerWidth / 2 - gw / 2))) + 'px';
-		dlg.style.top = Math.max(0, Math.min(window.innerHeight - 200, g.y ?? Math.round(window.innerHeight * 0.08))) + 'px';
+		dlg.style.top = Math.max(0, Math.min(window.innerHeight - 200, g.y ?? Math.round(window.innerHeight * (o.modal ? 0.05 : 0.08)))) + 'px';
 		if (isPhone()) {
 			dlg.classList.add('ibx-window--maximized');
 		}
 		dlg.innerHTML = '<div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis">' + esc(o.title) + '</span>'
-			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmin" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>'
+			+ (o.modal ? '' : '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmin" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wclose" title="' + th('InboxCloseWindow') + '" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-window__body"><iframe class="ibx-window__frame" title="' + esc(o.title) + '" src="' + esc(o.url) + '"></iframe></div>';
-		const w = { key, dlg, module: true, title: o.title, mailId: o.mailId, box: o.box, kind: 'module' };
+		const w = { key, dlg, module: true, title: o.title, mailId: o.mailId, box: o.box, panel: o.panel, kind, opener: o.opener || null, child: null };
 		w.frame = $('iframe', dlg);
+		if (o.modal) {
+			w.backdrop = document.createElement('div');
+			w.backdrop.className = 'ibx-backdrop';
+			document.body.appendChild(w.backdrop);
+		}
+		if (o.opener) {
+			o.opener.child = w;
+		}
 		windows.push(w);
 		document.body.appendChild(dlg);
 		dlg.show();
 		front(w);
 		bindWindow(w);
+	}
+	/** A URL of this site only (a page of a module), else '' */
+	function sameOriginUrl(url) {
+		try {
+			const u = new URL(String(url || ''), window.location.href);
+			return u.origin === window.location.origin ? u.href : '';
+		} catch (e) {
+			return '';
+		}
+	}
+	function setWindowTitle(w, title) {
+		w.title = title;
+		const el = $('.ibx-window__title', w.dlg);
+		if (el) {
+			el.textContent = title;
+		}
+		w.dlg.setAttribute('aria-label', title);
 	}
 	/** What a module page in a window says (same origin, from its own frame only) */
 	window.addEventListener('message', async e => {
@@ -6996,6 +7027,33 @@
 		const d = e.data;
 		if (d.action === 'close') {
 			closeWindow(w);
+			return;
+		}
+		// Work not saved in the page: closing the window by its cross or Escape asks first (text given by the page)
+		if (d.action === 'dirty') {
+			w.dirty = !!d.on;
+			w.dirtyText = typeof d.text === 'string' ? d.text.slice(0, 300) : '';
+			return;
+		}
+		if (d.action === 'title') {
+			if (typeof d.title === 'string' && d.title.trim() !== '') {
+				setWindowTitle(w, d.title.slice(0, 200));
+			}
+			return;
+		}
+		// A window over this one (one level): its page and the page of its opener talk through inbox
+		if (d.action === 'open') {
+			const url = sameOriginUrl(d.url);
+			if (url && !w.opener) {
+				openModuleWindow({ mailId: w.mailId, box: w.box, panel: w.panel, url, title: String(d.title || w.title).slice(0, 200), modal: d.modal !== false, opener: w });
+			}
+			return;
+		}
+		if (d.action === 'relay') {
+			const to = w.opener || w.child;
+			if (to && to.frame && to.frame.contentWindow) {
+				to.frame.contentWindow.postMessage({ source: 'inbox-panel', action: 'relay', data: d.data }, window.location.origin);
+			}
 			return;
 		}
 		if (d.action !== 'done') {
@@ -7047,6 +7105,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wclose" title="' + th('InboxCloseWindow') + '" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-window__body ibx-viewer" aria-busy="true"><div class="ibx-empty">' + th('InboxScanning') + '</div></div>';
+		addGrips(w.dlg);
 		const body = $('.ibx-window__body', w.dlg);
 		if (w.source) {
 			try {
@@ -7188,15 +7247,38 @@
 		windows.forEach(x => x.dlg.classList.toggle('is-front', x === w));
 	}
 	function closeWindow(w) {
+		const at = windows.indexOf(w);
+		if (at < 0) {
+			return;
+		}
+		if (w.child) {
+			closeWindow(w.child);
+		}
 		w.dlg.remove();
 		if (w.dock) {
 			w.dock.remove();
 		}
-		windows.splice(windows.indexOf(w), 1);
+		if (w.backdrop) {
+			w.backdrop.remove();
+		}
+		windows.splice(at, 1);
+		if (w.opener) {
+			w.opener.child = null;
+			front(w.opener);
+			w.opener.frame.focus();
+			return;
+		}
 		const tileEl = !w.source && !w.module && S.mail && S.mail.id === w.mail.id ? $('[data-att="' + w.index + '"] .ibx-js-attopen', readPane()) : null;
 		if (tileEl) {
 			tileEl.focus();
 		}
+	}
+	/** Closed by the user (cross, Escape): a page with work not saved asks first */
+	async function askCloseWindow(w) {
+		if (w.dirty && !(await I.confirmDialog({ title: w.title, text: w.dirtyText || t('InboxWindowCloseDirty'), confirm: t('InboxCloseWindow') }))) {
+			return;
+		}
+		closeWindow(w);
 	}
 	function dockBox() {
 		let d = $('.ibx-dock');
@@ -7233,9 +7315,21 @@
 		}
 		const r = w.dlg.getBoundingClientRect();
 		// Kept per kind (1.45.0): a PDF made big does not make every text window big
-		const all = { doc: savedGeometry('doc'), other: savedGeometry('other'), module: savedGeometry('module') };
+		const all = { doc: savedGeometry('doc'), other: savedGeometry('other'), module: savedGeometry('module'), modal: savedGeometry('modal') };
 		all[w.kind || 'other'] = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
 		saveParam('windows', JSON.stringify(all));
+	}
+	function addGrips(dlg) {
+		if ($(':scope > .ibx-wgrip', dlg)) {
+			return;
+		}
+		['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'].forEach(dir => {
+			const g = document.createElement('div');
+			g.className = 'ibx-wgrip ibx-wgrip--' + dir;
+			g.dataset.wgrip = dir;
+			g.setAttribute('aria-hidden', 'true');
+			dlg.appendChild(g);
+		});
 	}
 	function bindWindow(w) {
 		const dlg = w.dlg;
@@ -7246,7 +7340,7 @@
 				return;
 			}
 			if (b.classList.contains('ibx-js-wclose')) {
-				closeWindow(w);
+				askCloseWindow(w);
 			} else if (b.classList.contains('ibx-js-wmin')) {
 				minimize(w);
 			} else if (b.classList.contains('ibx-js-wmax')) {
@@ -7265,8 +7359,57 @@
 			if (e.key === 'Escape') {
 				e.preventDefault();
 				e.stopPropagation();
-				closeWindow(w);
+				askCloseWindow(w);
 			}
+		});
+		// Size from every edge and corner (1.48.0); the grips are put back when the content is drawn again
+		addGrips(dlg);
+		dlg.addEventListener('pointerdown', e => {
+			const g = e.target.closest('[data-wgrip]');
+			if (!g || dlg.classList.contains('ibx-window--maximized')) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			const dir = g.dataset.wgrip;
+			const r0 = dlg.getBoundingClientRect();
+			const x0 = e.clientX;
+			const y0 = e.clientY;
+			const cs = getComputedStyle(dlg);
+			const minW = parseFloat(cs.minWidth) || 280;
+			const minH = parseFloat(cs.minHeight) || 160;
+			g.setPointerCapture(e.pointerId);
+			const move = ev => {
+				let left = r0.left;
+				let top = r0.top;
+				let width = r0.width;
+				let height = r0.height;
+				if (dir.includes('e')) {
+					width = Math.min(window.innerWidth - r0.left, Math.max(minW, r0.width + ev.clientX - x0));
+				}
+				if (dir.includes('s')) {
+					height = Math.min(window.innerHeight - r0.top, Math.max(minH, r0.height + ev.clientY - y0));
+				}
+				if (dir.includes('w')) {
+					left = Math.max(0, Math.min(r0.right - minW, r0.left + ev.clientX - x0));
+					width = r0.right - left;
+				}
+				if (dir.includes('n')) {
+					top = Math.max(0, Math.min(r0.bottom - minH, r0.top + ev.clientY - y0));
+					height = r0.bottom - top;
+				}
+				dlg.style.left = Math.round(left) + 'px';
+				dlg.style.top = Math.round(top) + 'px';
+				dlg.style.width = Math.round(width) + 'px';
+				dlg.style.height = Math.round(height) + 'px';
+			};
+			const up = () => {
+				g.removeEventListener('pointermove', move);
+				g.removeEventListener('pointerup', up);
+				saveGeometry(w);
+			};
+			g.addEventListener('pointermove', move);
+			g.addEventListener('pointerup', up);
 		});
 		// Move by the title bar
 		dlg.addEventListener('pointerdown', e => {
@@ -7295,7 +7438,7 @@
 				dlg.classList.toggle('ibx-window--maximized');
 			}
 		});
-		// Size changed by the corner (CSS resize): kept
+		// Size changed (grips, maximized): kept
 		if (typeof ResizeObserver === 'function') {
 			let timer = 0;
 			new ResizeObserver(() => {
