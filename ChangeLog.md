@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: window of a module opened in the middle of the screen, a closed window no longer kept at 0, 0 :   1.48.1
+  - closing or reducing a window gave it no size, kept as its last place: the next one opened in the top left
+    corner (empty size thrown away); the window of a module keeps its size and opens centered.
+
 - NEW: windows of inbox with a neutral title bar, sized from every edge, a module window able to open another over it :   1.48.0
   - title bar white with framed buttons (the cross red on hover); the window in front told by its shadow, the
     others by their title in grey.
