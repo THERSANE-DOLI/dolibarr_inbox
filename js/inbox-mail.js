@@ -1917,7 +1917,9 @@
 		$('.ibx-js-view', S.el).setAttribute('aria-label', $('.ibx-js-view', S.el).title);
 		const sortKey = { 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFrom', 'from:desc': 'InboxSortFrom', 'subject:asc': 'InboxSortSubject', 'subject:desc': 'InboxSortSubject', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSize' }[params.list_sort || 'date:desc'];
 		const sortLabel = S.ft && S.ft.relevance ? t('InboxSortRelevance') : (sortKey ? t(sortKey) : '');
-		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortLabel ? ' · ' + t('InboxSortedBy', sortLabel) : '');
+		// Trash and junk emptied after some days (1.41.0): said where the mails are, nobody surprised
+		const purge = S.scope === 'folder' && f && f.folder.purge ? ' · ' + t('InboxRetentionHint', f.folder.purge) : '';
+		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortLabel ? ' · ' + t('InboxSortedBy', sortLabel) : '') + purge;
 		renderPills();
 	}
 

@@ -1173,6 +1173,13 @@
 				+ '</select>' + (current ? '' : '<div class="ibx-formrow__help">' + th('InboxFolderMissing') + '</div>') + '</div></div>';
 		});
 		html += '<div class="ibx-formfoot"><span class="ibx-muted">' + th('InboxFoldersCount', data.folders.length) + '</span><span class="ibx-formfoot__spacer"></span><button type="submit" class="ibx-btn ibx-btn--primary">' + th('InboxSave') + '</button></div></form>';
+		// Trash and junk emptied after some days (1.41.0): removed for good on the server, a choice made here only
+		const ret = data.retention || { trash: 0, junk: 0, choices: [0] };
+		const delay = (name, r) => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-ret-' + name + '">' + th(roleKey(r)) + '</label><div><select class="ibx-field ibx-field--medium" id="f-ret-' + name + '" name="' + name + '">'
+			+ ret.choices.map(d => '<option value="' + d + '"' + (d === ret[name] ? ' selected' : '') + '>' + (d ? th('InboxRetentionDays', d) : th('InboxRetentionNever')) + '</option>').join('') + '</select></div></div>';
+		html += '<h3 class="ibx-section__title ibx-twins__title">' + ic('delete') + ' ' + th('InboxRetentionTitle') + '</h3><p class="ibx-section__help">' + th('InboxRetentionHelp') + '</p>'
+			+ '<form class="ibx-form ibx-js-retention">' + delay('trash', 'trash') + delay('junk', 'junk')
+			+ '<div class="ibx-formfoot"><span class="ibx-formfoot__spacer"></span><button type="submit" class="ibx-btn">' + th('InboxSave') + '</button></div></form>';
 		// Duplicates of a special folder (1.38.0): one folder per role, the others ordinary; the administrator chooses
 		const kept = data.kept || [];
 		const twins = data.folders.filter(f => f.twin && !kept.includes(f.path));
@@ -1191,6 +1198,23 @@
 				}).join('') + '</tbody></table>';
 		}
 		box.innerHTML = html;
+		$('.ibx-js-retention', box).addEventListener('submit', async e => {
+			e.preventDefault();
+			const v = formValues(e.target);
+			const more = ['trash', 'junk'].filter(k => +v[k] > 0 && (!ret[k] || +v[k] < ret[k]));
+			// Turned on or shortened: said before, the removal is for good
+			if (more.length && !await confirmDialog({ title: t('InboxRetentionConfirmTitle'), text: t('InboxRetentionConfirmText', Math.min(...more.map(k => +v[k]))), confirm: t('InboxSave'), danger: true })) {
+				return;
+			}
+			try {
+				const r = await post('account', 'retention', { id: account.id, trash: v.trash, junk: v.junk });
+				Object.assign(ret, r);
+				I.changed('account', account.id);
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
 		$$('.ibx-js-twin', box).forEach(b => b.addEventListener('click', async () => {
 			const tr = b.closest('tr');
 			const f = twins.find(x => x.path === tr.dataset.path);

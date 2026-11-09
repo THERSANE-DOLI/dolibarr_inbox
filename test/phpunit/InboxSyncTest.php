@@ -223,12 +223,19 @@ class InboxSyncTest extends InboxTestCase
 		$this->assertGreaterThan(0, (int) $this->db->getRow("SELECT COUNT(*) AS n FROM ".$p."inbox_mail WHERE fk_account = ".((int) $a->id))->n);
 		$soc = $this->db->getRow("SELECT rowid FROM ".$p."societe ORDER BY rowid");
 		if (is_object($soc)) {
-			$this->db->query("INSERT INTO ".$p."socpeople (entity, fk_soc, lastname, email, statut, datec) VALUES (1, ".((int) $soc->rowid).", 'inboxtest_contact', 'j.dupont@acme.invalid', 1, '".$this->db->idate(dol_now())."')");
+			// fk_user_creat: a foreign key to the users on recent databases
+			$this->assertTrue((bool) $this->db->query("INSERT INTO ".$p."socpeople (entity, fk_soc, lastname, email, statut, datec, fk_user_creat) VALUES (1, ".((int) $soc->rowid).", 'inboxtest_contact',"
+				." 'j.dupont@acme.invalid', 1, '".$this->db->idate(dol_now())."', ".((int) $this->admin->id).")"), (string) $this->db->lasterror());
 			$cid = (int) $this->db->last_insert_id($p.'socpeople');
+			// The mails of the address matched again from nothing; the first active contact with it wins, as in match()
+			// (the base may hold another contact with this address)
+			$this->db->query("UPDATE ".$p."inbox_mail SET fk_soc = NULL, fk_socpeople = NULL WHERE fk_account = ".((int) $a->id)." AND from_email = 'j.dupont@acme.invalid'");
+			$first = (int) $this->db->getRow("SELECT MIN(rowid) as id FROM ".$p."socpeople WHERE LOWER(email) = 'j.dupont@acme.invalid' AND statut = 1")->id;
 			$m = new InboxContactMatcher($this->db);
 			$this->assertGreaterThan(0, $m->refreshAddress('j.dupont@acme.invalid'));
 			$r = $this->row($a, 'seed-1@inbox-test.invalid');
-			$this->assertSame($cid, (int) $r->fk_socpeople);
+			$this->assertSame($first, (int) $r->fk_socpeople);
+			$this->assertGreaterThanOrEqual($first, $cid);
 			$this->db->query("DELETE FROM ".$p."socpeople WHERE rowid = ".$cid);
 			$m->refreshAddress('j.dupont@acme.invalid');
 		}
@@ -373,5 +380,29 @@ class InboxSyncTest extends InboxTestCase
 		$this->assertSame(array('trash' => 'INBOX.Corbeille', 'junk' => 'INBOX.Spam'), $a->getFolderRoles());
 		$a->setFolderRoles(array('trash' => 'INBOX.Trash'));
 		$this->assertSame(array('trash' => 'INBOX.Trash'), $a->getChosenRoles(), 'null keeps the roles chosen before');
+	}
+
+	/**
+	 * Trash and junk emptied after some days (1.41.0): delays offered only, a delay turned on or shortened counts
+	 * from now
+	 *
+	 * @return void
+	 */
+	public function testRetentionSettings()
+	{
+		dol_include_once('/inbox/class/inboxretention.class.php');
+		$a = new InboxAccount($this->db);
+		$this->assertSame(0, InboxRetention::daysOf($a, 'trash'), 'never by default');
+		$this->assertFalse(InboxRetention::set($a, 5, 0), 'a delay not offered');
+		$this->assertTrue(InboxRetention::set($a, 30, 0));
+		$c = $a->getConnectorConfig();
+		$this->assertSame(30, InboxRetention::daysOf($a, 'trash'));
+		$this->assertGreaterThan(dol_now() - 5, (int) $c['trash_days_since']);
+		$c['trash_days_since'] = 1000;
+		$a->setConnectorConfig($c);
+		InboxRetention::set($a, 60, 0);
+		$this->assertSame(1000, (int) $a->getConnectorConfig()['trash_days_since'], 'a longer delay keeps its start');
+		InboxRetention::set($a, 7, 0);
+		$this->assertGreaterThan(1000, (int) $a->getConnectorConfig()['trash_days_since'], 'a shorter delay starts again');
 	}
 }

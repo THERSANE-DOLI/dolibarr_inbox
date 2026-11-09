@@ -45,6 +45,25 @@ class InboxMail
 	/** @var int[] Rows added by the last addMany() (ignored threads, lot W4 1.11.0) */
 	public $lastNewIds = array();
 
+	/** @var bool|null The column date_folder is there (1.41.0) */
+	protected static $dateFolder = null;
+
+	/**
+	 * The column date_folder (1.41.0) is there: the files of a new version may run before the module is enabled again
+	 * (its update SQL not played yet); the indexing never fails for it
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return bool
+	 */
+	public static function hasDateFolder(DoliDB $db)
+	{
+		if (self::$dateFolder === null) {
+			self::$dateFolder = (bool) $db->query("SELECT date_folder FROM ".$db->prefix()."inbox_mail WHERE 1 = 0");
+		}
+
+		return self::$dateFolder;
+	}
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -70,6 +89,7 @@ class InboxMail
 		if ($this->matcher === null) {
 			$this->matcher = new InboxContactMatcher($this->db);
 		}
+		$withFolderDate = self::hasDateFolder($this->db);
 		$p = $this->db->prefix();
 		$existing = array();
 		$ids = array_map(function ($m) {
@@ -100,13 +120,13 @@ class InboxMail
 				return $v === '' ? 'NULL' : "'".$this->db->escape(dol_trunc($v, $max, 'right', 'UTF-8', 1))."'";
 			};
 			$sql = "INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, in_reply_to, refs, date_mail, date_received,";
-			$sql .= " from_email, from_name, to_text, cc_text, subject, snippet, size, has_attachments, seen, answered, flagged, draft, keywords, fk_soc, fk_socpeople, date_index)";
+			$sql .= " from_email, from_name, to_text, cc_text, subject, snippet, size, has_attachments, seen, answered, flagged, draft, keywords, fk_soc, fk_socpeople, date_index".($withFolderDate ? ", date_folder" : "").")";
 			$sql .= " VALUES (".((int) $accountId).", ".((int) $folderId).", '".$this->db->escape((string) $m['remote_id'])."', ".((int) $m['sort_key']).",";
 			$sql .= " ".$str($m['message_id']).", ".$str($m['in_reply_to']).", ".$str($m['refs'], 2000).", ".$date((int) $m['date_mail']).", ".$date((int) $m['date_received']).",";
 			$sql .= " ".$str($m['from_email']).", ".$str($m['from_name']).", ".$str(InboxHeaderParser::addressText($m['to']), 2000).", ".$str(InboxHeaderParser::addressText($m['cc']), 2000).",";
 			$sql .= " ".$str($m['subject']).", ".$str($m['snippet']).", ".((int) $m['size']).", ".((int) $m['has_attachments']).",";
 			$sql .= " ".((int) $m['seen']).", ".((int) $m['answered']).", ".((int) $m['flagged']).", ".((int) $m['draft']).", ".$str(implode(' ', (array) $m['keywords']), 1024).",";
-			$sql .= " ".($match['fk_soc'] ? (int) $match['fk_soc'] : 'NULL').", ".($match['fk_socpeople'] ? (int) $match['fk_socpeople'] : 'NULL').", '".$now."')";
+			$sql .= " ".($match['fk_soc'] ? (int) $match['fk_soc'] : 'NULL').", ".($match['fk_socpeople'] ? (int) $match['fk_socpeople'] : 'NULL').", '".$now."'".($withFolderDate ? ", '".$now."'" : "").")";
 			if (!$this->db->query($sql)) {
 				// Another pass wrote it in between (unique key): not an error. Any other error is kept: the mail is not
 				// in the index, the folder says it

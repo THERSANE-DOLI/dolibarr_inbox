@@ -27,7 +27,7 @@ dol_include_once('/inbox/class/inboxidentity.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin'), true);
+$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -277,7 +277,21 @@ switch ($action) {
 			}
 		}
 		$config = $account->getConnectorConfig();
-		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'chosen' => array_keys($account->getChosenRoles()), 'kept' => array_values((array) ($config['twins_kept'] ?? array()))));
+		dol_include_once('/inbox/class/inboxretention.class.php');
+		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'chosen' => array_keys($account->getChosenRoles()), 'kept' => array_values((array) ($config['twins_kept'] ?? array())),
+			'retention' => array('trash' => InboxRetention::daysOf($account, 'trash'), 'junk' => InboxRetention::daysOf($account, 'junk'), 'choices' => InboxRetention::CHOICES)));
+		// no break
+
+	case 'retention':
+		// Trash and junk emptied after some days (1.41.0): removed for good by the nightly job
+		inboxAjaxNeedAdmin();
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'), true);
+		dol_include_once('/inbox/class/inboxretention.class.php');
+		if (!InboxRetention::set($account, (int) inboxAjaxParam('trash', 'int'), (int) inboxAjaxParam('junk', 'int'))) {
+			inboxAjaxError('Bad delay', 422);
+		}
+		$account->update($user);
+		inboxAjaxReply(array('trash' => InboxRetention::daysOf($account, 'trash'), 'junk' => InboxRetention::daysOf($account, 'junk')));
 		// no break
 
 	case 'twin':

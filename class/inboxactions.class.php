@@ -392,8 +392,9 @@ class InboxActions
 			$new = $map[(string) $r->remote_id] ?? '';
 			if ($new !== '' && preg_match('/^\d+:(\d+)$/', $new, $m)) {
 				$this->db->query("DELETE FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $target->rowid)." AND remote_id = '".$this->db->escape($new)."'");
+				// In this folder from now (the trash emptied after some days counts from here, 1.41.0)
 				$this->db->query("UPDATE ".$p."inbox_mail SET fk_folder = ".((int) $target->rowid).", remote_id = '".$this->db->escape($new)."', sort_key = ".((int) $m[1])
-					." WHERE rowid = ".((int) $r->rowid));
+					.(InboxMail::hasDateFolder($this->db) ? ", date_folder = '".$this->db->idate(dol_now())."'" : '')." WHERE rowid = ".((int) $r->rowid));
 				$newIds[(int) $r->rowid] = (int) $r->rowid;
 			} else {
 				$unknown = true;
