@@ -101,7 +101,30 @@ class InboxLinkNoteTest extends InboxTestCase
 		$d = $elements->describe($this->admin, 'societe', $soc);
 		$this->assertTrue($d['readable']);
 		$this->assertSame('inboxtest_soc', $d['ref']);
+		// Status as the badge of Dolibarr: short label and kind (an open thirdparty = status4)
+		$this->assertSame(4, $d['status_type']);
+		$this->assertNotSame('', $d['status_short']);
 		$this->assertFalse($elements->describe($alice, 'societe', $soc)['readable'], 'nothing of the piece without the right');
+
+		// Search (1.46.0): the events only when asked, « contains » from 3 characters, the exact name first
+		$now = $this->db->idate(dol_now());
+		$ok = $this->db->query("INSERT INTO ".$p."actioncomm (ref, entity, label, fk_soc, datep, datec, code, fk_action, percent) VALUES ('inboxtest', 1, 'Rappel inboxtest_soc', ".$soc.", '".$now."', '".$now."', 'AC_OTH', 5, -1)");
+		$this->assertNotFalse($ok, (string) $this->db->lasterror());
+		$eventId = (int) $this->db->last_insert_id($p.'actioncomm', 'id');
+		$this->assertGreaterThan(0, $eventId);
+		$types = function ($list) {
+			return array_values(array_unique(array_column($list, 'type')));
+		};
+		$found = $elements->search($this->admin, 'inboxtest_soc');
+		$this->assertSame('societe', $found[0]['type']);
+		$this->assertTrue($found[0]['exact'], 'the exact name first');
+		$this->assertNotContains('action', $types($found), 'no event without asking');
+		$events = $elements->search($this->admin, 'inboxtest_soc', 0, 20, array('action'));
+		$this->assertSame(array('action'), $types($events), 'the events alone when asked');
+		$this->assertContains($eventId, array_column($events, 'id'));
+		$this->assertContains($soc, array_column($elements->search($this->admin, 'test_soc'), 'id'), 'contains from 3 characters');
+		$this->assertNotContains($soc, array_column($elements->search($this->admin, 'st'), 'id'), 'shorter: at the start only');
+		$this->db->query("DELETE FROM ".$p."actioncomm WHERE id = ".$eventId);
 
 		// Notes: author or manager of the mailbox
 		$notes = new InboxNote($this->db);
@@ -139,6 +162,19 @@ class InboxLinkNoteTest extends InboxTestCase
 		(new InterfaceInboxTriggers($this->db))->runTrigger('COMPANY_DELETE', $socObj, $this->admin, $langs, $conf);
 		$this->assertSame(array(), $linker->listFor(array($ref)));
 		$this->assertCount(1, $notes->listFor(array($ref)));
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testStatusOf()
+	{
+		$s = InboxElements::statusOf('Tous les produits reçus', '<span class="badge  badge-status6 badge-status" title="Tous les produits reçus">Produits reçus</span>');
+		$this->assertSame(array('status' => 'Tous les produits reçus', 'status_short' => 'Produits reçus', 'status_type' => 6), $s);
+		$this->assertSame(1, InboxElements::statusOf('Validée', '<span class="badge badge-status1b badge-status">Validée</span>')['status_type'], 'variant 1b');
+		$s = InboxElements::statusOf('Brouillon', '<img src="x.png" class="inline-block status0" title="Brouillon">');
+		$this->assertSame(array('status' => 'Brouillon', 'status_short' => 'Brouillon', 'status_type' => 0), $s, 'picto alone: kind of the picto, its title');
+		$this->assertSame(-1, InboxElements::statusOf('Actif', 'Actif')['status_type'], 'no badge: unknown kind');
 	}
 
 	/**

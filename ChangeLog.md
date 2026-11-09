@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: linking a mail to a piece: status badge, faster search, pieces cited in the mail :   1.46.0
+  - status of the pieces as the badge of Dolibarr (short label, colour of its kind, long label in the title), in
+    the panel and in « Link ».
+  - « Link » search: references by their start (index), other fields « contain » from 3 characters, only the
+    pieces kept read in full; exact reference first, then the thirdparty of the sender; running wheel, empty state
+    and « Retry »; the events left out (12 s on a big agenda), « Extend to… » > Events, searched apart, after.
+  - references cited in the subject, body and attachment names, found with the numbering models in use, checked
+    against the thirdparty of the writer (its parent and subsidiaries; the original sender of an internal
+    transfer): the pieces of the writer suggested in the panel with « Link », the ones of another thirdparty only
+    in « Link », at the bottom, with a warning (its own numbering may match ours); « their ref. » kept on our pieces
+    found too.
+
 - NEW: viewer of the attachments bigger, Ctrl+click in a new tab, antivirus shown on the tiles :   1.45.0
   - a PDF or a picture opens in a large window (90 % of the screen height, full screen on a phone), the PDF at the
     width of the page; its size and place are kept apart from those of the other viewers.

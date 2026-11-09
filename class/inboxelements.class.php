@@ -210,57 +210,120 @@ class InboxElements
 				$label = trim($title.($label !== '' ? ' · '.$label : ''));
 			}
 		}
-		$status = method_exists($o, 'getLibStatut') ? trim(dol_string_nohtmltag((string) $o->getLibStatut(1))) : '';
+		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'status' => '', 'url' => $url, 'icon' => $icon, 'kind' => $kind);
+		if (method_exists($o, 'getLibStatut')) {
+			$out = array_merge($out, self::statusOf((string) $o->getLibStatut(0), (string) $o->getLibStatut(5)));
+		}
 
-		return array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'status' => $status, 'url' => $url, 'icon' => $icon, 'kind' => $kind);
+		return $out;
 	}
 
 	/**
-	 * Pieces to link: by words (ref, name, mail of the thirdparty), the ones of a thirdparty first; only the readable
+	 * Status of a piece as Dolibarr shows it: the long label (title), the short one (badge) and the kind of badge
+	 * (status0 to status9, read in the html of getLibStatut(5): badge-status4, or status4 of the picto)
 	 *
-	 * @param User   $user  User
-	 * @param string $q     Words
-	 * @param int    $socId Thirdparty recognized (its pieces first, or alone when there is no word)
-	 * @param int    $limit Results
+	 * @param string $long  getLibStatut(0)
+	 * @param string $short getLibStatut(5)
+	 * @return array{status:string,status_short:string,status_type:int} status_type -1 when unknown
+	 */
+	public static function statusOf($long, $short)
+	{
+		$type = -1;
+		$m = array();
+		if (preg_match('/\b(?:badge-)?status(\d)b?\b/', $short, $m)) {
+			$type = (int) $m[1];
+		}
+		$longText = trim(dol_string_nohtmltag($long));
+		$shortText = trim(dol_string_nohtmltag($short));
+		if ($shortText === '' && preg_match('/title="([^"]*)"/', $short, $m)) {
+			// Picto alone: its title is the label
+			$shortText = trim(html_entity_decode($m[1], ENT_QUOTES, 'UTF-8'));
+		}
+
+		return array('status' => $longText !== '' ? $longText : $shortText, 'status_short' => $shortText !== '' ? $shortText : $longText, 'status_type' => $type);
+	}
+
+	/** Types left out of the search unless asked (« Extend to »): the events, by far the biggest table, searched on a free label */
+	const SEARCH_ON_DEMAND = array('action');
+
+	/** Words shorter than this are searched at the start of the fields only (no « contains »: no index) */
+	const CONTAINS_FROM = 3;
+
+	/**
+	 * Pieces to link (1.46.0): the reference found exactly first, then the pieces of the thirdparty recognized, then the
+	 * references starting with the words, then the other fields containing them; only the readable.
+	 * The references are searched by their start (index), the other fields (names, references of the customer or of the
+	 * supplier) contain the words from 3 characters; the events only when asked (SEARCH_ON_DEMAND).
+	 * Only the pieces kept are read in full (describe).
+	 *
+	 * @param User          $user  User
+	 * @param string        $q     Words
+	 * @param int           $socId Thirdparty recognized (its pieces first, or alone when there is no word)
+	 * @param int           $limit Results
+	 * @param string[]|null $types Types searched; null = all but the ones on demand
 	 * @return array<int,array<string,mixed>>
 	 */
-	public function search(User $user, $q, $socId = 0, $limit = 20)
+	public function search(User $user, $q, $socId = 0, $limit = 20, $types = null)
 	{
 		$q = trim((string) $q);
-		$out = array();
 		if ($q === '' && $socId <= 0) {
-			return $out;
+			return array();
 		}
 		$p = $this->db->prefix();
+		$like = $this->db->escape($this->db->escapeforlike($q));
+		$exactValue = $this->db->escape($q);
+		$contains = dol_strlen($q) >= self::CONTAINS_FROM;
+		$found = array();
+		$order = 0;
 		foreach (self::TYPES as $type => $t) {
+			$order++;
+			if ($types === null ? in_array($type, self::SEARCH_ON_DEMAND, true) : !in_array($type, $types, true)) {
+				continue;
+			}
 			if (!self::canReadType($user, $type)) {
 				continue;
 			}
+			$key = $t['key'] ?? 'rowid';
+			$main = $t['search'][0];
 			$where = array("t.entity IN (".getEntity($t['entity']).")");
+			$exact = "0";
 			if ($q !== '') {
-				$like = $this->db->escape($this->db->escapeforlike($q));
-				$where[] = "(".implode(' OR ', array_map(function ($f) use ($like) {
-					return "t.".$f." LIKE '%".$like."%'";
-				}, $t['search'])).")";
+				$or = array();
+				foreach ($t['search'] as $f) {
+					// A reference by its start (index); a name, a reference of the other side may hold the words anywhere
+					$or[] = "t.".$f." LIKE '".($f === 'ref' || !$contains ? '' : '%').$like."%'";
+				}
+				$where[] = "(".implode(' OR ', $or).")";
+				$exact = "CASE WHEN t.".$main." = '".$exactValue."' THEN 1 ELSE 0 END";
 			} else {
 				$where[] = "t.".$t['soc']." = ".((int) $socId);
 			}
-			$key = $t['key'] ?? 'rowid';
-			$order = $socId > 0 ? "CASE WHEN t.".$t['soc']." = ".((int) $socId)." THEN 0 ELSE 1 END, t.".$key." DESC" : "t.".$key." DESC";
-			$rows = $this->db->getRows("SELECT t.".$key." as rowid FROM ".$p.$t['table']." as t WHERE ".implode(' AND ', $where)." ORDER BY ".$order." LIMIT 8");
+			$near = $socId > 0 ? "CASE WHEN t.".$t['soc']." = ".((int) $socId)." THEN 1 ELSE 0 END" : "0";
+			$starts = $q !== '' ? "CASE WHEN t.".$main." LIKE '".$like."%' THEN 1 ELSE 0 END" : "0";
+			$rows = $this->db->getRows("SELECT t.".$key." as rowid, ".$exact." as exact, ".$near." as near, ".$starts." as starts FROM ".$p.$t['table']." as t"
+				." WHERE ".implode(' AND ', $where)." ORDER BY exact DESC, near DESC, starts DESC, t.".$key." DESC LIMIT 8");
 			foreach (is_array($rows) ? $rows : array() as $r) {
-				$d = $this->describe($user, $type, (int) $r->rowid);
-				if ($d && $d['readable']) {
-					$d['near'] = $socId > 0 && $this->socOf($type, (int) $r->rowid) === (int) $socId;
-					$out[] = $d;
-				}
+				$found[] = array('type' => $type, 'id' => (int) $r->rowid, 'score' => 4 * (int) $r->exact + 2 * (int) $r->near + (int) $r->starts, 'order' => $order, 'near' => (bool) $r->near);
 			}
 		}
-		usort($out, function ($a, $b) {
-			return (int) $b['near'] <=> (int) $a['near'];
+		// Best first; same score: the order of the types, then the newest
+		usort($found, function ($a, $b) {
+			return array($b['score'], $a['order'], $b['id']) <=> array($a['score'], $b['order'], $a['id']);
 		});
+		$out = array();
+		foreach ($found as $f) {
+			if (count($out) >= max(1, (int) $limit)) {
+				break;
+			}
+			$d = $this->describe($user, $f['type'], $f['id']);
+			if ($d && $d['readable']) {
+				$d['near'] = $f['near'];
+				$d['exact'] = $f['score'] >= 4;
+				$out[] = $d;
+			}
+		}
 
-		return array_slice($out, 0, max(1, (int) $limit));
+		return $out;
 	}
 
 	/**
