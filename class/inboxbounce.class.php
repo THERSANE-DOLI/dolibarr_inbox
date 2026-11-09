@@ -133,8 +133,11 @@ class InboxBounce
 			$code = isset($fields['status']) && preg_match('/^\s*([245]\.\d{1,3}\.\d{1,3})/', $fields['status'], $m) ? $m[1] : '';
 			$diagnostic = '';
 			if (isset($fields['diagnostic-code'])) {
+				// Text of the remote server, given by anyone who sends a report: no < > (never a tag, wherever it
+				// goes, audit INBX-030)
 				$diagnostic = preg_replace('/^[^;]{0,20};\s*/', '', $fields['diagnostic-code']);
-				$diagnostic = mb_substr(InboxMimeParser::clean(preg_replace('/\s+/', ' ', (string) $diagnostic)), 0, 300, 'UTF-8');
+				$diagnostic = str_replace(array('<', '>'), '', InboxMimeParser::clean(preg_replace('/\s+/', ' ', (string) $diagnostic)));
+				$diagnostic = mb_substr(trim($diagnostic), 0, 300, 'UTF-8');
 			}
 			$recipients[$email] = array('email' => $email, 'action' => $action, 'status' => $code, 'family' => self::family($action, $code), 'diagnostic' => $diagnostic);
 			if (count($recipients) >= self::MAX_RECIPIENTS) {
@@ -201,6 +204,11 @@ class InboxBounce
 		if ($report === null || $report['original'] === '') {
 			return 0;
 		}
+		// A report counts only in the mailbox the mail was sent from: anyone who received the mail knows its
+		// Message-ID and could send a report about it to another mailbox (audit INBX-031)
+		if (!$this->sentFrom($report['original'], (int) $accountId)) {
+			return 0;
+		}
 		$p = $this->db->prefix();
 		$now = dol_now();
 		$added = array();
@@ -226,20 +234,74 @@ class InboxBounce
 			return $r['action'] === 'failed';
 		}));
 		if ($failed && (!$dateReport || (int) $dateReport >= $now - self::TELL_WITHIN)) {
-			$this->tell($report['original'], $failed);
+			$this->tell($report['original'], $failed, (int) $accountId);
 		}
 
 		return count($added);
 	}
 
 	/**
+	 * The mail was sent from this mailbox: its sending by inbox, else a copy in its folder Sent, else an event of
+	 * Dolibarr recording a sending from its address or from one of its identities (a piece sent by mail)
+	 *
+	 * @param string $messageId Message-ID of the mail sent, without < >
+	 * @param int    $accountId Mailbox where the report arrived
+	 * @return bool
+	 */
+	protected function sentFrom($messageId, $accountId)
+	{
+		global $conf;
+
+		$p = $this->db->prefix();
+		$ids = "('".$this->db->escape($messageId)."', '<".$this->db->escape($messageId).">')";
+		$sent = $this->db->getRow("SELECT fk_account FROM ".$p."inbox_outbox WHERE entity = ".((int) $conf->entity)." AND message_id IN ".$ids." ORDER BY rowid DESC");
+		if (is_object($sent)) {
+			return (int) $sent->fk_account === (int) $accountId;
+		}
+		$copy = $this->db->getRow("SELECT m.rowid FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.role = 'sent'"
+			." WHERE m.fk_account = ".((int) $accountId)." AND m.message_id = '".$this->db->escape($messageId)."'");
+		if (is_object($copy)) {
+			return true;
+		}
+		$addresses = array();
+		$rows = $this->db->getRows("SELECT email FROM ".$p."inbox_account WHERE rowid = ".((int) $accountId)." AND entity = ".((int) $conf->entity)
+			." UNION SELECT email FROM ".$p."inbox_identity WHERE fk_account = ".((int) $accountId)." LIMIT 500");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$addresses[strtolower(trim((string) $r->email))] = true;
+		}
+		$events = $this->db->getRows("SELECT email_from FROM ".$p."actioncomm WHERE entity = ".((int) $conf->entity)." AND email_msgid IN ".$ids." LIMIT 20");
+		foreach (is_array($events) ? $events : array() as $e) {
+			$from = (string) $e->email_from;
+			$from = strtolower(trim(preg_match('/<([^<>]+)>/', $from, $m) ? $m[1] : $from));
+			if ($from !== '' && isset($addresses[$from])) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Note of an event of Dolibarr from a text: escaped, lines kept; the screens of Dolibarr show a note as HTML
+	 * (audit INBX-030)
+	 *
+	 * @param string $text Text
+	 * @return string HTML
+	 */
+	public static function noteHtml($text)
+	{
+		return dol_nl2br(dol_escape_htmltag((string) $text, 0, 1));
+	}
+
+	/**
 	 * Tell a failure: the bell of the author of the sending (sent by inbox), an event on the pieces of the mail sent
 	 *
-	 * @param string $original Message-ID of the mail sent
+	 * @param string $original  Message-ID of the mail sent
 	 * @param array<int,array{email:string,action:string,status:string,family:string,diagnostic:string}> $failed Recipients
+	 * @param int    $accountId Mailbox the mail was sent from (where the report arrived)
 	 * @return void
 	 */
-	protected function tell($original, array $failed)
+	protected function tell($original, array $failed, $accountId)
 	{
 		global $conf, $langs, $user;
 
@@ -249,7 +311,7 @@ class InboxBounce
 			." AND message_id IN ('".$this->db->escape($original)."', '<".$this->db->escape($original).">') ORDER BY rowid DESC");
 		$subject = is_object($sent) ? (string) $sent->subject : '';
 		if ($subject === '') {
-			$known = $this->db->getRow("SELECT subject FROM ".$p."inbox_mail WHERE message_id = '".$this->db->escape($original)."'");
+			$known = $this->db->getRow("SELECT subject FROM ".$p."inbox_mail WHERE fk_account = ".((int) $accountId)." AND message_id = '".$this->db->escape($original)."'");
 			$subject = is_object($known) ? (string) $known->subject : '';
 		}
 		$author = null;
@@ -278,14 +340,15 @@ class InboxBounce
 		$langs->load('inbox@inbox');
 		$note = array();
 		foreach ($failed as $r) {
-			$note[] = $r['email'].' : '.$langs->transnoentities('InboxBounce_'.$r['family']).($r['status'] !== '' ? ' ('.$r['status'].')' : '').($r['diagnostic'] !== '' ? "\n".$r['diagnostic'] : '');
+			$note[] = $r['email'].' : '.$langs->transnoentities('InboxBounce_'.$r['family']).($r['status'] !== '' ? ' ('.$r['status'].')' : '')
+				.($r['diagnostic'] !== '' ? "\n".$langs->transnoentities('InboxBounceServerSaid', $r['diagnostic']) : '');
 		}
 		foreach ($events as $e) {
 			$event = new ActionComm($this->db);
 			$event->type_code = 'AC_OTH_AUTO';
 			$event->code = 'AC_INBOX_BOUNCE';
 			$event->label = dol_trunc($langs->transnoentities('InboxEventNotDelivered', $emails, $subject), 250, 'right', 'UTF-8', 1);
-			$event->note_private = implode("\n\n", $note);
+			$event->note_private = self::noteHtml(implode("\n\n", $note));
 			$event->datep = dol_now();
 			$event->datef = dol_now();
 			$event->percentage = -1;
@@ -329,11 +392,13 @@ class InboxBounce
 		global $conf;
 
 		$messageId = trim((string) $messageId, " <>\t");
-		if ($messageId === '') {
+		$accounts = array_filter(array_map('intval', $accounts));
+		if ($messageId === '' || !$accounts) {
 			return array();
 		}
+		// Reports arrived in a mailbox the user reads (audit INBX-031)
 		$rows = $this->db->getRows("SELECT recipient, status, diagnostic, report_id FROM ".$this->db->prefix()."inbox_bounce WHERE entity = ".((int) $conf->entity)
-			." AND message_id = '".$this->db->escape($messageId)."' AND action = 'failed' ORDER BY rowid LIMIT 50");
+			." AND message_id = '".$this->db->escape($messageId)."' AND fk_account IN (".implode(',', $accounts).") AND action = 'failed' ORDER BY rowid LIMIT 50");
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$out[(string) $r->recipient] = array(
@@ -362,7 +427,7 @@ class InboxBounce
 		if ($ids) {
 			$p = $this->db->prefix();
 			$found = $this->db->getRows("SELECT m.rowid FROM ".$p."inbox_mail as m WHERE m.rowid IN (".implode(',', $ids).") AND m.message_id IS NOT NULL AND m.message_id <> ''"
-				." AND EXISTS (SELECT 1 FROM ".$p."inbox_bounce as b WHERE b.message_id = m.message_id AND b.entity = ".((int) $conf->entity)." AND b.action = 'failed') LIMIT 1000");
+				." AND EXISTS (SELECT 1 FROM ".$p."inbox_bounce as b WHERE b.message_id = m.message_id AND b.fk_account = m.fk_account AND b.entity = ".((int) $conf->entity)." AND b.action = 'failed') LIMIT 1000");
 			foreach (is_array($found) ? $found : array() as $f) {
 				$hit[(int) $f->rowid] = true;
 			}

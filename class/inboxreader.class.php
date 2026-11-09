@@ -180,7 +180,7 @@ class InboxReader
 		require_once __DIR__.'/inboxbounce.class.php';
 		$bounce = new InboxBounce($this->db);
 		$readable = array_keys((new InboxAccess($this->db))->getLevels($user));
-		$allowImages = $remote && $auth['fail'] === false && $this->imagesAllowed($user, (string) $this->row->from_email);
+		$allowImages = $remote && self::authPass($auth, (string) $this->row->from_email) && $this->imagesAllowed($user, (string) $this->row->from_email);
 
 		return array(
 			'id' => (int) $this->row->rowid,
@@ -568,8 +568,9 @@ class InboxReader
 	 * the one of our server; the lower ones may be forged by the sender)
 	 *
 	 * @param array<int,array{0:string,1:string}> $headers Headers
-	 * @return array{spf:string,dkim:string,dmarc:string,fail:bool,trusted:bool} trusted: written by one of the receiving
-	 *         servers of the setup (INBOX_AUTH_SERVERS), not by the sender (audit INBX-022)
+	 * @return array{spf:string,dkim:string,dmarc:string,fail:bool,trusted:bool,dkim_domains:string[]} trusted: written by
+	 *         one of the receiving servers of the setup (INBOX_AUTH_SERVERS), not by the sender (audit INBX-022);
+	 *         dkim_domains: domains of the valid DKIM signatures
 	 */
 	public static function authResults(array $headers)
 	{
@@ -594,10 +595,16 @@ class InboxReader
 				break;
 			}
 		}
-		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false, 'trusted' => $trusted);
+		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false, 'trusted' => $trusted, 'dkim_domains' => array());
 		foreach (array('spf', 'dkim', 'dmarc') as $k) {
 			if (preg_match('/\b'.$k.'=([a-z]+)/i', $value, $m)) {
 				$out[$k] = strtolower($m[1]);
+			}
+		}
+		// Domains of the valid DKIM signatures (header.d, else header.i), each result being separated by a ;
+		foreach (explode(';', $value) as $part) {
+			if (preg_match('/^\s*dkim=pass\b/i', $part) && preg_match('/\bheader\.(?:d|i)=@?([a-z0-9.-]{1,253})/i', $part, $m)) {
+				$out['dkim_domains'][] = strtolower(trim($m[1], '.'));
 			}
 		}
 		if ($out['spf'] === '') {
@@ -609,6 +616,34 @@ class InboxReader
 		$out['fail'] = $out['dmarc'] === 'fail' || ($out['dkim'] === 'fail' && in_array($out['spf'], array('fail', 'softfail'), true));
 
 		return $out;
+	}
+
+	/**
+	 * The sender is proven, enough for what happens alone (the pictures of a sender allowed): a positive result, not
+	 * only « no failure »: DMARC passed, or a valid DKIM signature of the domain of the sender (or of a parent one);
+	 * the result of the server declared when there is one (INBOX_AUTH_SERVERS). Audit INBX-022.
+	 *
+	 * @param array<string,mixed> $auth      authResults()
+	 * @param string              $fromEmail Address of the sender
+	 * @return bool
+	 */
+	public static function authPass(array $auth, $fromEmail)
+	{
+		require_once __DIR__.'/inboxknownsenders.class.php';
+		if (!empty($auth['fail']) || (InboxKnownSenders::trustedServers() && empty($auth['trusted']))) {
+			return false;
+		}
+		if (($auth['dmarc'] ?? '') === 'pass') {
+			return true;
+		}
+		$domain = strtolower((string) substr((string) strrchr((string) $fromEmail, '@'), 1));
+		foreach ((array) ($auth['dkim_domains'] ?? array()) as $d) {
+			if ($domain !== '' && ($domain === $d || substr($domain, -strlen('.'.$d)) === '.'.$d)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

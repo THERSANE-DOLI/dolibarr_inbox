@@ -169,7 +169,10 @@ class InboxNotification
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$payload = json_decode((string) $r->payload, true);
 			if ((int) $r->fk_account > 0 && !isset($levels[(int) $r->fk_account]) && is_array($payload)) {
+				// Neither its text nor its detail (the recipients of a mail not delivered, audit INBX-045)
 				$payload['subject'] = '';
+				$payload['text'] = '';
+				$payload['detail'] = '';
 			}
 			$actor = trim($r->firstname.' '.$r->lastname);
 			$items[] = array(

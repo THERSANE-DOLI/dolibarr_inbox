@@ -115,7 +115,8 @@ switch ($action) {
 		));
 		if ($html === null) {
 			$http = array('off' => 403, 'mailbox' => 403, 'right' => 403, 'limit' => 429, 'empty' => 422, 'service' => 502);
-			inboxAjaxReply(array('error' => $langs->transnoentities('InboxAiError_'.$ai->errorCode), 'code' => $ai->errorCode, 'detail' => $ai->error), $http[$ai->errorCode] ?? 502);
+			// The text of the AI service (its name, sometimes its address) for the administrators only (audit INBX-037)
+			inboxAjaxReply(array('error' => $langs->transnoentities('InboxAiError_'.$ai->errorCode), 'code' => $ai->errorCode, 'detail' => !empty($user->admin) ? $ai->error : ''), $http[$ai->errorCode] ?? 502);
 		}
 		inboxAjaxReply(array('html' => $html));
 		break;

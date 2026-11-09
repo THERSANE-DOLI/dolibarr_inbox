@@ -105,9 +105,13 @@ function inboxAccountApplyForm(InboxAccount $account)
 	$typed = inboxAccountFromInput($account);
 	// Servers allowed by the setup, if any (audit INBX-010)
 	dol_include_once('/inbox/class/inboxservertester.class.php');
-	foreach (array($account->imap_host, $account->smtp_host) as $host) {
+	foreach (array('imap_host' => $account->imap_host, 'smtp_host' => $account->smtp_host) as $field => $host) {
 		if (!InboxServerTester::hostAllowed((string) $host)) {
-			inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', (string) $host), 422, array('imap_host' => 1));
+			inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', (string) $host), 422, array($field => 1));
+		}
+		// A server of the private network, new: chosen by the administrator of Dolibarr (audit INBX-010)
+		if (InboxServerTester::privateRefused((string) $host, InboxServerTester::knownMailHosts())) {
+			inboxAjaxError($langs->transnoentities('InboxErrorPrivateHost', (string) $host), 422, array($field => $langs->transnoentities('InboxErrorPrivateHost', (string) $host)));
 		}
 	}
 	$error = $account->guardSecrets($old, $typed['imap'], $typed['smtp'], !empty($user->admin));

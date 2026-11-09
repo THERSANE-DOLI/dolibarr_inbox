@@ -52,6 +52,32 @@ function inboxFulltextMasterKey($url)
 	inboxAjaxError($langs->transnoentities('InboxMeiliKeyAgain'), 422, array('key' => 1));
 }
 
+/**
+ * Address typed for Meilisearch: http(s), allowed by the setup, and a host of the private network only when already
+ * set or chosen by the administrator of Dolibarr (audit INBX-010), for the test as for the activation
+ *
+ * @return string
+ */
+function inboxFulltextUrl()
+{
+	global $langs;
+
+	$url = trim((string) inboxAjaxParam('url', 'alphanohtml'));
+	if (!InboxMeili::validUrl($url)) {
+		inboxAjaxError($langs->transnoentities('InboxMeiliBadUrl'), 422, array('url' => 1));
+	}
+	dol_include_once('/inbox/class/inboxservertester.class.php');
+	$host = (string) parse_url($url, PHP_URL_HOST);
+	if (!InboxServerTester::hostAllowed($host)) {
+		inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', $host), 422, array('url' => 1));
+	}
+	if (InboxServerTester::privateRefused($host, array((string) parse_url(getDolGlobalString('INBOX_MEILI_URL'), PHP_URL_HOST)))) {
+		inboxAjaxError($langs->transnoentities('InboxErrorPrivateHost', $host), 422, array('url' => 1));
+	}
+
+	return $url;
+}
+
 switch ($action) {
 	case 'get':
 		$url = getDolGlobalString('INBOX_MEILI_URL');
@@ -65,20 +91,13 @@ switch ($action) {
 		// no break
 
 	case 'test':
-		$url = trim((string) inboxAjaxParam('url', 'alphanohtml'));
-		if (!InboxMeili::validUrl($url)) {
-			inboxAjaxError($langs->transnoentities('InboxMeiliBadUrl'), 422, array('url' => 1));
-		}
-		dol_include_once('/inbox/class/inboxservertester.class.php');
-		if (!InboxServerTester::hostAllowed((string) parse_url($url, PHP_URL_HOST))) {
-			inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', (string) parse_url($url, PHP_URL_HOST)), 422, array('url' => 1));
-		}
+		$url = inboxFulltextUrl();
 		$client = new InboxMeili($url, inboxFulltextMasterKey($url));
 		$client->timeout = 5;
 		$version = $client->version();
 		if ($version === '') {
 			// No answer of the private network said to who is not administrator of Dolibarr (audit INBX-010)
-			$said = !empty($user->admin) || !InboxMeili::isLocal($url) ? $client->error : '';
+			$said = !empty($user->admin) || !InboxMeili::isLocal($url) ? $client->error : $langs->transnoentities('InboxDetailForAdmin');
 			inboxAjaxReply(array('ok' => false, 'error' => $langs->transnoentities('InboxMeiliNoAnswer', $said), 'local' => InboxMeili::isLocal($url)));
 		}
 		// Only the master key may create the key of inbox
@@ -88,12 +107,9 @@ switch ($action) {
 		// no break
 
 	case 'enable':
-		$url = trim((string) inboxAjaxParam('url', 'alphanohtml'));
+		$url = inboxFulltextUrl();
 		$prefix = trim((string) inboxAjaxParam('prefix', 'aZ09'));
 		$typed = (string) inboxAjaxParam('key', 'none');
-		if (!InboxMeili::validUrl($url)) {
-			inboxAjaxError($langs->transnoentities('InboxMeiliBadUrl'), 422, array('url' => 1));
-		}
 		if (!InboxFulltext::validPrefix($prefix)) {
 			inboxAjaxError($langs->transnoentities('InboxMeiliBadPrefix'), 422, array('prefix' => 1));
 		}
@@ -103,7 +119,9 @@ switch ($action) {
 		$master = new InboxMeili($url, inboxFulltextMasterKey($url));
 		$key = $master->createKey($prefix, 'inbox '.$prefix);
 		if (!$key) {
-			inboxAjaxError($langs->transnoentities('InboxMeiliNoKey', $master->error), 422, array('key' => 1));
+			// No answer of the private network said to who is not administrator of Dolibarr (audit INBX-010)
+			$said = !empty($user->admin) || !InboxMeili::isLocal($url) ? $master->error : $langs->transnoentities('InboxDetailForAdmin');
+			inboxAjaxError($langs->transnoentities('InboxMeiliNoKey', $said), 422, array('key' => 1));
 		}
 		$entity = (int) $conf->entity;
 		dolibarr_set_const($db, 'INBOX_MEILI_URL', $url, 'chaine', 0, '', $entity);

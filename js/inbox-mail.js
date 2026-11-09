@@ -498,7 +498,8 @@
 	/** Unread of the views that show a counter: their search with the unread only, one mail asked (the total counts) */
 	async function refreshVcounts() {
 		clearTimeout(S.vcountTimer);
-		const asked = S.vviews.filter(v => v.show_count && !v.hidden);
+		// 20 counters at most, each one a search on every mailbox (audit INBX-036)
+		const asked = S.vviews.filter(v => v.show_count && !v.hidden).slice(0, 20);
 		for (const v of asked) {
 			const q = { scope: 'all', q: v.search.q, sort: 'date:desc', cursor: '', limit: 1, threads: 0, unread: 1, vcount: 1 };
 			['flagged', 'attachment', 'mine'].forEach(k => {
@@ -619,6 +620,8 @@
 		if (!v.mine) {
 			items.push({ icon: 'copy', label: t('InboxViewCopy'), run: () => vviewCall('copy', { id }, t('InboxViewCopied')) });
 			items.push({ icon: 'folders-hide', label: t('InboxViewHide'), run: () => vviewCall('hide', { id, hide: 1 }, '') });
+			// Its number of unread: the choice of each reader, off until asked (audit INBX-036)
+			items.push({ icon: 'unread', label: t(v.show_count ? 'InboxViewCountOff' : 'InboxViewCounterLabel'), run: () => vviewCall('count', { id, on: v.show_count ? 0 : 1 }, '') });
 		} else {
 			items.push({ sep: true }, { icon: 'delete', label: t('InboxViewDelete'), danger: true, run: async () => {
 				if (await I.confirmDialog({ title: t('InboxViewDeleteTitle', v.label), text: v.shares && v.shares.length ? t('InboxViewDeleteShared') : t('InboxViewDeleteText'), confirm: t('InboxViewDelete'), danger: true })) {
@@ -692,7 +695,8 @@
 			+ '<div class="ibx-vviewform__edit"><label class="ibx-radio"><input type="radio" name="boxes" value="all"' + (cur.accounts.length ? '' : ' checked') + '> ' + th('InboxViewBoxesAll') + '</label> '
 			+ '<label class="ibx-radio"><input type="radio" name="boxes" value="some"' + (cur.accounts.length ? ' checked' : '') + '> ' + th('InboxViewBoxesSome') + '</label></div>'
 			+ '<div class="ibx-vviewform__boxes"' + (cur.accounts.length ? '' : ' hidden') + '>' + S.accounts.map(a => '<label class="ibx-check"><input type="checkbox" name="acc" value="' + a.id + '"' + (cur.accounts.includes(a.id) ? ' checked' : '') + '> ' + esc(accountName(a)) + '</label>').join('') + '</div></div></div>'
-			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewCounter') + '</span><div><label class="ibx-check"><input type="checkbox" name="show_count"' + (cur.show_count ? ' checked' : '') + '> ' + th('InboxViewCounterLabel') + '</label></div></div>'
+			// The counter: the choice of the author for himself; a reader chooses his own from the menu of the view
+			+ (own ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxViewCounter') + '</span><div><label class="ibx-check"><input type="checkbox" name="show_count"' + (cur.show_count ? ' checked' : '') + '> ' + th('InboxViewCounterLabel') + '</label></div></div>' : '')
 			+ (own ? '<div class="ibx-formrow"><label class="ibx-formrow__label" for="vv-share">' + th('InboxViewShare') + '</label><div>'
 				+ '<input class="ibx-field" id="vv-share" list="vv-share-list" autocomplete="off" placeholder="' + th('InboxSearchUserOrGroup') + '"><datalist id="vv-share-list"></datalist>'
 				+ '<div class="ibx-vviewform__shares ibx-js-vvshares"></div>'
@@ -720,7 +724,7 @@
 					return false;
 				}
 				const take = !v || withSearch || (f.elements.take && f.elements.take.checked);
-				const data = { id: v ? v.id : 0, label, icon, color, accounts, show_count: f.elements.show_count.checked ? 1 : 0, search: take ? currentSearch() : v.search };
+				const data = { id: v ? v.id : 0, label, icon, color, accounts, show_count: f.elements.show_count && f.elements.show_count.checked ? 1 : 0, search: take ? currentSearch() : v.search };
 				if (own) {
 					data.shares = shares.map(s => ({ kind: s.kind, id: s.id }));
 					data.shared_edit = +((f.querySelector('[name="shared_edit"]:checked') || {}).value || 0);
@@ -5578,7 +5582,7 @@
 		// mail sent. A mail sent: its failures, link to the report.
 		const bounceLine = (r, key) => '<div class="ibx-bounce__line"><b>' + th(key, r.email) + '</b> : ' + th('InboxBounce_' + r.family)
 			+ (r.status ? ' <span class="ibx-mono ibx-muted">' + esc(r.status) + '</span>' : '')
-			+ (r.diagnostic ? '<div class="ibx-bounce__server ibx-muted">' + esc(r.diagnostic) + '</div>' : '') + '</div>';
+			+ (r.diagnostic ? '<div class="ibx-bounce__server ibx-muted">' + th('InboxBounceServerSaid', r.diagnostic) + '</div>' : '') + '</div>';
 		const gotoLink = (where, key) => where ? '<div><button type="button" class="ibx-linkbtn ibx-js-bouncego" data-folder="' + where.folder + '" data-mail="' + where.mail + '">' + th(key) + '</button></div>' : '';
 		if (m.report && m.report.recipients && m.report.recipients.length) {
 			const failed = m.report.recipients.filter(r => r.action === 'failed');

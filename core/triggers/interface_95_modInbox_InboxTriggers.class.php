@@ -117,9 +117,17 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 				$accounts[] = (int) $r->fk_account;
 			}
 		}
-		$tables = $column === 'fk_user' ? array('inbox_userparam', 'inbox_account_access', 'inbox_image_allow', 'inbox_mail_assign', 'inbox_notification', 'inbox_thread_mark') : array('inbox_account_access');
+		$p = $this->db->prefix();
+		// Views (1.31.0): the shares to the user or the group; the views of a user removed, with their shares, as
+		// nobody could remove them any more and an id given again would inherit them (audit INBX-035)
+		if ($column === 'fk_user' && !$this->db->query("DELETE FROM ".$p."inbox_view_share WHERE fk_view IN (SELECT rowid FROM ".$p."inbox_view WHERE fk_user = ".((int) $id).")")) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		$tables = $column === 'fk_user' ? array('inbox_userparam', 'inbox_account_access', 'inbox_image_allow', 'inbox_mail_assign', 'inbox_notification', 'inbox_thread_mark', 'inbox_view_share', 'inbox_view')
+			: array('inbox_account_access', 'inbox_view_share');
 		foreach ($tables as $table) {
-			if (!$this->db->query("DELETE FROM ".$this->db->prefix().$table." WHERE ".$column." = ".((int) $id))) {
+			if (!$this->db->query("DELETE FROM ".$p.$table." WHERE ".$column." = ".((int) $id))) {
 				$this->error = $this->db->lasterror();
 				return -1;
 			}

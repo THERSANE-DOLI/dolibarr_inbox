@@ -1,5 +1,24 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-09 :   1.35.1
+  - a delivery report forged by anyone could run a script in the agenda of Dolibarr: the note of the event « not
+    delivered » is written as text, the older ones cleaned at the update; a report counts only in the mailbox the
+    mail was sent from; its sentence is shown as the answer of the remote server, not checked.
+  - proposal of the AI: no picture nor style able to load something from elsewhere, an unclosed tag included;
+    links of a writing: full web addresses, mails and phone numbers only.
+  - test of a mailbox, of Meilisearch or of the transcription server, import by QR codes: a server of the private
+    network not used yet is chosen by the administrator of Dolibarr; the answer of the IMAP server to the test is
+    said to who may see it; Meilisearch turned on with the same checks.
+  - an undo goes outside the journal only when it gives back what was done; the pictures of a sender allowed load
+    alone only for a mail proven by DMARC or by a DKIM signature of its domain.
+  - voice typing by the server: 300 pieces per user and per hour at most (INBOX_WHISPER_MAX_PER_HOUR); its consent
+    and its count never changed from My account.
+  - shared views: the number of unread is the choice of each reader (off until asked, 20 views counted at most);
+    groups of the entity only; removed with their author; the third party named with the rights of the reader; a
+    reader allowed to change a view keeps the mailboxes of the author he does not read; logins never searched.
+  - details of an error of the AI service for the administrators only; notifications of a mailbox not read any more
+    without their addresses.
+
 - NEW: voice typing by a transcription server (Whisper), besides the speech recognition of the browser :   1.35.0
   - Settings > General > Voice typing: the engine, the browser or a transcription server (OpenAI compatible address:
     a Whisper installed on the network, or an online service), its key (never sent back) and model; a test lists

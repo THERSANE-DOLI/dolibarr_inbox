@@ -71,11 +71,12 @@ if ($action !== 'run' || !in_array($what, array('seen', 'flag', 'tag', 'move', '
 $undoOf = inboxAjaxParam('undo_of', 'none');
 $undoOf = array_filter(array_map('intval', is_array($undoOf) ? $undoOf : array()));
 // Not journaled only when it undoes lines of the journal of this user, of the last 10 minutes (an undo sent by
-// batches gives the same lines each time): no action can hide itself from the journal (audit INBX-016)
+// batches gives the same lines each time), and gives back what they did: no other action hides itself from the
+// journal behind a line of its author (audit INBX-016)
 if ($undoOf) {
-	$mine = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_action_log WHERE rowid IN (".implode(',', $undoOf).")"
-		." AND fk_user = ".((int) $user->id)." AND date_action > '".$db->idate(dol_now() - 600)."'");
-	if (!is_object($mine) || (int) $mine->n !== count(array_unique($undoOf))) {
+	$lines = $db->getRows("SELECT rowid, action, fk_account, fk_account_to, folder_from, folder_to FROM ".$db->prefix()."inbox_action_log WHERE rowid IN (".implode(',', $undoOf).")"
+		." AND fk_user = ".((int) $user->id)." AND date_action > '".$db->idate(dol_now() - 600)."' LIMIT 1000");
+	if (!is_array($lines) || count($lines) !== count(array_unique($undoOf)) || !InboxActionLog::undoes($db, $what, $ids, $params, $lines)) {
 		inboxAjaxError('Bad undo', 400);
 	}
 	InboxActionLog::$paused = true;

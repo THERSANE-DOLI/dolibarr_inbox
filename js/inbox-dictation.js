@@ -368,12 +368,12 @@
 					put(w, r.text);
 				}
 			}, err => {
-				// Said once per dictation; a consent missing or a mailbox refused stops it
+				// Said once per dictation; a consent missing, a mailbox refused or the cap of the hour stops it
 				if (!s.failed) {
 					s.failed = true;
 					toast(err.message, { error: true });
 				}
-				if (err.status === 403) {
+				if (err.status === 403 || err.status === 429) {
 					stop(w);
 				}
 			}).finally(() => {

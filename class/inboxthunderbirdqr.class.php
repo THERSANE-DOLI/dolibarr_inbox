@@ -493,7 +493,8 @@ class InboxThunderbirdQr
 			$hosts[] = $smtp['host'];
 		}
 		foreach ($hosts as $host) {
-			if (!InboxServerTester::hostAllowed($host)) {
+			// Allowed by the setup; a server of the private network, new: by the administrator (audit INBX-010)
+			if (!InboxServerTester::hostAllowed($host) || InboxServerTester::privateRefused($host, InboxServerTester::knownMailHosts())) {
 				return self::SKIP_HOST;
 			}
 		}

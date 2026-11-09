@@ -42,6 +42,12 @@ class InboxDictation
 	/** Parameter of the user holding the consents: provider => date */
 	const PARAM = 'dictation_consent';
 
+	/** Parameter of the user counting the pieces of voice sent to the transcription server in the hour: {h, n} */
+	const USAGE = 'dictation_usage';
+
+	/** Pieces of voice sent to the transcription server per user and per hour, at most (INBOX_WHISPER_MAX_PER_HOUR) */
+	const MAX_PER_HOUR = 300;
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -171,5 +177,25 @@ class InboxDictation
 		foreach ($gone as $p) {
 			InboxActionLog::add($this->db, $user, 0, 'dictation_off', array((object) array('subject' => '')), '', '', 0, $p);
 		}
+	}
+
+	/**
+	 * One more piece of voice for the transcription server, within the cap of the hour of the user: the server of
+	 * Dolibarr does not relay without end to a service maybe paid or shared (audit INBX-033)
+	 *
+	 * @param User $user User
+	 * @return bool false when the cap of the hour is reached
+	 */
+	public function countPiece(User $user)
+	{
+		$params = new InboxUserParam($this->db);
+		$hour = (int) floor(dol_now() / 3600);
+		$usage = json_decode((string) $params->get($user, self::USAGE), true);
+		$n = is_array($usage) && (int) ($usage['h'] ?? 0) === $hour ? (int) ($usage['n'] ?? 0) : 0;
+		if ($n >= max(1, getDolGlobalInt('INBOX_WHISPER_MAX_PER_HOUR', self::MAX_PER_HOUR))) {
+			return false;
+		}
+
+		return $params->set($user, self::USAGE, (string) json_encode(array('h' => $hour, 'n' => $n + 1))) > 0;
 	}
 }

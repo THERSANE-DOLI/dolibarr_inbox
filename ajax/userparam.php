@@ -23,6 +23,7 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxuserparam.class.php');
+dol_include_once('/inbox/class/inboxdictation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('set', 'remove'), true));
@@ -54,19 +55,20 @@ switch ($action) {
 		// no break
 
 	case 'set':
+	case 'remove':
 		// The presence is written by the call of state of the Mail space only (audit INBX-028)
-		// The consents of the voice typing go through ajax/dictation.php (journal): never set here
-		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', 'dictation_consent'), true)) {
+		// The consents of the voice typing go through ajax/dictation.php (journal), the count of the pieces of voice
+		// sent to the transcription server is kept by it: never set nor removed here (audit INBX-033, INBX-044)
+		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', InboxDictation::PARAM, InboxDictation::USAGE), true)) {
 			inboxAjaxError('Unknown param', 400);
+		}
+		if ($action === 'remove') {
+			$params->remove($user, (string) inboxAjaxParam('param', 'aZ09'), $accountId);
+			inboxAjaxReply(array('params' => $params->getAll($user, $accountId)));
 		}
 		if ($params->set($user, (string) inboxAjaxParam('param', 'aZ09'), (string) inboxAjaxParam('value', 'none'), $accountId) < 0) {
 			inboxAjaxError($langs->transnoentities($params->error), 422);
 		}
-		inboxAjaxReply(array('params' => $params->getAll($user, $accountId)));
-		// no break
-
-	case 'remove':
-		$params->remove($user, (string) inboxAjaxParam('param', 'aZ09'), $accountId);
 		inboxAjaxReply(array('params' => $params->getAll($user, $accountId)));
 		// no break
 

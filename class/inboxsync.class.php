@@ -240,6 +240,7 @@ class InboxSync
 		$maxDays = (int) $account->sync_max_days;
 		$firstSyncLeft = false;
 		$done = array();
+		$reports = array();
 		foreach ($queue as $item) {
 			list($f, $backfill) = $item;
 			if (microtime(true) > $deadline) {
@@ -278,9 +279,12 @@ class InboxSync
 			}
 			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
 			// Delivery reports among the new mails (1.25.0): their start read (the report comes before the original),
-			// linked to the mail sent; never in Sent or Drafts
+			// linked to the mail sent; never in Sent or Drafts. Read at the end of the pass, once the copy in Sent of
+			// the mail they are about is indexed too: a report counts only for a mail sent from this mailbox (INBX-031)
 			if (!in_array((string) $f->role, array('sent', 'drafts'), true)) {
-				$this->bounces($connector, (int) $account->id, (string) $f->path, $res['new']);
+				$reports[] = array((string) $f->path, array_filter($res['new'], function ($m) {
+					return !empty($m['is_report']);
+				}));
 			}
 			// Answers in an ignored thread arrive read (1.11.0); never in Sent or Drafts
 			$readNow = 0;
@@ -310,6 +314,11 @@ class InboxSync
 			$f->sync_cursor = $res['cursor'];
 			if (!$complete) {
 				$firstSyncLeft = true;
+			}
+		}
+		foreach ($reports as $r) {
+			if ($r[1]) {
+				$this->bounces($connector, (int) $account->id, $r[0], $r[1]);
 			}
 		}
 		$this->repairAttachments($connector, $rows, $mails, $folders, $deadline);

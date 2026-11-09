@@ -168,9 +168,11 @@ class InboxMailBuilder
 	 * @param string $html     HTML
 	 * @param bool   $keepVars Keep the variables of a template (span data-inbox-var): drafts, templates; sent mails
 	 *                         hold their text only
+	 * @param bool   $noRemote Nothing that the browser would load: no picture, no style able to point at one (a
+	 *                         proposal of the AI, audit INBX-032)
 	 * @return string Fragment (inside of a body)
 	 */
-	public static function cleanHtml($html, $keepVars = false)
+	public static function cleanHtml($html, $keepVars = false, $noRemote = false)
 	{
 		$html = (string) $html;
 		if (trim($html) === '') {
@@ -185,7 +187,7 @@ class InboxMailBuilder
 		if (!$body) {
 			return '';
 		}
-		self::cleanNode($body, (bool) $keepVars);
+		self::cleanNode($body, (bool) $keepVars, (bool) $noRemote);
 		$out = '';
 		foreach ($body->childNodes as $child) {
 			$out .= $doc->saveHTML($child);
@@ -197,9 +199,10 @@ class InboxMailBuilder
 	/**
 	 * @param DOMNode $node     Node whose children are cleaned
 	 * @param bool    $keepVars Keep the variables of a template
+	 * @param bool    $noRemote Nothing that the browser would load
 	 * @return void
 	 */
-	protected static function cleanNode(DOMNode $node, $keepVars = false)
+	protected static function cleanNode(DOMNode $node, $keepVars = false, $noRemote = false)
 	{
 		foreach (iterator_to_array($node->childNodes) as $child) {
 			if ($child instanceof DOMComment || $child instanceof DOMProcessingInstruction) {
@@ -210,13 +213,13 @@ class InboxMailBuilder
 				continue;
 			}
 			$tag = strtolower($child->nodeName);
-			if (in_array($tag, InboxMimeParser::HTML_DROP, true) || $tag === 'style') {
+			if (in_array($tag, InboxMimeParser::HTML_DROP, true) || $tag === 'style' || ($noRemote && $tag === 'img')) {
 				$node->removeChild($child);
 				continue;
 			}
 			if (!in_array($tag, self::TAGS, true)) {
 				// Unknown tag: its content is kept, the tag goes
-				self::cleanNode($child, $keepVars);
+				self::cleanNode($child, $keepVars, $noRemote);
 				while ($child->firstChild) {
 					$node->insertBefore($child->firstChild, $child);
 				}
@@ -237,11 +240,13 @@ class InboxMailBuilder
 					// Only the marks of inbox (a draft reopened finds its quote and signature again)
 					$keep = in_array($value, array('inbox-quote', 'inbox-signature'), true);
 				} elseif ($keep && $name === 'href') {
-					$keep = (bool) preg_match('#^(https?:|mailto:|tel:|\#)#i', $value);
+					// A web address in full, a mail, a phone number (no other scheme hidden after it, audit INBX-038)
+					$keep = (bool) preg_match('#^(https?://|mailto:|tel:[^:]{1,64}$|\#)#i', $value);
 				} elseif ($keep && $name === 'src') {
 					$keep = (bool) preg_match('#^(https:|cid:|data:image/(png|jpeg|gif|webp);base64,)#i', $value);
 				} elseif ($keep && $name === 'style') {
-					$keep = !preg_match('/expression\s*\(|javascript:|behavior\s*:|-moz-binding|url\s*\(\s*[\'"]?\s*(?!https:)/i', $value);
+					$keep = !preg_match('/expression\s*\(|javascript:|behavior\s*:|-moz-binding|url\s*\(\s*[\'"]?\s*(?!https:)/i', $value)
+						&& !($noRemote && preg_match('/url|image|@|\\\\/i', $value));
 				} elseif ($keep) {
 					$keep = !preg_match('/^\s*(javascript|vbscript|data):/i', $value);
 				}
@@ -258,7 +263,7 @@ class InboxMailBuilder
 			} elseif (($tag === 'td' || $tag === 'th') && stripos($child->getAttribute('style'), 'border') === false) {
 				$child->setAttribute('style', trim($child->getAttribute('style').';border:1px solid #d0d5dd;padding:4px 8px;vertical-align:top', '; '));
 			}
-			self::cleanNode($child, $keepVars);
+			self::cleanNode($child, $keepVars, $noRemote);
 		}
 	}
 

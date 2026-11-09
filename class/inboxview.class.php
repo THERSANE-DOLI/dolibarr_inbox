@@ -76,17 +76,27 @@ class InboxView
 		$params = new InboxUserParam($this->db);
 		$hidden = json_decode((string) $params->get($user, 'views_hidden'), true);
 		$hidden = array_map('intval', is_array($hidden) ? $hidden : array());
+		$counted = json_decode((string) $params->get($user, 'views_counted'), true);
+		$counted = array_map('intval', is_array($counted) ? $counted : array());
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$mine = (int) $r->fk_user === (int) $user->id;
+			$search = self::cleanSearch(json_decode((string) $r->search, true));
+			// The name of the third party read again with the rights of the reader, never the text of the author
+			// (audit INBX-041)
+			if ($search['soc']) {
+				$search['soc']['name'] = $this->socName($user, (int) $search['soc']['id']);
+			}
 			$view = array(
 				'id' => (int) $r->rowid,
 				'label' => (string) $r->label,
 				'icon' => (string) $r->icon,
 				'color' => (string) $r->color,
-				'search' => self::cleanSearch(json_decode((string) $r->search, true)),
+				'search' => $search,
 				'accounts' => self::ids(json_decode((string) $r->accounts, true)),
-				'show_count' => (int) $r->show_count,
+				// The counter of a view shared with the user: his choice, off until he asks for it; the author does
+				// not make every reader count (audit INBX-036)
+				'show_count' => $mine ? (int) $r->show_count : (int) in_array((int) $r->rowid, $counted, true),
 				'mine' => $mine,
 				'editable' => $mine || (int) $r->shared_edit === 1,
 				'shared_edit' => (int) $r->shared_edit,
@@ -130,7 +140,9 @@ class InboxView
 				return $this->fail('too_many');
 			}
 		}
-		$label = trim(dol_trunc(str_replace(array("\r", "\n", "\t"), ' ', (string) ($data['label'] ?? '')), 128, 'right', 'UTF-8', 1));
+		// A name in plain text: no < > whatever the filter of the call, shown to every reader (audit INBX-043)
+		$label = str_replace(array("\r", "\n", "\t", '<', '>'), array(' ', ' ', ' ', '', ''), (string) ($data['label'] ?? ''));
+		$label = trim(dol_trunc($label, 128, 'right', 'UTF-8', 1));
 		if ($label === '') {
 			return $this->fail('bad_label');
 		}
@@ -138,12 +150,24 @@ class InboxView
 		$color = preg_match('/^#[0-9a-f]{6}$/i', (string) ($data['color'] ?? '')) ? strtolower((string) $data['color']) : '';
 		$search = self::cleanSearch(is_array($data['search'] ?? null) ? $data['search'] : array());
 		$accounts = self::ids(is_array($data['accounts'] ?? null) ? $data['accounts'] : array());
-		$showCount = !empty($data['show_count']) ? 1 : 0;
 		$p = $this->db->prefix();
 		$s = function ($v) {
 			return $v === '' ? 'NULL' : "'".$this->db->escape($v)."'";
 		};
 		$isOwner = !$old || (int) $old->fk_user === (int) $user->id;
+		// The counter is the choice of the author for himself; a reader allowed to change the view chooses his own
+		// from the menu (audit INBX-036)
+		$showCount = $isOwner ? (!empty($data['show_count']) ? 1 : 0) : (int) $old->show_count;
+		// A reader allowed to change the view only sees his own mailboxes: those of the author he does not read stay;
+		// an empty choice (all) does not widen the view of the author (audit INBX-042)
+		if (!$isOwner) {
+			$before = self::ids(json_decode((string) $old->accounts, true));
+			if ($before) {
+				require_once __DIR__.'/inboxaccess.class.php';
+				$kept = array_values(array_diff($before, array_keys((new InboxAccess($this->db))->getLevels($user))));
+				$accounts = $accounts ? self::ids(array_merge($accounts, $kept)) : $before;
+			}
+		}
 		$this->db->begin();
 		if ($old) {
 			$sql = "UPDATE ".$p."inbox_view SET label = '".$this->db->escape($label)."', icon = ".$s($icon).", color = ".$s($color).","
@@ -237,6 +261,54 @@ class InboxView
 	}
 
 	/**
+	 * The number of unread of a view shared with the user shown for him, or not (his choice, audit INBX-036)
+	 *
+	 * @param User $user User
+	 * @param int  $id   View
+	 * @param bool $on   Show it
+	 * @return bool
+	 */
+	public function counted(User $user, $id, $on)
+	{
+		$v = $this->visible($user, $id);
+		if (!$v || (int) $v->fk_user === (int) $user->id) {
+			return (bool) $this->fail('not_found');
+		}
+		$params = new InboxUserParam($this->db);
+		$list = json_decode((string) $params->get($user, 'views_counted'), true);
+		$list = array_map('intval', is_array($list) ? $list : array());
+		$list = $on ? array_values(array_unique(array_merge($list, array((int) $id)))) : array_values(array_diff($list, array((int) $id)));
+
+		return $params->set($user, 'views_counted', (string) json_encode(array_slice($list, -self::MAX_OWN))) > 0;
+	}
+
+	/**
+	 * Name of a third party for the user: read in the database with his rights (third parties, those of a sales
+	 * representative when he sees only his own), '' when he may not see it
+	 *
+	 * @param User $user User
+	 * @param int  $id   Third party
+	 * @return string
+	 */
+	protected function socName(User $user, $id)
+	{
+		static $cache = array();
+
+		$key = (int) $user->id.':'.(int) $id;
+		if (!isset($cache[$key])) {
+			$cache[$key] = '';
+			if (isModEnabled('societe') && $user->hasRight('societe', 'lire')) {
+				$p = $this->db->prefix();
+				$restrict = !$user->hasRight('societe', 'client', 'voir') ? " AND EXISTS (SELECT sc.rowid FROM ".$p."societe_commerciaux as sc WHERE sc.fk_soc = s.rowid AND sc.fk_user = ".((int) $user->id).")" : '';
+				$row = $this->db->getRow("SELECT s.nom FROM ".$p."societe as s WHERE s.rowid = ".((int) $id)." AND s.entity IN (".getEntity('societe').")".$restrict);
+				$cache[$key] = is_object($row) ? (string) $row->nom : '';
+			}
+		}
+
+		return $cache[$key];
+	}
+
+	/**
 	 * Order of the views of the user (his own)
 	 *
 	 * @param User  $user User
@@ -248,7 +320,8 @@ class InboxView
 		global $conf;
 
 		$pos = 1;
-		foreach (array_map('intval', $ids) as $id) {
+		// His own views at most (audit INBX-040)
+		foreach (array_slice(array_map('intval', $ids), 0, self::MAX_OWN) as $id) {
 			$this->db->query("UPDATE ".$this->db->prefix()."inbox_view SET position = ".($pos++)." WHERE rowid = ".$id." AND fk_user = ".((int) $user->id)." AND entity = ".((int) $conf->entity));
 		}
 	}
@@ -380,7 +453,11 @@ class InboxView
 	 */
 	protected function groupsOf(User $user)
 	{
-		$rows = $this->db->getRows("SELECT fk_usergroup FROM ".$this->db->prefix()."usergroup_user WHERE fk_user = ".((int) $user->id)." LIMIT 1000");
+		global $conf;
+
+		// The groups of the user in this entity, as for the accesses to the mailboxes (audit INBX-034)
+		$rows = $this->db->getRows("SELECT fk_usergroup FROM ".$this->db->prefix()."usergroup_user WHERE fk_user = ".((int) $user->id)
+			." AND entity IN (0, ".((int) $conf->entity).") LIMIT 1000");
 
 		return array_map(function ($r) {
 			return (int) $r->fk_usergroup;

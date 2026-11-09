@@ -131,6 +131,57 @@ class InboxActionLog
 	}
 
 	/**
+	 * The action gives back what the lines of the journal did: a tag changed again, or mails moved back from where the
+	 * lines took them to where they were (same mailboxes, same folders). Only these two make an undo (InboxActions).
+	 * Audit INBX-016: no other action hides itself from the journal behind a line of its author.
+	 *
+	 * @param DoliDB               $db     Database handler
+	 * @param string               $what   Action asked
+	 * @param int[]                $ids    Mails
+	 * @param array<string,mixed>  $params Parameters (folder)
+	 * @param array<int,object>    $lines  Lines of the journal named by the undo
+	 * @return bool
+	 */
+	public static function undoes(DoliDB $db, $what, array $ids, array $params, array $lines)
+	{
+		$moves = array('move', 'archive', 'delete', 'junk', 'notjunk');
+		foreach ($lines as $l) {
+			if ($l->action !== 'tag' && !in_array($l->action, $moves, true)) {
+				return false;
+			}
+		}
+		if ($what === 'tag') {
+			return true;
+		}
+		if ($what !== 'move' || !$ids) {
+			return false;
+		}
+		$p = $db->prefix();
+		$target = $db->getRow("SELECT fk_account, path FROM ".$p."inbox_folder WHERE rowid = ".((int) $params['folder']));
+		$mails = $db->getRows("SELECT m.fk_account, f.path FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
+			." WHERE m.rowid IN (".implode(',', array_map('intval', $ids)).") LIMIT 1000");
+		if (!is_object($target) || !is_array($mails) || count($mails) !== count(array_unique($ids))) {
+			return false;
+		}
+		foreach ($mails as $m) {
+			$back = false;
+			foreach ($lines as $l) {
+				$to = (int) $l->fk_account_to > 0 ? (int) $l->fk_account_to : (int) $l->fk_account;
+				if (in_array($l->action, $moves, true) && (int) $m->fk_account === $to && (string) $m->path === (string) $l->folder_to
+					&& (int) $target->fk_account === (int) $l->fk_account && (string) $target->path === (string) $l->folder_from) {
+					$back = true;
+					break;
+				}
+			}
+			if (!$back) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Lines of a mailbox, most recent first
 	 *
 	 * @param DoliDB              $db        Database handler

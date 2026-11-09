@@ -296,10 +296,9 @@ class InboxAi
 				return trim($p) !== '';
 			})));
 		}
-		// No picture from elsewhere in a proposal
-		$res = preg_replace('#<img\b[^>]*>#i', '', (string) $res);
-
-		return self::tightBlocks(InboxMailBuilder::cleanHtml((string) $res));
+		// Nothing a browser would load in a proposal (shown in the page, maybe inserted in the mail): no picture, no
+		// style pointing at one; removed once the HTML is read, a tag left open at the end included (audit INBX-032)
+		return self::tightBlocks(InboxMailBuilder::cleanHtml((string) $res, false, true));
 	}
 
 	/**

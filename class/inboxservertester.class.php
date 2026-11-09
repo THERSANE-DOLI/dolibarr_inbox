@@ -63,13 +63,95 @@ class InboxServerTester
 		if (!$list || $host === '') {
 			return true;
 		}
-		foreach ($list as $h) {
+
+		return self::listed($host);
+	}
+
+	/**
+	 * @param string $host Host
+	 * @return bool Named in INBOX_ALLOWED_HOSTS (an empty list names nothing)
+	 */
+	protected static function listed($host)
+	{
+		$host = strtolower(trim((string) $host, " []"));
+		foreach (array_filter(array_map('trim', explode(',', strtolower(getDolGlobalString('INBOX_ALLOWED_HOSTS'))))) as $h) {
 			if ($host === ltrim($h, '.') || ($h[0] === '.' && substr($host, -strlen($h)) === $h)) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * A host of the private network or of this server, chosen by who is not administrator of Dolibarr: refused
+	 * unless it is already in use (hosts of the mailboxes, master server, service set) or named in
+	 * INBOX_ALLOWED_HOSTS; else the test of a mailbox or of a service probes the network behind the web server
+	 * (audit INBX-010). The administrator of Dolibarr chooses any host.
+	 *
+	 * @param string   $host  Host typed
+	 * @param string[] $known Hosts already in use
+	 * @return bool
+	 */
+	public static function privateRefused($host, array $known = array())
+	{
+		global $user;
+
+		$host = strtolower(trim((string) $host, " []"));
+		if ($host === '' || !empty($user->admin)) {
+			return false;
+		}
+		foreach ($known as $k) {
+			if ($host === strtolower(trim((string) $k, " []"))) {
+				return false;
+			}
+		}
+
+		return !self::listed($host) && self::isPrivate($host);
+	}
+
+	/**
+	 * @param string $host Host
+	 * @return bool This server or the private network, by its name or by one of its addresses, IPv4 or IPv6
+	 */
+	public static function isPrivate($host)
+	{
+		$host = strtolower(trim((string) $host, " []"));
+		if ($host === '' || $host === 'localhost' || preg_match('/\.(local|localhost|internal|lan|home\.arpa)$/', $host) || (strpos($host, '.') === false && strpos($host, ':') === false)) {
+			return true;
+		}
+		$ips = filter_var($host, FILTER_VALIDATE_IP) ? array($host) : (array) gethostbynamel($host);
+		if (!filter_var($host, FILTER_VALIDATE_IP) && function_exists('dns_get_record')) {
+			foreach ((array) @dns_get_record($host, DNS_AAAA) as $r) {
+				if (!empty($r['ipv6'])) {
+					$ips[] = $r['ipv6'];
+				}
+			}
+		}
+		foreach (array_filter($ips) as $ip) {
+			if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @return string[] Hosts of the mailboxes of the entity and the master server: in use, set before
+	 */
+	public static function knownMailHosts()
+	{
+		global $conf, $db;
+
+		$out = array_filter(array(getDolGlobalString('INBOX_MASTER_HOST')));
+		$rows = $db->getRows("SELECT DISTINCT imap_host, smtp_host FROM ".$db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." LIMIT 1000");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$out[] = (string) $r->imap_host;
+			$out[] = (string) $r->smtp_host;
+		}
+
+		return array_values(array_unique(array_filter($out)));
 	}
 
 	/**
@@ -98,7 +180,11 @@ class InboxServerTester
 		$t = microtime(true);
 		$test = $connector->testConnection();
 		if ($test === null) {
-			$steps[] = $this->step('imap', self::ERROR, $connector->getError(), $t);
+			// The text of the connection (refused, closed, banner, delay) tells what listens on this host and port: said
+			// only to who may see it; a refused login is always said (audit INBX-010)
+			$said = $this->withDetail || $connector->getErrorCode() === 'auth' ? $connector->getError()
+				: $langs->transnoentities('InboxTestImapConnect', $account->imap_host, $account->imap_port);
+			$steps[] = $this->step('imap', self::ERROR, $said, $t);
 			// No SMTP / Sieve test when the server cannot be reached at all: same host, same answer
 			return $this->finish($steps, $start, $serverInfo, $roles);
 		}

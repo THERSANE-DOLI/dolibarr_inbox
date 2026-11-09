@@ -69,6 +69,10 @@ function inboxWhisperUrl()
 	if (!InboxServerTester::hostAllowed(InboxWhisper::hostOf($url))) {
 		inboxAjaxError($langs->transnoentities('InboxErrorHostNotAllowed', InboxWhisper::hostOf($url)), 422, array('url' => 1));
 	}
+	// A host of the private network, new: chosen by the administrator of Dolibarr (audit INBX-010)
+	if (InboxServerTester::privateRefused(InboxWhisper::hostOf($url), array(InboxWhisper::hostOf(getDolGlobalString('INBOX_WHISPER_URL'))))) {
+		inboxAjaxError($langs->transnoentities('InboxErrorPrivateHost', InboxWhisper::hostOf($url)), 422, array('url' => 1));
+	}
 
 	return $url;
 }
@@ -107,6 +111,10 @@ switch ($action) {
 		$mime = strtolower(trim(explode(';', (string) $_FILES['file']['type'])[0]));
 		if (!preg_match('/^audio\/[a-z0-9.+-]+$/', $mime)) {
 			inboxAjaxError($langs->transnoentities('InboxDictateBadAudio'), 422);
+		}
+		// A cap per user and per hour (audit INBX-033)
+		if (!$dictation->countPiece($user)) {
+			inboxAjaxError($langs->transnoentities('InboxDictateLimit'), 429);
 		}
 		$client = InboxWhisper::fromConf();
 		$text = $client->transcribe((string) $_FILES['file']['tmp_name'], $mime, substr((string) $langs->defaultlang, 0, 2), InboxWhisper::model());

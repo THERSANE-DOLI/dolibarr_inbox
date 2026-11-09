@@ -65,7 +65,7 @@ class InboxBounceTest extends InboxImapTestCase
 		$this->assertSame('dsn1@inbox-test.invalid', $r['report_id']);
 		$this->assertCount(2, $r['recipients'], 'delivered recipients are left out');
 		$this->assertSame(array('nobody@client.example.invalid', 'failed', '5.1.1', 'no_user'), array_slice(array_values($r['recipients'][0]), 0, 4));
-		$this->assertSame('550 5.1.1 <nobody@client.example.invalid>: Recipient address rejected: User unknown', $r['recipients'][0]['diagnostic'], 'folded line joined');
+		$this->assertSame('550 5.1.1 nobody@client.example.invalid: Recipient address rejected: User unknown', $r['recipients'][0]['diagnostic'], 'folded line joined, never a < > (INBX-030)');
 		$this->assertSame('full', $r['recipients'][1]['family']);
 
 		// Gmail: headers of the original only, delivery status in base64, delayed
@@ -143,7 +143,9 @@ class InboxBounceTest extends InboxImapTestCase
 		$this->assertSame(2, $b->record((int) $a->id, $this->postfix('sent9@inbox-test.invalid', 'dsn-old@inbox-test.invalid'), dol_now() - 30 * 86400));
 		$this->assertCount(1, $this->db->getRows("SELECT rowid FROM ".$p."inbox_notification WHERE fk_user = ".((int) $author->id)." LIMIT 10"));
 		// A delay alone: recorded, nobody told, no mark on the mail sent
-		$delayed = str_replace(array('Action: failed', 'dsn9@'), array('Action: delayed', 'dsn-delay@'), $this->postfix('sent8@inbox-test.invalid'));
+		$this->db->query("INSERT INTO ".$p."inbox_outbox (entity, fk_user, fk_account, message_id, subject, date_send, status, date_creation) VALUES (1, ".((int) $author->id).", ".((int) $a->id).","
+			." 'sent8@inbox-test.invalid', 'Devis 119', '".$this->db->idate(dol_now())."', 1, '".$this->db->idate(dol_now())."')");
+		$delayed = str_replace(array('Action: failed', 'dsn1@'), array('Action: delayed', 'dsn-delay@'), $this->postfix('sent8@inbox-test.invalid'));
 		$this->assertSame(2, $b->record((int) $a->id, $delayed, dol_now()));
 		$this->assertSame(array(), $b->forMail('sent8@inbox-test.invalid', array((int) $a->id)));
 		// Not a report, or a report without the mail sent: nothing
@@ -157,7 +159,8 @@ class InboxBounceTest extends InboxImapTestCase
 	{
 		$a = $this->ready();
 		$sent = "Message-ID: <sent7".self::MARK.">\r\nFrom: ".self::BOX."\r\nTo: nobody@client.example.invalid\r\nSubject: ZzAct devis\r\nDate: ".date('r')."\r\n\r\nBonjour\r\n";
-		$this->imap()->appendMessage('INBOX.ZzActB', $sent);
+		// The copy in Sent, indexed in the same pass as the report: the report is read at the end of the pass (INBX-031)
+		$this->imap()->appendMessage('INBOX.Sent', $sent);
 		$this->imap()->appendMessage('INBOX', $this->postfix('sent7'.self::MARK, 'dsn7'.self::MARK));
 		$this->sync($a);
 		$row = $this->db->getRow("SELECT recipient, fk_account FROM ".$this->db->prefix()."inbox_bounce WHERE report_id = 'dsn7".self::MARK."' AND recipient = 'nobody@client.example.invalid'");
@@ -174,5 +177,63 @@ class InboxBounceTest extends InboxImapTestCase
 		$this->assertCount(2, $d['bounces']);
 		$this->assertSame((int) $this->row($a, 'dsn7')->rowid, $d['bounces'][0]['report']['mail'], 'link to the report');
 		$this->assertSame(array(), $r->describe($this->admin, $r->raw($this->admin))['report'] ?? array(), 'a mail sent is not a report');
+	}
+
+	/**
+	 * A report forged by anyone (audit of 2026-11-09): about a mail of another mailbox, or of a mail never sent,
+	 * nothing; its sentence never goes as HTML in the agenda of Dolibarr (INBX-030, INBX-031)
+	 *
+	 * @return void
+	 */
+	public function testForgedReport()
+	{
+		$a = $this->box(true);
+		$other = $this->box(true, array('email' => 'other'.self::BOX));
+		$author = $this->user('bounceforged');
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."inbox_outbox (entity, fk_user, fk_account, message_id, subject, date_send, status, date_creation) VALUES (1, ".((int) $author->id).", ".((int) $a->id).","
+			." 'sent5@inbox-test.invalid', 'Devis 120', '".$this->db->idate(dol_now())."', 1, '".$this->db->idate(dol_now())."')");
+		$event = new ActionComm($this->db);
+		$event->type_code = 'AC_EMAIL';
+		$event->code = 'AC_EMAIL';
+		$event->label = 'Envoi inbox-test.invalid';
+		$event->datep = dol_now();
+		$event->userownerid = (int) $this->admin->id;
+		$event->elementtype = 'propal';
+		$event->fk_element = 999998;
+		$event->email_msgid = 'sent5@inbox-test.invalid';
+		$this->assertGreaterThan(0, $event->create($this->admin), (string) $event->error);
+		$forged = str_replace('Diagnostic-Code: smtp; 552 5.2.2 Mailbox full', 'Diagnostic-Code: smtp; 550 <img src=x onerror=alert(1)> write to evil@x.invalid',
+			$this->postfix('sent5@inbox-test.invalid', 'dsn5@inbox-test.invalid'));
+
+		$b = new InboxBounce($this->db);
+		$this->assertSame(0, $b->record((int) $other->id, $forged, dol_now()), 'another mailbox than the one of the sending: nothing');
+		$this->assertSame(0, $b->record((int) $a->id, $this->postfix('never@inbox-test.invalid', 'dsn6@inbox-test.invalid'), dol_now()), 'a mail never sent: nothing');
+		$this->assertSame(2, $b->record((int) $a->id, $forged, dol_now()));
+		$ev = $this->db->getRow("SELECT note FROM ".$p."actioncomm WHERE code = 'AC_INBOX_BOUNCE' AND fk_element = 999998");
+		$this->assertIsObject($ev);
+		$this->assertDoesNotMatchRegularExpression('/<(?!br>)/i', (string) $ev->note, 'no other tag than <br> in the note');
+		$this->assertStringContainsString('img src=x onerror=alert(1)', (string) $ev->note, 'the sentence kept as text');
+		$this->assertCount(2, $b->forMail('sent5@inbox-test.invalid', array((int) $a->id)));
+		$this->assertSame(array(), $b->forMail('sent5@inbox-test.invalid', array((int) $other->id)), 'reports of the mailboxes read only');
+
+		// A sending of Dolibarr (no outbox), from the address of the mailbox: counted
+		$event2 = new ActionComm($this->db);
+		$event2->type_code = 'AC_EMAIL';
+		$event2->code = 'AC_EMAIL';
+		$event2->label = 'Envoi inbox-test.invalid';
+		$event2->datep = dol_now();
+		$event2->userownerid = (int) $this->admin->id;
+		$event2->email_msgid = 'sent4@inbox-test.invalid';
+		$event2->email_from = 'Devis <'.self::BOX.'>';
+		$this->assertGreaterThan(0, $event2->create($this->admin), (string) $event2->error);
+		$this->assertSame(0, $b->record((int) $other->id, $this->postfix('sent4@inbox-test.invalid', 'dsn4@inbox-test.invalid'), dol_now()));
+		$this->assertSame(2, $b->record((int) $a->id, $this->postfix('sent4@inbox-test.invalid', 'dsn4@inbox-test.invalid'), dol_now()));
+
+		// The note of an older event, rewritten by the update
+		$note = InboxBounce::noteHtml("x@client.example.invalid : refused\n<img src=x onerror=alert(1)>");
+		$this->assertStringContainsString('&lt;img', $note);
+		$this->assertStringContainsString('<br>', $note);
+		$this->assertDoesNotMatchRegularExpression('/<(?!br>)/i', $note);
 	}
 }

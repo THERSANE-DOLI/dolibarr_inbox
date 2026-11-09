@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.35.0';
+		$this->version = '1.35.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -343,6 +343,25 @@ class modInbox extends DolibarrModules
 				}
 			}
 			$done = '1.4.0';
+		}
+		if (version_compare($done, '1.35.1', '<')) {
+			// 1.35.1 (audit INBX-030): the note of the events « not delivered » written as an escaped text; before, the
+			// sentence of the remote server, given by anyone who sends a report, went in as HTML. A note written since
+			// has no other tag than <br>: only a note with another < is taken.
+			dol_include_once('/inbox/class/inboxbounce.class.php');
+			$res = $this->db->query("SELECT id, note FROM ".$prefix."actioncomm WHERE code = 'AC_INBOX_BOUNCE' AND entity = ".((int) $conf->entity)." AND note LIKE '%<%'");
+			$rows = array();
+			while ($res && ($o = $this->db->fetch_object($res))) {
+				if (preg_match('/<(?!br>)/i', (string) $o->note)) {
+					$rows[] = $o;
+				}
+			}
+			foreach ($rows as $o) {
+				if (!$this->db->query("UPDATE ".$prefix."actioncomm SET note = '".$this->db->escape(InboxBounce::noteHtml((string) $o->note))."' WHERE id = ".((int) $o->id))) {
+					return -1;
+				}
+			}
+			$done = '1.35.1';
 		}
 		dolibarr_set_const($this->db, 'INBOX_SCHEMA_VERSION', $done, 'chaine', 0, 'Data changes of inbox already done', $conf->entity);
 

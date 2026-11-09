@@ -114,6 +114,8 @@ class InboxUserParam
 			'mdn_mode' => array('ask', array('ask', 'never')),
 			// Voice typing (1.28.0): receivers of the voice the user agreed to (provider => date), written by InboxDictation
 			'dictation_consent' => array('', 'json'),
+			// Pieces of voice sent to the transcription server in the current hour, kept by ajax/dictation.php (1.35.1)
+			'dictation_usage' => array('', 'json'),
 			// Unified views (1.29.0): the ones shown in the section « Views », the mailboxes left out of them
 			'views_shown' => array('["inbox","unread","flagged","mine"]', 'json'),
 			// One mailbox at a time (1.30.0): auto (on a narrow screen), all, single; the mailbox shown
@@ -122,6 +124,8 @@ class InboxUserParam
 			'unified_exclude' => array('[]', 'json'),
 			// Virtual views (1.31.0): the views shared with the user that he hides
 			'views_hidden' => array('[]', 'json'),
+			// Views shared with the user whose number of unread he shows (1.35.1)
+			'views_counted' => array('[]', 'json'),
 		);
 	}
 

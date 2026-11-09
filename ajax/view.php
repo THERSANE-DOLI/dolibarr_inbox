@@ -25,7 +25,7 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxview.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('save', 'delete', 'copy', 'hide', 'order'), true));
+inboxAjaxStart(in_array($action, array('save', 'delete', 'copy', 'hide', 'count', 'order'), true));
 $views = new InboxView($db);
 
 /**
@@ -91,6 +91,14 @@ switch ($action) {
 		inboxAjaxReply(array('views' => $views->listFor($user)));
 		// no break
 
+	case 'count':
+		// The number of unread of a view shared with the user: his choice (audit INBX-036)
+		if (!$views->counted($user, (int) inboxAjaxParam('id', 'int'), (int) inboxAjaxParam('on', 'int') === 1)) {
+			inboxViewFail($views);
+		}
+		inboxAjaxReply(array('views' => $views->listFor($user)));
+		// no break
+
 	case 'order':
 		$ids = inboxAjaxParam('ids', 'none');
 		$views->order($user, is_array($ids) ? $ids : array());
@@ -102,16 +110,17 @@ switch ($action) {
 		$q = trim((string) inboxAjaxParam('q'));
 		$like = $db->escape($db->escapeforlike($q));
 		$out = array();
-		$sql = "SELECT rowid, firstname, lastname, login FROM ".$db->prefix()."user WHERE statut = 1 AND (fk_soc IS NULL OR fk_soc = 0)";
+		// Found by name or address, never by login, and the login never given: no way to guess the logins (audit INBX-039)
+		$sql = "SELECT rowid, firstname, lastname, email FROM ".$db->prefix()."user WHERE statut = 1 AND (fk_soc IS NULL OR fk_soc = 0)";
 		$sql .= " AND entity IN (0, ".((int) $conf->entity).") AND rowid <> ".((int) $user->id);
 		if ($q !== '') {
-			$sql .= " AND (firstname LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR login LIKE '%".$like."%'";
+			$sql .= " AND (firstname LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR email LIKE '%".$like."%'";
 			$sql .= " OR CONCAT(firstname, ' ', lastname) LIKE '%".$like."%' OR CONCAT(lastname, ' ', firstname) LIKE '%".$like."%')";
 		}
 		$sql .= " ORDER BY lastname, firstname LIMIT 30";
 		foreach ((array) $db->getRows($sql) as $row) {
 			$name = trim($row->firstname.' '.$row->lastname);
-			$out[] = array('kind' => 'user', 'id' => (int) $row->rowid, 'name' => $name !== '' ? $name : (string) $row->login);
+			$out[] = array('kind' => 'user', 'id' => (int) $row->rowid, 'name' => $name !== '' ? $name : ((string) $row->email !== '' ? (string) $row->email : '#'.((int) $row->rowid)));
 		}
 		$sql = "SELECT rowid, nom FROM ".$db->prefix()."usergroup WHERE entity IN (0, ".((int) $conf->entity).")";
 		if ($q !== '') {
