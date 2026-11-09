@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: what the other modules give to the Dolibarr panel of a mail shown again (blocks, links, actions, alerts) :   1.47.1
+  - the hooks inboxMailPanels, inboxMailLinks, inboxMailActions and inboxMailAlerts were read from
+    $hookmanager->results instead of $hookmanager->resArray, where Dolibarr puts them: nothing was ever shown.
+
 - NEW: blocks of other modules in the Dolibarr panel of a mail, their page in a window of inbox :   1.47.0
   - hook inboxMailPanels: a module declares a block (title, icon, address of its JSON summary inside Dolibarr);
     the summary is read after the panel (badges, lines, one action, links), again while the module is working.

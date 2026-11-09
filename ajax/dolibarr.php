@@ -143,8 +143,8 @@ switch ($action) {
 		$extraLinks = array();
 		$alerts = array();
 		$hookObject = null;
-		if ($hookmanager->executeHooks('inboxMailLinks', $hookParams, $hookObject) >= 0 && is_array($hookmanager->results['links'] ?? null)) {
-			foreach ($hookmanager->results['links'] as $x) {
+		if ($hookmanager->executeHooks('inboxMailLinks', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['links'] ?? null)) {
+			foreach ($hookmanager->resArray['links'] as $x) {
 				if (is_array($x) && !empty($x['type']) && !empty($x['id'])) {
 					$d = $elements->describe($user, (string) $x['type'], (int) $x['id']);
 					if ($d) {
@@ -155,16 +155,16 @@ switch ($action) {
 		}
 		// Actions of the other modules (« Fill the proposal »...): a label and an address inside Dolibarr
 		$actions = array();
-		if ($hookmanager->executeHooks('inboxMailActions', $hookParams, $hookObject) >= 0 && is_array($hookmanager->results['actions'] ?? null)) {
-			foreach ($hookmanager->results['actions'] as $x) {
+		if ($hookmanager->executeHooks('inboxMailActions', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['actions'] ?? null)) {
+			foreach ($hookmanager->resArray['actions'] as $x) {
 				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
 				if ($url !== '' && !empty($x['label']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
 					$actions[] = array('label' => dol_trunc((string) $x['label'], 80, 'right', 'UTF-8', 1), 'url' => $url, 'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic');
 				}
 			}
 		}
-		if ($hookmanager->executeHooks('inboxMailAlerts', $hookParams, $hookObject) >= 0 && is_array($hookmanager->results['alerts'] ?? null)) {
-			foreach ($hookmanager->results['alerts'] as $x) {
+		if ($hookmanager->executeHooks('inboxMailAlerts', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['alerts'] ?? null)) {
+			foreach ($hookmanager->resArray['alerts'] as $x) {
 				if (is_array($x) && !empty($x['text'])) {
 					$alerts[] = array('level' => ($x['level'] ?? '') === 'danger' ? 'danger' : 'warning', 'text' => dol_trunc((string) $x['text'], 500, 'right', 'UTF-8', 1));
 				}
@@ -173,8 +173,8 @@ switch ($action) {
 		// Blocks of the other modules in the panel (1.47.0): a title and the address of their summary (JSON, inside
 		// Dolibarr), read by the panel after it is shown; its action opens a page of the module in a window of inbox
 		$panels = array();
-		if ($hookmanager->executeHooks('inboxMailPanels', $hookParams, $hookObject) >= 0 && is_array($hookmanager->results['panels'] ?? null)) {
-			foreach (array_slice($hookmanager->results['panels'], 0, 3) as $x) {
+		if ($hookmanager->executeHooks('inboxMailPanels', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['panels'] ?? null)) {
+			foreach (array_slice($hookmanager->resArray['panels'], 0, 3) as $x) {
 				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
 				if ($url !== '' && preg_match('/^[a-z0-9_-]{1,40}$/', (string) ($x['id'] ?? '')) && !empty($x['title']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
 					$panels[] = array('id' => (string) $x['id'], 'title' => dol_trunc((string) $x['title'], 60, 'right', 'UTF-8', 1), 'url' => $url,
