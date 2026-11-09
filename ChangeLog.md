@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: windows of inbox with a neutral title bar, sized from every edge, a module window able to open another over it :   1.48.0
+  - title bar white with framed buttons (the cross red on hover); the window in front told by its shadow, the
+    others by their title in grey.
+  - every window (viewer, page of a module) sized from its 4 edges and 4 corners, size kept as before.
+  - a page of a module may open one window over it, modal: a dark backdrop puts what is under it out of reach;
+    the two pages talk through inbox (« relay »), the page may set the title of its window.
+  - a page of a module may say it holds work not saved (« dirty »): its cross and Escape then ask before closing.
+
 - FIX: what the other modules give to the Dolibarr panel of a mail shown again (blocks, links, actions, alerts) :   1.47.1
   - the hooks inboxMailPanels, inboxMailLinks, inboxMailActions and inboxMailAlerts were read from
     $hookmanager->results instead of $hookmanager->resArray, where Dolibarr puts them: nothing was ever shown.
