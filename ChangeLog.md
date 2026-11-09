@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: folders put in order and moved by drag and drop in the panel :   1.43.0
+  - on the edge of a brother: put before or after it, in my own order (nothing changes on the server); in the middle
+    of a folder or on the mailbox: moved into it on the server (its managers only), undone in the toast.
+  - special folders stay first in their place; never into one of its subfolders nor into another mailbox; the
+    reason told while dragging. Move up and Move down in the menu of a folder (keyboard, phone).
+  - menu « ... » of the panel: folders back in alphabetical order.
+
+- NEW: progress of an action on many mails :   1.42.0
+  - from 20 mails (move, archive, delete, junk, tag): a card at the bottom with the count and a bar, by about ten
+    batches (20 to 200 mails each).
+  - Reduce to a pill (the work goes on, even in another folder); Stop after the batch running, the mails not reached
+    back in the list, the part done undone in the toast; the page asks before being closed meanwhile.
+
 - NEW: trash and junk emptied automatically after some days, per mailbox :   1.41.0
   - tab Folders of a mailbox: never (default), 7, 30, 60 or 90 days, for the trash and for the junk; turned on or
     shortened only after a confirmation (removal for good, for every user of the mailbox).
