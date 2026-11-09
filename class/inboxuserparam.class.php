@@ -124,6 +124,8 @@ class InboxUserParam
 			'unified_exclude' => array('[]', 'json'),
 			// Virtual views (1.31.0): the views shared with the user that he hides
 			'views_hidden' => array('[]', 'json'),
+			// Order of the mailboxes of the user, ids (My account, 1.36.0); the others after, by name
+			'accounts_order' => array('[]', 'json'),
 			// Views shared with the user whose number of unread he shows (1.35.1)
 			'views_counted' => array('[]', 'json'),
 		);

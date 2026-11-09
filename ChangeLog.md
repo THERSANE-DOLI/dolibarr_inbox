@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: My account, order of my mailboxes :   1.37.0
+  - each one moved by its handle or by the arrows (keyboard, phone), kept at once; back to the order by name in one
+    click.
+  - the panel of the folders, the choice of a mailbox and the sender of a writing follow it; a mailbox given later
+    goes at the end. The list of Settings > Mailboxes stays by name.
+
+- NEW: Settings > Mailboxes, several mailboxes turned on or off from the list :   1.36.0
+  - a box per line and « select all »; a bar of the selection: Turn on (counted), Turn off (confirmed), unselect.
+  - after an import, the drafts tested well picked in one click; those not tested or failed are told, never sent.
+  - one mailbox after the other with the checks of its card; those that could not change stay selected, with why.
+
+- FIX: text of a field selectable again in the rows moved by drag and drop (global tags, templates) :   1.35.2
+  - a row is dragged by its handle only.
+
 - FIX: security audit of 2026-11-09 :   1.35.1
   - a delivery report forged by anyone could run a script in the agenda of Dolibarr: the note of the event « not
     delivered » is written as text, the older ones cleaned at the update; a report counts only in the mailbox the

@@ -143,7 +143,7 @@
 	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['avatars', 'user-circle', 'InboxAvatars'],
 		['ai', 'magic', 'InboxAiSection'], ['dictation', 'mic', 'InboxDictationSection'], ['search', 'search', 'InboxSectionSearch'], ['tags', 'tag', 'InboxGlobalTags']];
 	/** Sections of Settings > My account (1.32.0); the 4th value: shown only for some users, hidden until there */
-	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true],
+	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true], ['order', 'folders', 'InboxBoxOrderSection', true],
 		['permailbox', 'mark-read', 'InboxReadPerMailbox', true], ['unified', 'multi', 'InboxUnifiedSection', true], ['dictation', 'mic', 'InboxDictationSection', true],
 		['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
 	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, me: ME_SECTIONS };
@@ -242,9 +242,22 @@
 			html += '<div class="ibx-empty" style="height:auto">' + ic('inbox', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxNoAccount') + '</div><div>'
 				+ th(isAdmin() ? 'InboxNoAccountAdmin' : 'InboxNoAccountManager') + '</div></div>';
 		} else {
-			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxAccount') + '</th><th>' + th('InboxAccountType') + '</th><th>' + th('InboxStatus') + '</th><th>' + th('InboxLastTest') + '</th><th>' + th('InboxSync') + '</th><th>' + th('InboxAccesses') + '</th></tr></thead><tbody>';
+			const pick = isAdmin();
+			// After an import: the drafts tested well, ready to be turned on, picked in one click
+			const ready = rows.filter(r => accountCanEnable(r));
+			if (pick && ready.length) {
+				html += '<div class="ibx-notice ibx-notice--info ibx-acctready">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxAccountsReady', ready.length) + '</div>'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-pickready">' + th('InboxAccountsPickReady') + '</button></div>';
+			}
+			if (pick) {
+				html += '<div class="ibx-bulkbar ibx-acctbar ibx-js-acctbar" hidden></div>';
+			}
+			html += '<table class="ibx-table"><thead><tr>' + (pick ? '<th class="ibx-col-pick"><label class="ibx-pickcell"><input type="checkbox" class="ibx-js-pickall" aria-label="' + th('InboxSelectAll') + '"></label></th>' : '')
+				+ '<th>' + th('InboxAccount') + '</th><th>' + th('InboxAccountType') + '</th><th>' + th('InboxStatus') + '</th><th>' + th('InboxLastTest') + '</th><th>' + th('InboxSync') + '</th><th>' + th('InboxAccesses') + '</th></tr></thead><tbody>';
 			rows.forEach(r => {
-				html += '<tr><td><a href="#/settings/accounts/' + r.id + '/server"><b>' + esc(r.label || r.email) + '</b></a><div class="ibx-muted">' + esc(r.email) + '</div></td>'
+				html += '<tr>' + (pick ? '<td class="ibx-col-pick"><label class="ibx-pickcell"><input type="checkbox" class="ibx-js-pick" value="' + r.id + '"' + (acctKeep.has(r.id) ? ' checked' : '')
+					+ ' aria-label="' + esc(t('InboxSelectAccount', r.email)) + '"></label></td>' : '')
+					+ '<td><a href="#/settings/accounts/' + r.id + '/server"><b>' + esc(r.label || r.email) + '</b></a><div class="ibx-muted">' + esc(r.email) + '</div></td>'
 					+ '<td>' + th(r.type === 'personal' ? 'InboxTypePersonal' : 'InboxTypeShared') + (r.owner ? '<div class="ibx-muted">' + esc(r.owner) + '</div>' : '') + '</td>'
 					+ '<td>' + statusBadge(r.status) + (r.sync_state && r.sync_state !== 'ok' ? '<div><span class="ibx-status ibx-status--error">' + th('InboxSyncError') + '</span></div>' : '') + '</td>'
 					+ '<td>' + testBadge(r.last_test_result) + '</td>'
@@ -254,6 +267,230 @@
 			html += '</tbody></table>';
 		}
 		main.innerHTML = html + '</div>';
+		acctKeep.clear();
+		if (rows.length && isAdmin()) {
+			bindAccountsPick(main, parts, rows);
+		}
+	}
+
+	/** A mailbox in the list of My account > Order of my mailboxes: handle, name, up and down */
+	function boxOrderItem(m) {
+		const name = m.label && m.label !== m.email ? m.label : m.email;
+		return '<li class="ibx-boxorder__item ibx-dragrow" data-id="' + m.id + '"><span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>'
+			+ '<span class="ibx-boxorder__name"><b>' + esc(name) + '</b>' + (name !== m.email ? ' <span class="ibx-muted">' + esc(m.email) + '</span>' : '') + '</span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-boxup" aria-label="' + esc(t('InboxMoveUp') + ' : ' + name) + '" title="' + th('InboxMoveUp') + '">' + ic('chevron-up') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-boxdown" aria-label="' + esc(t('InboxMoveDown') + ' : ' + name) + '" title="' + th('InboxMoveDown') + '">' + ic('chevron-down') + '</button></li>';
+	}
+	/**
+	 * Order of my mailboxes: dragged by the handle, or moved by the arrows (keyboard, phone); kept at once in my
+	 * settings, every list of my mailboxes follows it; « Back to the order by name » forgets it
+	 * @param {HTMLElement} main Page My account
+	 */
+	function bindBoxOrder(main) {
+		const list = $('.ibx-js-boxorder', main);
+		if (!list) {
+			return;
+		}
+		const reset = $('.ibx-js-boxorderreset', main);
+		const items = () => $$('.ibx-boxorder__item', list);
+		const paintArrows = () => items().forEach((li, i, all) => {
+			$('.ibx-js-boxup', li).disabled = i === 0;
+			$('.ibx-js-boxdown', li).disabled = i === all.length - 1;
+		});
+		const save = async value => {
+			try {
+				const r = await post('userparam', 'set', { param: 'accounts_order', value: JSON.stringify(value) });
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+				reset.hidden = !value.length;
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		};
+		const keep = () => {
+			paintArrows();
+			save(items().map(li => +li.dataset.id));
+		};
+		list.addEventListener('click', e => {
+			const btn = e.target.closest('.ibx-js-boxup, .ibx-js-boxdown');
+			if (!btn) {
+				return;
+			}
+			const li = btn.closest('li');
+			const up = btn.classList.contains('ibx-js-boxup');
+			const other = up ? li.previousElementSibling : li.nextElementSibling;
+			if (!other) {
+				return;
+			}
+			list.insertBefore(up ? li : other, up ? other : li);
+			keep();
+			// The focus stays on the arrow, on the mailbox that moved (several steps in a row with the keyboard)
+			(up && !li.previousElementSibling ? $('.ibx-js-boxdown', li) : (!up && !li.nextElementSibling ? $('.ibx-js-boxup', li) : btn)).focus();
+		});
+		dragByHandle(list);
+		let dragged = null;
+		list.addEventListener('dragstart', e => {
+			dragged = e.target.closest('.ibx-boxorder__item');
+			if (dragged) {
+				dragged.classList.add('is-dragging');
+				e.dataTransfer.effectAllowed = 'move';
+			}
+		});
+		list.addEventListener('dragover', e => {
+			const over = e.target.closest('.ibx-boxorder__item');
+			if (!dragged || !over || over === dragged) {
+				return;
+			}
+			e.preventDefault();
+			const r = over.getBoundingClientRect();
+			list.insertBefore(dragged, e.clientY < r.top + r.height / 2 ? over : over.nextElementSibling);
+		});
+		list.addEventListener('dragend', () => {
+			if (dragged) {
+				dragged.classList.remove('is-dragging');
+				dragged = null;
+				keep();
+			}
+		});
+		reset.addEventListener('click', async () => {
+			const sorted = items().sort((a, b) => $('.ibx-boxorder__name b', a).textContent.localeCompare($('.ibx-boxorder__name b', b).textContent));
+			sorted.forEach(li => list.appendChild(li));
+			paintArrows();
+			await save([]);
+			// The button goes away: the focus on the list, at its first mailbox
+			$('.ibx-js-boxdown', items()[0]).focus();
+		});
+		paintArrows();
+	}
+
+	/**
+	 * Rows moved only by their handle: a row draggable as a whole starts a drag from its fields, and the text of a
+	 * field cannot be selected any more. The row becomes draggable while its handle is pressed.
+	 * @param {HTMLElement} box Container of the rows (.ibx-dragrow, handle .ibx-draghandle)
+	 */
+	function dragByHandle(box) {
+		// Once per container: a tab drawn again (after a change) keeps its listeners
+		if (box.dataset.dragHandle) {
+			return;
+		}
+		box.dataset.dragHandle = '1';
+		const off = () => $$('.ibx-dragrow[draggable="true"]', box).forEach(r => {
+			r.draggable = false;
+		});
+		box.addEventListener('pointerdown', e => {
+			const row = e.target.closest('.ibx-dragrow');
+			if (row && e.target.closest('.ibx-draghandle')) {
+				row.draggable = true;
+			}
+		});
+		box.addEventListener('pointerup', off);
+		box.addEventListener('dragend', off);
+	}
+
+	/** Mailboxes kept selected after a change of several (those that could not change) */
+	const acctKeep = new Set();
+	/** A mailbox that may be turned on: not active, its last test passed (the server refuses the others) */
+	function accountCanEnable(r) {
+		return r.status !== 1 && ['ok', 'warning'].includes(r.last_test_result);
+	}
+	/**
+	 * Several mailboxes turned on or off from the list: a box per line, a bar of the selection with the actions that
+	 * apply to it (counted), one call per mailbox (the checks of each one stay those of its card)
+	 * @param {HTMLElement} main Page
+	 * @param {string[]} parts Route
+	 * @param {object[]} rows Mailboxes of the list
+	 */
+	function bindAccountsPick(main, parts, rows) {
+		const bar = $('.ibx-js-acctbar', main);
+		const all = $('.ibx-js-pickall', main);
+		const boxes = $$('.ibx-js-pick', main);
+		const byId = new Map(rows.map(r => [r.id, r]));
+		let busy = false;
+		const picked = () => boxes.filter(b => b.checked).map(b => byId.get(+b.value));
+		const paint = () => {
+			const sel = picked();
+			all.checked = sel.length > 0 && sel.length === boxes.length;
+			all.indeterminate = sel.length > 0 && sel.length < boxes.length;
+			boxes.forEach(b => b.closest('tr').classList.toggle('is-picked', b.checked));
+			bar.hidden = !sel.length;
+			if (!sel.length || busy) {
+				return;
+			}
+			const on = sel.filter(accountCanEnable);
+			const off = sel.filter(r => r.status === 1);
+			const skipped = sel.filter(r => r.status !== 1 && !accountCanEnable(r));
+			bar.innerHTML = '<span class="ibx-bulkbar__count" role="status" aria-label="' + th('InboxAccountsSelectedCount', sel.length) + '"><b class="ibx-bulkbar__num">' + sel.length + '</b>'
+				+ '<span class="ibx-bulkbar__word" aria-hidden="true">' + th('InboxSelectedWord') + '</span>'
+				+ (skipped.length ? '<span class="ibx-muted ibx-acctbar__skip">' + th('InboxAccountsSkipped', skipped.length) + '</span>' : '') + '</span>'
+				+ (off.length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-acctoff">' + th('InboxDisableCount', off.length) + '</button>' : '')
+				+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-accton"' + (on.length ? '' : ' disabled title="' + th('InboxErrorEnableNeedsTest') + '"') + '>' + th('InboxEnableCount', on.length) + '</button>'
+				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-acctclear" title="' + th('InboxClearSelection') + '" aria-label="' + th('InboxClearSelection') + '">' + ic('close') + '</button>';
+			$('.ibx-js-accton', bar).addEventListener('click', () => run(on, 1));
+			const offBtn = $('.ibx-js-acctoff', bar);
+			if (offBtn) {
+				offBtn.addEventListener('click', async () => {
+					if (await confirmDialog({ title: t('InboxDisableManyTitle', off.length), text: t('InboxDisableText'), confirm: t('InboxDisable'), danger: true })) {
+						run(off, 9);
+					}
+				});
+			}
+			$('.ibx-js-acctclear', bar).addEventListener('click', () => {
+				boxes.forEach(b => {
+					b.checked = false;
+				});
+				paint();
+				all.focus();
+			});
+		};
+		/** One mailbox after the other; the list read again, those that failed still selected */
+		const run = async (list, status) => {
+			busy = true;
+			$$('button', bar).forEach(b => {
+				b.disabled = true;
+			});
+			const count = $('.ibx-bulkbar__count', bar);
+			const failed = [];
+			let done = 0;
+			for (const r of list) {
+				count.textContent = t('InboxAccountsWorking', done + failed.length + 1, list.length);
+				try {
+					await post('account', 'status', { id: r.id, status });
+					I.changed('account', r.id);
+					done++;
+				} catch (err) {
+					failed.push(r.email + ' (' + err.message + ')');
+					acctKeep.add(r.id);
+				}
+			}
+			if (done) {
+				toast(t(status === 1 ? 'InboxAccountsEnabledCount' : 'InboxAccountsDisabledCount', done));
+			}
+			if (failed.length) {
+				toast(t('InboxAccountsFailedCount', failed.length, failed.join(', ')), { error: true });
+			}
+			renderAccounts(main, parts);
+		};
+		all.addEventListener('change', () => {
+			boxes.forEach(b => {
+				b.checked = all.checked;
+			});
+			paint();
+		});
+		boxes.forEach(b => b.addEventListener('change', paint));
+		const ready = $('.ibx-js-pickready', main);
+		if (ready) {
+			ready.addEventListener('click', () => {
+				boxes.forEach(b => {
+					b.checked = accountCanEnable(byId.get(+b.value));
+				});
+				paint();
+				const go = $('.ibx-js-accton', bar);
+				if (go) {
+					go.focus();
+				}
+			});
+		}
+		paint();
 	}
 
 	/** Greys of the interface (pure): light, dark (same values as css/inbox.css and inboxLookTokens()) */
@@ -1082,7 +1319,7 @@
 			html += '<div class="ibx-empty">' + ic('template') + '<p>' + th('InboxTemplatesEmpty') + '</p></div>';
 		} else {
 			html += '<table class="ibx-table ibx-js-tpls"><thead><tr><th></th><th>' + th('InboxTemplateLabel') + '</th><th>' + th('InboxTemplateFor') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
-				+ data.templates.map((tp, n) => '<tr class="' + (tp.editable ? 'ibx-dragrow' : '') + '" draggable="' + !!tp.editable + '" data-tpl="' + tp.id + '">'
+				+ data.templates.map((tp, n) => '<tr class="' + (tp.editable ? 'ibx-dragrow' : '') + '" data-tpl="' + tp.id + '">'
 					+ '<td>' + (tp.editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
 					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + esc(tp.subject) + '</div></td>'
 					+ '<td class="ibx-muted">' + forWho(tp) + '</td>'
@@ -1137,6 +1374,7 @@
 			}
 		};
 		// Drag and drop of the rows (with the up / down buttons for the keyboard and the phone)
+		dragByHandle(box);
 		let dragged = null;
 		box.ondragstart = e => {
 			dragged = e.target.closest('[data-tpl]');
@@ -1534,7 +1772,7 @@
 			}
 		}
 		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
-			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" draggable="' + editable + '" data-tag="' + tg.id + '">'
+			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" data-tag="' + tg.id + '">'
 				+ '<td>' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
 				+ '<td>' + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
 				+ '<td>' + (editable ? '<input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '">' : C.badge(tg)) + '</td>'
@@ -1672,6 +1910,7 @@
 			}
 		};
 		// Drag and drop of the rows (with the up / down buttons for the keyboard and the phone)
+		dragByHandle(box);
 		let dragged = null;
 		box.ondragstart = e => {
 			dragged = e.target.closest('[data-tag]');
@@ -2478,6 +2717,12 @@
 					+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + m.id + '/away">' + ic('agenda') + ' ' + th('InboxTabAway') + '</a></div></div>').join('')
 				+ '</div></section>';
 		}
+		// Order of my mailboxes (1.36.0): the panel of the folders, the choice of a mailbox, the writing follow it
+		if (data.mailboxes.length > 1) {
+			html += '<section class="ibx-section" data-section="order">' + title('order') + '<p class="ibx-section__help">' + th('InboxBoxOrderHelp') + '</p>'
+				+ '<ol class="ibx-boxorder ibx-js-boxorder">' + data.mailboxes.map(m => boxOrderItem(m)).join('') + '</ol>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-boxorderreset"' + (JSON.parse(p.accounts_order || '[]').length ? '' : ' hidden') + '>' + th('InboxBoxOrderReset') + '</button></section>';
+		}
 		if (data.mailboxes.length) {
 			html += '<section class="ibx-section" data-section="permailbox">' + title('permailbox') + '<p class="ibx-section__help">' + th('InboxReadPerMailboxHelp') + '</p><table class="ibx-table"><tbody>'
 				+ data.mailboxes.map(m => '<tr><td><b>' + esc(m.label || m.email) + '</b><div class="ibx-muted">' + esc(m.email) + '</div></td><td><select class="ibx-field ibx-field--medium" data-param="read_mode" data-account="' + m.id + '" aria-label="' + th('InboxReadMode') + '">'
@@ -2532,6 +2777,7 @@
 				requestAnimationFrame(() => pointSection(main, parts[0]));
 			}
 		});
+		bindBoxOrder(main);
 		const unified = $('.ibx-js-unified', main);
 		if (unified) {
 			unified.addEventListener('change', async () => {
