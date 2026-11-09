@@ -5936,6 +5936,26 @@
 		loadDolibar($('.ibx-js-dolibar', pane));
 	}
 
+	/** Tests of an anti-spam filter that weigh towards spam, in words (3 reasons at most; the others left) */
+	const SPAM_REASONS = [
+		[/^BAYES_(5[0-9]|[6-9]\d|SPAM)/, 'InboxSpamWhy_learnt'],
+		[/^(URIBL|SURBL|URI_|DBL_|PHISHING|PH_)/, 'InboxSpamWhy_links'],
+		[/^(RCVD_IN_|RBL_|DNSBL|SPAMHAUS|RECEIVED_SPAMHAUS|RWL_)/, 'InboxSpamWhy_blacklist'],
+		[/^(SPF_FAIL|SPF_SOFTFAIL|R_SPF_FAIL|R_SPF_SOFTFAIL|DKIM_INVALID|R_DKIM_REJECT|DMARC_POLICY_|DMARC_NA|DMARC_REJECT|DMARC_QUAR)/, 'InboxSpamWhy_auth'],
+		[/^(FORGED|FAKE_|SPOOF|HEADER_FROM_DIFFERENT|FROM_EXCESS|MISSING_|R_MISSING|FROM_NEQ_)/, 'InboxSpamWhy_headers'],
+		[/^(HTML_|MIME_HTML|MPART_|TVD_|LOTS_OF_MONEY|ADVANCE_FEE|MONEY_|SUBJ_ALL_CAPS|UPPERCASE|FREEMAIL_FORGED|DEAR_)/, 'InboxSpamWhy_content'],
+	];
+	function spamReasons(tests) {
+		const out = [];
+		(tests || []).forEach(test => {
+			const hit = SPAM_REASONS.find(([re]) => re.test(String(test).toUpperCase()));
+			if (hit && !out.includes(t(hit[1])) && out.length < 3) {
+				out.push(t(hit[1]));
+			}
+		});
+		return out;
+	}
+
 	/**
 	 * Banners, body and attachments of a mail (reading pane, or one mail of a conversation: inline = attachments
 	 * not stuck at the bottom, fold = quotes of the previous mails folded)
@@ -5978,6 +5998,20 @@
 			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
 		}
+		// Verdict of the anti-spam filter of the server (1.44.0): a mail judged spam but not in the junk says it, with
+		// the button; in the junk, the score and the reasons in words
+		const sp = m.spam;
+		if (sp && !opts.inline && (sp.spam || m.folder_role === 'junk')) {
+			const score = sp.score === null ? '' : (sp.required === null ? th('InboxSpamScore', sp.score.toLocaleString(locale())) : th('InboxSpamScoreOf', sp.score.toLocaleString(locale()), sp.required.toLocaleString(locale())));
+			const why = spamReasons(sp.tests);
+			const text = (sp.spam ? th('InboxSpamJudged') : th('InboxSpamFilter')) + (score ? ' ' + score : '') + (why.length ? '<div class="ibx-muted">' + esc(why.join(' · ')) + '</div>' : '');
+			if (sp.spam && m.folder_role !== 'junk') {
+				banners += '<div class="ibx-banner ibx-banner--warning">' + ic('junk') + '<div class="ibx-banner__text"' + (sp.tests.length ? ' title="' + esc(sp.tests.join(', ')) + '"' : '') + '>' + text + '</div>'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-isjunk">' + ic('junk') + ' ' + th('InboxJunk') + '</button></div>';
+			} else {
+				banners += '<div class="ibx-banner ibx-banner--info">' + ic('junk') + '<div class="ibx-banner__text"' + (sp.tests.length ? ' title="' + esc(sp.tests.join(', ')) + '"' : '') + '>' + text + '</div></div>';
+			}
+		}
 		if (m.unsubscribe && !opts.inline) {
 			// Newsletter (B4): one-click by the server, never the link opened; by mail when the composer comes (W6)
 			const u = m.unsubscribe;
@@ -6012,6 +6046,8 @@
 				+ (files ? '<button type="button" class="ibx-attbar__toggle ibx-js-atttoggle" aria-expanded="' + open + '">' + ic(open ? 'chevron-down' : 'chevron-right') + ic('attachment')
 				+ '<b>' + th('InboxAttachmentsCount', files) + '</b> <span class="ibx-muted">' + esc(size(total)) + '</span>'
 				+ '<span class="ibx-attbar__names ibx-ellipsis ibx-muted">' + esc(att.map(a => a.name).join(', ')) + '</span></button>'
+				// The antivirus: running, then its result (1.45.0), seen even when the attachments are folded
+				+ '<span class="ibx-attbar__scan ibx-js-attscan" role="status"></span>'
 				// Its name hides on a narrow pane: kept as title and accessible name
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-saveall" title="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '" aria-label="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '">'
 				+ ic('download-all') + '<span class="ibx-attbar__savelabel">' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '</span></button>' : '') + '</div>'
@@ -6052,7 +6088,9 @@
 			+ '<button type="button" class="ibx-attachment__open ibx-js-attopen" title="' + esc(a.name) + '">'
 			+ ic(KIND_ICON[a.kind] || 'attachment', 'ibx-attachment__icon' + (a.kind === 'pdf' ? ' ibx-attachment__icon--pdf' : (a.kind === 'image' ? ' ibx-attachment__icon--img' : '')))
 			+ '<span class="ibx-attachment__info"><span class="ibx-ellipsis">' + esc(a.name) + '</span><span class="ibx-attachment__size">' + esc(size(a.size))
-			+ (warn ? ' · <span class="ibx-attachment__warn">' + esc(a.warnings.map(w => t(w)).join(', ')) + '</span>' : '') + '</span></span></button>'
+			+ (warn ? ' · <span class="ibx-attachment__warn">' + esc(a.warnings.map(w => t(w)).join(', ')) + '</span>' : '') + '</span>'
+			// Verdict of the antivirus, asked when the mail opens (1.45.0)
+			+ '<span class="ibx-attachment__verdict"></span></span></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-attdownload" title="' + th('InboxDownload') + '" aria-label="' + th('InboxDownload') + ' ' + esc(a.name) + '">' + ic('download') + '</button></div>';
 	}
 
@@ -6089,6 +6127,10 @@
 		const notJunk = $('.ibx-js-notjunk', pane);
 		if (notJunk) {
 			notJunk.addEventListener('click', () => doJunk([m.id], false));
+		}
+		const isJunk = $('.ibx-js-isjunk', pane);
+		if (isJunk) {
+			isJunk.addEventListener('click', () => doJunk([m.id], true));
 		}
 		// Delivery report <-> mail sent (1.25.0)
 		$$('.ibx-js-bouncego', pane).forEach(b => b.addEventListener('click', () => Dolibarr.executeHook('inbox:mail:goto', { folder: +b.dataset.folder, mail: +b.dataset.mail })));
@@ -6132,10 +6174,44 @@
 					return;
 				}
 				const a = m.attachments[+tileEl.dataset.att];
+				// The verdict asked at the opening: waited for, never a second analysis meanwhile
+				if (m.scan && m.scan.pending) {
+					const ctrl = e.ctrlKey || e.metaKey;
+					const down = !!e.target.closest('.ibx-js-attdownload');
+					m.scan.promise.then(() => {
+						if (down) {
+							guardedDownload(m, a);
+						} else if (ctrl) {
+							openInTab(m, +tileEl.dataset.att);
+						} else {
+							openViewer({ mail: m, index: +tileEl.dataset.att });
+						}
+					});
+					return;
+				}
 				if (e.target.closest('.ibx-js-attdownload')) {
 					guardedDownload(m, a);
+				} else if (e.ctrlKey || e.metaKey) {
+					// Ctrl+click (Cmd on a Mac): in a new tab (1.45.0)
+					openInTab(m, +tileEl.dataset.att);
 				} else {
 					openViewer({ mail: m, index: +tileEl.dataset.att });
+				}
+			});
+			// An infected file is never dragged out (to a piece, the desktop)
+			$('.ibx-attachments', pane).addEventListener('dragstart', e => {
+				if (e.target.closest && e.target.closest('.ibx-attachment.is-infected')) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
+			}, true);
+			scanAttachments(m, pane);
+			// Middle click: in a new tab too
+			$('.ibx-attachments', pane).addEventListener('auxclick', e => {
+				const tileEl = e.button === 1 && !e.target.closest('.ibx-js-attdownload') ? e.target.closest('[data-att]') : null;
+				if (tileEl) {
+					e.preventDefault();
+					openInTab(m, +tileEl.dataset.att);
 				}
 			});
 		}
@@ -6322,6 +6398,138 @@
 		return I.ctx('INBOX_AJAX_URL', '') + 'attachment.php?id=' + m.id + '&part=' + a.part + '&mode=' + mode + (force ? '&force=1' : '');
 	}
 
+	/** Time after which the summary says the analysis is still running */
+	const SCAN_LONG = 5000;
+	/**
+	 * Antivirus of the attachments asked when the mail opens (1.45.0): every tile shows its verdict (virus, risky,
+	 * not scanned), the head of the bar a summary; a click meanwhile waits for it (m.scan.promise).
+	 * An antivirus turned off says nothing per file: the warnings of the name and content stay the only marks.
+	 * @param {object} m Mail
+	 * @param {HTMLElement} pane Reading pane
+	 */
+	function scanAttachments(m, pane) {
+		const box = $('.ibx-attachments', pane);
+		const status = $('.ibx-js-attscan', pane);
+		if (!box || !status || !(m.attachments || []).length) {
+			return;
+		}
+		const tiles = $$('.ibx-attachment', box);
+		const say = (html, cls) => {
+			status.className = 'ibx-attbar__scan ibx-js-attscan' + (cls ? ' ' + cls : '');
+			status.innerHTML = html;
+		};
+		const scanning = on => tiles.forEach(el => {
+			el.classList.toggle('is-scanning', on);
+			const vd = $('.ibx-attachment__verdict', el);
+			if (vd && on) {
+				vd.innerHTML = '<span class="ibx-spinner" aria-hidden="true"></span>' + esc(t('InboxAttScanning'));
+			}
+		});
+		const run = () => {
+			scanning(true);
+			say('<span class="ibx-spinner" aria-hidden="true"></span>' + esc(t('InboxAttScanning')), 'is-running');
+			const long = setTimeout(() => {
+				if (m.scan && m.scan.pending) {
+					say('<span class="ibx-spinner" aria-hidden="true"></span>' + esc(t('InboxAttScanLong')), 'is-running');
+				}
+			}, SCAN_LONG);
+			const scan = { pending: true };
+			m.scan = scan;
+			scan.promise = api('attachment', 'check', { id: m.id, part: -1, mode: 'check' }).then(res => {
+				scan.parts = res.parts || [];
+				markTiles(m, tiles, scan.parts, say);
+			}, () => {
+				scanning(false);
+				tiles.forEach(el => {
+					const vd = $('.ibx-attachment__verdict', el);
+					if (vd) {
+						vd.textContent = '';
+					}
+				});
+				say(esc(t('InboxAttScanFailed')) + ' <button type="button" class="ibx-linkbtn ibx-js-attretry">' + esc(t('InboxAttRetry')) + '</button>', 'is-failed');
+				const retry = $('.ibx-js-attretry', status);
+				if (retry) {
+					retry.addEventListener('click', e => {
+						e.stopPropagation();
+						run();
+					});
+				}
+			}).finally(() => {
+				clearTimeout(long);
+				scan.pending = false;
+			});
+		};
+		// The pane drawn again (same mail): the verdict already known, no second analysis
+		if (m.scan && m.scan.parts) {
+			markTiles(m, tiles, m.scan.parts, say);
+			return;
+		}
+		run();
+	}
+
+	/**
+	 * Marks of the tiles after the analysis, and the summary
+	 * @param {object} m Mail
+	 * @param {HTMLElement[]} tiles Tiles (data-att = index in m.attachments)
+	 * @param {object[]} parts Verdicts {part, state, message, warnings, blocked, warn}
+	 * @param {Function} say Writer of the summary (html, class)
+	 */
+	function markTiles(m, tiles, parts, say) {
+		let infected = 0;
+		let risky = 0;
+		let off = false;
+		tiles.forEach(el => {
+			const a = m.attachments[+el.dataset.att];
+			const v = a ? parts.find(p => +p.part === +a.part) : null;
+			const vd = $('.ibx-attachment__verdict', el);
+			el.classList.remove('is-scanning', 'is-infected', 'is-risky', 'is-unscanned');
+			if (vd) {
+				vd.textContent = '';
+			}
+			if (!v) {
+				return;
+			}
+			a.verdict = v;
+			const warnings = (v.warnings || []).length || (a.warnings || []).length;
+			let label = '';
+			if (v.blocked) {
+				infected++;
+				el.classList.add('is-infected');
+				el.setAttribute('draggable', 'false');
+				label = t('InboxAttVirus');
+			} else if (warnings) {
+				risky++;
+				el.classList.add('is-risky');
+				label = t('InboxAttRiskyTitle');
+			} else if (v.warn) {
+				risky++;
+				el.classList.add('is-unscanned');
+				label = t('InboxAttNotScanned');
+			}
+			if (v.state === 'off') {
+				off = true;
+			}
+			if (vd && label) {
+				vd.innerHTML = ic(v.blocked ? 'virus' : 'virus-off') + esc(label);
+			}
+			const open = $('.ibx-js-attopen', el);
+			if (open) {
+				open.title = a.name + (label ? ' · ' + label + (v.blocked && v.message ? ' (' + v.message + ')' : '') : '');
+			}
+		});
+		const badges = (infected ? '<span class="ibx-attbadge ibx-attbadge--danger">' + ic('virus') + esc(t('InboxAttBadgeVirus', infected)) + '</span>' : '')
+			+ (risky ? '<span class="ibx-attbadge ibx-attbadge--warning">' + ic('virus-off') + esc(t('InboxAttBadgeCheck', risky)) + '</span>' : '');
+		if (badges) {
+			say(badges, 'is-done');
+		} else if (off) {
+			// No antivirus on the server: nothing said, a neutral « not analysed » would be noise on every mail
+			say('', '');
+		} else {
+			say(ic('check') + esc(t('InboxAttNoVirus')), 'is-clean');
+			setTimeout(() => say('', ''), 4000);
+		}
+	}
+
 	/** Antivirus first: infected = never, not scanned = warning and « Download anyway » */
 	async function guardedDownload(m, a) {
 		let v;
@@ -6341,6 +6549,15 @@
 				body: banner('warning', 'virus-off', th(v.state === 'too_big' ? 'InboxAttTooBig' : 'InboxAttUnscanned')),
 				actions: [{ label: t('InboxDownloadAnyway'), primary: true, run: () => download(attUrl(m, a, 'download', true)) }],
 			});
+			return;
+		}
+		// A risky file (double extension, program, PDF with scripts): asked once more before it leaves the mailbox
+		const warnings = (v.warnings && v.warnings.length ? v.warnings : a.warnings) || [];
+		if (warnings.length && !(await I.confirmDialog({
+			title: t('InboxAttRiskyTitle'),
+			text: t('InboxAttRiskyText', a.name) + ' ' + warnings.map(w => t(w)).join(', '),
+			confirm: t('InboxDownloadAnyway'),
+		}))) {
 			return;
 		}
 		download(attUrl(m, a, 'download', false));
@@ -6375,12 +6592,66 @@
 
 	// ---------- Floating preview windows (interface §7) ----------
 	const windows = [];
-	function savedGeometry() {
+	/**
+	 * Size and place of a viewer, kept per kind (1.45.0): « doc » for a PDF or a picture, « other » for a text, a mail;
+	 * a size kept before 1.45.0 (one for all) is the one of the « other »
+	 * @param {string} kind doc or other
+	 * @returns {object} {x, y, w, h}, {} when none
+	 */
+	function savedGeometry(kind) {
+		let all = {};
 		try {
-			return JSON.parse(params.windows || '{}') || {};
+			all = JSON.parse(params.windows || '{}') || {};
 		} catch (e) {
-			return {};
+			all = {};
 		}
+		if (all.w && !all.doc && !all.other) {
+			all = { other: all };
+		}
+		return all[kind] || {};
+	}
+	/** A PDF or a picture: the kind of viewer that wants room */
+	function viewerKind(m, o) {
+		const a = !o.source && m.attachments ? m.attachments[o.index] : null;
+		return a && (a.kind === 'pdf' || a.kind === 'image') ? 'doc' : 'other';
+	}
+	/** Opening of a PDF by the viewer of the browser: the width of the page, no panel of thumbnails when it obeys */
+	const PDF_OPEN = '#view=FitH&zoom=page-width&pagemode=none&navpanes=0';
+	/**
+	 * A PDF or a picture in a new tab (Ctrl+click, middle click, menu, 1.45.0): the antivirus first, as for the preview;
+	 * the tab is opened at once (a tab opened after waiting is blocked by the browser), closed if the file may not be
+	 * shown, the warning then in the viewer. Another kind is downloaded (a browser shows nothing else).
+	 * @param {object} m Mail
+	 * @param {number} index Attachment
+	 */
+	async function openInTab(m, index) {
+		const a = m.attachments[index];
+		if (!a || (a.kind !== 'pdf' && a.kind !== 'image')) {
+			if (a) {
+				guardedDownload(m, a);
+			}
+			return;
+		}
+		const tab = window.open('about:blank', '_blank');
+		if (!tab) {
+			openViewer({ mail: m, index });
+			return;
+		}
+		tab.opener = null;
+		let v;
+		try {
+			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+		} catch (err) {
+			tab.close();
+			toast(err.message, { error: true });
+			return;
+		}
+		if (v.blocked || v.warn) {
+			tab.close();
+			openViewer({ mail: m, index });
+			return;
+		}
+		tab.location.href = attUrl(m, a, 'inline', false) + (a.kind === 'pdf' ? PDF_OPEN : '');
 	}
 
 	/**
@@ -6398,13 +6669,22 @@
 		const dlg = document.createElement('dialog');
 		dlg.className = 'ibx-window';
 		dlg.setAttribute('aria-modal', 'false');
-		const g = savedGeometry();
+		const kind = viewerKind(m, o);
+		const g = savedGeometry(kind);
 		const n = windows.length;
-		dlg.style.width = (g.w || 720) + 'px';
-		dlg.style.height = (g.h || 560) + 'px';
-		dlg.style.left = Math.min(window.innerWidth - 300, (g.x || Math.round(window.innerWidth / 2 - (g.w || 720) / 2)) + n * 24) + 'px';
-		dlg.style.top = Math.min(window.innerHeight - 200, (g.y || 60) + n * 24) + 'px';
-		const w = { key, dlg, mail: m, index: o.index, source: !!o.source };
+		// A PDF or a picture: most of the screen the first time (an A4 page read in its width), else as before
+		const dw = kind === 'doc' ? Math.round(Math.min(1100, window.innerWidth * 0.9)) : 720;
+		const dh = kind === 'doc' ? Math.round(window.innerHeight * 0.9) : 560;
+		const gw = g.w || dw;
+		dlg.style.width = gw + 'px';
+		dlg.style.height = (g.h || dh) + 'px';
+		dlg.style.left = Math.max(0, Math.min(window.innerWidth - 300, (g.x ?? Math.round(window.innerWidth / 2 - gw / 2)) + n * 24)) + 'px';
+		dlg.style.top = Math.max(0, Math.min(window.innerHeight - 200, (g.y ?? (kind === 'doc' ? Math.round(window.innerHeight * 0.05) : 60)) + n * 24)) + 'px';
+		// A small screen: the whole screen at once
+		if (isPhone()) {
+			dlg.classList.add('ibx-window--maximized');
+		}
+		const w = { key, dlg, mail: m, index: o.index, source: !!o.source, kind };
 		windows.push(w);
 		document.body.appendChild(dlg);
 		dlg.show();
@@ -6484,7 +6764,7 @@
 		const force = !!w.forced;
 		const top = warnings ? '<div class="ibx-viewer__pad">' + warnings + '</div>' : '';
 		if (a.kind === 'pdf') {
-			body.innerHTML = top + '<iframe class="ibx-viewer__frame" title="' + esc(a.name) + '" src="' + attUrl(m, a, 'inline', force) + '"></iframe>';
+			body.innerHTML = top + '<iframe class="ibx-viewer__frame" title="' + esc(a.name) + '" src="' + attUrl(m, a, 'inline', force) + PDF_OPEN + '"></iframe>';
 		} else if (a.kind === 'image') {
 			body.innerHTML = top + '<div class="ibx-viewer__canvas"><img class="ibx-viewer__img" alt="' + esc(a.name) + '" src="' + attUrl(m, a, 'inline', force) + '"></div>';
 			const img = $('img', body);
@@ -6618,7 +6898,10 @@
 			return;
 		}
 		const r = w.dlg.getBoundingClientRect();
-		saveParam('windows', JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) }));
+		// Kept per kind (1.45.0): a PDF made big does not make every text window big
+		const all = { doc: savedGeometry('doc'), other: savedGeometry('other') };
+		all[w.kind || 'other'] = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+		saveParam('windows', JSON.stringify(all));
 	}
 	function bindWindow(w) {
 		const dlg = w.dlg;
@@ -7118,8 +7401,9 @@
 		const pieces = box && box._data ? box._data.links.filter(l => l.readable) : [];
 		menu(el, [
 			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
+		].concat(a.kind === 'pdf' || a.kind === 'image' ? [{ icon: 'external', label: t('InboxOpenNewTab'), key: 'Ctrl+clic', run: () => openInTab(m, index) }] : [], [
 			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
-		].concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
+		]).concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
 			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }]) : [], [HINT()]), at || rectPoint(el));
 	}
 

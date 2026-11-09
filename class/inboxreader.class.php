@@ -210,6 +210,8 @@ class InboxReader
 			'report' => $bounce->view($raw, $readable),
 			'bounces' => $bounce->forMail($message->messageId, $readable),
 			'sender_check' => $this->senderCheck($raw),
+			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
+			'spam' => self::spamVerdict($headers),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
@@ -616,6 +618,60 @@ class InboxReader
 		$out['fail'] = $out['dmarc'] === 'fail' || ($out['dkim'] === 'fail' && in_array($out['spf'], array('fail', 'softfail'), true));
 
 		return $out;
+	}
+
+	/**
+	 * Verdict of the anti-spam filter of the receiving server (1.44.0): SpamAssassin (X-Spam-Status, X-Spam-Flag,
+	 * X-Spam-Score) or Rspamd (X-Spamd-Result, X-Rspamd-Score, X-Spam). The topmost header of each name only: the one
+	 * of our server, added last; a lower one may come from the sender (a « No » written in advance).
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers, in their order
+	 * @return array{engine:string,spam:bool,score:float|null,required:float|null,tests:string[]}|null Null when no filter
+	 */
+	public static function spamVerdict(array $headers)
+	{
+		$top = array();
+		foreach ($headers as $h) {
+			$name = strtolower((string) $h[0]);
+			if (!isset($top[$name])) {
+				$top[$name] = trim((string) $h[1]);
+			}
+		}
+		$num = function ($v) {
+			return is_numeric($v) ? round((float) $v, 1) : null;
+		};
+		if (isset($top['x-spam-status'])) {
+			// Yes, score=7.4 required=5.0 tests=BAYES_99,URIBL_BLACK autolearn=no version=3.4.6
+			$v = $top['x-spam-status'];
+			$tests = preg_match('/\btests=([A-Z0-9_,\s]+?)(?:\s+\w+=|$)/i', $v, $m) ? preg_split('/[\s,]+/', trim($m[1]), -1, PREG_SPLIT_NO_EMPTY) : array();
+			return array(
+				'engine' => 'spamassassin',
+				'spam' => (bool) preg_match('/^yes\b/i', $v) || (isset($top['x-spam-flag']) && strtoupper($top['x-spam-flag']) === 'YES'),
+				'score' => preg_match('/\bscore=(-?[\d.]+)/i', $v, $m) ? $num($m[1]) : (isset($top['x-spam-score']) ? $num($top['x-spam-score']) : null),
+				'required' => preg_match('/\brequired=(-?[\d.]+)/i', $v, $m) ? $num($m[1]) : null,
+				'tests' => array_slice(array_values(array_filter($tests, function ($t) {
+					return preg_match('/^[A-Z0-9_]{2,40}$/i', $t);
+				})), 0, 40),
+			);
+		}
+		if (isset($top['x-spamd-result']) || isset($top['x-rspamd-score'])) {
+			// default: False [3.10 / 15.00]; BAYES_HAM(-3.00)[99.99%]; R_SPF_ALLOW(-0.20)[+ip4:1.2.3.4]...
+			$v = $top['x-spamd-result'] ?? '';
+			$score = preg_match('/\[\s*(-?[\d.]+)\s*\/\s*(-?[\d.]+)\s*\]/', $v, $m) ? array($num($m[1]), $num($m[2])) : array(isset($top['x-rspamd-score']) ? $num($top['x-rspamd-score']) : null, null);
+			preg_match_all('/;\s*([A-Z0-9_]{2,40})\(/', $v, $tm);
+			return array(
+				'engine' => 'rspamd',
+				'spam' => (bool) preg_match('/:\s*true\b/i', $v) || (isset($top['x-spam']) && strtolower($top['x-spam']) === 'yes'),
+				'score' => $score[0],
+				'required' => $score[1],
+				'tests' => array_slice($tm[1], 0, 40),
+			);
+		}
+		if (isset($top['x-spam-flag'])) {
+			return array('engine' => 'spamassassin', 'spam' => strtoupper($top['x-spam-flag']) === 'YES', 'score' => isset($top['x-spam-score']) ? $num($top['x-spam-score']) : null, 'required' => null, 'tests' => array());
+		}
+
+		return null;
 	}
 
 	/**
