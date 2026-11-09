@@ -2180,3 +2180,4 @@ InboxCitedUnknownSoc = Tiers de l'expéditeur inconnu : à vérifier
 InboxCitedTheirRef = sa réf. %s
 InboxPiecesOfSender = Pièces de l'expéditeur
 InboxCitedOtherGroup = Citées, d'un autre tiers
+InboxPanelLoading = Chargement…

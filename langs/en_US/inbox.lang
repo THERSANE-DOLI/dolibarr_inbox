@@ -2180,3 +2180,4 @@ InboxCitedUnknownSoc = Thirdparty of the sender not known: to check
 InboxCitedTheirRef = their ref. %s
 InboxPiecesOfSender = Pieces of the sender
 InboxCitedOtherGroup = Cited, of another thirdparty
+InboxPanelLoading = Loading…
