@@ -2054,3 +2054,19 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-vviewform__edit { display: flex; flex-wrap: wrap; gap: var(--ibx-s3); margin-top: var(--ibx-s2); }
 .ibx-vviewform__boxes + .ibx-vviewform__edit, div > .ibx-vviewform__edit:first-child { margin-top: 0; }
 
+
+/* Mailboxes turned on or off from the list (Settings > Mailboxes): a box per line, the bar of the selection */
+.ibx-table .ibx-col-pick { width: 2.75rem; padding: 0; }
+.ibx-pickcell { display: flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; cursor: pointer; }
+.ibx-table tbody tr.is-picked, .ibx-table tbody tr.is-picked:hover { background: var(--ibx-accent-softer); }
+.ibx-acctbar { position: sticky; top: 0; z-index: 2; margin: 0 0 var(--ibx-s2); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-acctbar__skip { margin-left: var(--ibx-s2); font-weight: 400; }
+.ibx-acctready { align-items: center; }
+.ibx-acctready .ibx-notice__text { flex: 1; }
+
+/* My account > Order of my mailboxes: a list moved by its handles or its arrows */
+.ibx-boxorder { list-style: none; margin: 0 0 var(--ibx-s3); padding: 0; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-boxorder__item { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); border-bottom: 1px solid var(--ibx-border); background: var(--ibx-bg); }
+.ibx-boxorder__item:last-child { border-bottom: 0; }
+.ibx-boxorder__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ibx-boxorder .ibx-draghandle { display: inline-flex; padding: var(--ibx-s1); }

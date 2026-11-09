@@ -170,7 +170,7 @@ class InboxAccess
 	}
 
 	/**
-	 * Mailboxes the user can use with at least a level, ordered by label
+	 * Mailboxes the user can use with at least a level, in the order he chose (My account), the others by label
 	 *
 	 * @param User   $user     User
 	 * @param string $minLevel Level needed
@@ -189,8 +189,18 @@ class InboxAccess
 				$out[$id] = $account;
 			}
 		}
-		uasort($out, function ($a, $b) {
-			return strcasecmp((string) $a->label, (string) $b->label);
+		$pos = array();
+		if ($user instanceof User && $out) {
+			require_once __DIR__.'/inboxuserparam.class.php';
+			$order = json_decode((string) (new InboxUserParam($this->db))->get($user, 'accounts_order'), true);
+			$pos = array_flip(array_map('intval', is_array($order) ? $order : array()));
+		}
+		// Those he placed first, in his order; a mailbox given later goes after them, by label
+		uasort($out, function ($a, $b) use ($pos) {
+			$pa = $pos[(int) $a->id] ?? PHP_INT_MAX;
+			$pb = $pos[(int) $b->id] ?? PHP_INT_MAX;
+
+			return $pa !== $pb ? ($pa < $pb ? -1 : 1) : strcasecmp((string) $a->label, (string) $b->label);
 		});
 
 		return $out;

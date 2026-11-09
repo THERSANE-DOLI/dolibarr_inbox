@@ -243,6 +243,17 @@
 		return S.folders.get(S.folderId) || null;
 	}
 
+	/** My mailboxes in the order chosen in My account (as the server gives them), the others after by name */
+	function orderAccounts() {
+		let order = [];
+		try {
+			order = JSON.parse(params.accounts_order || '[]').map(Number);
+		} catch (e) {
+			order = [];
+		}
+		const at = a => (order.includes(a.id) ? order.indexOf(a.id) : Infinity);
+		(S.accounts || []).sort((a, b) => (at(a) - at(b)) || String(a.label || a.email).localeCompare(String(b.label || b.email)));
+	}
 	async function loadTree() {
 		// The virtual views with the tree (never blocking it)
 		api('view', 'list').then(r => {
@@ -7074,6 +7085,7 @@
 	}
 	Dolibarr.on('inbox:params:changed', p => {
 		Object.assign(params, p || {});
+		orderAccounts();
 		adaptTags();
 		if (S.el) {
 			renderTree();
