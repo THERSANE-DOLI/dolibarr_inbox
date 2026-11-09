@@ -310,6 +310,7 @@ class InboxImapConnector extends InboxConnector
 				'flags' => $flags,
 			);
 		}
+		self::uniqueRoles($out, $roles);
 		self::addLabels($out);
 		usort($out, function ($a, $b) {
 			if (strtoupper($a['path']) === 'INBOX') {
@@ -356,6 +357,49 @@ class InboxImapConnector extends InboxConnector
 				$label = implode(' / ', explode($f['delimiter'], $label));
 			}
 			$folders[$i]['label'] = $label;
+		}
+	}
+
+	/**
+	 * One folder per role. Several folders may claim one (Spam marked \Junk by the server and Junk created by a mail
+	 * software, Trash and Corbeille): the one chosen by the administrator keeps it, else the one marked by the server,
+	 * else the usual name (English first); the others become ordinary folders, with « twin » = the role they looked
+	 * like (shown as duplicates in the tab Folders of the mailbox)
+	 *
+	 * @param array<int,array<string,mixed>> $folders Folders (path, role, flags), changed in place
+	 * @param array<string,string>           $chosen  Roles chosen by the administrator: role => path
+	 * @return void
+	 */
+	public static function uniqueRoles(array &$folders, array $chosen = array())
+	{
+		$first = array('sent' => 'sent', 'drafts' => 'drafts', 'trash' => 'trash', 'junk' => 'junk', 'archive' => 'archive');
+		foreach ($first as $role => $usual) {
+			$keys = array();
+			foreach ($folders as $k => $f) {
+				if ((string) $f['role'] === $role) {
+					$keys[] = $k;
+				}
+			}
+			if (count($keys) < 2) {
+				continue;
+			}
+			$score = function ($f) use ($role, $usual, $chosen) {
+				$name = strtolower((string) preg_replace('/^.*[.\/]/', '', self::decodeFolderName((string) $f['path'])));
+				if (isset($chosen[$role]) && $chosen[$role] === (string) $f['path']) {
+					return 0;
+				}
+				if (in_array('\\'.$role, (array) $f['flags'], true)) {
+					return 1;
+				}
+				return $name === $usual ? 2 : ($role === 'junk' && $name === 'spam' ? 3 : 4);
+			};
+			usort($keys, function ($a, $b) use ($folders, $score) {
+				return ($score($folders[$a]) <=> $score($folders[$b])) ?: strcmp((string) $folders[$a]['path'], (string) $folders[$b]['path']);
+			});
+			foreach (array_slice($keys, 1) as $k) {
+				$folders[$k]['role'] = '';
+				$folders[$k]['twin'] = $role;
+			}
 		}
 	}
 
@@ -878,6 +922,64 @@ class InboxImapConnector extends InboxConnector
 		}
 
 		return $map;
+	}
+
+	/**
+	 * Every mail of a folder moved into another one (a duplicate of a special folder merged into the folder of its
+	 * role, 1.38.0); checked: nothing left in the source
+	 *
+	 * @param string $folder Source
+	 * @param string $target Target
+	 * @return int|null Mails moved, null on error
+	 */
+	public function moveAll($folder, $target)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !self::isSafeFolderPath($target) || $folder === $target) {
+			$this->error = 'Invalid move';
+			return null;
+		}
+		if (!$this->connect() || !$this->selectForWrite($folder, 0)) {
+			return null;
+		}
+		try {
+			$conn = $this->client->getConnection();
+			$caps = $this->serverCapabilities;
+			$uids = array_map('intval', $this->searchUids(array('ALL')));
+			foreach (array_chunk($uids, 500) as $chunk) {
+				$set = implode(',', $chunk);
+				if (in_array('MOVE', $caps, true)) {
+					$res = $conn->requestAndResponse('UID MOVE', array($set, $conn->escapeString($target)));
+				} else {
+					if (!in_array('UIDPLUS', $caps, true)) {
+						// Without UID EXPUNGE, EXPUNGE would remove every mail marked \Deleted by another client
+						$this->error = 'The server knows neither MOVE nor UIDPLUS: mails not moved';
+						return null;
+					}
+					$res = $conn->requestAndResponse('UID COPY', array($set, $conn->escapeString($target)));
+					if (is_array($res)) {
+						$conn->requestAndResponse('UID STORE', array($set, '+FLAGS.SILENT', '(\\Deleted)'));
+						$conn->requestAndResponse('UID EXPUNGE', array($set));
+					}
+				}
+				if (!is_array($res)) {
+					$this->error = 'The server refused the move';
+					return null;
+				}
+			}
+			$left = $uids ? $this->presentUids($uids) : array();
+			if ($left) {
+				$this->error = count($left).' mail(s) still in the source folder after the move';
+				return null;
+			}
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			return null;
+		} finally {
+			$this->readOnly($folder);
+		}
+
+		return count($uids);
 	}
 
 	/**

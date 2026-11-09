@@ -2070,3 +2070,10 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-boxorder__item:last-child { border-bottom: 0; }
 .ibx-boxorder__name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ibx-boxorder .ibx-draghandle { display: inline-flex; padding: var(--ibx-s1); }
+
+/* Tab Folders of a mailbox: duplicates of a special folder */
+.ibx-twins__title { display: flex; align-items: center; gap: var(--ibx-s1); margin-top: var(--ibx-s5); }
+.ibx-twins__actions { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); justify-content: flex-end; }
+
+/* A closed folder: the unread of its subfolders, apart from its own (outline only) */
+.ibx-count--below { color: var(--ibx-accent); background: transparent; box-shadow: inset 0 0 0 1px var(--ibx-accent); }

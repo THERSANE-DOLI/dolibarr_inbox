@@ -333,4 +333,32 @@ class InboxSyncTest extends InboxTestCase
 		};
 		$this->assertNull(InboxImapResponse::read($no, 'TAG4'));
 	}
+
+	/**
+	 * One folder per role (1.38.0): the choice of the administrator, else the mark of the server, else the usual name;
+	 * the others ordinary, told as duplicates
+	 *
+	 * @return void
+	 */
+	public function testUniqueRoles()
+	{
+		$f = function ($path, $flags = array()) {
+			return array('path' => $path, 'role' => InboxImapConnector::guessRole($path, $flags), 'flags' => $flags);
+		};
+		$list = array($f('INBOX.Junk'), $f('INBOX.Spam', array('\\junk')), $f('INBOX.Corbeille'), $f('INBOX.Trash'), $f('INBOX.Drafts'));
+		InboxImapConnector::uniqueRoles($list);
+		$roles = array_column($list, 'role', 'path');
+		$this->assertSame('junk', $roles['INBOX.Spam'], 'the mark of the server first');
+		$this->assertSame('', $roles['INBOX.Junk']);
+		$this->assertSame('junk', $list[0]['twin']);
+		$this->assertSame('trash', $roles['INBOX.Trash'], 'the usual name');
+		$this->assertSame('', $roles['INBOX.Corbeille']);
+		$this->assertSame('drafts', $roles['INBOX.Drafts'], 'one folder: nothing changes');
+		$this->assertArrayNotHasKey('twin', $list[4]);
+
+		// The choice of the administrator before the mark of the server
+		$list = array($f('INBOX.Junk'), $f('INBOX.Spam', array('\\junk')));
+		InboxImapConnector::uniqueRoles($list, array('junk' => 'INBOX.Junk'));
+		$this->assertSame(array('INBOX.Junk' => 'junk', 'INBOX.Spam' => ''), array_column($list, 'role', 'path'));
+	}
 }

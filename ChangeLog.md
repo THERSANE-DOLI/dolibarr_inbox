@@ -1,5 +1,21 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the panel of the folders follows the order of my mailboxes chosen in My account :   1.39.1
+  - without an order chosen: my personal mailbox first, then by name, as before.
+
+- NEW: folders with subfolders closed in the panel until opened :   1.39.0
+  - those opened are kept; the mailbox and the parents of the folder opened unfold by themselves.
+  - a closed folder tells the unread of its subfolders apart from its own (« +12 »): nothing hidden.
+  - the filter of the folders opens what matches; a mail dragged over a closed folder opens it for a moment.
+
+- NEW: one folder per role, duplicates of a special folder handled in the tab Folders of a mailbox :   1.38.0
+  - several folders claiming a role (Spam marked by the server and Junk created by a mail software, Trash and
+    Corbeille): the one chosen by the administrator keeps it, else the one marked by the server, else the usual
+    name; the others are ordinary folders, with their mails.
+  - each duplicate shown with its number of mails: keep as an ordinary folder, make it the main folder, or merge
+    into the main folder (mails moved on the server, checked, then the empty folder removed; confirmed, journal).
+  - a reminder to set the mail software too, or the folder comes back.
+
 - NEW: My account, order of my mailboxes :   1.37.0
   - each one moved by its handle or by the arrows (keyboard, phone), kept at once; back to the order by name in one
     click.
