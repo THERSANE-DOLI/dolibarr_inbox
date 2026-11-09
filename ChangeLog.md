@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: trash and junk emptied automatically after some days, per mailbox :   1.41.0
+  - tab Folders of a mailbox: never (default), 7, 30, 60 or 90 days, for the trash and for the junk; turned on or
+    shortened only after a confirmation (removal for good, for every user of the mailbox).
+  - each night the mails there for longer are removed from the server, by batches, checked, written in the journal;
+    the age counts from their arrival in the folder (new column of the index), never from their reception; nothing
+    goes before the delay has passed since it was set; the mails followed (star) stay.
+  - the list of the trash says it (« removed for good after 30 days »).
+  - the column comes with the update SQL: until the module is enabled again, the indexing goes on as before.
+
 - FIX: the folder marked by the server keeps its role over a folder only found by an older test :   1.40.1
   - the roles chosen by hand in the tab Folders are kept apart from those found by the test of the mailbox; only
     the first ones come before the mark of the server; the form keeps as chosen only what is changed.

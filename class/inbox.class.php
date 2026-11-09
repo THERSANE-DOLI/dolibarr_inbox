@@ -520,6 +520,13 @@ class Inbox
 		// Writings left open (lot W6): their temporary folder
 		require_once __DIR__.'/inboxcomposer.class.php';
 		InboxComposer::purge();
+		// Trash and junk of the mailboxes emptied after their delay (1.41.0): removed for good on the server
+		global $user;
+		if ($user instanceof User && (int) $user->id > 0) {
+			require_once __DIR__.'/inboxretention.class.php';
+			$retention = new InboxRetention($this->db);
+			$retention->run($user);
+		}
 
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)

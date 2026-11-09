@@ -29,6 +29,7 @@ dol_include_once('/inbox/class/inboxtag.class.php');
 dol_include_once('/inbox/class/inboxnewmarks.class.php');
 dol_include_once('/inbox/class/inboxlook.class.php');
 dol_include_once('/inbox/class/inboxuserparam.class.php');
+dol_include_once('/inbox/class/inboxretention.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('look', 'lookreset'), true));
@@ -141,6 +142,10 @@ switch ($action) {
 			$folderTree = inboxFolderTree((int) $account->id);
 			foreach ($folderTree as $k => $f) {
 				$folderTree[$k]['new'] = $news[$f['id']] ?? 0;
+				// Trash and junk emptied after some days (1.41.0): told on the list of the folder
+				if (in_array($f['role'], array('trash', 'junk'), true)) {
+					$folderTree[$k]['purge'] = InboxRetention::daysOf($account, $f['role']);
+				}
 			}
 			$list[] = array(
 				'id' => (int) $account->id,
