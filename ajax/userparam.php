@@ -1,0 +1,77 @@
+<?php
+/* Copyright (C) 2026 THERSANE www.thersane.fr
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \file    inbox/ajax/userparam.php
+ * \ingroup inbox
+ * \brief   Settings of the current user (Settings > My account), for all the mailboxes or for one the user can read
+ */
+
+require __DIR__.'/inbox_ajax.inc.php';
+dol_include_once('/inbox/class/inboxuserparam.class.php');
+dol_include_once('/inbox/class/inboxdictation.class.php');
+
+$action = (string) inboxAjaxParam('action', 'aZ09');
+inboxAjaxStart(in_array($action, array('set', 'remove'), true));
+$params = new InboxUserParam($db);
+$accountId = (int) inboxAjaxParam('id', 'int');
+if ($accountId > 0) {
+	$access = new InboxAccess($db);
+	if (!$access->check($user, $accountId, InboxAccess::LEVEL_READ)) {
+		inboxAjaxNotFound();
+	}
+}
+
+switch ($action) {
+	case 'get':
+		dol_include_once('/inbox/class/inboxtag.class.php');
+		$mailboxes = array();
+		$access = new InboxAccess($db);
+		$tagHelper = new InboxTag($db);
+		foreach ($access->getAccounts($user) as $account) {
+			$mailboxes[] = array('id' => (int) $account->id, 'email' => $account->email, 'label' => $account->label, 'params' => $params->getAll($user, (int) $account->id),
+				// Settings > Notifications: a personal mailbox of the user tells its new mails by default
+				'personal' => $account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner === (int) $user->id,
+				// Active tags, to tell the user which ones show another colour for his vision
+				'tags' => array_map(function ($t) {
+					return array('label' => $t['label'], 'color' => $t['color']);
+				}, $tagHelper->listForAccount($account, true)));
+		}
+		inboxAjaxReply(array('params' => $params->getAll($user), 'mailboxes' => $mailboxes));
+		// no break
+
+	case 'set':
+	case 'remove':
+		// The presence is written by the call of state of the Mail space only (audit INBX-028)
+		// The consents of the voice typing go through ajax/dictation.php (journal), the count of the pieces of voice
+		// sent to the transcription server is kept by it: never set nor removed here (audit INBX-033, INBX-044)
+		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', InboxDictation::PARAM, InboxDictation::USAGE), true)) {
+			inboxAjaxError('Unknown param', 400);
+		}
+		if ($action === 'remove') {
+			$params->remove($user, (string) inboxAjaxParam('param', 'aZ09'), $accountId);
+			inboxAjaxReply(array('params' => $params->getAll($user, $accountId)));
+		}
+		if ($params->set($user, (string) inboxAjaxParam('param', 'aZ09'), (string) inboxAjaxParam('value', 'none'), $accountId) < 0) {
+			inboxAjaxError($langs->transnoentities($params->error), 422);
+		}
+		inboxAjaxReply(array('params' => $params->getAll($user, $accountId)));
+		// no break
+
+	default:
+		inboxAjaxError('Unknown action', 400);
+}

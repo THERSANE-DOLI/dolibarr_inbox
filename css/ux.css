@@ -1,0 +1,32 @@
+/* Copyright (C) 2026 THERSANE www.thersane.fr - GPLv3. Layout of the catalogue only (ibx-doc-*): the components come from inbox.css */
+
+/* Catalogue layout only (ibx-doc-*), components come from inbox.css */
+body { margin: 0; }
+.ibx-doc { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.ibx-doc-side { position: sticky; top: 0; height: 100vh; overflow: auto; padding: var(--ibx-s4); background: var(--ibx-bg-pane); border-right: 1px solid var(--ibx-border); }
+.ibx-doc-side h1 { font-size: var(--ibx-fs-lg); margin: 0 0 var(--ibx-s4); }
+.ibx-doc-side h2 { font-size: var(--ibx-fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--ibx-text-faint); margin: var(--ibx-s4) 0 var(--ibx-s1); }
+.ibx-doc-side a { display: block; padding: 3px var(--ibx-s2); color: var(--ibx-text); text-decoration: none; border-radius: var(--ibx-radius); }
+.ibx-doc-side a:hover { background: var(--ibx-bg-hover); }
+.ibx-doc-main { padding: var(--ibx-s5) var(--ibx-s6) 80px; max-width: 1100px; }
+.ibx-doc-section { margin-bottom: 56px; scroll-margin-top: 16px; }
+.ibx-doc-section > h2 { font-size: var(--ibx-fs-xl); margin: 0 0 var(--ibx-s2); }
+.ibx-doc-section > h3 { font-size: var(--ibx-fs-body); margin: var(--ibx-s5) 0 var(--ibx-s2); }
+.ibx-doc-section p, .ibx-doc-section li { font-size: var(--ibx-fs-body); max-width: 75ch; }
+.ibx-doc-example { display: flex; flex-wrap: wrap; gap: var(--ibx-s3); align-items: center; padding: var(--ibx-s4); background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius) var(--ibx-radius) 0 0; }
+.ibx-doc-example--block { display: block; }
+.ibx-doc-code { margin: 0 0 var(--ibx-s3); padding: var(--ibx-s3); font: 12px/1.5 var(--ibx-font-mono); color: var(--ibx-text); background: var(--ibx-bg-sunken); border: 1px solid var(--ibx-border); border-top: 0; border-radius: 0 0 var(--ibx-radius) var(--ibx-radius); overflow: auto; white-space: pre; }
+.ibx-doc-rules { padding: var(--ibx-s3) var(--ibx-s4); background: var(--ibx-accent-softer); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius); }
+.ibx-doc-rules ul { margin: 0; padding-left: 18px; }
+.ibx-doc-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--ibx-s2); }
+.ibx-doc-swatch { border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); overflow: hidden; font-size: var(--ibx-fs-sm); }
+.ibx-doc-swatch > span { display: block; height: 44px; }
+.ibx-doc-swatch > code { display: block; padding: 4px 6px; }
+.ibx-doc-table { border-collapse: collapse; font-size: var(--ibx-fs-md); }
+.ibx-doc-table td, .ibx-doc-table th { border: 1px solid var(--ibx-border); padding: 4px 10px; text-align: left; }
+.ibx-doc-themebar { display: flex; gap: 6px; margin-bottom: var(--ibx-s4); }
+.ibx-doc-iconsheet { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--ibx-s2); }
+.ibx-doc-iconcell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--ibx-s3) var(--ibx-s1); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); text-align: center; }
+.ibx-doc-iconcell .ibx-icon { width: 24px; height: 24px; }
+.ibx-doc-iconcell code { font-size: var(--ibx-fs-xs); }
+.ibx-doc-iconcell span { font-size: 10px; color: var(--ibx-text-faint); }
