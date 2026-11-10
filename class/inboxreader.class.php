@@ -219,7 +219,8 @@ class InboxReader
 			'trusted' => $trusted->senderVerdict($message->fromEmail, (string) $message->replyToEmail, $auth, $passed),
 			'link_hosts' => (object) $links['hosts'],
 			// The user may recognize domains: the domain of the sender when proven, the domains of the links
-			'trust_offer' => $canTrust ? array('sender' => $passed ? self::trustableSender($trusted, $message->fromEmail) : null, 'links' => $links['domains']) : null,
+			'trust_offer' => $canTrust ? array('sender' => $passed ? self::trustableSender($trusted, $message->fromEmail) : null,
+				'sender_why' => self::untrustableSenderWhy($trusted, $message->fromEmail, $passed), 'links' => $links['domains']) : null,
 			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
 			'spam' => self::spamVerdict($headers),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
@@ -254,6 +255,31 @@ class InboxReader
 
 		return array('domain' => $host, 'parent' => ($parent !== $host && InboxTrustedDomain::refusal($parent, $own) === '') ? $parent : '',
 			'like' => InboxTrustedDomain::likeOf($host, $trusted->fetchAll(), $own));
+	}
+
+	/**
+	 * Why the domain of the sender is not offered in « Recognize this domain… », said in the dialog
+	 *
+	 * @param InboxTrustedDomain $trusted   Helper
+	 * @param string             $fromEmail Address of the sender
+	 * @param bool               $passed    Sender proven
+	 * @return string Key of translation, '' when it is offered or already recognized
+	 */
+	protected static function untrustableSenderWhy(InboxTrustedDomain $trusted, $fromEmail, $passed)
+	{
+		$host = InboxTrustedDomain::normalize((string) $fromEmail);
+		if ($host === '' || $trusted->find($host)) {
+			return '';
+		}
+		$why = InboxTrustedDomain::refusal($host, $trusted->ownDomains());
+		if ($why === 'InboxTrustedErrorOwnDomain') {
+			return 'InboxTrustDialogSenderOwn';
+		}
+		if ($why !== '') {
+			return 'InboxTrustDialogSenderOpen';
+		}
+
+		return $passed ? '' : 'InboxTrustDialogSenderUnproven';
 	}
 
 	/**

@@ -58,6 +58,12 @@ class InboxTrustedDomain
 		'wetransfer.com', 'we.tl', 'github.io', 'gitlab.io', 'netlify.app', 'vercel.app', 'pages.dev', 'workers.dev', 'herokuapp.com',
 		'wordpress.com', 'blogspot.com', 'wixsite.com', 'weebly.com', 'jimdosite.com', 'webflow.io', 'squarespace.com', 'notion.site',
 		'typeform.com', 'jotform.com', 'canva.site', 'ipfs.io',
+		// Social networks and public platforms: anyone has a page there (the links of a signature, never an organisation)
+		'facebook.com', 'fb.com', 'fb.me', 'messenger.com', 'instagram.com', 'linkedin.com', 'twitter.com', 'x.com', 'youtube.com',
+		'youtu.be', 'tiktok.com', 'pinterest.com', 'pinterest.fr', 'snapchat.com', 'threads.net', 'bsky.app', 'mastodon.social',
+		'reddit.com', 'medium.com', 'substack.com', 'tumblr.com', 'vimeo.com', 'dailymotion.com', 'twitch.tv', 'discord.com',
+		'discord.gg', 'whatsapp.com', 'wa.me', 't.me', 'telegram.org', 'google.com', 'g.page', 'maps.app.goo.gl',
+		'calendly.com', 'linktr.ee', 'viadeo.com', 'xing.com',
 		// Shorteners
 		'bit.ly', 'bitly.com', 'tinyurl.com', 't.co', 'lnkd.in', 'goo.gl', 'ow.ly', 'buff.ly', 'is.gd', 'cutt.ly', 'rebrand.ly', 'shorturl.at', 'tiny.cc',
 	);

@@ -82,6 +82,9 @@ class InboxTrustedDomainTest extends InboxTestCase
 		$this->assertSame('InboxTrustedErrorPublicSuffix', InboxTrustedDomain::refusal('gouv.fr'));
 		$this->assertSame('InboxTrustedErrorOpenService', InboxTrustedDomain::refusal('gmail.com'));
 		$this->assertSame('InboxTrustedErrorOpenService', InboxTrustedDomain::refusal('r.sendibm1.com'));
+		// Social networks (1.59.1): the links of a signature, never an organisation
+		$this->assertSame('InboxTrustedErrorOpenService', InboxTrustedDomain::refusal('facebook.com'));
+		$this->assertSame('InboxTrustedErrorOpenService', InboxTrustedDomain::refusal('fr.linkedin.com'));
 		// Shared platform of the private section of the list
 		$this->assertSame('InboxTrustedErrorOpenService', InboxTrustedDomain::refusal('someone.github.io'));
 		$this->assertSame('InboxTrustedErrorOwnDomain', InboxTrustedDomain::refusal('mail.exemple.fr', array('exemple.fr')));
@@ -179,7 +182,7 @@ class InboxTrustedDomainTest extends InboxTestCase
 
 		// Links: recognized and lookalikes, the text of a link counts as a host too
 		$html = '<p><a href="https://suivi.colissimo-zztest.info/x">www.colissimo-zztest.info</a> <a href="http://colissimo-zztest.com/login">Suivre</a>'
-			.' <a href="https://exemple.com/a">exemple.com</a> <a href="mailto:a@b.fr">mail</a></p>';
+			.' <a href="https://exemple.com/a">exemple.com</a> <a href="mailto:a@b.fr">mail</a> <a href="https://www.facebook.com/x">f</a></p>';
 		$v = $t->linkVerdicts($html, '', true);
 		$this->assertSame('trusted', $v['hosts']['suivi.colissimo-zztest.info']['t']);
 		$this->assertSame('trusted', $v['hosts']['colissimo-zztest.info']['t']);
@@ -190,6 +193,7 @@ class InboxTrustedDomainTest extends InboxTestCase
 		// Offered in the dialog « Recognize this domain… », a lookalike says what it looks like
 		$offer = array_column($v['domains'], 'like', 'domain');
 		$this->assertNull($offer['exemple.com']);
+		$this->assertArrayNotHasKey('facebook.com', $offer);
 		$this->assertSame('colissimo-zztest.info', $offer['colissimo-zztest.com']['domain']);
 
 		$this->assertSame(1, $t->update($this->admin, $id, 'colissimo-zztest.info', 'ZzTrusted La Poste', 0, ''));

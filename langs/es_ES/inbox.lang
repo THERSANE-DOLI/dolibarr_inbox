@@ -2305,4 +2305,7 @@ InboxTrustDialogLinksHelp = Marque un dominio de los enlaces solo si pertenece a
 InboxTrustDialogButton = Reconocer
 InboxTrustDialogNone = Marque al menos un dominio.
 InboxTrustDialogLookalike = Se parece a %s (%s): compruébelo dos veces antes de reconocerlo.
+InboxTrustDialogSenderOwn = %s es el dominio de sus buzones: inbox ya lo conoce, nunca se añade a esta lista.
+InboxTrustDialogSenderOpen = %s es un servicio abierto a todos (correo, emailing, alojamiento): no se puede reconocer.
+InboxTrustDialogSenderUnproven = %s no se propone: este correo no está autenticado para este dominio (DMARC o DKIM). Añádalo en Ajustes > Dominios reconocidos tras comprobarlo.
 InboxTrustDialogDone = Reconocido: %s
