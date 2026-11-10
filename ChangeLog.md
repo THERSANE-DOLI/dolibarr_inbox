@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: bank details in a mail, a lesson rather than a verdict (lot A6) :   1.75.0
+  - a mail that talks of bank details (an IBAN with a right key, words of a change in 5 languages, an attachment
+    named RIB / IBAN) gets a banner above its body: red when the sender is not authenticated or imitates a known one,
+    orange otherwise, never green. An IBAN of the card at the foot of an invoice says nothing.
+  - « Call with the numbers of your Dolibarr card »: the phones of the contact and of the thirdparty (click to call),
+    never the ones of the mail; without a card, where to find a safe number.
+  - what inbox noticed, each signal said as a doubt and not a proof: authentication (which proves the domain only),
+    imitation, IBAN of the mail against the ones of the card (shown masked), a number of the mail not on the cards,
+    first mail of the address, answer going elsewhere, pressure (urgency, secrecy); « even when everything is green »
+    a mailbox whose password was stolen sends real authenticated mails.
+  - « Why so much caution? » and five steps; « I checked by phone » writes the number called and the person reached
+    as an internal note of the mail.
+
 - NEW: form of a data source guided, for an admin who does not know the headers :   1.74.0
   - « From a mail of the site »: the source of a mail pasted, or « Make a data source from this mail » in the menu
     of a mail (admins of Dolibarr only): its sender, whether it is authenticated, its own headers (X-...) with a role

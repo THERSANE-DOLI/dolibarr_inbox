@@ -7120,6 +7120,11 @@
 			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
 		}
+		// Bank details (lot A6, 1.75.0): red when not authenticated or imitated, orange otherwise, never green
+		if (m.bank && !opts.inline) {
+			const b = bankBanner(m);
+			banners = b + banners;
+		}
 		// Recognized domains (1.59.0): a recognized domain whose authentication failed (red, above everything), a
 		// lookalike of a recognized domain (red, orange when its name only contains the recognized one)
 		const tr = m.trusted;
@@ -7190,6 +7195,66 @@
 				+ (files ? '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div>' : '') + '</section>' : '');
 	}
 
+	/**
+	 * Bank details in the mail (lot A6, 1.75.0): a lesson, not a verdict. What to do first (call with the numbers of
+	 * Dolibarr, never the ones of the mail), what inbox saw (each signal a doubt, not a proof), why even a green mail
+	 * may come from a mailbox whose password was stolen, and the check written as a note of the mail
+	 */
+	function bankBanner(m) {
+		const b = m.bank;
+		const mark = { ok: ['check', 'is-ok', 'InboxBankSignalOk'], warn: ['warning', 'is-warn', 'InboxBankSignalWarn'], bad: ['spoof', 'is-bad', 'InboxBankSignalBad'] };
+		const signals = b.signals.map(x => {
+			const k = mark[x.state] || mark.warn;
+			return '<li class="ibx-bank__signal ' + k[1] + '">' + ic(k[0]) + '<span class="ibx-sr-only">' + th(k[2]) + ' </span><span>' + th('InboxBankSignal_' + x.id, ...(x.args || [])) + '</span></li>';
+		}).join('');
+		const call = b.call.length
+			? '<ul class="ibx-bank__call">' + b.call.map(c => '<li><a class="ibx-btn ibx-btn--sm" href="tel:' + esc(c.number.replace(/[^\d+]/g, '')) + '">' + ic('phone') + ' ' + esc(c.number) + '</a> <span class="ibx-muted">' + esc(c.who) + (c.mobile ? ' · ' + th('InboxBankMobile') : '') + '</span></li>').join('') + '</ul>'
+			: '<p>' + th(b.known ? 'InboxBankNoNumber' : 'InboxBankNoCard') + '</p>';
+		return '<div class="ibx-banner ibx-banner--' + b.level + ' ibx-bank" role="' + (b.level === 'danger' ? 'alert' : 'status') + '">' + ic(b.level === 'danger' ? 'spoof' : 'warning')
+			+ '<div class="ibx-banner__text">'
+			+ '<b>' + th('InboxBankTitle') + '</b>' + (b.ibans.length ? ' <span class="ibx-mono">' + esc(b.ibans.join(', ')) + '</span>' : '')
+			+ '<p>' + th(b.level === 'danger' ? 'InboxBankLeadDanger' : 'InboxBankLead') + '</p>'
+			+ '<div class="ibx-bank__block"><b>' + th('InboxBankCallTitle') + '</b>' + call + '<p class="ibx-muted">' + th('InboxBankCallWhy') + '</p></div>'
+			+ '<details class="ibx-bank__block"' + (b.warnings ? ' open' : '') + '><summary>' + th('InboxBankSeen', b.warnings) + '</summary><ul class="ibx-bank__signals">' + signals + '</ul>'
+			+ '<p class="ibx-bank__doubt">' + ic('info') + ' ' + th('InboxBankEvenGreen') + '</p></details>'
+			+ '<details class="ibx-bank__block"><summary>' + th('InboxBankWhyTitle') + '</summary><p>' + th('InboxBankWhyText') + '</p><ol class="ibx-bank__steps">'
+			+ ['1', '2', '3', '4', '5'].map(n => '<li>' + th('InboxBankStep' + n) + '</li>').join('') + '</ol></details>'
+			+ '<div class="ibx-bank__foot"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-bankchecked">' + ic('note') + ' ' + th('InboxBankChecked') + '</button></div>'
+			+ '</div></div>';
+	}
+	/** « I checked by phone »: the number called (one of the cards) and the person, written as a note of the mail */
+	function bankCheckedDialog(m) {
+		const nums = (m.bank.call || []);
+		dialog({
+			title: t('InboxBankChecked'),
+			body: '<form class="ibx-form" novalidate><p>' + th('InboxBankCheckedHelp') + '</p>'
+				+ (nums.length ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxBankCheckedNumber') + '</span><div>'
+					+ nums.map((c, i) => '<label class="ibx-radio"><input type="radio" name="number" value="' + esc(c.number) + '"' + (i ? '' : ' checked') + '> ' + esc(c.number) + ' <span class="ibx-muted">' + esc(c.who) + '</span></label>').join('') + '</div></div>'
+					: '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-banknum">' + th('InboxBankCheckedNumber') + '</label><div><input class="ibx-field" id="f-banknum" name="number" type="text" autocomplete="off"><div class="ibx-formrow__help">' + th('InboxBankCheckedNumberHelp') + '</div></div></div>')
+				+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-bankwho">' + th('InboxBankCheckedWho') + '</label><div><input class="ibx-field" id="f-bankwho" name="who" type="text" autocomplete="off" required></div></div>'
+				+ '</form>',
+			actions: [{ label: t('InboxBankCheckedSave'), primary: true, run: async dlg => {
+				const f = $('form', dlg);
+				const num = ($('[name="number"]:checked', f) || $('[name="number"]', f) || {}).value || '';
+				const who = $('[name="who"]', f).value.trim();
+				if (!num.trim() || !who) {
+					toast(t('InboxBankCheckedMissing'), { error: true });
+					return false;
+				}
+				try {
+					await post('dolibarr', 'note', { id: m.id, text: t('InboxBankCheckedNote', num.trim(), who) });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxBankCheckedDone'));
+				const box = $('.ibx-dolibar', mailRoot(m));
+				if (box) {
+					loadDolibar(box);
+				}
+			} }],
+		});
+	}
 	function banner(type, icon, html) {
 		return '<div class="ibx-banner ibx-banner--' + type + '" role="' + (type === 'danger' ? 'alert' : 'status') + '">' + ic(icon) + '<div class="ibx-banner__text">' + html + '</div></div>';
 	}
@@ -7259,6 +7324,10 @@
 		}
 		if (I.bindMailExtras) {
 			I.bindMailExtras(m, pane);
+		}
+		const bankChecked = $('.ibx-js-bankchecked', pane);
+		if (bankChecked) {
+			bankChecked.addEventListener('click', () => bankCheckedDialog(m));
 		}
 		const notJunk = $('.ibx-js-notjunk', pane);
 		if (notJunk) {
