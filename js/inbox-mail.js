@@ -5228,6 +5228,17 @@
 			resocDialog(box);
 			return true;
 		}
+		const fix = e.target.closest('.ibx-js-domfix');
+		if (fix) {
+			domainFix(box, fix.dataset.cat);
+			return true;
+		}
+		const cand = e.target.closest('.ibx-js-domcand');
+		if (cand) {
+			// A thirdparty chosen among the ones of the domain: the mail (and its conversation) attached to it
+			post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: +cand.dataset.soc, remember: 0 }).then(() => loadDolibar(box), err => toast(err.message, { error: true }));
+			return true;
+		}
 		const phoneSet = e.target.closest('.ibx-js-phoneset');
 		if (phoneSet) {
 			phoneDialog(box, phoneSet.dataset.number, phoneSet.dataset.mobile === '1');
@@ -5256,6 +5267,37 @@
 		socCardToggle(box, zone.dataset.card, !!e.target.closest('.ibx-js-socfold'));
 		return true;
 	}
+	/**
+	 * A thirdparty found by the domain only: « this domain is a public mail service » or « several companies use it »;
+	 * a manager of the settings marks it at once (undo), another user asks the managers (bell)
+	 */
+	function domainFixHtml(d) {
+		if (!d.sender.domain || !d.level) {
+			return '';
+		}
+		return '<span class="ibx-domfix">' + ['public', 'shared'].map(c => '<button type="button" class="ibx-linkbtn ibx-js-domfix" data-cat="' + c + '">' + th('InboxDomainsFix_' + c) + '</button>').join(' · ') + '</span>';
+	}
+	async function domainFix(box, category) {
+		const d = box._data;
+		const domain = d.sender.domain;
+		try {
+			if (d.sender.domain_admin) {
+				const res = await post('domain', 'add', { domains: domain, category });
+				toast(t('InboxDomainsMarked', domain, t('InboxDomainsCat_' + category)), { action: t('InboxUndo'), onAction: async () => {
+					for (const id of res.added) {
+						await post('domain', 'delete', { domain_id: id });
+					}
+					loadDolibar(box);
+				} });
+				loadDolibar(box);
+			} else {
+				const res = await post('domain', 'request', { domain, category });
+				toast(res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager'));
+			}
+		} catch (err) {
+			toast(err.message, { error: true });
+		}
+	}
 	function paintDolibar(box) {
 		const d = box._data;
 		const folded = params.dolibar_folded === '1';
@@ -5274,7 +5316,16 @@
 			const sender = [];
 			if (d.sender.soc) {
 				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0))
-					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' : ''));
+					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
+			}
+			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
+			if (d.sender.domain_category === 'disposable') {
+				sender.push('<span class="ibx-badge ibx-domwarn" title="' + th('InboxDomainsDisposableHelp') + '">' + ic('warning') + th('InboxDomainsDisposable') + '</span>');
+			}
+			if (!d.sender.soc && (d.sender.candidates || []).length) {
+				sender.push('<span class="ibx-domcands"><span class="ibx-muted">' + th(d.sender.domain_category === 'shared' ? 'InboxDomainsSharedBy' : 'InboxDomainsSeveral', d.sender.candidates.length, d.sender.domain) + '</span>'
+					+ d.sender.candidates.map(c => '<span class="ibx-domcand">' + pieceHtml(c, 0) + (d.level ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-domcand" data-soc="' + c.id + '">' + ic('link') + ' ' + th('InboxDomainsThisOne') + '</button>' : '') + '</span>').join('')
+					+ '</span>');
 			}
 			if (d.sender.contact) {
 				sender.push(d.sender.contact.readable ? socCardHtml(box, d.sender.contact, 'contact') : pieceHtml(d.sender.contact, 0, '', socId));
@@ -5637,7 +5688,9 @@
 		const dlg = dialog({
 			title: t('InboxCreateTitle'),
 			noCancel: false,
-			body: '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
+			// A disposable address (lot A7, 1.76.0): said before a thirdparty is made from it
+			body: (d.sender.domain_category === 'disposable' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxDomainsDisposableCreate', d.sender.domain) + '</div></div>' : '')
+				+ '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
 				+ '<label class="ibx-inline ibx-createattach"><input type="checkbox" class="ibx-js-createattach"> ' + th('InboxCreateAttachMail') + '</label>'
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],

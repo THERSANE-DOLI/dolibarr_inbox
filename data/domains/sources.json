@@ -1,0 +1,18 @@
+{
+    "public": {
+        "file": "public.txt",
+        "source": "inbox",
+        "licence": "GPL-3.0-or-later",
+        "copied": "2026-11-10",
+        "count": 162,
+        "sha256": "d3311ebe22e6cb66f1731145160a22d9383695b659ae9f624a03f2fa5ff28256"
+    },
+    "disposable": {
+        "file": "disposable.txt",
+        "source": "https://github.com/disposable-email-domains/disposable-email-domains",
+        "licence": "CC0-1.0",
+        "copied": "2026-11-10",
+        "count": 10181,
+        "sha256": "e0ac2c1e69080fca7885318c2e3420fe84ad3cd07caaf5dde6fe908a72cfe5b7"
+    }
+}

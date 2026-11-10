@@ -118,6 +118,11 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_tag WHERE fk_account = 0 AND keyword LIKE 'zz_test%'");
 		// Recognized domains (1.59.0) of the tests
 		$db->query("DELETE FROM ".$p."inbox_trusted_domain WHERE label LIKE 'ZzTrusted%'");
+		// Shared domains (1.76.0) of the tests
+		$db->query("DELETE FROM ".$p."inbox_domain WHERE origin = 'local' AND domain LIKE '%inbox-test.invalid'");
+		if (class_exists('InboxDomains')) {
+			InboxDomains::reset();
+		}
 		// Data sources (1.72.0) of the tests
 		$db->query("DELETE FROM ".$p."inbox_source WHERE label LIKE 'ZzSource%'");
 		if (class_exists('InboxDataSource')) {

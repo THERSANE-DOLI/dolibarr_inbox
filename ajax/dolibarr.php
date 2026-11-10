@@ -166,6 +166,7 @@ switch ($action) {
 		$email = strtolower($requester ? $requester['email'] : (string) $row->from_email);
 		$socId = (int) $row->fk_soc;
 		$contactId = (int) $row->fk_socpeople;
+		$matcher = null;
 		if (!$socId && $email !== '') {
 			$matcher = new InboxContactMatcher($db);
 			$m = $matcher->match($email);
@@ -177,6 +178,22 @@ switch ($action) {
 			}
 		}
 		$sender['by'] = $sender['by'] ?: ($socId || $contactId ? 'address' : '');
+		// Shared domains (lot A7, 1.76.0): the category of the domain (a disposable address is said), the
+		// thirdparties that share it offered to choose (never linked without the user), and who may correct the list
+		$matcher = $matcher ?? new InboxContactMatcher($db);
+		$byDomain = $email !== '' ? $matcher->domainCandidates($email) : array('socs' => array(), 'category' => '', 'domain' => '');
+		$sender['domain'] = $byDomain['domain'];
+		$sender['domain_category'] = $byDomain['category'];
+		$sender['candidates'] = array();
+		if (!$socId) {
+			foreach ($byDomain['socs'] as $cand) {
+				$dc = $elements->describe($user, 'societe', $cand);
+				if (!empty($dc['readable'])) {
+					$sender['candidates'][] = $dc;
+				}
+			}
+		}
+		$sender['domain_admin'] = (int) $user->hasRight('inbox', 'account', 'admin');
 		// Their ways to reach them (card of the thirdparty, 1.67.0) when the user may read them
 		$situation = new InboxSituation($db);
 		if ($socId) {

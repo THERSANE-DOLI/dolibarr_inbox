@@ -2446,3 +2446,29 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bank__steps { margin: var(--ibx-s2) 0 0; padding-left: 1.25rem; }
 .ibx-bank__steps li + li { margin-top: var(--ibx-s1); }
 .ibx-bank__foot { display: flex; justify-content: flex-end; margin-top: var(--ibx-s2); }
+
+/* Shared domains (lot A7, 1.76.0) */
+.ibx-domwhy { margin-bottom: var(--ibx-s3); }
+.ibx-domwhy > summary { cursor: pointer; font-weight: 600; }
+.ibx-domwhy dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--ibx-s1) var(--ibx-s3); margin: var(--ibx-s2) 0 0; }
+.ibx-domwhy dt { font-weight: 600; }
+.ibx-domwhy dd { margin: 0; }
+.ibx-domtools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin-bottom: var(--ibx-s3); }
+.ibx-domtable .ibx-num { text-align: right; }
+.ibx-domtable tr.is-off td { color: var(--ibx-text-muted); }
+.ibx-domtable tr.is-off b { text-decoration: line-through; }
+.ibx-dompager { display: flex; align-items: center; justify-content: center; gap: var(--ibx-s3); margin-top: var(--ibx-s3); }
+.ibx-domfix { display: inline-flex; gap: var(--ibx-s1); margin-left: var(--ibx-s2); font-size: var(--ibx-fs-sm); }
+.ibx-domwarn { color: var(--ibx-warning); border-color: var(--ibx-warning); }
+.ibx-domcands { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s2); }
+.ibx-domcand { display: inline-flex; align-items: center; gap: var(--ibx-s1); }
+/* Phone: the list as cards (P36) */
+@media (max-width: 39.9375rem) {
+	.ibx-domwhy dl { grid-template-columns: 1fr; }
+	.ibx-domtable thead { display: none; }
+	.ibx-domtable, .ibx-domtable tbody, .ibx-domtable tr, .ibx-domtable td { display: block; width: 100%; }
+	.ibx-domtable tr { padding: var(--ibx-s2) 0; border-bottom: 1px solid var(--ibx-border); }
+	.ibx-domtable td { display: flex; justify-content: space-between; gap: var(--ibx-s2); padding: 0.125rem 0; border: 0; text-align: left; }
+	.ibx-domtable td[data-label]::before { content: attr(data-label); color: var(--ibx-text-muted); }
+	.ibx-domtable .ibx-num { text-align: left; }
+}

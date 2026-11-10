@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.75.0';
+		$this->version = '1.76.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -263,6 +263,13 @@ class modInbox extends DolibarrModules
 		if ($result > 0 && $this->installExampleSource() < 0) {
 			$this->error = $this->db->lasterror();
 			return -1;
+		}
+		if ($result > 0) {
+			// Shared domains (lot A7, 1.76.0): the shipped list is read in its files; the hidden setting of before
+			// becomes local entries
+			dol_include_once('/inbox/class/inboxdomains.class.php');
+			InboxDomains::reset();
+			(new InboxDomains($this->db))->migrateOldSetting();
 		}
 		if ($result > 0 && $this->migrate() < 0) {
 			$this->error = $this->db->lasterror();
