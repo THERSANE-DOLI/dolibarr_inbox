@@ -3425,7 +3425,8 @@
 			+ '<div class="ibx-readhead__who"><div class="ibx-readhead__name ibx-addr' + (fromUser ? ' ibx-addr--user' : '') + '" data-email="' + esc(m.from.email) + '" data-name="' + esc(fromName) + '"'
 			+ (fromUser ? ' data-user="' + esc(fromUser.email) + '" aria-haspopup="dialog"' : '') + '>'
 			+ (mine ? esc(t('InboxMe')) + ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>'
-				: esc(fromName || m.from.email || t('InboxNoSender')) + (fromName ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')) + '</div>'
+				: esc(fromName || m.from.email || t('InboxNoSender')) + (fromName ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')
+					+ (m.trusted && m.trusted.state === 'ok' ? ' ' + trustedBadge(m.trusted) : '')) + '</div>'
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
@@ -6037,6 +6038,11 @@
 			const tagAnchor = () => $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
 			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
+		// Recognized domains (1.59.0): with the right, the domain of the authenticated sender or of the links
+		const offer = m.trust_offer;
+		if (offer && (offer.sender || (offer.links || []).length)) {
+			list.push({ sep: true }, { id: 'trust', icon: 'trusted', label: t('InboxTrustedDomainAdd'), run: () => trustDialog(m) });
+		}
 		list.push(
 			{ sep: true },
 			{ id: 'headers', icon: 'info', label: t('InboxAllHeaders'), run: () => headersDialog(m) },
@@ -6386,6 +6392,15 @@
 			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
 		}
+		// Recognized domains (1.59.0): a recognized domain whose authentication failed (red, above everything), a
+		// lookalike of a recognized domain (red, orange when its name only contains the recognized one)
+		const tr = m.trusted;
+		if (tr && tr.state === 'unproven') {
+			banners = banner('danger', 'spoof', '<b>' + th('InboxTrustedUnprovenTitle') + '</b> ' + th('InboxTrustedUnproven', tr.label, tr.host)) + banners;
+		} else if (tr && tr.state === 'lookalike') {
+			const b = banner(tr.level === 'danger' ? 'danger' : 'warning', 'spoof', th('InboxLookalikeSender', tr.domain, tr.label, tr.host));
+			banners = tr.level === 'danger' ? b + banners : banners + b;
+		}
 		// Verdict of the anti-spam filter of the server (1.44.0): a mail judged spam but not in the junk says it, with
 		// the button; in the junk, the score and the reasons in words
 		const sp = m.spam;
@@ -6679,7 +6694,22 @@
 			const shown = (a.textContent || '').trim();
 			const real = hostOf(href);
 			const claimed = hostOf(/^[a-z]+:\/\//i.test(shown) ? shown : (/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/|$)/i.test(shown) ? 'http://' + shown : ''));
-			if (real && claimed && !sameSite(real, claimed)) {
+			// Recognized domains (1.59.0): a lookalike of a recognized domain is asked first
+			const verdicts = m.link_hosts || {};
+			const vReal = verdicts[real];
+			if (vReal && vReal.t === 'lookalike') {
+				e.preventDefault();
+				dialog({
+					title: t('InboxLookalikeLinkTitle'),
+					body: '<div class="ibx-notice ibx-notice--warning">' + ic('spoof') + '<div class="ibx-notice__text">' + th('InboxLookalikeLink', vReal.domain, vReal.label, real) + '</div></div>'
+						+ '<p class="ibx-muted ibx-breakall">' + esc(href) + '</p>',
+					actions: [{ label: t('InboxOpenAnyway'), run: () => window.open(href, '_blank', 'noopener,noreferrer') }],
+				});
+				return;
+			}
+			const vClaimed = verdicts[claimed];
+			const sameOrganisation = vReal && vClaimed && vReal.t === 'trusted' && vClaimed.t === 'trusted' && vReal.label === vClaimed.label;
+			if (real && claimed && !sameSite(real, claimed) && !sameOrganisation) {
 				e.preventDefault();
 				dialog({
 					title: t('InboxLinkWarningTitle'),
@@ -6704,11 +6734,159 @@
 			closeMenu();
 		});
 		doc.addEventListener('wheel', activity, { passive: true });
-		// Real address of a link at hover and focus (title), also read by the screen readers
-		Array.from(doc.querySelectorAll('a[href]')).forEach(a => {
-			if (!a.title) {
-				a.title = a.getAttribute('href');
+		// Real address of a link at hover and focus (1.59.0): a bar of inbox outside the mail (the HTML of a mail cannot
+		// draw over it), with the recognized domain or the lookalike; on a phone, at a long press
+		const linkOf = target => (target && target.closest ? target.closest('a[href]') : null);
+		doc.addEventListener('mouseover', e => linkBar(frame, m, linkOf(e.target)));
+		doc.addEventListener('focusin', e => linkBar(frame, m, linkOf(e.target)));
+		doc.documentElement.addEventListener('mouseleave', () => linkBar(frame, m, null));
+		let press = 0;
+		doc.addEventListener('touchstart', e => {
+			const a = linkOf(e.target);
+			clearTimeout(press);
+			if (a) {
+				press = setTimeout(() => {
+					linkBar(frame, m, a);
+					press = setTimeout(() => linkBar(frame, m, null), 4000);
+				}, 450);
 			}
+		}, { passive: true });
+		doc.addEventListener('touchmove', () => clearTimeout(press), { passive: true });
+	}
+
+	/**
+	 * Bar of the link under the pointer (1.59.0), in the reading pane outside the frame of the mail: host in bold,
+	 * path cut, the organisation of a recognized domain or the warning of a lookalike. Null link: hidden.
+	 */
+	function linkBar(frame, m, a) {
+		const host = frame.closest('.ibx-pane--read') || frame.closest('dialog') || document.body;
+		let bar = host.querySelector(':scope > .ibx-linkbar');
+		if (!a) {
+			if (bar) {
+				bar.hidden = true;
+			}
+			return;
+		}
+		if (!bar) {
+			bar = document.createElement('div');
+			bar.className = 'ibx-linkbar' + (host === document.body ? ' ibx-linkbar--fixed' : '');
+			bar.setAttribute('role', 'status');
+			bar.setAttribute('aria-live', 'polite');
+			host.appendChild(bar);
+		}
+		const href = a.getAttribute('href') || '';
+		let html = '';
+		if (/^(mailto|tel):/i.test(href)) {
+			html = '<b>' + esc(decodeURIComponent(href.replace(/^[a-z]+:/i, '').split('?')[0])) + '</b>';
+		} else if (/^https?:\/\//i.test(href)) {
+			let url = null;
+			try {
+				url = new URL(href);
+			} catch (e) {
+				url = null;
+			}
+			if (!url) {
+				return;
+			}
+			const rest = (url.pathname === '/' ? '' : url.pathname) + url.search;
+			html = '<span class="ibx-linkbar__url"><b>' + esc(url.hostname) + '</b>' + (rest ? '<span class="ibx-muted">' + esc(rest.length > 60 ? rest.slice(0, 59) + '…' : rest) + '</span>' : '') + '</span>';
+			const v = (m.link_hosts || {})[hostOf(href)];
+			if (v && v.t === 'trusted') {
+				html += '<span class="ibx-linkbar__ok">' + ic('trusted') + ' ' + esc(v.label) + '</span>';
+			} else if (v && v.t === 'lookalike') {
+				html += '<span class="ibx-linkbar__warn">' + ic('warning') + ' ' + th('InboxLookalikeShort', v.label) + '</span>';
+			}
+		} else {
+			bar.hidden = true;
+			return;
+		}
+		bar.innerHTML = html;
+		bar.hidden = false;
+	}
+
+	/** Badge of the recognized domain of an authenticated sender (1.59.0); its details on click */
+	function trustedBadge(tr) {
+		return '<button type="button" class="ibx-trustbadge ibx-js-trustinfo" aria-haspopup="dialog" data-trust="' + esc(JSON.stringify(tr)) + '" title="' + th('InboxTrustedTooltip', tr.domain, tr.by) + '">'
+			+ ic('trusted') + '<span>' + esc(tr.label) + '</span></button>';
+	}
+
+	function trustInfo(b) {
+		let tr;
+		try {
+			tr = JSON.parse(b.dataset.trust || '{}');
+		} catch (e) {
+			return;
+		}
+		const day = ts => new Date(ts * 1000).toLocaleDateString(locale());
+		dialog({
+			title: tr.label,
+			body: '<p>' + ic('trusted') + ' ' + th('InboxTrustedInfoDomain', tr.domain) + (tr.host !== tr.domain ? ' <span class="ibx-muted">(' + esc(tr.host) + ')</span>' : '') + '</p>'
+				+ '<p>' + th('InboxTrustedInfoAuth', tr.by) + '</p>'
+				+ (tr.reply_to ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxTrustedInfoReplyTo', tr.reply_to) + '</div></div>' : '')
+				+ (tr.note ? '<p class="ibx-muted">' + esc(tr.note) + '</p>' : '')
+				+ '<p class="ibx-muted">' + th('InboxTrustedInfoAdded', tr.user || '-', tr.date ? day(tr.date) : '-') + '</p>'
+				+ '<p class="ibx-muted">' + th('InboxTrustedInfoScope') + '</p>',
+		});
+	}
+
+	/**
+	 * « Recognize this domain… » (1.59.0): proposed, then validated. The domain of the authenticated sender checked,
+	 * the domains of the links offered unchecked; nothing written before « Recognize »
+	 */
+	function trustDialog(m) {
+		const offer = m.trust_offer || {};
+		const auth = m.auth || {};
+		const res = v => '<span class="ibx-status' + (v === 'pass' ? ' ibx-status--ok' : (v === 'fail' || v === 'softfail' ? ' ibx-status--error' : '')) + '">' + esc(v || '-') + '</span>';
+		// A lookalike of a recognized domain is offered unchecked, with the warning (never a font where 1 reads l)
+		const likeNote = like => like ? '<div class="ibx-trustlike">' + ic('warning') + ' ' + th('InboxTrustDialogLookalike', like.domain, like.label) + '</div>' : '';
+		const check = (value, checked, like, extra) => '<label class="ibx-check"><input type="checkbox" name="domains" value="' + esc(value) + '"' + (checked && !like ? ' checked' : '') + '> <b>' + esc(value) + '</b>' + (extra ? ' <span class="ibx-muted">' + extra + '</span>' : '') + '</label>' + likeNote(like);
+		let body = '<p class="ibx-section__help">' + th('InboxTrustDialogHelp') + '</p><form class="ibx-form" novalidate>';
+		if (offer.sender) {
+			body += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSender') + '</span><div>'
+				+ check(offer.sender.domain, true, offer.sender.like, th('InboxTrustDialogAuth') + ' SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc))
+				+ (offer.sender.parent ? '<div>' + check(offer.sender.parent, false, null, th('InboxTrustDialogParent')) + '</div>' : '') + '</div></div>';
+		}
+		if ((offer.links || []).length) {
+			body += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxTrustDialogLinks') + '</span><div>'
+				+ offer.links.map(l => '<div>' + check(l.domain, false, l.like, th('InboxTrustDialogLinkCount', l.links)) + '</div>').join('')
+				+ '<div class="ibx-formrow__help">' + th('InboxTrustDialogLinksHelp') + '</div></div></div>';
+		}
+		body += '<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div><label class="ibx-check"><input type="checkbox" name="subdomains" checked> ' + th('InboxTrustedWithSubdomains') + '</label></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-trust-label">' + th('InboxTrustedLabel') + ' <span class="ibx-req" aria-hidden="true">*</span></label><div>'
+			+ '<input class="ibx-field" id="ibx-trust-label" name="label" required autocomplete="off" spellcheck="false" value="' + esc(m.from.name || '') + '"><div class="ibx-formrow__help">' + th('InboxTrustedLabelHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-trust-note">' + th('InboxTrustedNote') + '</label><div>'
+			+ '<input class="ibx-field" id="ibx-trust-note" name="note" autocomplete="off" spellcheck="false"><div class="ibx-formrow__help">' + th('InboxTrustedNoteHelp') + '</div></div></div>'
+			+ '</form>';
+		dialog({
+			title: t('InboxTrustDialogTitle'),
+			wide: true,
+			body,
+			actions: [{ label: t('InboxTrustDialogButton'), primary: true, run: async dlg => {
+				const form = $('form', dlg);
+				const domains = $$('input[name="domains"]:checked', form).map(i => i.value);
+				const label = form.elements.label.value.trim();
+				if (!domains.length) {
+					toast(t('InboxTrustDialogNone'), { error: true });
+					return false;
+				}
+				if (!label) {
+					form.elements.label.focus();
+					toast(t('InboxTrustedErrorLabel'), { error: true });
+					return false;
+				}
+				try {
+					await post('trusteddomain', 'create', { domains, label, note: form.elements.note.value, subdomains: form.elements.subdomains.checked ? 1 : 0 });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxTrustDialogDone', domains.join(', ')));
+				// The mail read again: its sender and its links with the new list
+				if (S.openId === m.id) {
+					openMail(m.id, true);
+				}
+			} }],
+			onOpen: dlg => $('#ibx-trust-label', dlg).select(),
 		});
 	}
 
@@ -8156,6 +8334,14 @@
 	}
 
 	function bindContextMenus() {
+		// Recognized domain of the sender (1.59.0): its details
+		S.el.addEventListener('click', e => {
+			const b = e.target.closest('.ibx-js-trustinfo');
+			if (b && S.el.contains(b)) {
+				e.stopPropagation();
+				trustInfo(b);
+			}
+		});
 		// Tags beside the subject of a mail read: the menu of the tags under them
 		S.el.addEventListener('click', e => {
 			const b = e.target.closest('.ibx-js-tagedit');

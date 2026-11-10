@@ -2248,3 +2248,20 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-updatebar > .ibx-icon { flex: none; color: var(--ibx-accent); }
 .ibx-updatebar > span { min-width: 0; }
 
+
+/* Recognized domains (1.59.0): badge of the authenticated sender, bar of the link under the pointer (outside the mail) */
+.ibx-trustbadge { display: inline-flex; align-items: center; gap: .25rem; margin-left: var(--ibx-s1); padding: 0 .4rem; vertical-align: middle;
+	font: inherit; font-size: var(--ibx-fs-xs); font-weight: 600; line-height: 1.5; color: var(--ibx-success); background: var(--ibx-success-soft);
+	border: 1px solid color-mix(in srgb, var(--ibx-success) 35%, transparent); border-radius: var(--ibx-radius-sm); cursor: pointer; }
+.ibx-trustbadge .ibx-icon { width: .95em; height: .95em; }
+.ibx-trustbadge:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+.ibx-linkbar { position: absolute; left: var(--ibx-s2); bottom: var(--ibx-s2); z-index: 30; display: flex; align-items: center; gap: var(--ibx-s2);
+	max-width: calc(100% - 2 * var(--ibx-s2)); padding: .2rem var(--ibx-s2); font-size: var(--ibx-fs-sm); color: var(--ibx-text); background: var(--ibx-bg);
+	border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-sm); box-shadow: var(--ibx-shadow-float); pointer-events: none; }
+.ibx-linkbar--fixed { position: fixed; }
+.ibx-linkbar[hidden] { display: none; }
+.ibx-linkbar__url { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-linkbar__ok, .ibx-linkbar__warn { flex: none; display: inline-flex; align-items: center; gap: .25rem; font-weight: 600; }
+.ibx-linkbar__ok { color: var(--ibx-success); }
+.ibx-linkbar__warn { color: var(--ibx-warning-text); }
+.ibx-trustlike { display: flex; align-items: center; gap: .25rem; margin: 0 0 var(--ibx-s1) 1.6rem; font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-warning-text); }

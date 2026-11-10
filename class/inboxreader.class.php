@@ -180,7 +180,13 @@ class InboxReader
 		require_once __DIR__.'/inboxbounce.class.php';
 		$bounce = new InboxBounce($this->db);
 		$readable = array_keys((new InboxAccess($this->db))->getLevels($user));
-		$allowImages = $remote && self::authPass($auth, (string) $this->row->from_email) && $this->imagesAllowed($user, (string) $this->row->from_email);
+		$passed = self::authPass($auth, (string) $this->row->from_email);
+		$allowImages = $remote && $passed && $this->imagesAllowed($user, (string) $this->row->from_email);
+		// Recognized domains (1.59.0): the sender (authenticated only) and the links, lookalikes of the list
+		require_once __DIR__.'/inboxtrusteddomain.class.php';
+		$trusted = new InboxTrustedDomain($this->db);
+		$canTrust = $user->hasRight('inbox', 'trusteddomain', 'write');
+		$links = $trusted->linkVerdicts($message->bodyHtml, $message->bodyText, $canTrust);
 
 		return array(
 			'id' => (int) $this->row->rowid,
@@ -210,6 +216,10 @@ class InboxReader
 			'report' => $bounce->view($raw, $readable),
 			'bounces' => $bounce->forMail($message->messageId, $readable),
 			'sender_check' => $this->senderCheck($raw),
+			'trusted' => $trusted->senderVerdict($message->fromEmail, (string) $message->replyToEmail, $auth, $passed),
+			'link_hosts' => (object) $links['hosts'],
+			// The user may recognize domains: the domain of the sender when proven, the domains of the links
+			'trust_offer' => $canTrust ? array('sender' => $passed ? self::trustableSender($trusted, $message->fromEmail) : null, 'links' => $links['domains']) : null,
 			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
 			'spam' => self::spamVerdict($headers),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
@@ -223,6 +233,27 @@ class InboxReader
 			'read_delay' => (int) $params->get($user, 'read_delay', (int) $this->row->fk_account),
 			'can_flag' => true,
 		);
+	}
+
+	/**
+	 * Domain of the sender a user may recognize from the mail: proven sender, not recognized yet, not refused; its
+	 * registrable domain offered too when the sender writes from a subdomain (mail.exemple.com: exemple.com)
+	 *
+	 * @param InboxTrustedDomain $trusted   Helper
+	 * @param string             $fromEmail Address of the sender
+	 * @return array{domain:string,parent:string,like:array{domain:string,label:string}|null}|null Null when there is nothing to offer
+	 */
+	protected static function trustableSender(InboxTrustedDomain $trusted, $fromEmail)
+	{
+		$host = InboxTrustedDomain::normalize((string) $fromEmail);
+		$own = $trusted->ownDomains();
+		if ($host === '' || $trusted->find($host) || InboxTrustedDomain::refusal($host, $own) !== '') {
+			return null;
+		}
+		$parent = InboxTrustedDomain::registrable($host);
+
+		return array('domain' => $host, 'parent' => ($parent !== $host && InboxTrustedDomain::refusal($parent, $own) === '') ? $parent : '',
+			'like' => InboxTrustedDomain::likeOf($host, $trusted->fetchAll(), $own));
 	}
 
 	/**
