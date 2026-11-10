@@ -2472,3 +2472,12 @@ InboxPhoneNow = Actuellement : %s
 InboxPhoneEmpty = Vide actuellement
 InboxPhoneReplaceDo = Remplacer
 InboxPhoneReplaced = Fiche du contact mise à jour
+
+# Tracking numbers, carriers (1.70.0)
+InboxCitedTracking = suivi n° %s
+InboxCarrierCategory = Transporteurs
+InboxCarrierNone = Aucune catégorie
+InboxCarrierHelp = Catégorie de fournisseurs dont les mails parlent de nos colis : pas de situation sur leur carte ; l'expédition d'un numéro de suivi du mail est dans « Citées dans le mail ».
+InboxCarrierSaved = Catégorie des transporteurs enregistrée
+InboxSituationCarrier = Transporteur : pas de situation. L'expédition d'un numéro de suivi du mail est dans « Citées dans le mail ».
+InboxLogCarriers = Catégorie des transporteurs changée

@@ -38,6 +38,10 @@ class InboxSituationTest extends InboxTestCase
 	{
 		$p = $this->db->prefix();
 		$this->db->query("DELETE FROM ".$p."commande_fournisseur WHERE ref LIKE 'PO2699-98%'");
+		// Before the thirdparties of the tests are removed (a shipment left would keep them, foreign key)
+		$this->db->query("DELETE FROM ".$p."expedition WHERE ref LIKE 'SH2699-96%'");
+		$this->db->query("DELETE FROM ".$p."categorie_fournisseur WHERE fk_categorie IN (SELECT rowid FROM ".$p."categorie WHERE label LIKE 'inboxtest_%')");
+		$this->db->query("DELETE FROM ".$p."categorie WHERE label LIKE 'inboxtest_%'");
 		$this->db->query("DELETE FROM ".$p."inbox_address_soc WHERE email LIKE '%inbox-test.invalid'");
 		parent::tearDown();
 	}
@@ -161,6 +165,47 @@ class InboxSituationTest extends InboxTestCase
 		$this->assertSame('', $s->setContactPhone($this->admin, $contact, 'phone_mobile', '+33 (0)6 12 34 56 79'), 'empty before');
 		$this->assertSame(array(), $s->newPhones($text, $contact, $soc), 'nothing new any more');
 		$this->assertNull($s->setContactPhone($this->admin, $contact, 'email', 'x'), 'only the phones');
+	}
+
+	/**
+	 * Tracking numbers and carriers (1.70.0)
+	 *
+	 * @return void
+	 */
+	public function testTrackingAndCarriers()
+	{
+		dol_include_once('/inbox/class/inboxcited.class.php');
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_parcel', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$customer = (int) $this->db->last_insert_id($p.'societe');
+		// A number of this run only: other shipments of the database never answer
+		$number = 'TST'.date('His').mt_rand(100000, 999999);
+		$this->db->query("INSERT INTO ".$p."expedition (ref, entity, fk_soc, fk_statut, tracking_number, date_creation, fk_user_author) VALUES ('SH2699-96001', 1, ".$customer.", 1, '".$number."', '"
+			.$this->db->idate(dol_now())."', ".((int) $this->admin->id).")");
+		$ship = (int) $this->db->last_insert_id($p.'expedition');
+		$this->assertGreaterThan(0, $ship, 'test shipment created');
+		$cited = new InboxCited($this->db);
+		$found = $cited->trackings("Votre colis ".$number." n'a pas pu être livré.");
+		$this->assertSame($number, $found[$ship] ?? null, 'found by its tracking number');
+		$this->assertArrayNotHasKey($ship, $cited->trackings('Commande X'.$number.'Y'), 'never inside a longer word');
+
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, fournisseur, datec) VALUES ('inboxtest_carrier', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$carrier = (int) $this->db->last_insert_id($p.'societe');
+		$this->db->query("INSERT INTO ".$p."categorie (entity, label, type, visible) VALUES (1, 'inboxtest_Carriers', 1, 1)");
+		$cat = (int) $this->db->last_insert_id($p.'categorie');
+		$this->db->query("INSERT INTO ".$p."categorie_fournisseur (fk_categorie, fk_soc) VALUES (".$cat.", ".$carrier.")");
+		$this->db->query("INSERT INTO ".$p."categorie (entity, label, type, visible) VALUES (1, 'inboxtest_Customers', 2, 1)");
+		$notSupplier = (int) $this->db->last_insert_id($p.'categorie');
+		$a = $this->box(true);
+		$s = new InboxSituation($this->db);
+		$this->assertLessThan(0, $s->setCarrierCategory($this->admin, $a, $notSupplier), 'only a category of suppliers');
+		$this->assertSame(1, $s->setCarrierCategory($this->admin, $a, $cat));
+		$this->assertFalse($s->isCarrier($a, $carrier), 'only with the usage Transport');
+		$s->setUsage($this->admin, $a, 'transport');
+		if (isModEnabled('category')) {
+			$this->assertTrue($s->isCarrier($a, $carrier));
+		}
+		$this->assertFalse($s->isCarrier($a, $customer));
 	}
 
 	/**

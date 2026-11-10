@@ -4961,6 +4961,8 @@
 				html += '<div class="ibx-soccard__group">' + th('InboxSituation') + ' <small>· ' + esc(t('InboxUsageOf', shown)) + '</small></div>';
 				if (!s) {
 					html += '<div class="ibx-soccard__none"><span class="ibx-spinner" aria-hidden="true"></span> ' + th('InboxPanelLoading') + '</div>';
+				} else if (s.carrier) {
+					html += '<div class="ibx-soccard__none">' + th('InboxSituationCarrier') + '</div>';
 				} else if (s.error) {
 					html += '<div class="ibx-soccard__none">' + ic('warning') + ' ' + esc(s.error) + '</div>';
 				} else if (!s.indicators.length) {
@@ -5292,7 +5294,7 @@
 					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
 				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
 					+ suggest.map(c => pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '', socId, {
-						theirs: c.theirs ? t('InboxCitedTheirRef', c.cited) : '',
+						theirs: c.theirs ? t('InboxCitedTheirRef', c.cited) : (c.tracking ? t('InboxCitedTracking', c.cited) : ''),
 						action: '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-piece__act ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '" aria-label="' + esc(t('InboxLink') + ' ' + (c.ref || '')) + '">' + ic('link') + ' ' + th('InboxLink') + '</button>',
 					})).join('')
 					+ '</span></div>' : '')

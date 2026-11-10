@@ -258,6 +258,42 @@ class InboxCited
 	}
 
 	/**
+	 * Shipments whose tracking number is in the text (1.70.0): words of 8 to 35 letters and digits with 6 digits at
+	 * least, compared with the tracking numbers of the shipments (as written and in capitals)
+	 *
+	 * @param string $text Text of the mail
+	 * @return array<int,string> Shipment => tracking number
+	 */
+	public function trackings($text)
+	{
+		$m = array();
+		preg_match_all('/(?<![\p{L}\p{N}])[A-Za-z0-9]{8,35}(?![\p{L}\p{N}])/u', (string) $text, $m);
+		$words = array();
+		foreach ($m[0] as $w) {
+			if (preg_match_all('/\d/', $w) >= 6) {
+				$words[strtoupper($w)] = true;
+				$words[$w] = true;
+			}
+			if (count($words) >= 400) {
+				break;
+			}
+		}
+		if (!$words) {
+			return array();
+		}
+		$in = implode(',', array_map(function ($w) {
+			return "'".$this->db->escape((string) $w)."'";
+		}, array_keys($words)));
+		$rows = $this->db->getRows("SELECT rowid, tracking_number FROM ".$this->db->prefix()."expedition WHERE tracking_number IN (".$in.") AND entity IN (".getEntity('expedition').") ORDER BY rowid DESC LIMIT ".self::MAX);
+		$out = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$out[(int) $r->rowid] = (string) $r->tracking_number;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Pieces cited in the text: our references (numbering models), and the references of the other side kept on the
 	 * pieces of its thirdparty; only the readable, with their match against the thirdparty of the writer
 	 *
@@ -311,6 +347,13 @@ class InboxCited
 				}
 			}
 		}
+		// Tracking numbers of our shipments (1.70.0): the carrier writes about a parcel; the shipment and its customer,
+		// whoever writes
+		if (InboxElements::canReadType($user, 'shipping')) {
+			foreach ($this->trackings($text) as $id => $number) {
+				$found['shipping:'.$id] = array('type' => 'shipping', 'id' => (int) $id, 'soc' => 0, 'cited' => $number, 'theirs' => false, 'tracking' => true);
+			}
+		}
 		$out = array();
 		foreach ($found as $f) {
 			$d = $elements->describe($user, $f['type'], $f['id']);
@@ -319,14 +362,15 @@ class InboxCited
 			}
 			$d['cited'] = $f['cited'];
 			$d['theirs'] = $f['theirs'];
-			$d['match'] = !$socs ? 'unknown' : (in_array($f['soc'], $socs, true) ? 'same' : 'other');
+			$d['tracking'] = !empty($f['tracking']);
+			$d['match'] = $d['tracking'] ? 'tracking' : (!$socs ? 'unknown' : (in_array($f['soc'], $socs, true) ? 'same' : 'other'));
 			$out[] = $d;
 			if (count($out) >= self::MAX) {
 				break;
 			}
 		}
 		// Its own reference first, then the pieces of the writer, the unknown, the others
-		$rank = array('same' => 0, 'unknown' => 1, 'other' => 2);
+		$rank = array('tracking' => 0, 'same' => 0, 'unknown' => 1, 'other' => 2);
 		usort($out, function ($a, $b) use ($rank) {
 			return array((int) !$a['theirs'], $rank[$a['match']]) <=> array((int) !$b['theirs'], $rank[$b['match']]);
 		});
