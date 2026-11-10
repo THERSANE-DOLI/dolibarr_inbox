@@ -379,6 +379,7 @@ InboxMoveDown = Bajar
 InboxNewTag = Nueva etiqueta
 InboxAddTag = Añadir
 InboxTagsKeysHelp = Las teclas 1 a 9 ponen las nueve primeras etiquetas activas, 0 las quita todas. Arrastre las líneas, o use las flechas, para cambiar el orden.
+InboxTagsAliasHelp = Una palabra clave $labelN de Thunderbird que ninguna etiqueta de la lista tiene se lee como la etiqueta de la tecla N (mostrada, filtrada, quitada con ella): cambiar el orden de la lista cambia la etiqueta de estos correos.
 InboxTagKeyword = Palabra clave
 InboxTagUnknown = Palabra clave %s puesta por otro software, ausente de la lista de etiquetas (¿una etiqueta del mismo nombre con otra palabra clave?)
 InboxTagsThunderbird = Mismas etiquetas en Thunderbird

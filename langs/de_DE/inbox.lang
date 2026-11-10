@@ -379,6 +379,7 @@ InboxMoveDown = Nach unten
 InboxNewTag = Neues Schlagwort
 InboxAddTag = Hinzufügen
 InboxTagsKeysHelp = Die Tasten 1 bis 9 setzen die ersten neun aktiven Schlagwörter, 0 entfernt alle. Ziehen Sie die Zeilen oder nutzen Sie die Pfeile, um die Reihenfolge zu ändern.
+InboxTagsAliasHelp = Ein Schlüsselwort $labelN von Thunderbird, das kein Schlagwort der Liste trägt, gilt als das Schlagwort der Taste N (angezeigt, gefiltert, mit ihm entfernt): eine andere Reihenfolge der Liste ändert das Schlagwort dieser Mails.
 InboxTagKeyword = Schlüsselwort
 InboxTagUnknown = Schlüsselwort %s von einer anderen Software gesetzt, nicht in der Liste der Schlagwörter (ein Schlagwort gleichen Namens mit einem anderen Schlüsselwort?)
 InboxTagsThunderbird = Dieselben Schlagwörter in Thunderbird

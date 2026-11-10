@@ -1480,13 +1480,44 @@
 	function tagsHtml(row) {
 		const entry = S.folders.get(row.folder);
 		const defs = entry ? entry.account.tags : [];
+		const shown = new Set();
 		return (row.tags || []).map(k => {
-			const d = defs.find(x => x.keyword.toLowerCase() === String(k).toLowerCase());
+			const d = tagOf(defs, k);
 			if (!d) {
 				return userKeyword(k) ? '<span class="ibx-tag ibx-tag--unknown" title="' + th('InboxTagUnknown', String(k)) + '">' + esc(String(k)) + '</span>' : '';
 			}
+			// The tag and its alias $labelN on the same mail: one badge
+			if (shown.has(d.keyword.toLowerCase())) {
+				return '';
+			}
+			shown.add(d.keyword.toLowerCase());
 			return Dolibarr.tools.inboxColors.badge(d, d.view);
 		}).join(' ');
+	}
+	/**
+	 * Tag of a keyword in the active tags of a mailbox (in their order): its keyword, else $labelN of Thunderbird as an
+	 * alias of the tag of the key N when no tag has this keyword (a tag of Thunderbird with the same name as a tag of
+	 * the list but another keyword). Same rule on the server for the filter (InboxTag::keywordAliases)
+	 * @param {Array<Object>} defs Active tags of the mailbox, in order
+	 * @param {string} k Keyword
+	 * @return {Object|null}
+	 */
+	function tagOf(defs, k) {
+		const l = String(k).toLowerCase();
+		const d = defs.find(x => x.keyword.toLowerCase() === l);
+		if (d) {
+			return d;
+		}
+		const m = /^\$label([1-9])$/.exec(l);
+		return m ? (defs[+m[1] - 1] || null) : null;
+	}
+	/** Keywords of a mail that are this tag (its keyword or its alias $labelN) */
+	function keywordsOfTag(defs, row, keyword) {
+		const l = keyword.toLowerCase();
+		return (row.tags || []).filter(k => {
+			const d = tagOf(defs, k);
+			return d ? d.keyword.toLowerCase() === l : String(k).toLowerCase() === l;
+		});
 	}
 	/**
 	 * Keyword set by a person in another software (a tag of Thunderbird not in the list: other keyword than the tag of
@@ -4081,10 +4112,13 @@
 	}
 	function toggleTag(ids, keyword) {
 		const rows = ids.map(rowOf).filter(Boolean);
-		const has = r => (r.tags || []).some(k => k.toLowerCase() === keyword.toLowerCase());
-		const all = rows.every(has);
+		const a = rows.length ? accountOfRow(rows[0]) : null;
+		const defs = a ? (a.tags || []) : [];
+		const all = rows.every(r => keywordsOfTag(defs, r, keyword).length > 0);
+		// Removed: the keyword and its alias $labelN set by Thunderbird (else the tag would stay on the server)
+		const remove = Array.from(new Set([keyword].concat(rows.flatMap(r => keywordsOfTag(defs, r, keyword)))));
 		// One mail: the tag is seen on it and undone by the same key, no toast (several mails: « Undo »)
-		return runAction('tag', ids, all ? { remove: [keyword] } : { add: [keyword] }, { quiet: ids.length < 2 });
+		return runAction('tag', ids, all ? { remove } : { add: [keyword] }, { quiet: ids.length < 2 });
 	}
 
 	/** Dot of a tag for the menus: its colour (adapted to the theme), its border style when it has one */
@@ -4102,7 +4136,7 @@
 		const defs = a ? (a.tags || []) : [];
 		const why = refusal('tag', ids);
 		// Each tag with a dot of its colour and its border: the one to put is seen at once (the label stays written)
-		const items = defs.map((d, i) => ({ swatch: tagDot(d), label: d.label, key: i < 9 ? String(i + 1) : '', checked: rows.every(r => (r.tags || []).some(k => k.toLowerCase() === d.keyword.toLowerCase())),
+		const items = defs.map((d, i) => ({ swatch: tagDot(d), label: d.label, key: i < 9 ? String(i + 1) : '', checked: rows.every(r => keywordsOfTag(defs, r, d.keyword).length > 0),
 			disabled: !!why, run: () => toggleTag(ids, d.keyword) }));
 		if (!items.length) {
 			items.push({ note: t('InboxNoTags') });

@@ -102,6 +102,46 @@ class InboxTag
 	}
 
 	/**
+	 * Aliases $labelN of a keyword in mailboxes: the tag of the key N of the list of a mailbox (its active tags in
+	 * order) is also recognised on the keyword $labelN of Thunderbird when no tag of the list has it (a tag of
+	 * Thunderbird with the name of a tag of the list but another keyword). Same rule in the application (tagOf)
+	 *
+	 * @param string $keyword    Keyword of the tag
+	 * @param int[]  $accountIds Mailboxes
+	 * @return array<string,int[]> Alias => mailboxes where it is this tag
+	 */
+	public function keywordAliases($keyword, array $accountIds)
+	{
+		$accountIds = array_values(array_filter(array_map('intval', $accountIds)));
+		$keyword = strtolower((string) $keyword);
+		if (!$accountIds || $keyword === '') {
+			return array();
+		}
+		// Mailboxes by list: its own one in mode "own", else the global one (0)
+		$byList = array();
+		$rows = $this->db->getRows("SELECT rowid, tags_mode FROM ".$this->db->prefix()."inbox_account WHERE rowid IN (".implode(',', $accountIds).") LIMIT 10000");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$byList[(string) $r->tags_mode === 'own' ? (int) $r->rowid : 0][] = (int) $r->rowid;
+		}
+		$out = array();
+		foreach ($byList as $listId => $accounts) {
+			$keywords = array_map(function ($t) {
+				return strtolower($t['keyword']);
+			}, $this->listTags((int) $listId, true));
+			$i = array_search($keyword, $keywords, true);
+			if ($i === false || $i >= 9) {
+				continue;
+			}
+			$alias = '$label'.($i + 1);
+			if (!in_array($alias, $keywords, true)) {
+				$out[$alias] = array_merge($out[$alias] ?? array(), $accounts);
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * @param string $color Colour
 	 * @return bool         #RRGGBB
 	 */

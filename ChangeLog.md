@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: keyword $labelN of Thunderbird read as the tag of the key N when no tag of the list has it :   1.66.0
+  - a tag of Thunderbird with the name of a tag of the list but the keyword $labelN (e.g. $label8 for the tag of
+    the key 8, keyword demande_fournisseur_ok) is shown as this tag, found by its filter, and removed with it (both
+    keywords removed on the server). One badge when a mail has both.
+  - list of each mailbox (own or global): its active tags in order. Help of the settings: changing the order of
+    the list changes the tag of these mails.
+
 - NEW: tags of Thunderbird with another keyword than the tag of the same name, seen and aligned :   1.65.0
   - a keyword set by another software and absent from the list of the tags is shown on the mail as a dashed badge
     with the raw keyword (it was hidden: a tag created in Thunderbird gets a keyword made from its name, the mail

@@ -379,6 +379,7 @@ InboxMoveDown = Move down
 InboxNewTag = New tag
 InboxAddTag = Add
 InboxTagsKeysHelp = Keys 1 to 9 set the first nine active tags, 0 removes them all. Drag the rows, or use the arrows, to change the order.
+InboxTagsAliasHelp = A keyword $labelN of Thunderbird that no tag of the list has is read as the tag of the key N (shown, filtered, removed with it): changing the order of the list changes the tag of these mails.
 InboxTagKeyword = Keyword
 InboxTagUnknown = Keyword %s set by another software, not in the list of the tags (a tag of the same name with another keyword?)
 InboxTagsThunderbird = Same tags in Thunderbird
