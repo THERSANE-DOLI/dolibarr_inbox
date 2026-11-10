@@ -1,5 +1,22 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: cards of the pieces in the Dolibarr column on the right :   1.61.0
+  - ref and status on the first line, the status never cut (the ref is shortened), the thirdparty on a second line;
+    the card no more wider than the column.
+  - the thirdparty is left out when it is the one of the sender (the title of a project or ticket stays): a piece of
+    another thirdparty stands out; the full label stays in the title of the card.
+  - cited pieces: « their ref » joins the thirdparty on the second line, « Link » at its end (never a line for the
+    button alone); a card is two lines at most.
+
+- FIX: the users of Dolibarr named in the head of a mail lost their photo and card :   1.60.2
+  - the people assigned to the mail replaced them in the answer of the reading; they now have their own key.
+
+- FIX: the people assigned showed their initials, never the photo of their Dolibarr card :   1.60.1
+  - list, line « Assigned to », choice of the people and « is reading this mail » show the photo of the user card,
+    the initials when there is none.
+  - picture of a sender in the list: the photo of the user of the address comes before the photo of a contact with
+    the same address, as in the head of the reading.
+
 - NEW: lookalikes of our own domain :   1.60.0
   - the domains of the mailboxes are references of the lookalikes too, beside the recognized domains: a sender
     imitating our domain gets a banner (red, orange when its name only contains ours), a link a warning in the bar of

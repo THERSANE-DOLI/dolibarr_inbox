@@ -24,7 +24,7 @@
 /**
  * Picture of a correspondent, looked for by the server, never by the browser (neither the address of the workstation
  * nor the moment of the reading leave Dolibarr). Order:
- * 1. Dolibarr: photo of the contact of the address, else of the user, else logo of the thirdparty recognised;
+ * 1. Dolibarr: photo of the user of the address, else of the contact, else logo of the thirdparty recognised;
  * 2. BIMI (verified logo published in the DNS of the domain), only for a mail that passed DMARC: a forged mail
  *    would otherwise show the real logo of the company imitated;
  * 3. Gravatar, off by default (a hash of the address of each correspondent would be sent to a third party);
@@ -102,7 +102,7 @@ class InboxAvatar
 	}
 
 	/**
-	 * Photo of the contact, of the user, logo of the thirdparty (thumbnail when there is one)
+	 * Photo of the user, of the contact, logo of the thirdparty (thumbnail when there is one)
 	 *
 	 * @param string $email Address
 	 * @param int    $socid Thirdparty recognised
@@ -114,17 +114,20 @@ class InboxAvatar
 
 		$p = $this->db->prefix();
 		$e = "'".$this->db->escape($email)."'";
-		$c = $this->db->getRow("SELECT rowid, photo, entity FROM ".$p."socpeople WHERE email = ".$e." AND photo IS NOT NULL AND photo <> '' AND entity IN (".getEntity('contact').")");
-		if (is_object($c)) {
-			$base = $conf->societe->multidir_output[(int) $c->entity] ?? $conf->societe->dir_output;
-			$pic = $this->file($base.'/contact/'.((int) $c->rowid).'/photos', (string) $c->photo);
+		// The user first: the person himself, a contact with the same address is a copy (same order as the head of the
+		// reading, where a user of Dolibarr shows his photo)
+		$u = $this->db->getRow("SELECT rowid, photo FROM ".$p."user WHERE LOWER(email) = ".$e." AND photo IS NOT NULL AND photo <> '' AND statut = 1"
+			." AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") ORDER BY rowid");
+		if (is_object($u)) {
+			$pic = $this->file($conf->user->dir_output.'/'.((int) $u->rowid).'/photos', (string) $u->photo);
 			if ($pic) {
 				return $pic;
 			}
 		}
-		$u = $this->db->getRow("SELECT rowid, photo FROM ".$p."user WHERE email = ".$e." AND photo IS NOT NULL AND photo <> '' AND statut = 1");
-		if (is_object($u)) {
-			$pic = $this->file($conf->user->dir_output.'/'.((int) $u->rowid).'/photos', (string) $u->photo);
+		$c = $this->db->getRow("SELECT rowid, photo, entity FROM ".$p."socpeople WHERE email = ".$e." AND photo IS NOT NULL AND photo <> '' AND entity IN (".getEntity('contact').")");
+		if (is_object($c)) {
+			$base = $conf->societe->multidir_output[(int) $c->entity] ?? $conf->societe->dir_output;
+			$pic = $this->file($base.'/contact/'.((int) $c->rowid).'/photos', (string) $c->photo);
 			if ($pic) {
 				return $pic;
 			}
