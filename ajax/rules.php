@@ -49,6 +49,24 @@ function inboxRulesFail(InboxRules $rules)
 }
 
 /**
+ * Full state of the rules for the screens: the rules and out of office plus the folders, tags and addresses of the
+ * mailbox. Every reply that replaces the state of the screen (get, save, undo) has them, else the editor opened next
+ * from that state finds no folder and does not open.
+ *
+ * @param InboxRules   $rules   Rules
+ * @param InboxAccount $account Mailbox
+ * @param array        $state   State from load(), save() or undo()
+ * @return array
+ */
+function inboxRulesState(InboxRules $rules, InboxAccount $account, array $state)
+{
+	$state['folders'] = $rules->foldersOf($account);
+	$state['tags'] = $rules->tagsOf($account);
+	$state['addresses'] = $rules->addressesOf($account);
+	return $state;
+}
+
+/**
  * @param string $key Parameter holding JSON
  * @return mixed
  */
@@ -72,10 +90,7 @@ switch ($action) {
 		if ($state === null) {
 			inboxRulesFail($rules);
 		}
-		$state['folders'] = $rules->foldersOf($account);
-		$state['tags'] = $rules->tagsOf($account);
-		$state['addresses'] = $rules->addressesOf($account);
-		inboxAjaxReply($state);
+		inboxAjaxReply(inboxRulesState($rules, $account, $state));
 		// no break
 
 	case 'script':
@@ -109,7 +124,7 @@ switch ($action) {
 		if ($res === null) {
 			inboxRulesFail($rules);
 		}
-		inboxAjaxReply($res);
+		inboxAjaxReply(inboxRulesState($rules, $account, $res));
 		// no break
 
 	case 'undo':
@@ -117,7 +132,7 @@ switch ($action) {
 		if ($res === null) {
 			inboxRulesFail($rules);
 		}
-		inboxAjaxReply($res);
+		inboxAjaxReply(inboxRulesState($rules, $account, $res));
 		// no break
 
 	case 'preview':
