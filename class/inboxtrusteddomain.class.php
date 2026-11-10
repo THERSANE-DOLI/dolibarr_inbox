@@ -80,6 +80,9 @@ class InboxTrustedDomain
 	/** @var array<int,list<array<string,mixed>>> Cache per entity of the list, for one request */
 	protected static $cache = array();
 
+	/** @var array<int,string[]> Cache per entity of the domains of the mailboxes, for one request */
+	protected static $ownCache = array();
+
 	/** @var array<string,int>|null Rules of the Public Suffix List */
 	protected static $suffixes = null;
 
@@ -89,6 +92,17 @@ class InboxTrustedDomain
 	public function __construct(DoliDB $db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * Forget the lists read in this request (a mailbox or a domain added since)
+	 *
+	 * @return void
+	 */
+	public static function clearCache()
+	{
+		self::$cache = array();
+		self::$ownCache = array();
 	}
 
 	// ---------- Domains ----------
@@ -498,6 +512,10 @@ class InboxTrustedDomain
 	{
 		global $conf;
 
+		$entity = (int) $conf->entity;
+		if (isset(self::$ownCache[$entity])) {
+			return self::$ownCache[$entity];
+		}
 		$rows = $this->db->getRows("SELECT DISTINCT email FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." LIMIT 500");
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
@@ -505,6 +523,29 @@ class InboxTrustedDomain
 			if ($d !== '') {
 				$out[$d] = $d;
 			}
+		}
+		self::$ownCache[$entity] = array_values($out);
+
+		return self::$ownCache[$entity];
+	}
+
+	/**
+	 * Domains of the mailboxes as references of the lookalikes (1.60.0): a sender or a link imitating our own domain.
+	 * Never an open service (a mailbox on gmail.com) nor a name shorter than 5 characters (pro.fr: too many
+	 * neighbours). Named after the company.
+	 *
+	 * @return list<array{domain:string,label:string,subdomains:int,own:int}>
+	 */
+	public function ownRefs()
+	{
+		$label = getDolGlobalString('MAIN_INFO_SOCIETE_NOM');
+		$out = array();
+		foreach ($this->ownDomains() as $d) {
+			$reg = self::registrable($d);
+			if ($reg === '' || isset($out[$reg]) || self::isOpenService($reg) || mb_strlen(self::skeleton(self::nameOf($reg)), 'UTF-8') < 5) {
+				continue;
+			}
+			$out[$reg] = array('domain' => $reg, 'label' => $label !== '' ? $label : $reg, 'subdomains' => 1, 'own' => 1);
 		}
 
 		return array_values($out);
@@ -684,8 +725,10 @@ class InboxTrustedDomain
 	public function senderVerdict($fromEmail, $replyTo, array $auth, $passed)
 	{
 		$entries = $this->fetchAll();
+		// References of the lookalikes: the recognized domains and our own ones (1.60.0)
+		$refs = array_merge($entries, $this->ownRefs());
 		$host = self::normalize((string) $fromEmail);
-		if (!$entries || $host === '' || strpos((string) $fromEmail, '@') === false) {
+		if (!$refs || $host === '' || strpos((string) $fromEmail, '@') === false) {
 			return null;
 		}
 		$e = $this->find($host);
@@ -707,10 +750,10 @@ class InboxTrustedDomain
 			}
 			return null;
 		}
-		$like = self::lookalike($host, $entries, true, $this->ownDomains());
+		$like = self::lookalike($host, $refs, true, $this->ownDomains());
 		if ($like) {
 			return array('state' => 'lookalike', 'case' => $like['case'], 'level' => $like['case'] === 4 ? 'warning' : 'danger',
-				'domain' => $like['entry']['domain'], 'label' => $like['entry']['label'], 'host' => $host);
+				'domain' => $like['entry']['domain'], 'label' => $like['entry']['label'], 'host' => $host, 'own' => !empty($like['entry']['own']));
 		}
 
 		return null;
@@ -780,8 +823,9 @@ class InboxTrustedDomain
 	public function linkVerdicts($html, $text, $withList = false)
 	{
 		$entries = $this->fetchAll();
+		$refs = array_merge($entries, $this->ownRefs());
 		$out = array('hosts' => array(), 'domains' => array());
-		if (!$entries && !$withList) {
+		if (!$refs && !$withList) {
 			return $out;
 		}
 		$hosts = self::linkHosts($html, $text);
@@ -791,8 +835,8 @@ class InboxTrustedDomain
 			$e = $this->find($h);
 			if ($e) {
 				$out['hosts'][$h] = array('t' => 'trusted', 'domain' => $e['domain'], 'label' => $e['label']);
-			} elseif ($entries && ($like = self::lookalike($h, $entries, false, $own))) {
-				$out['hosts'][$h] = array('t' => 'lookalike', 'domain' => $like['entry']['domain'], 'label' => $like['entry']['label']);
+			} elseif ($refs && ($like = self::lookalike($h, $refs, false, $own))) {
+				$out['hosts'][$h] = array('t' => 'lookalike', 'domain' => $like['entry']['domain'], 'label' => $like['entry']['label'], 'own' => !empty($like['entry']['own']));
 			}
 			if ($withList && $count > 0 && !$e) {
 				$reg = self::registrable($h);
@@ -804,7 +848,7 @@ class InboxTrustedDomain
 		arsort($domains);
 		foreach (array_slice($domains, 0, 8, true) as $d => $n) {
 			// A lookalike stays offered (a real organisation may write from it) but never checked, and said
-			$out['domains'][] = array('domain' => (string) $d, 'links' => (int) $n, 'like' => self::likeOf((string) $d, $entries, $own));
+			$out['domains'][] = array('domain' => (string) $d, 'links' => (int) $n, 'like' => self::likeOf((string) $d, $refs, $own));
 		}
 
 		return $out;

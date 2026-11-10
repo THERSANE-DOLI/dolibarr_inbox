@@ -61,6 +61,9 @@ abstract class InboxTestCase extends TestCase
 		$this->admin = $user;
 		self::cleanup($this->db);
 		InboxAccess::clearCache();
+		if (class_exists('InboxTrustedDomain')) {
+			InboxTrustedDomain::clearCache();
+		}
 	}
 
 	/**

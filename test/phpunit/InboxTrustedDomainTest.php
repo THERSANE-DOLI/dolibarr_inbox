@@ -139,6 +139,36 @@ class InboxTrustedDomainTest extends InboxTestCase
 	}
 
 	/**
+	 * 1.60.0: our own domain (of the mailboxes) is a reference of the lookalikes too
+	 *
+	 * @return void
+	 */
+	public function testOwnDomainLookalikes()
+	{
+		$this->box(true);
+		InboxTrustedDomain::clearCache();
+		$t = new InboxTrustedDomain($this->db);
+		$this->assertContains('inbox-test.invalid', array_column($t->ownRefs(), 'domain'));
+		$dkim = array('spf' => 'pass', 'dkim' => 'pass', 'dmarc' => 'pass', 'fail' => false, 'trusted' => false, 'dkim_domains' => array());
+		$like = $t->senderVerdict('compta@inbox-tests.invalid', '', $dkim, true);
+		$this->assertSame('lookalike', $like['state']);
+		$this->assertTrue($like['own']);
+		$this->assertSame('inbox-test.invalid', $like['domain']);
+		$this->assertSame(1, $t->senderVerdict('compta@inbox-test.com', '', $dkim, true)['case']);
+		// Our own domain and its subdomains: never
+		$this->assertNull($t->senderVerdict('devis@inbox-test.invalid', '', $dkim, true));
+		$this->assertNull($t->senderVerdict('a@mail.inbox-test.invalid', '', $dkim, true));
+		$this->assertNull($t->senderVerdict('a@exemple.com', '', $dkim, true));
+		$v = $t->linkVerdicts('<a href="https://inbox-tesst.invalid/login">Espace client</a>', '');
+		$this->assertTrue($v['hosts']['inbox-tesst.invalid']['own']);
+		// A domain of ours recognized: no more a lookalike
+		$this->assertGreaterThan(0, $t->create($this->admin, 'inbox-test.com', 'ZzTrusted Nous'));
+		$this->assertNull($t->senderVerdict('compta@inbox-test.com', '', array('fail' => false), false));
+		// A mailbox on an open service is never a reference
+		$this->assertNull(InboxTrustedDomain::lookalike('gmaii.com', array(), true));
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testListAndSender()
