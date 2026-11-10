@@ -806,6 +806,11 @@
 				}
 			}
 			await Dolibarr.tools.langs.load('inbox@inbox');
+			// Searchable lists (tool combo, js/dolibarr-combo.js or the core): their words in the language of the user
+			if (Dolibarr.tools.combo) {
+				Dolibarr.tools.combo.labels({ search: t('InboxComboSearch'), none: t('InboxComboNone'), noResult: t('InboxComboNoResult'), typeMore: t('InboxComboTypeMore'),
+					moreChosen: t('InboxComboMoreChosen'), minChars: t('InboxComboMinChars'), searching: t('InboxComboSearching'), clear: t('InboxComboClear') });
+			}
 		} catch (e) {
 			// Keys shown as they are: the application still works
 		}

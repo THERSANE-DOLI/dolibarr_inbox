@@ -111,6 +111,15 @@ Other modules add their domains with the hook `inboxSharedDomains` (context `inb
 `$this->results['domains'] = array('example-group.com' => 'shared')` (categories `public`, `disposable`, `shared`);
 they show with the origin « other module », read only.
 
+## Searchable lists (tool combo)
+
+`js/dolibarr-combo.js` and `css/dolibarr-combo.css` define `Dolibarr.tools.combo`, a searchable list of choices
+written to go into the core: no dependency (no jQuery, nothing of inbox), defined only when the core has none.
+Opt-in: `<select data-combo>` (with `multiple`, `data-combo-clear="1"`, `data-combo-placeholder`,
+`data-combo-source="url"` + `data-combo-min`, `<option data-sub>`), or `Dolibarr.tools.combo.attach(select, opts)`.
+The native select stays in the page and stays the truth (value, options, native `change`, browser validation); see
+the head of the file. Colours: the variables `--dol-combo-*`, set by inbox from its theme.
+
 ## New customer from a mail
 
 On a mail of an unknown sender, the Dolibarr band offers « New customer »: a side panel on the left, the mail left

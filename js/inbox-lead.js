@@ -159,18 +159,18 @@
 				+ '<span class="ibx-lead__label">' + th('InboxLeadKind') + '</span><div class="ibx-lead__inline" role="radiogroup" aria-label="' + th('InboxLeadKind') + '">'
 				+ '<label class="ibx-inline"><input type="radio" name="ibx-lead-kind" class="ibx-js-leadkind" value="0"' + (o.private ? '' : ' checked') + '> ' + th('InboxLeadCompany') + '</label>'
 				+ '<label class="ibx-inline"><input type="radio" name="ibx-lead-kind" class="ibx-js-leadkind" value="1"' + (o.private ? ' checked' : '') + '> ' + th('InboxLeadPrivate') + '</label></div>'
-				+ (f.types.length ? '<label class="ibx-lead__label" for="ibx-lead-typent">' + th('InboxLeadType') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-typent" data-part="soc" data-field="typent_id"><option value=""></option>'
+				+ (f.types.length ? '<label class="ibx-lead__label" for="ibx-lead-typent">' + th('InboxLeadType') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-typent" data-combo data-part="soc" data-field="typent_id"><option value=""></option>'
 					+ f.types.map(x => '<option value="' + x.id + '"' + (String(x.id) === String(st.values.soc.typent_id || '') ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></div>' : '')
 				+ (o.customer || o.prospect ? (f.code.auto ? '<span class="ibx-lead__label">' + th('InboxLeadCode') + '</span><div class="ibx-muted">' + th('InboxLeadCodeAuto') + '</div>'
 					: (f.code.required ? fieldHtml(st, 'soc', 'customer_code', t('InboxLeadCode'), true) : '')) : '')
 				+ mainSoc + moduleFields('soc') + '</div>'
 				+ '<details class="ibx-lead__moredet"' + (st.moreOpen ? ' open' : '') + '><summary>' + th('InboxLeadMore') + '</summary><div class="ibx-lead__grid">'
 				+ moreSoc
-				+ '<label class="ibx-lead__label" for="ibx-lead-country">' + th('InboxLeadCountry') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-country" data-part="soc" data-field="country_id"><option value=""></option>'
+				+ '<label class="ibx-lead__label" for="ibx-lead-country">' + th('InboxLeadCountry') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-country" data-combo data-part="soc" data-field="country_id"><option value=""></option>'
 				+ f.countries.map(x => '<option value="' + x.id + '"' + (String(x.id) === String(st.values.soc.country_id || '') ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></div>'
 				+ '<span class="ibx-lead__label">' + th('InboxLeadSalesRep') + '</span><label class="ibx-inline"><input type="checkbox" class="ibx-js-leadopt" data-opt="commercial"' + (o.commercial ? ' checked' : '') + '> ' + esc(f.me.name) + '</label>'
 				+ '<span class="ibx-lead__label">' + th('InboxLeadVat') + '</span><label class="ibx-inline"><input type="checkbox" class="ibx-js-leadopt" data-opt="vat_subject"' + (o.vat_subject ? ' checked' : '') + '> ' + th('InboxLeadVatSubject') + '</label>'
-				+ (f.categories.length ? '<label class="ibx-lead__label" for="ibx-lead-cats">' + th('InboxLeadCategories') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-cats" multiple size="4">'
+				+ (f.categories.length ? '<label class="ibx-lead__label" for="ibx-lead-cats">' + th('InboxLeadCategories') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-cats" multiple data-combo>'
 					+ f.categories.map(c => '<option value="' + c.id + '"' + (o.categories.includes(c.id) ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select></div>' : '')
 				+ '</div></details>';
 		const contactPart = o.private && !useSoc ? '<p class="ibx-muted">' + th('InboxLeadPrivateHelp') + '</p>'

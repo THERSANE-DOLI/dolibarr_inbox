@@ -724,7 +724,7 @@
 		box.innerHTML = '<p class="ibx-section__help">' + th('InboxJournalHelp') + '</p>'
 			+ '<div class="ibx-journal__filters" role="search">'
 			+ '<label class="ibx-sr-only" for="j-q">' + th('InboxJournalSearch') + '</label><input type="search" class="ibx-field ibx-field--medium" id="j-q" autocomplete="off" placeholder="' + th('InboxJournalSearch') + '">'
-			+ '<label class="ibx-sr-only" for="j-user">' + th('InboxJournalWho') + '</label><select class="ibx-field ibx-field--medium" id="j-user"><option value="0">' + th('InboxJournalEveryone') + '</option></select>'
+			+ '<label class="ibx-sr-only" for="j-user">' + th('InboxJournalWho') + '</label><select class="ibx-field ibx-field--medium" id="j-user" data-combo><option value="0">' + th('InboxJournalEveryone') + '</option></select>'
 			+ '<label class="ibx-sr-only" for="j-what">' + th('InboxJournalAction') + '</label><select class="ibx-field ibx-field--medium" id="j-what"><option value="">' + th('InboxJournalAllActions') + '</option>'
 			+ JOURNAL_ACTIONS.map(a => '<option value="' + a + '">' + th('InboxJournal_' + a) + '</option>').join('') + '</select>'
 			+ '<span class="ibx-inline"><label for="j-from">' + th('InboxJournalFrom') + '</label><input type="date" class="ibx-field" id="j-from"><label for="j-to">' + th('InboxJournalTo') + '</label><input type="date" class="ibx-field" id="j-to"></span>'
@@ -1186,7 +1186,7 @@
 		roles.forEach(r => {
 			const current = holder(r);
 			initial[r] = current;
-			html += '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-role-' + r + '">' + th(roleKey(r)) + '</label><div><select class="ibx-field ibx-field--medium" id="f-role-' + r + '" name="role_' + r + '">'
+			html += '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-role-' + r + '">' + th(roleKey(r)) + '</label><div><select class="ibx-field ibx-field--medium" data-combo id="f-role-' + r + '" name="role_' + r + '">'
 				+ '<option value="">' + th('InboxFolderNone') + '</option>'
 				+ selectable.map(f => '<option value="' + esc(f.path) + '"' + (f.path === current ? ' selected' : '') + ' title="' + esc(f.path) + '">' + esc(f.label || f.name) + (f.role === r ? ' (' + th('InboxFolderFound') + ')' : '') + '</option>').join('')
 				+ '</select>' + (current ? '' : '<div class="ibx-formrow__help">' + th('InboxFolderMissing') + '</div>') + '</div></div>';
@@ -2245,7 +2245,7 @@
 			// Usage Transport: the category of the suppliers that are carriers (1.70.0)
 			if (u === 'transport' && (account.carrier_categories || []).length) {
 				indicators += '<div class="ibx-formrow" style="margin-top:var(--ibx-s4)"><label class="ibx-formrow__label" for="ibx-carriers">' + th('InboxCarrierCategory') + '</label><div>'
-					+ '<select class="ibx-field ibx-js-carriers" id="ibx-carriers"><option value="0">' + th('InboxCarrierNone') + '</option>'
+					+ '<select class="ibx-field ibx-js-carriers" id="ibx-carriers" data-combo><option value="0">' + th('InboxCarrierNone') + '</option>'
 					+ account.carrier_categories.map(c => '<option value="' + c.id + '"' + (c.id === account.carrier_category ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>'
 					+ '<div class="ibx-formrow__help">' + th('InboxCarrierHelp') + '</div></div></div>';
 			}

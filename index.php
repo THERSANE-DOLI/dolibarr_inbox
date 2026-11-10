@@ -100,6 +100,8 @@ print '<title>'.dol_escape_htmltag($title).'</title>'."\n";
 print '<link rel="manifest" href="'.dol_buildpath('/inbox/manifest.json.php', 1).'">'."\n";
 print '<link rel="icon" type="image/svg+xml" href="'.dol_buildpath('/inbox/img/favicon.svg', 1).'">'."\n";
 print '<link rel="apple-touch-icon" href="'.dol_buildpath('/inbox/img/app-192.png', 1).'">'."\n";
+// Searchable lists: tool of the JavaScript context, written for the core (the copy of inbox only when the core has none)
+print '<link rel="stylesheet" href="'.$asset('/css/dolibarr-combo.css').'">'."\n";
 print '<link rel="stylesheet" href="'.$asset('/css/inbox.css').'">'."\n";
 print '<style nonce="'.getNonce().'" id="ibx-accent-css">'.inboxAccentCss($accent, getDolGlobalString('INBOX_ACCENT_DARK'), getDolGlobalString('INBOX_GREYS', 'neutral')).'</style>'."\n";
 // Styles of the other modules, after the ones of the application (module_parts 'inboxcss'), then their dynamic header
@@ -115,6 +117,7 @@ if (!inboxPrintJsContext($vars)) {
 	print '</head><body class="ibx-doc"><p class="ibx-notice ibx-notice--error">'.dol_escape_htmltag($langs->trans('InboxNeedBackportDolContext')).'</p></body></html>';
 	exit;
 }
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/dolibarr-combo.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-colors.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-mail.js').'" defer></script>'."\n";

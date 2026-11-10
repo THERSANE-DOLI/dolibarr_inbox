@@ -326,9 +326,9 @@
 				+ '<div class="ibx-ruled__block"><div class="ibx-ruled__title">' + th('InboxRuleThen') + '</div>'
 				+ r.acts.map((a, i) => '<div class="ibx-ruled__row ibx-ruled__row--act">'
 					+ '<select class="ibx-field" data-a="' + i + '" data-k="a" aria-label="' + th('InboxRuleActionLabel') + '"' + (ro ? ' disabled' : '') + '>' + opt(RULE_ACTIONS, a.a, 'InboxRuleAct_') + '</select>'
-					+ (a.a === 'move' || a.a === 'copy' ? '<select class="ibx-field" data-a="' + i + '" data-k="v" aria-label="' + th('InboxRuleFolder') + '"' + (ro ? ' disabled' : '') + '>'
+					+ (a.a === 'move' || a.a === 'copy' ? '<select class="ibx-field" data-combo data-a="' + i + '" data-k="v" aria-label="' + th('InboxRuleFolder') + '"' + (ro ? ' disabled' : '') + '>'
 						+ st.folders.filter(f => f.role !== 'trash').map(f => '<option value="' + esc(f.path) + '"' + (f.path === a.v ? ' selected' : '') + '>' + esc(rulePathName(f.path, st.folders)) + '</option>').join('') + '</select>'
-						: a.a === 'tag' ? '<select class="ibx-field" data-a="' + i + '" data-k="v" aria-label="' + th('InboxRuleTag') + '"' + (ro ? ' disabled' : '') + '>'
+						: a.a === 'tag' ? '<select class="ibx-field" data-combo data-a="' + i + '" data-k="v" aria-label="' + th('InboxRuleTag') + '"' + (ro ? ' disabled' : '') + '>'
 							+ st.tags.map(x => '<option value="' + esc(x.keyword) + '"' + (x.keyword === a.v ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select>'
 							: a.a === 'redirect' ? '<input class="ibx-field" type="email" data-a="' + i + '" data-k="v" value="' + esc(a.v || '') + '" placeholder="' + th('InboxRuleRedirectPlaceholder') + '" aria-label="' + th('InboxRuleRedirectTo') + '" autocomplete="off"' + (ro ? ' readonly' : '') + '>'
 								: '<span class="ibx-muted">' + (a.a === 'delete' ? th('InboxRuleDeleteHelp') : '') + '</span>')
@@ -646,7 +646,7 @@
 		const boxes = managedAccounts();
 		const a = boxes.find(x => x.id === P.account) || { id: P.account, email: '' };
 		$('.ibx-rp__box', P.el).innerHTML = boxes.length > 1
-			? '<select class="ibx-field ibx-js-rpbox" aria-label="' + th('InboxMailbox') + '">' + boxes.map(x => '<option value="' + x.id + '"' + (x.id === P.account ? ' selected' : '') + '>' + esc(x.label || x.email) + '</option>').join('') + '</select>'
+			? '<select class="ibx-field ibx-js-rpbox" data-combo aria-label="' + th('InboxMailbox') + '">' + boxes.map(x => '<option value="' + x.id + '"' + (x.id === P.account ? ' selected' : '') + '>' + esc(x.label || x.email) + '</option>').join('') + '</select>'
 			: '<span class="ibx-muted ibx-ellipsis">' + esc(a.label || a.email) + '</span>';
 		const sel = $('.ibx-js-rpbox', P.el);
 		if (sel) {

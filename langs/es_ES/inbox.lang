@@ -2858,3 +2858,12 @@ InboxLeadPendingCreate = Crear el contacto %s
 InboxLeadPendingDismiss = No crear este contacto
 InboxLeadExisting = Tercero existente…
 InboxLeadMissing = Campos obligatorios vacíos: %s
+# Searchable lists, tool combo (1.80.0)
+InboxComboSearch = Buscar…
+InboxComboNone = Ninguno
+InboxComboNoResult = Ningún resultado
+InboxComboTypeMore = %s más, escriba para filtrar
+InboxComboMoreChosen = +%s
+InboxComboMinChars = Escriba al menos %s caracteres
+InboxComboSearching = Buscando…
+InboxComboClear = Borrar

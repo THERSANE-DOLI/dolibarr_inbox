@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: searchable lists, tool « combo » of the JavaScript context, written for the core :   1.80.0
+  - js/dolibarr-combo.js and css/dolibarr-combo.css, no dependency (no jQuery, nothing of inbox): Dolibarr.tools.combo
+    is defined only when the core has none. Opt-in: the selects marked data-combo, or attach(). Search with case
+    and accents ignored, single or multiple, groups, a second line per option, clear button, options asked to the
+    server as one types (function or URL), keyboard and ARIA combobox; the native list kept on a phone for a single
+    choice.
+  - the native select stays the truth: visually hidden (a required field is still checked by the browser), in sync,
+    a native « change » on each choice; a value set by the code or options loaded later show on the button; a focus
+    on the select goes to the button; the classes the code looks for (js-) are never given to the button.
+  - in inbox: country, type and categories of the panel « New customer », folder, tag and mailbox of the rules,
+    user of the journal, folders per role, carriers, language of the AI. Colours from the theme of inbox.
+
 - FIX: panel « New customer », signature found and read better :   1.79.3
   - the HTML of the mail is read (a tool of signatures may leave « Sent from ... as Plain Text » in the text part);
     the signature found after « -- », else from the line of the name of the sender, else after a closing formula,
