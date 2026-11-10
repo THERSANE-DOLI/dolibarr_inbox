@@ -2185,6 +2185,7 @@ InboxRuleSpam = Règle anti-spam
 InboxRuleSpamHelp = Ranger dans les indésirables les mails marqués spam par le filtre du serveur (SpamAssassin, Rspamd)
 InboxRuleSpamName = Spam marqué par le serveur
 InboxOpenNewTab = Ouvrir dans un nouvel onglet
+InboxOpenWith = Ouvrir avec %s
 InboxAttScanning = Analyse antivirus…
 InboxAttScanLong = Analyse antivirus toujours en cours…
 InboxAttScanFailed = Analyse antivirus impossible.

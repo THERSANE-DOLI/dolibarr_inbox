@@ -6729,6 +6729,21 @@
 		return I.ctx('INBOX_AJAX_URL', '') + 'attachment.php?id=' + m.id + '&part=' + a.part + '&mode=' + mode + (force ? '&force=1' : '');
 	}
 
+	/**
+	 * Viewers of other modules for the attachments of a mail (hook inboxAttachmentViewers, C1): part => list of
+	 * {code, label, url}, asked once per mail. Inbox does not know the modules, only what they declare.
+	 * @param {object} m Mail
+	 * @returns {Promise<object>}
+	 */
+	function viewersOf(m) {
+		if (!m._viewers) {
+			m._viewers = api('attachment', 'viewers', { id: m.id, part: -1, mode: 'viewers' })
+				.then(r => (r && r.viewers) || {})
+				.catch(() => ({}));
+		}
+		return m._viewers;
+	}
+
 	/** Time after which the summary says the analysis is still running */
 	const SCAN_LONG = 5000;
 	/**
@@ -6944,7 +6959,8 @@
 	/** A PDF or a picture: the kind of viewer that wants room */
 	function viewerKind(m, o) {
 		const a = !o.source && m.attachments ? m.attachments[o.index] : null;
-		return a && (a.kind === 'pdf' || a.kind === 'image') ? 'doc' : 'other';
+		// The viewer of another module, or an office document (shown by such a viewer): the size of a PDF
+		return o.viewer || (a && (a.kind === 'pdf' || a.kind === 'image' || /\.(docx?|xlsx?|pptx?|od[tsp]|rtf)$/i.test(a.name || ''))) ? 'doc' : 'other';
 	}
 	/** Opening of a PDF by the viewer of the browser: the width of the page, no panel of thumbnails when it obeys */
 	const PDF_OPEN = '#view=FitH&zoom=page-width&pagemode=none&navpanes=0';
@@ -6990,7 +7006,7 @@
 	 */
 	function openViewer(o) {
 		const m = o.mail;
-		const key = m.id + ':' + (o.source ? 'source' : o.index);
+		const key = m.id + ':' + (o.source ? 'source' : o.index) + (o.viewer ? ':' + o.viewer.code : '');
 		const existing = windows.find(w => w.key === key);
 		if (existing) {
 			restore(existing);
@@ -7016,7 +7032,7 @@
 		if (isPhone()) {
 			dlg.classList.add('ibx-window--maximized');
 		}
-		const w = { key, dlg, mail: m, index: o.index, source: !!o.source, kind };
+		const w = { key, dlg, mail: m, index: o.index, source: !!o.source, kind, viewer: o.viewer || null };
 		windows.push(w);
 		document.body.appendChild(dlg);
 		dlg.show();
@@ -7237,6 +7253,16 @@
 		const m = w.mail;
 		const force = !!w.forced;
 		const top = warnings ? '<div class="ibx-viewer__pad">' + warnings + '</div>' : '';
+		// Viewer of another module: chosen in « Open with… », or the first one for a kind inbox does not show itself
+		let other = w.viewer;
+		if (!other && !['pdf', 'image', 'mail', 'text', 'csv', 'zip'].includes(a.kind)) {
+			other = ((await viewersOf(m))[a.part] || [])[0] || null;
+		}
+		if (other) {
+			// Same origin page (checked by the server of inbox), the warnings of the antivirus stay above it
+			body.innerHTML = top + '<iframe class="ibx-viewer__frame" title="' + esc(a.name) + '" src="' + esc(other.url + (force ? '&force=1' : '')) + '"></iframe>';
+			return;
+		}
 		if (a.kind === 'pdf') {
 			body.innerHTML = top + '<iframe class="ibx-viewer__frame" title="' + esc(a.name) + '" src="' + attUrl(m, a, 'inline', force) + PDF_OPEN + '"></iframe>';
 		} else if (a.kind === 'image') {
@@ -7955,16 +7981,18 @@
 		paint();
 	}
 
-	function attachmentMenu(m, index, el, at) {
+	async function attachmentMenu(m, index, el, at) {
 		const a = m.attachments[index];
 		if (!a) {
 			return;
 		}
 		const box = dolibarOf(el);
 		const pieces = box && box._data ? box._data.links.filter(l => l.readable) : [];
+		// « Open with… »: the viewers of other modules (office server, Office preview...), after the viewer of inbox
+		const others = ((await viewersOf(m))[a.part] || []).map(v => ({ icon: 'open', label: t('InboxOpenWith', v.label), run: () => openViewer({ mail: m, index, viewer: v }) }));
 		menu(el, [
 			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
-		].concat(a.kind === 'pdf' || a.kind === 'image' ? [{ icon: 'external', label: t('InboxOpenNewTab'), key: 'Ctrl+clic', run: () => openInTab(m, index) }] : [], [
+		].concat(others, a.kind === 'pdf' || a.kind === 'image' ? [{ icon: 'external', label: t('InboxOpenNewTab'), key: 'Ctrl+clic', run: () => openInTab(m, index) }] : [], [
 			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
 		]).concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
 			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }]) : [], [HINT()]), at || rectPoint(el));

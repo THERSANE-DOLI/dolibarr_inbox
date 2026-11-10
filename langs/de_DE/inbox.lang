@@ -2185,6 +2185,7 @@ InboxRuleSpam = Spam-Regel
 InboxRuleSpamHelp = Vom Spamfilter des Servers markierte Mails in den Spam-Ordner verschieben (SpamAssassin, Rspamd)
 InboxRuleSpamName = Vom Server markierter Spam
 InboxOpenNewTab = In neuem Tab öffnen
+InboxOpenWith = Öffnen mit %s
 InboxAttScanning = Virenprüfung…
 InboxAttScanLong = Virenprüfung läuft noch…
 InboxAttScanFailed = Virenprüfung nicht möglich.
