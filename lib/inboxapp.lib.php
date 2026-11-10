@@ -111,6 +111,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_USER_NAME' => $user->getFullName($GLOBALS['langs']),
 		'INBOX_RIGHT_WEBMAIL' => (bool) $user->hasRight('inbox', 'webmail', 'use'),
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),
+		// Settings > Server (1.54.0): admins of Dolibarr only
+		'INBOX_RIGHT_DOLIBARR_ADMIN' => !empty($user->admin),
 		// Lot W6: the user may write (an active mailbox with the level « send » at least)
 		'INBOX_CAN_SEND' => inboxCanSend($user),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),

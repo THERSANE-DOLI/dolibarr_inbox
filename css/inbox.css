@@ -1561,7 +1561,8 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__tools { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 0.125rem; padding: var(--ibx-s1) var(--ibx-s2); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); }
 .ibx-compose__tools [aria-pressed="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-compose__sep { width: 1px; height: 1.25rem; margin: 0 var(--ibx-s1); background: var(--ibx-border); }
-.ibx-compose__editor { flex: 1 0 auto; min-height: 10rem; padding: 0; cursor: text; }
+/* The text grows with what is written, the signature right under it (1.53.5, as the mail software) */
+.ibx-compose__editor { flex: none; min-height: 10rem; padding: 0; cursor: text; }
 .ibx-editor__content { min-height: 10rem; padding: var(--ibx-s3); outline: none; font-size: var(--ibx-fs-body); line-height: 1.5; overflow-wrap: break-word; }
 .ibx-editor__content p { margin: 0 0 0.5em; }
 .ibx-editor__content ul, .ibx-editor__content ol { margin: 0 0 0.5em; padding-left: 1.5em; }
@@ -1572,7 +1573,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-editor__content p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--ibx-text-faint); pointer-events: none; }
 .ibx-compose__editor:focus-within { box-shadow: inset 0 0 0 2px var(--ibx-accent-soft); }
 .ibx-compose__sig { position: relative; margin: 0 var(--ibx-s3) var(--ibx-s2); border: 1px dashed var(--ibx-border); border-radius: var(--ibx-radius); }
-.ibx-compose__sig iframe, .ibx-compose__quote iframe { display: block; width: 100%; height: 7rem; border: 0; background: #fff; border-radius: var(--ibx-radius); }
+.ibx-compose__sig iframe, .ibx-compose__quote iframe { display: block; width: 100%; height: 3rem; border: 0; background: #fff; border-radius: var(--ibx-radius); }
 .ibx-compose__quote iframe { height: 16rem; }
 .ibx-compose__sig .ibx-js-sigoff { position: absolute; top: var(--ibx-s1); right: var(--ibx-s1); background: var(--ibx-bg); }
 .ibx-compose__body > .ibx-js-sigadd, .ibx-compose__body > .ibx-js-quoteon { align-self: flex-start; margin: 0 var(--ibx-s3) var(--ibx-s2); }
@@ -2222,3 +2223,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-varpick__value { flex: 1; min-width: 0; text-align: right; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-varpick__value.is-empty { font-style: italic; color: var(--ibx-text-faint); }
 .ibx-varpick__none { border-top: 0; margin: 0; padding: var(--ibx-s3); }
+/* Settings > Server (1.54.0): the jobs table scrolls sideways on a phone */
+.ibx-tablewrap { overflow-x: auto; }
+.ibx-crontable td:first-child a { display: inline-flex; align-items: center; gap: var(--ibx-s1); }
+.ibx-crontable .ibx-formrow__error { max-width: 28rem; }

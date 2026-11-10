@@ -18,8 +18,8 @@
 /**
  * \file    inbox/admin/setup.php
  * \ingroup inbox
- * \brief   Technical setup of Inbox (the webmail settings are in the inbox application): cache, journals, master
- *          user of the mail server, timeouts, tests of reading
+ * \brief   Technical setup of Inbox (the settings are in the inbox application: Settings > General, Settings > Server
+ *          since 1.54.0): cache emptied, tests of reading
  */
 
 // Load Dolibarr environment
@@ -73,17 +73,6 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-$numericConsts = array(
-	'INBOX_CACHE_DAYS' => array('min' => 1, 'default' => 30),
-	'INBOX_LOG_DAYS' => array('min' => 1, 'default' => 365),
-	'INBOX_ACCOUNT_LOG_DAYS' => array('min' => 30, 'default' => 730),
-);
-// Seconds (not days)
-$secondConsts = array(
-	'INBOX_IMAP_TIMEOUT' => array('min' => 5, 'max' => 120, 'default' => 20),
-	'INBOX_TEST_TIMEOUT' => array('min' => 3, 'max' => 60, 'default' => 15),
-);
-
 $form = new Form($db);
 $inbox = new Inbox($db);
 $testMessage = null;
@@ -96,55 +85,6 @@ $testMessageId = dol_trunc(trim(GETPOST('test_message_id', 'none')), 255, 'right
 /*
  * Actions
  */
-
-if ($action == 'update' && $_SERVER['REQUEST_METHOD'] == 'POST') {
-	$error = 0;
-	foreach ($numericConsts as $constName => $def) {
-		$value = max($def['min'], GETPOSTINT($constName));
-		if (dolibarr_set_const($db, $constName, $value, 'chaine', 0, '', $conf->entity) < 0) {
-			$error++;
-		}
-	}
-	foreach ($secondConsts as $constName => $def) {
-		$value = min($def['max'], max($def['min'], GETPOSTINT($constName)));
-		if (dolibarr_set_const($db, $constName, $value, 'chaine', 0, '', $conf->entity) < 0) {
-			$error++;
-		}
-	}
-	if ($error) {
-		setEventMessages($langs->trans("Error"), null, 'errors');
-	} else {
-		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
-	}
-	header("Location: ".$_SERVER["PHP_SELF"]);
-	exit;
-}
-
-// Master user of the mail server (Dovecot): password encrypted, never shown again; an empty field keeps it
-if ($action == 'updatemaster' && $_SERVER['REQUEST_METHOD'] == 'POST') {
-	$masterUser = trim(GETPOST('INBOX_MASTER_USER', 'alphanohtml'));
-	$masterHost = strtolower(trim(GETPOST('INBOX_MASTER_HOST', 'alphanohtml')));
-	$separator = trim(GETPOST('INBOX_MASTER_SEPARATOR', 'alphanohtml'));
-	$password = GETPOST('INBOX_MASTER_PASSWORD', 'none');
-	if ($separator === '' || strlen($separator) > 2 || preg_match('/[\s"\']/', $separator)) {
-		setEventMessages($langs->trans('InboxErrorMasterSeparator'), null, 'errors');
-	} elseif ($masterUser !== '' && strpos($masterUser, $separator) !== false) {
-		setEventMessages($langs->trans('InboxErrorMasterUserSeparator', $separator), null, 'errors');
-	} else {
-		dolibarr_set_const($db, 'INBOX_MASTER_USER', $masterUser, 'chaine', 0, '', $conf->entity);
-		// The only server the master password is sent to (audit INBX-002)
-		dolibarr_set_const($db, 'INBOX_MASTER_HOST', preg_replace('/[^a-z0-9.\-:\[\]]/', '', $masterHost), 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($db, 'INBOX_MASTER_SEPARATOR', $separator, 'chaine', 0, '', $conf->entity);
-		if ($masterUser === '') {
-			dolibarr_del_const($db, 'INBOX_MASTER_PASSWORD', $conf->entity);
-		} elseif ($password !== '') {
-			dolibarr_set_const($db, 'INBOX_MASTER_PASSWORD', dolEncrypt($password), 'chaine', 0, '', $conf->entity);
-		}
-		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
-	}
-	header("Location: ".$_SERVER["PHP_SELF"]);
-	exit;
-}
 
 if ($action == 'confirm_clearcache' && GETPOST('confirm', 'alpha') == 'yes') {
 	$removed = $inbox->clearCache();
@@ -192,6 +132,11 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'inbox@in
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
 // The webmail settings live in the application, not here (analyse-lot-w1 §5)
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupAppHelp').'</span> <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxOpenSettings').'</a><br><br>';
+// Companion module for the attachments, suggested only while it is missing: link to the page of its last
+// GitHub release (stable URL, the zip there keeps the name module_docstudio-x.y.z.zip asked by Dolibarr)
+if (!isModEnabled('docstudio')) {
+	print '<span class="opacitymedium">'.$langs->trans('InboxDocStudioHelp').'</span> <a href="https://github.com/THERSANE-DOLI/dolibarr_docstudio/releases/latest" target="_blank" rel="noopener noreferrer">'.img_picto('', 'fa-download', 'class="pictofixedwidth"').$langs->trans('InboxDocStudioDownload').'</a><br><br>';
+}
 
 // Mailboxes: those of inbox (managed in the inbox application), others given by modules through a hook
 $mailboxes = $inbox->listMailboxes();
@@ -199,40 +144,8 @@ print load_fiche_titre($langs->trans('InboxMailboxes'), '', '');
 print '<span class="opacitymedium">'.$langs->trans('InboxMailboxesHelp', count($mailboxes)).'</span><br>';
 print '<br>';
 
-// Settings
-print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
-print '<input type="hidden" name="token" value="'.newToken().'">';
-print '<input type="hidden" name="action" value="update">';
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
-foreach ($numericConsts as $constName => $def) {
-	print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans($constName), $langs->trans($constName.'Help')).'</td>';
-	print '<td><input type="number" class="maxwidth75" min="'.$def['min'].'" name="'.$constName.'" value="'.getDolGlobalInt($constName, $def['default']).'"> '.$langs->trans('days').'</td></tr>';
-}
-foreach ($secondConsts as $constName => $def) {
-	print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans($constName), $langs->trans($constName.'Help')).'</td>';
-	print '<td><input type="number" class="maxwidth75" min="'.$def['min'].'" max="'.$def['max'].'" name="'.$constName.'" value="'.getDolGlobalInt($constName, $def['default']).'"> '.$langs->trans('InboxSecondsShort').'</td></tr>';
-}
-print '</table>';
-print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans("Save").'"></div>';
-print '</form>';
-print '<br>';
-
-// Master user of the mail server
-print load_fiche_titre($langs->trans('InboxMasterUser'), '', '');
-print '<span class="opacitymedium">'.$langs->trans('InboxMasterUserHelp').'</span><br><br>';
-print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'" autocomplete="off">';
-print '<input type="hidden" name="token" value="'.newToken().'">';
-print '<input type="hidden" name="action" value="updatemaster">';
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
-print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('InboxMasterUserName').'</td><td><input type="text" class="minwidth200" name="INBOX_MASTER_USER" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_USER')).'" autocomplete="off"></td></tr>';
-print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans('InboxMasterHost'), $langs->trans('InboxMasterHostHelp')).'</td><td><input type="text" class="minwidth200" name="INBOX_MASTER_HOST" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_HOST')).'" autocomplete="off" placeholder="mail.example.com"></td></tr>';
-print '<tr class="oddeven"><td>'.$form->textwithpicto($langs->trans('InboxMasterSeparator'), $langs->trans('InboxMasterSeparatorHelp')).'</td><td><input type="text" class="maxwidth50" maxlength="2" name="INBOX_MASTER_SEPARATOR" value="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_SEPARATOR', '*')).'"></td></tr>';
-print '<tr class="oddeven"><td>'.$langs->trans('Password').'</td><td><input type="password" class="minwidth200" name="INBOX_MASTER_PASSWORD" value="" autocomplete="new-password" placeholder="'.dol_escape_htmltag(getDolGlobalString('INBOX_MASTER_PASSWORD') !== '' ? $langs->trans('InboxPasswordKept') : '').'"></td></tr>';
-print '</table>';
-print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans("Save").'"></div>';
-print '</form>';
+// Keeping, timeouts, master user of the mail server: in the application, Settings > Server (1.54.0)
+print '<div class="info">'.$langs->trans('InboxSetupServerMoved').' <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings/server">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxNavServer').'</a></div>';
 print '<br>';
 
 // Cache: what it holds, emptied on demand
