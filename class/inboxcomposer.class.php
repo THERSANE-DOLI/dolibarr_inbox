@@ -21,6 +21,8 @@
  * \brief   Writing of a mail (lot W6 1.16.0): new, reply, forward, drafts on the server, sending, copy in Sent
  */
 
+// dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxidentity.class.php';

@@ -21,6 +21,8 @@
  * \brief   Queue of the sending (lot W6 1.17.0): delay with « Undo », sending at a date, failures told, record on a piece
  */
 
+// dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';

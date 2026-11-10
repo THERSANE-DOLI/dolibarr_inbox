@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « Server error (500) » after a mail sent, though it left :   1.53.4
+  - closing the writing after the sending removed its folder with a function of Dolibarr not loaded (files.lib):
+    the mail was sent, the closing failed. Loaded by the writing and by the queue of the sendings (its cleaning
+    after a delayed or scheduled sending, by the scheduled job too).
+
 - FIX: variables picked from a button with a search, the value each one gives shown :   1.53.3
   - the long « Insert a variable » list of the signature and of the templates becomes a button of the toolbar: a
     search on the name and on the value, the keys grouped (mail and identity, user, company, third party, others).
