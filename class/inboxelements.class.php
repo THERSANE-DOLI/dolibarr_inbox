@@ -182,10 +182,20 @@ class InboxElements
 		if (!is_object($o) || empty($o->id)) {
 			return null;
 		}
+		// Tooltip of Dolibarr, built by the application: the parameters of the ajax tooltip of getNomUrl (data-params, read
+		// by core/ajax/ajaxtooltip.php with its own checks and hooks), else its content when the ajax tooltip is off
 		$url = '';
+		$tipParams = null;
+		$tipHtml = '';
 		$html = method_exists($o, 'getNomUrl') ? (string) $o->getNomUrl(0) : '';
 		if (preg_match('/href="([^"]+)"/', $html, $m)) {
 			$url = html_entity_decode($m[1], ENT_QUOTES);
+		}
+		if (preg_match('/data-params="([^"]+)"/', $html, $m)) {
+			$tipParams = json_decode(html_entity_decode($m[1], ENT_QUOTES), true);
+			$tipParams = is_array($tipParams) ? $tipParams : null;
+		} elseif (preg_match('/\bclassfortooltip\b/', $html) && preg_match('/title="([^"]*)"/', $html, $m)) {
+			$tipHtml = html_entity_decode($m[1], ENT_QUOTES);
 		}
 		// Thirdparty of the piece apart (socid) and title of a project or ticket: the application leaves the thirdparty out
 		// when it is the one of the sender (label kept whole for the other uses)
@@ -215,7 +225,7 @@ class InboxElements
 				$label = trim($title.($label !== '' ? ' · '.$label : ''));
 			}
 		}
-		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'socid' => $socId, 'title' => $title, 'status' => '', 'url' => $url, 'icon' => $icon, 'kind' => $kind);
+		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'socid' => $socId, 'title' => $title, 'status' => '', 'url' => $url, 'tip_params' => $tipParams, 'tip_html' => $tipHtml, 'icon' => $icon, 'kind' => $kind);
 		if (method_exists($o, 'getLibStatut')) {
 			$out = array_merge($out, self::statusOf((string) $o->getLibStatut(0), (string) $o->getLibStatut(5)));
 		}

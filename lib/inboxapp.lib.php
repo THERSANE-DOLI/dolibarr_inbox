@@ -104,6 +104,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_VERSION' => $moduleVersion,
 		'INBOX_URL' => dol_buildpath('/inbox/index.php', 1),
 		'INBOX_AJAX_URL' => dol_buildpath('/inbox/ajax/', 1),
+		// Tooltips of the Dolibarr objects (parameters given by getNomUrl)
+		'INBOX_TOOLTIP_URL' => DOL_URL_ROOT.'/core/ajax/ajaxtooltip.php',
 		'INBOX_ICONS_URL' => dol_buildpath('/inbox/img/inbox-icons.svg', 1).'?v='.urlencode($moduleVersion).'-'.@filemtime(dirname(__DIR__).'/img/inbox-icons.svg'),
 		'INBOX_TOKEN' => currentToken(),
 		// The JS context only takes strings, numbers and booleans: flat keys, JSON text for the settings

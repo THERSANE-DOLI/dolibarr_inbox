@@ -2331,6 +2331,7 @@
 		w.dlg = dlg;
 		dlg.innerHTML = html(w);
 		document.body.appendChild(dlg);
+		I.mount(dlg);
 		w.to = recipients(w, 'to', d.to);
 		w.cc = recipients(w, 'cc', d.cc);
 		w.bcc = recipients(w, 'bcc', d.bcc);

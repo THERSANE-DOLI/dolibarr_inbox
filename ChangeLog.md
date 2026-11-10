@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: card of a Dolibarr object on its link, widgets of Dolibarr started in the application :   1.62.0
+  - hover (or keyboard focus) on the ref of a piece: the tooltip of Dolibarr (its content and what the other modules
+    add) in a light card of the application; asked to core/ajax/ajaxtooltip.php with the parameters given by
+    getNomUrl, or given whole when the ajax tooltip is off; once per object and page. Works without the JS of the
+    footer of Dolibarr nor its icons (not loaded by the application, hidden in the card).
+  - Dolibarr.initNewContent called on the zones the application draws (list, reading, conversation, Dolibarr panel,
+    user card, dialogs, compose window, Settings pages) when Dolibarr gives it.
+
+- FIX: the cards of the Dolibarr column on the right were wider than it (status and « Link » cut) :   1.61.1
+  - its rows could not be narrower than their content.
+
 - NEW: cards of the pieces in the Dolibarr column on the right :   1.61.0
   - ref and status on the first line, the status never cut (the ref is shortened), the thirdparty on a second line;
     the card no more wider than the column.
