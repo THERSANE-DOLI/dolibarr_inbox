@@ -2456,3 +2456,19 @@ InboxIndRule_sinv_topay = Hinweis ab 1, Warnung bei überschrittener Fälligkeit
 InboxIndRule_order_toship = Hinweis ab 1, Warnung bei überschrittenem Termin
 InboxIndRule_ship_open = Hinweis ab 1, Warnung bei überschrittenem Termin
 InboxIndRule_reception_wait = Hinweis ab 1, Warnung bei überschrittenem Termin
+
+# Phones of the signature compared with the card (1.69.0)
+InboxSigPhones1 = Andere Telefonnummer in der Signatur
+InboxSigPhonesN = Andere Telefonnummern in der Signatur
+InboxSignatureNote = (Signatur)
+InboxPhoneReplace = Nummer der Karte durch %s ersetzen
+InboxPhoneReplaceShort = Nummer der Karte durch diese ersetzen
+InboxPhoneReplaceTitle = Kontaktkarte aktualisieren
+InboxPhoneFound = In der Signatur gefundene Nummer: %s
+InboxPhoneWhich = Zu ersetzende Nummer der Karte
+InboxPhonePro = Telefon geschäftlich
+InboxPhoneMobile = Mobiltelefon
+InboxPhoneNow = Derzeit: %s
+InboxPhoneEmpty = Derzeit leer
+InboxPhoneReplaceDo = Ersetzen
+InboxPhoneReplaced = Kontaktkarte aktualisiert

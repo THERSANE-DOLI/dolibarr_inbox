@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: phones of the signature compared with the card of the contact :   1.69.0
+  - the numbers written in the signature (text before the quoted mails; never a reference, a date nor a fax) that the
+    cards of the contact and of the thirdparty do not have: « Other phone in the signature » on the card of the
+    contact, the number in its ways to reach (call, copy).
+  - pencil « Replace the number of the card by this one »: professional or mobile number (mobile chosen for a mobile
+    number), the number of the card shown before; written through the class of Dolibarr (its triggers), right to
+    change the contacts; undo in the toast.
+
 - NEW: own list of indicators per mailbox, indicators of the other modules :   1.68.0
   - Settings > Mailboxes > Usage: the indicators of a usage with a list may be added (search), removed and moved
     (drag and drop, arrows up and down on the grip), saved at once with undo, written in the journal of the mailbox;

@@ -588,6 +588,131 @@ class InboxSituation
 	}
 
 	/**
+	 * Digits of a phone number to compare two writings of it: +33 6 12... = 06 12..., spaces, dots, (0) left out
+	 *
+	 * @param string $phone Phone as written
+	 * @return string Digits ('' when it is not a phone)
+	 */
+	public static function phoneKey($phone)
+	{
+		$p = preg_replace('/\(0\)/', '', (string) $phone);
+		$plus = strpos(ltrim((string) $p), '+') === 0;
+		$d = preg_replace('/\D/', '', (string) $p);
+		if (!$plus && strpos($d, '00') === 0) {
+			$d = substr($d, 2);
+			$plus = true;
+		}
+		// French numbers written with the country code: compared with their national writing
+		if ($plus && strpos($d, '33') === 0 && strlen($d) === 11) {
+			$d = '0'.substr($d, 2);
+		}
+
+		return strlen($d) >= 9 && strlen($d) <= 15 ? $d : '';
+	}
+
+	/**
+	 * Phones written in the signature of a mail (1.69.0): the last lines of the text before the quoted mails; never a
+	 * number glued to letters (a reference « CF2611-02221 ») nor a date
+	 *
+	 * @param string $text Body of the mail as text
+	 * @return array<int,array{number:string,key:string,mobile:bool}> At most 3, in their order
+	 */
+	public static function signaturePhones($text)
+	{
+		$lines = preg_split('/\r\n|\r|\n/', (string) $text);
+		$own = array();
+		foreach ($lines as $l) {
+			// The quoted mails start there
+			if (preg_match('/^\s*>/', $l) || preg_match('/^\s*-{2,}\s*(Original Message|Message d\'origine|Ursprüngliche Nachricht|Messaggio originale|Mensaje original)/i', $l)
+				|| preg_match('/^\s*(Le|On|Am|Il|El)\s.{4,200}(a écrit|wrote|schrieb|ha scritto|escribió)\s*:\s*$/iu', $l)
+				|| preg_match('/^\s*(De|From|Von|Da)\s*:\s*\S+/i', $l) && count($own) > 3) {
+				break;
+			}
+			$own[] = $l;
+		}
+		// The fax lines apart: never offered as a phone
+		$zone = implode("\n", array_filter(array_slice($own, -20), function ($l) {
+			return !preg_match('/\bfax\b|télécopie/iu', $l);
+		}));
+		$out = array();
+		$m = array();
+		if (preg_match_all('/(?<![\w+\/.-])(\+?\(?\d[\d \t.\-()]{7,20}\d)(?![\w\/])/u', $zone, $m)) {
+			foreach ($m[1] as $raw) {
+				$number = trim(preg_replace('/\s+/', ' ', $raw));
+				$key = self::phoneKey($number);
+				if ($key === '' || isset($out[$key]) || preg_match('/^\d{1,2}[.\-]\d{1,2}[.\-]\d{2,4}$/', $number)) {
+					continue;
+				}
+				$out[$key] = array('number' => $number, 'key' => $key, 'mobile' => (bool) preg_match('/^0[67]\d{8}$/', $key));
+				if (count($out) >= 3) {
+					break;
+				}
+			}
+		}
+
+		return array_values($out);
+	}
+
+	/**
+	 * Phones of the signature that the cards do not have (contact and thirdparty of the sender)
+	 *
+	 * @param string $text      Body as text
+	 * @param int    $contactId Contact of the sender (0 if none)
+	 * @param int    $socId     Thirdparty of the sender (0 if none)
+	 * @return array<int,array{number:string,key:string,mobile:bool}>
+	 */
+	public function newPhones($text, $contactId, $socId)
+	{
+		$known = array();
+		$p = $this->db->prefix();
+		if ($contactId > 0) {
+			$r = $this->db->getRow("SELECT phone, phone_mobile, phone_perso FROM ".$p."socpeople WHERE rowid = ".((int) $contactId));
+			$known = array_merge($known, is_object($r) ? array($r->phone, $r->phone_mobile, $r->phone_perso) : array());
+		}
+		if ($socId > 0) {
+			$r = $this->db->getRow("SELECT phone, phone_mobile, fax FROM ".$p."societe WHERE rowid = ".((int) $socId));
+			$known = array_merge($known, is_object($r) ? array($r->phone, $r->phone_mobile, $r->fax) : array());
+		}
+		$keys = array_filter(array_map(array(__CLASS__, 'phoneKey'), $known));
+
+		return array_values(array_filter(self::signaturePhones($text), function ($x) use ($keys) {
+			return !in_array($x['key'], $keys, true);
+		}));
+	}
+
+	/**
+	 * « Replace the number of the card by this one » (1.69.0): a phone of the contact (pro or mobile) changed through
+	 * the class of Dolibarr (its triggers run); the right to change the contact is checked by the caller
+	 *
+	 * @param User   $user      User doing it
+	 * @param int    $contactId Contact
+	 * @param string $field     phone_pro or phone_mobile
+	 * @param string $number    New number ('' empties it, for the undo of a number that was empty)
+	 * @return string|null Number before (for the undo), null KO
+	 */
+	public function setContactPhone(User $user, $contactId, $field, $number)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+		if (!in_array($field, array('phone_pro', 'phone_mobile'), true)) {
+			$this->error = 'Bad field';
+			return null;
+		}
+		$c = new Contact($this->db);
+		if ($c->fetch((int) $contactId) <= 0) {
+			$this->error = $c->error ?: 'Contact not found';
+			return null;
+		}
+		$before = (string) $c->$field;
+		$c->$field = dol_trunc(trim((string) $number), 30, 'right', 'UTF-8', 1);
+		if ($c->update((int) $c->id, $user) <= 0) {
+			$this->error = $c->error ?: implode(', ', (array) $c->errors);
+			return null;
+		}
+
+		return $before;
+	}
+
+	/**
 	 * « Not the right thirdparty? »: the thirdparty of the mails of a conversation of a mailbox chosen by hand (kept
 	 * when the contacts change); remembered for the next mails of the address when asked
 	 *
