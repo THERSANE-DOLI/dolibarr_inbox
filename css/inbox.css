@@ -1339,7 +1339,9 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-reading > .ibx-readhead { order: 0; }
 .ibx-reading > .ibx-readbanners { order: 1; }
 .ibx-reading > .ibx-dolibar { order: 2; }
-.ibx-reading > .ibx-readbody, .ibx-reading > .ibx-convo__item { order: 3; }
+.ibx-reading > .ibx-readbody, .ibx-reading > .ibx-convo__item, .ibx-convo__list > .ibx-convo__item { order: 3; }
+/* The list of the mails of a thread is no box of its own, except with the column Dolibarr on the right (below) */
+.ibx-convo__list { display: contents; }
 .ibx-reading > .ibx-attbar { order: 4; }
 
 /* On the right: a column of the mail (no splitter, no border of a pane), right under the head; the banners of the
@@ -1353,15 +1355,19 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-pane--read[data-dolibar="right"] .ibx-reading:not(.ibx-convo) > .ibx-readbody { grid-area: body; }
 .ibx-pane--read[data-dolibar="right"] .ibx-reading:not(.ibx-convo) > .ibx-attbar { grid-area: att; }
 .ibx-pane--read[data-dolibar="right"] .ibx-reading:not(.ibx-convo) > .ibx-dolibar { grid-area: side; }
-.ibx-pane--read[data-dolibar="right"] .ibx-convo { display: grid; grid-template-columns: minmax(0, 1fr) var(--ibx-dolibar-w, 20rem); align-items: start; }
-.ibx-pane--read[data-dolibar="right"] .ibx-convo > * { grid-column: 1; }
-.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-readhead { grid-column: 1 / -1; }
-.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-dolibar {
-	grid-column: 2; grid-row: 2 / span 300; position: sticky; top: calc(var(--ibx-head-h, 6rem) + var(--ibx-s3)); max-height: calc(100vh - var(--ibx-head-h, 6rem) - 2rem);
+/* A conversation with the column on the right: laid out as a mail alone (1.53.2), head on top, the column on the
+   whole height, the answers at the bottom; only the list of the mails scrolls */
+.ibx-pane--read[data-dolibar="right"] > .ibx-pane__body:has(> .ibx-convo) { display: flex; flex-direction: column; overflow: hidden; }
+.ibx-pane--read[data-dolibar="right"] .ibx-convo {
+	display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) var(--ibx-dolibar-w, 20rem); grid-template-rows: auto minmax(0, 1fr) auto;
+	grid-template-areas: "head head" "list side" "foot side";
 }
+.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-readhead { grid-area: head; position: static; }
+.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-convo__list { grid-area: list; display: block; min-height: 0; overflow: auto; }
+.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-convo__foot { grid-area: foot; position: static; margin-top: 0; }
+.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-dolibar { grid-area: side; }
 .ibx-pane--read[data-dolibar="right"] .ibx-reading.is-dolibar-folded { --ibx-dolibar-w: 2.75rem; }
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar { display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin: var(--ibx-s2) var(--ibx-s3) var(--ibx-s3) 0; align-self: stretch; }
-.ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-dolibar { align-self: start; }
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar__body { flex: 1; min-height: 0; }
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar__row { grid-template-columns: 1fr; gap: 0.25rem; }
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar__label { padding-top: 0; font-size: var(--ibx-fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }

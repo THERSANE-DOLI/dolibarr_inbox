@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: conversation laid out as a mail alone when the column Dolibarr is on the right :   1.53.2
+  - the column took the height of its content and the answer bar (Reply, Reply all, Forward) sat under the last
+    mail: head on top, the column on the whole height, the answer bar at the bottom, only the mails scroll.
+  - the column above the mails keeps the scroll of the whole pane.
+
 - FIX: conversations no longer joined by the subject alone when the only common address is the mailbox :   1.53.1
   - the fallback on the subject (same subject, same correspondent, 30 days) took the mailbox itself for the
     correspondent: a mail sent matched every mail received with the same subject (all written to the mailbox), and

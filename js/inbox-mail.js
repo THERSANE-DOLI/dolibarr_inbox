@@ -4422,11 +4422,6 @@
 				}
 			});
 		}
-		// In a conversation the column stays under the head of the thread while the mails scroll
-		const head = $('.ibx-convo > .ibx-readhead', pane);
-		if (head) {
-			head.parentNode.style.setProperty('--ibx-head-h', head.offsetHeight + 'px');
-		}
 	}
 	function setDolibarPosition(pos) {
 		saveParam('dolibar_position', pos);
@@ -6132,13 +6127,14 @@
 			+ assignLine([row.id], row.assignees || [], row.has_mid !== 0) + '</div>'
 			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
 			+ dolibarSlot(id, true)
-			+ mails.map(m => '<section class="ibx-convo__item' + (isMine(m) ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
+			// The mails of the thread: a box of their own, the one that scrolls when the column Dolibarr is on the right
+			+ '<div class="ibx-convo__list ibx-js-convolist">' + mails.map(m => '<section class="ibx-convo__item' + (isMine(m) ? ' is-mine' : '') + (m.id === id ? ' is-current' : '') + '" data-mailblock="' + m.id + '">'
 				+ '<button type="button" class="ibx-convo__line ibx-js-expand" aria-expanded="false">' + (isMine(m) ? '<span class="ibx-avatar ibx-avatar--sm ibx-avatar--me" aria-hidden="true">' + ic('sent') + '</span>' : avatar(m.from_name, m.from_email, 'ibx-avatar--sm', m.id))
 				+ '<span class="ibx-sr-only">' + th(isMine(m) ? 'InboxSent' : 'InboxReceived') + ' </span>'
 				+ '<span class="ibx-convo__who ibx-ellipsis' + (seenOf(m) ? '' : ' is-unread') + '">' + esc(isMine(m) ? mineLabel(m) : (m.from_name || m.from_email || t('InboxNoSender'))) + '</span>'
 				+ '<span class="ibx-convo__snippet ibx-ellipsis ibx-muted">' + esc(m.snippet || m.subject || '') + '</span>'
 				+ (m.attachments ? ic('attachment', 'ibx-faint') : '') + '<span class="ibx-convo__date ibx-muted" title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></button>'
-				+ '<div class="ibx-convo__body" hidden></div></section>').join('')
+				+ '<div class="ibx-convo__body" hidden></div></section>').join('') + '</div>'
 			+ '<section class="ibx-attbar ibx-attbar--answers ibx-convo__foot" aria-label="' + th('InboxQuickReply') + '"><div class="ibx-attbar__head">' + quickReplyHtml(last.id, '') + '</div></section></article>';
 		bindQuickReply(pane);
 		hydrateAvatars(pane);
@@ -6157,8 +6153,18 @@
 		await Promise.all(wanted.map(m => expandItem($('[data-mailblock="' + m.id + '"]', pane), m.id, mails)));
 		const current = $('[data-mailblock="' + id + '"]', pane) || $('[data-mailblock="' + last.id + '"]', pane);
 		if (current) {
-			scrollWithin(pane, current, current === $('[data-mailblock="' + last.id + '"]', pane) ? 'end' : 'start');
+			scrollWithin(convoScroller(pane), current, current === $('[data-mailblock="' + last.id + '"]', pane) ? 'end' : 'start');
 		}
+	}
+
+	/**
+	 * What scrolls in a conversation: its list of mails when the column Dolibarr is on the right (head, column and
+	 * answers fixed, as a mail alone), else the whole pane
+	 */
+	function convoScroller(pane) {
+		const list = pane && $('.ibx-js-convolist', pane);
+
+		return list && getComputedStyle(list).overflowY !== 'visible' ? list : pane;
 	}
 
 	/** Unfold one mail of the conversation: its head, banners, body (quotes folded) and attachments */
@@ -8539,8 +8545,8 @@
 			}
 		} else if (key === 'PageDown' || key === 'PageUp') {
 			e.preventDefault();
-			// A mail alone scrolls in its body (head and attachments stay), a conversation in the whole pane
-			const pane = $('.ibx-pane--read .ibx-reading:not(.ibx-convo) > .ibx-readbody', S.el) || $('.ibx-pane--read .ibx-pane__body', S.el);
+			// A mail alone scrolls in its body (head and attachments stay), a conversation in its list or the whole pane
+			const pane = $('.ibx-pane--read .ibx-reading:not(.ibx-convo) > .ibx-readbody', S.el) || convoScroller($('.ibx-pane--read .ibx-pane__body', S.el));
 			pane.scrollBy({ top: (key === 'PageDown' ? 1 : -1) * pane.clientHeight * 0.85 });
 		} else if (key === '?') {
 			e.preventDefault();
