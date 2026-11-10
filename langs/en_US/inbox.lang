@@ -2115,6 +2115,7 @@ InboxTwinMergeFailed = Merge impossible, nothing removed: %s
 InboxTwinNotRemoved = %s mails moved, but the folder could not be removed: %s
 InboxJournal_folder_merge = Duplicate folder merged
 InboxUnreadBelow = %s unread in the subfolders
+InboxUnreadElsewhere = %s unread in the other folders
 InboxFoldersDisplay = Display of the folders
 InboxFolderSizesShow = Show the size of the folders
 InboxFolderSizeIndexed = Size of the %s mails indexed, of %s

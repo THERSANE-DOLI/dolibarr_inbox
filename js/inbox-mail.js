@@ -121,17 +121,31 @@
 		}
 		return true;
 	}
-	/** The mailbox and the parents of a folder opened: the user sees where he is */
-	function openPathTo(folderId) {
+	/**
+	 * The mailbox and the parents of a folder opened: the user sees where he is
+	 * @param {number} folderId Folder
+	 * @param {boolean} withBox The mailbox unfolded too (false: a folded mailbox stays folded, its folder open shown
+	 *                          under it alone, 1.49.0)
+	 */
+	function openPathTo(folderId, withBox = true) {
 		const e = S.folders.get(folderId);
 		if (!e) {
 			return false;
 		}
-		let changed = setOpen('a' + e.account.id, true);
+		let changed = withBox ? setOpen('a' + e.account.id, true) : false;
 		for (let p = e.folder.parent; p; p = (S.folders.get(p) || { folder: {} }).folder.parent) {
 			changed = setOpen('f' + p, true) || changed;
 		}
 		return changed;
+	}
+	/** The Inbox of a mailbox: the one of the first level first */
+	function boxInbox(a) {
+		return a.folders.find(f => f.role === 'inbox' && !f.parent) || a.folders.find(f => f.role === 'inbox') || null;
+	}
+	/** Unread of a mailbox out of its Inbox (Sent, Drafts, Junk and Trash left out), told on it when it is folded */
+	function unreadElsewhere(a) {
+		const inbox = boxInbox(a);
+		return a.folders.reduce((n, f) => n + (f !== inbox && !['sent', 'drafts', 'junk', 'trash'].includes(f.role) ? f.unread || 0 : 0), 0);
 	}
 	/** Unread of the subfolders of a folder (Sent and Drafts left out), told on it when it is closed */
 	function unreadBelow(a, id) {
@@ -392,18 +406,30 @@
 		const filterBox = $('.ibx-js-folderfilterbox', pane);
 		filterBox.hidden = !many;
 		let html = '';
+		// Something of the current folder drawn on a folded mailbox (selected row, folder shown under it): drawn again
+		// when the user opens another folder or a view
+		S.peek = false;
+		const cur = S.scope === 'folder' ? currentFolder() : null;
 		S.accounts.forEach(a => {
 			const key = 'a' + a.id;
 			const open = !S.collapsed.has(key) || needle !== '';
 			const unread = a.folders.filter(f => f.role === 'inbox').reduce((n, f) => n + f.unread, 0);
+			// Folded (1.49.0): the row of the mailbox stands for its Inbox (selected when it is open), its other unread
+			// told apart, the folder open (not the Inbox) shown alone under it
+			const here = !open && cur && cur.account.id === a.id ? cur.folder : null;
+			const inboxOn = !!here && here === boxInbox(a);
+			const elsewhere = open ? 0 : unreadElsewhere(a);
+			S.peek = S.peek || !!here;
 			const quotaPct = a.quota && a.quota.limit ? Math.round(100 * a.quota.used / a.quota.limit) : 0;
 			const inError = !!a.error;
 			const progress = a.state === 'first_sync' && a.progress && a.progress.total ? Math.min(99, Math.floor(100 * a.progress.indexed / a.progress.total)) : -1;
-			html += '<li role="treeitem" aria-expanded="' + open + '" aria-level="1"><div class="ibx-tree__row ibx-tree__row--account' + (inError ? ' has-error' : '') + '" style="--ibx-depth:0" data-account="' + a.id + '">'
+			html += '<li role="treeitem" aria-expanded="' + open + '" aria-level="1"><div class="ibx-tree__row ibx-tree__row--account' + (inError ? ' has-error' : '') + '" style="--ibx-depth:0" data-account="' + a.id + '"'
+				+ ' aria-selected="' + inboxOn + '" tabindex="' + (inboxOn ? 0 : -1) + '">'
 				+ '<button type="button" class="ibx-tree__twisty" data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '" tabindex="-1">' + ic(open ? 'chevron-down' : 'chevron-right') + '</button>'
 				+ (inError ? ic('warning', 'ibx-tree__icon') : lookIcon(a.icon || 'account', a.color, 'ibx-tree__icon'))
 				+ '<span class="ibx-tree__label ibx-ellipsis" title="' + esc(a.email) + '">' + esc(accountName(a)) + '</span>'
-				+ (!open && unread ? '<span class="ibx-count">' + unread + '</span>' : '')
+				+ (!open && unread ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', unread) + '">' + unread + '</span>' : '')
+				+ (elsewhere ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadElsewhere', elsewhere) + '" aria-label="' + th('InboxUnreadElsewhere', elsewhere) + '">+' + elsewhere + '</span>' : '')
 				// Option of the panel: the space used on the server (quota, in KB)
 				+ (params.folder_sizes === '1' && a.quota ? '<span class="ibx-tree__size" title="' + th('InboxQuotaUsed', size(a.quota.used * 1024), size(a.quota.limit * 1024)) + '">' + esc(size(a.quota.used * 1024)) + '</span>' : '')
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
@@ -412,6 +438,8 @@
 				+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '');
 			if (open) {
 				html += '<ul role="group">' + branch(a, 0, 1, needle) + '</ul>';
+			} else if (here && !inboxOn) {
+				html += '<ul role="group">' + folderRow(a, here, 1, false, false, '') + '</ul>';
 			}
 			html += '</li>';
 		});
@@ -636,6 +664,9 @@
 		S.view = '';
 		S.scope = 'all';
 		S.vview = id;
+		if (S.peek) {
+			renderTree();
+		}
 		S.vAccounts = v.accounts || [];
 		if (S.deep) {
 			stopDeep(true);
@@ -921,6 +952,9 @@
 		leaveVview();
 		S.view = key;
 		S.scope = 'view';
+		if (S.peek) {
+			renderTree();
+		}
 		if (S.deep) {
 			stopDeep(true);
 		}
@@ -1073,30 +1107,57 @@
 				return;
 			}
 			const open = sub && (isOpen(key) || needle !== '');
-			// Closed: the unread of its subfolders told on it, apart from its own (nothing hidden)
-			const below = sub && !open ? unreadBelow(a, f.id) : 0;
-			const selected = f.id === S.folderId && S.scope === 'folder';
-			html += '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
-				+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
-				+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '"' + (movableFolder(f) && !isPhone() ? ' draggable="true"' : '') + '>'
-				+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
-				// An ordinary folder unfolded on its subfolders is drawn open
-				+ folderIcon(f, open, 'ibx-tree__icon')
-				+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
-				+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
-				// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
-				+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
-				+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
-				// Drafts: how many wait, in grey (they are not unread); the count of the server, the mails sending
-				// later (queue of inbox) left out (1.25.1)
-				+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
-				+ (below ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadBelow', below) + '" aria-label="' + th('InboxUnreadBelow', below) + '">+' + below + '</span>' : '')
-				+ folderSize(f)
-				+ '</div>'
-				+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
-				+ '</li>';
+			html += folderRow(a, f, depth, sub, open, subHtml);
 		});
 		return html;
+	}
+	/**
+	 * One folder of the tree (its subfolders already drawn)
+	 * @param {Object} a Mailbox
+	 * @param {Object} f Folder
+	 * @param {number} depth Indent
+	 * @param {boolean} sub It has subfolders
+	 * @param {boolean} open Unfolded on them
+	 * @param {string} subHtml Its subfolders
+	 */
+	function folderRow(a, f, depth, sub, open, subHtml) {
+		const key = 'f' + f.id;
+		// Closed: the unread of its subfolders told on it, apart from its own (nothing hidden)
+		const below = sub && !open ? unreadBelow(a, f.id) : 0;
+		const selected = f.id === S.folderId && S.scope === 'folder';
+		return '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
+			+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
+			+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '"' + (movableFolder(f) && !isPhone() ? ' draggable="true"' : '') + '>'
+			+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
+			// An ordinary folder unfolded on its subfolders is drawn open
+			+ folderIcon(f, open, 'ibx-tree__icon')
+			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
+			+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
+			// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
+			+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
+			+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
+			// Drafts: how many wait, in grey (they are not unread); the count of the server, the mails sending
+			// later (queue of inbox) left out (1.25.1)
+			+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
+			+ (below ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadBelow', below) + '" aria-label="' + th('InboxUnreadBelow', below) + '">+' + below + '</span>' : '')
+			+ folderSize(f)
+			+ '</div>'
+			+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
+			+ '</li>';
+	}
+
+	/** Rows of the tree reached with the arrows: folders, views, mailboxes (1.49.0) */
+	const TREE_ROWS = '[data-folder], [data-view], [data-vview], .ibx-tree__row--account[data-account]';
+	/** The Inbox of a mailbox opened, the mailbox left folded or not */
+	function openBoxInbox(accountId) {
+		const a = S.accounts.find(x => x.id === accountId);
+		const inbox = a && boxInbox(a);
+		if (inbox && inbox.selectable) {
+			openFolder(inbox.id);
+		} else if (a && setOpen('a' + a.id, true)) {
+			// No Inbox to open (not synced yet): unfolded, as before
+			renderTree();
+		}
 	}
 
 	function bindTree() {
@@ -1160,20 +1221,20 @@
 				S.collapsed.delete('views');
 				saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
 				renderTree();
-			} else if (e.target.closest('[data-account]')) {
-				const id = +e.target.closest('[data-account]').dataset.account;
-				const key = 'a' + id;
-				if (S.collapsed.has(key)) {
-					S.collapsed.delete(key);
-					saveParam('tree_collapsed', JSON.stringify(Array.from(S.collapsed)));
-					renderTree();
-				}
+			} else if (e.target.closest('.ibx-tree__row--account[data-account]')) {
+				// The mailbox clicked opens its Inbox, folded or not; only its arrow unfolds it (1.49.0)
+				openBoxInbox(+e.target.closest('[data-account]').dataset.account);
 			}
 		});
 		// Arrows in the tree (role tree): up / down between visible folders, left / right fold
 		pane.addEventListener('keydown', e => {
-			const row = e.target.closest('[data-folder], [data-view], [data-vview]');
+			const row = e.target.closest(TREE_ROWS);
 			if (!row) {
+				return;
+			}
+			if (row.dataset.account && (e.key === 'Enter' || e.key === ' ')) {
+				openBoxInbox(+row.dataset.account);
+				e.preventDefault();
 				return;
 			}
 			if ((row.dataset.view || row.dataset.vview) && (e.key === 'Enter' || e.key === ' ')) {
@@ -1185,7 +1246,7 @@
 				e.preventDefault();
 				return;
 			}
-			const rows = $$('[data-folder], [data-view], [data-vview]', pane);
+			const rows = $$(TREE_ROWS, pane);
 			const i = rows.indexOf(row);
 			let target = null;
 			if (e.key === 'ArrowDown') {
@@ -1201,7 +1262,7 @@
 				if (tw && (row.parentElement.getAttribute('aria-expanded') === 'true') === (e.key === 'ArrowLeft')) {
 					tw.click();
 					requestAnimationFrame(() => {
-						const again = $('[data-folder="' + row.dataset.folder + '"]', pane);
+						const again = $(row.dataset.account ? '.ibx-tree__row--account[data-account="' + row.dataset.account + '"]' : '[data-folder="' + row.dataset.folder + '"]', pane);
 						if (again) {
 							again.focus();
 						}
@@ -8054,13 +8115,15 @@
 			renderTree();
 		}
 		Dolibarr.executeHook('inbox:folder:open', { role: entry.folder.role, account: entry.account.id, el: S.el });
-		// The mailbox (and the parents) of the folder opened are unfolded: the user sees where he is
-		if (openPathTo(id)) {
-			renderTree();
-		}
+		// The parents of the folder opened are unfolded: the user sees where he is; a folded mailbox stays folded,
+		// its row selected for its Inbox, another folder shown alone under it (1.49.0)
+		const reveal = openPathTo(id, false);
 		leaveVview();
 		S.scope = 'folder';
 		S.view = '';
+		if (reveal || S.peek || S.collapsed.has('a' + entry.account.id)) {
+			renderTree();
+		}
 		$$('[data-view]', S.el).forEach(r => {
 			r.setAttribute('aria-selected', 'false');
 			r.setAttribute('tabindex', '-1');

@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: a mailbox clicked opens its Inbox, a folded mailbox stands for its Inbox :   1.49.0
+  - only the arrow of a mailbox folds or unfolds it; a click on its name opens its Inbox without unfolding it.
+  - folded, its row shows the unread of its Inbox, « +N » for the unread of its other folders (Sent, Drafts,
+    Junk and Trash left out), and is selected while its Inbox is open.
+  - a folder of a folded mailbox opened (search, link, notification) no longer unfolds it: shown alone under the
+    mailbox until another folder or view is opened.
+  - mailboxes reached with the arrow keys of the tree, Enter opens the Inbox.
+
 - FIX: window of a module opened in the middle of the screen, a closed window no longer kept at 0, 0 :   1.48.1
   - closing or reducing a window gave it no size, kept as its last place: the next one opened in the top left
     corner (empty size thrown away); the window of a module keeps its size and opens centered.
