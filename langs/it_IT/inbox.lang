@@ -379,6 +379,7 @@ InboxMoveDown = Sposta giù
 InboxNewTag = Nuova etichetta
 InboxAddTag = Aggiungi
 InboxTagsKeysHelp = I tasti da 1 a 9 applicano le prime nove etichette attive, 0 le rimuove tutte. Trascinare le righe, o usare le frecce, per cambiare l'ordine.
+InboxTagsAliasHelp = Una parola chiave $labelN di Thunderbird che nessuna etichetta dell'elenco ha è letta come l'etichetta del tasto N (mostrata, filtrata, rimossa con essa): cambiare l'ordine dell'elenco cambia l'etichetta di queste mail.
 InboxTagKeyword = Parola chiave
 InboxTagUnknown = Parola chiave %s impostata da un altro software, assente dall'elenco delle etichette (un'etichetta con lo stesso nome e un'altra parola chiave?)
 InboxTagsThunderbird = Stesse etichette in Thunderbird

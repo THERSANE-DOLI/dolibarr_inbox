@@ -253,8 +253,18 @@ class InboxSearchSql implements InboxSearchEngine
 		foreach ((array) ($query['subject'] ?? array()) as $w) {
 			$where[] = $like('m.subject', $w);
 		}
+		$hasKeyword = function ($k) {
+			return "CONCAT(' ', COALESCE(m.keywords, ''), ' ') LIKE '% ".$this->db->escape($this->db->escapeforlike((string) $k))." %'";
+		};
 		foreach ((array) ($query['tag'] ?? array()) as $w) {
-			$where[] = "CONCAT(' ', COALESCE(m.keywords, ''), ' ') LIKE '% ".$this->db->escape($this->db->escapeforlike((string) $w))." %'";
+			// The tag, or its alias $labelN set by Thunderbird in the mailboxes where it is this tag (InboxTag::keywordAliases)
+			require_once __DIR__.'/inboxtag.class.php';
+			$aliases = (new InboxTag($this->db))->keywordAliases((string) $w, $accountIds);
+			$cond = $hasKeyword($w);
+			foreach ($aliases as $alias => $accounts) {
+				$cond .= " OR (m.fk_account IN (".implode(',', array_map('intval', $accounts)).") AND ".$hasKeyword($alias).")";
+			}
+			$where[] = $aliases ? "(".$cond.")" : $cond;
 		}
 		if (!empty($query['before'])) {
 			$where[] = "m.date_received < '".$this->db->idate((int) $query['before'])."'";

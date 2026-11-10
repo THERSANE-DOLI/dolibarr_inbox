@@ -2237,7 +2237,7 @@
 		html += '</table>';
 		if (editable) {
 			html += '<form class="ibx-js-addtag" id="' + formId + '"></form>';
-			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + '</p>';
+			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + ' ' + th('InboxTagsAliasHelp') + '</p>';
 		}
 		html += '<div class="ibx-js-cvd" aria-live="polite"></div>';
 		html += thunderbirdTags(data.tags);
