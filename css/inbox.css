@@ -2472,3 +2472,9 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	.ibx-domtable td[data-label]::before { content: attr(data-label); color: var(--ibx-text-muted); }
 	.ibx-domtable .ibx-num { text-align: left; }
 }
+
+/* Fil of the mail (lot E2, 1.77.0): an answer sent, between the notes */
+.ibx-activity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); margin: var(--ibx-s1) 0; font-size: var(--ibx-fs-sm); background: var(--ibx-bg-sunken); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius-sm); }
+.ibx-activity > .ibx-icon { flex: none; color: var(--ibx-accent); }
+.ibx-activity__text { flex: 1 1 12rem; min-width: 0; }
+.ibx-compose__conflict { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }

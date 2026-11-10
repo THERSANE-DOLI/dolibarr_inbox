@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: fil of a mail, the answers sent beside the internal notes (lot E2) :   1.77.0
+  - the block of the notes in the panel becomes a fil by date: the notes and the mails sent from the mailbox in the
+    conversation (tied by In-Reply-To, References or the conversation, never by the subject): « Paul answered »
+    when inbox sent it (journal of the mailbox), « Answer sent from the mailbox (other software) » otherwise; « See »
+    opens it. Forwards are left out: nothing ties them to their mail.
+  - before sending an answer: when a colleague answered the same mail since the writing was opened (queue of inbox,
+    even still cancellable, or Sent folder read again), nothing is sent and the writing says « Paul answered this mail
+    at 10:42 » with « See the answer » and « Send anyway ».
+
 - NEW: shared domains, public mail services and disposable addresses (lot A7) :   1.76.0
   - list shipped in data/domains/ (public.txt: 162 public mail services and access providers kept by hand;
     disposable.txt: 10 181 domains copied from a CC0 list on 2026-11-10, refreshed before a version by

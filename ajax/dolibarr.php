@@ -28,6 +28,7 @@ dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
 dol_include_once('/inbox/class/inboxdatasource.class.php');
 dol_include_once('/inbox/class/inboxthreadlink.class.php');
+dol_include_once('/inbox/class/inboxactivity.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
@@ -286,7 +287,13 @@ switch ($action) {
 			// The piece the source offers to create, when the user may
 			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
 		}
-		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
+		// Fil of the mail (lot E2, 1.77.0): the answers sent from the mailbox in its conversation, beside the notes
+		$activity = array_map(function ($a) use ($user) {
+			$a['mine'] = $a['author'] > 0 && $a['author'] === (int) $user->id;
+			unset($a['message_id']);
+			return $a;
+		}, (new InboxActivity($db))->sentIn($row));
+		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);

@@ -2745,3 +2745,16 @@ InboxDomainsMatchLabel = Recognize the sender by the domain of his address
 InboxDomainsMatchHelp = On by default. Off, only the exact address of a contact or a thirdparty is recognized: the mails of a new contact of a known company no longer show it, and no thirdparty is offered for a shared domain. To turn off only when the searches by domain slow a big database down (the log of Dolibarr says their duration when it passes 200 ms).
 InboxDomainsMatchOn = Recognition by the domain turned on
 InboxDomainsMatchOff = Recognition by the domain turned off: exact addresses only
+# Fil of the mail: answers sent (lot E2, 1.77.0)
+InboxActivityReplied = %s answered
+InboxActivityWrote = %s wrote
+InboxActivityRepliedElsewhere = Answer sent from the mailbox (other software)
+InboxActivityWroteElsewhere = Mail sent from the mailbox (other software)
+InboxActivityOtherSoftware = other software
+InboxActivityTo = to %s
+InboxActivitySee = See
+InboxComposeConflict = %s answered this mail at %s, since you opened this answer.
+InboxComposeConflictQueued = %s is sending an answer to this mail (left at %s, still cancellable).
+InboxComposeConflictOther = An answer to this mail left the mailbox at %s from another software, since you opened this answer.
+InboxComposeConflictSee = See the answer
+InboxComposeConflictSend = Send anyway

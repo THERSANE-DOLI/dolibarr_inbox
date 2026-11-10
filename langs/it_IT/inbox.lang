@@ -2745,3 +2745,16 @@ InboxDomainsMatchLabel = Riconoscere il mittente dal dominio del suo indirizzo
 InboxDomainsMatchHelp = Attivo per impostazione predefinita. Disattivato, si riconosce solo l'indirizzo esatto di un contatto o di un soggetto terzo: le mail di un nuovo contatto di un'azienda nota non la mostrano più, e nessun soggetto terzo è proposto per un dominio condiviso. Da disattivare solo se le ricerche per dominio rallentano un grande database (il registro di Dolibarr annota la loro durata oltre 200 ms).
 InboxDomainsMatchOn = Riconoscimento dal dominio attivato
 InboxDomainsMatchOff = Riconoscimento dal dominio disattivato: solo indirizzi esatti
+# Fil of the mail: answers sent (lot E2, 1.77.0)
+InboxActivityReplied = %s ha risposto
+InboxActivityWrote = %s ha scritto
+InboxActivityRepliedElsewhere = Risposta inviata dalla casella (altro software)
+InboxActivityWroteElsewhere = Mail inviata dalla casella (altro software)
+InboxActivityOtherSoftware = altro software
+InboxActivityTo = a %s
+InboxActivitySee = Vedi
+InboxComposeConflict = %s ha risposto a questa mail alle %s, da quando avete aperto questa risposta.
+InboxComposeConflictQueued = %s sta inviando una risposta a questa mail (partita alle %s, ancora annullabile).
+InboxComposeConflictOther = Una risposta a questa mail è partita dalla casella alle %s da un altro software, da quando avete aperto questa risposta.
+InboxComposeConflictSee = Vedi la risposta
+InboxComposeConflictSend = Invia comunque

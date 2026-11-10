@@ -5379,7 +5379,7 @@
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
-				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine, d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
+				+ threadHtml(d)
 				+ '</div>'
 				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
 				+ '</div></div>';
@@ -5422,6 +5422,31 @@
 				}
 			});
 		}
+	}
+	/**
+	 * Fil of the mail (lot E2, 1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
+	 * date. Only what is sure: an answer is tied to the mail by its headers or its conversation, never by its subject;
+	 * the forwards are not there.
+	 */
+	function threadHtml(d) {
+		const items = d.notes.map(n => ({ kind: 'note', date: n.date, n })).concat((d.activity || []).map(a => ({ kind: 'sent', date: a.date, a })))
+			.sort((x, y) => x.date - y.date);
+		if (!items.length) {
+			return '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>';
+		}
+		return items.map((it, i) => {
+			if (it.kind === 'note') {
+				const prev = items[i - 1] && items[i - 1].kind === 'note' ? items[i - 1].n : null;
+				return noteHtml(it.n, it.n.mine, prev);
+			}
+			const a = it.a;
+			const who = a.mine ? t('InboxMe') : (a.author_name || t('InboxActivityOtherSoftware'));
+			const what = t(a.reply ? (a.author_name ? 'InboxActivityReplied' : 'InboxActivityRepliedElsewhere') : (a.author_name ? 'InboxActivityWrote' : 'InboxActivityWroteElsewhere'), who);
+			return '<div class="ibx-activity" role="note">' + ic(a.reply ? 'reply' : 'sent') + '<span class="ibx-activity__text"><b>' + esc(what) + '</b>'
+				+ (a.subject ? ' <span class="ibx-muted">« ' + esc(a.subject) + ' »</span>' : '') + (a.to ? ' <span class="ibx-muted">' + esc(t('InboxActivityTo', a.to)) + '</span>' : '') + '</span>'
+				+ '<time class="ibx-muted" datetime="' + new Date(a.date * 1000).toISOString() + '" title="' + esc(longDate(a.date)) + '">' + esc(longDate(a.date)) + '</time>'
+				+ '<button type="button" class="ibx-linkbtn ibx-js-activitysee" data-folder="' + a.folder + '" data-mail="' + a.mail + '">' + th('InboxActivitySee') + '</button></div>';
+		}).join('');
 	}
 	/**
 	 * A note as a text message: the picture of its author on the left (its photo of Dolibarr, else its initials), a
@@ -5560,6 +5585,11 @@
 		}
 		if (e.target.closest('.ibx-js-createpiece')) {
 			createDialog(box);
+			return;
+		}
+		const seeSent = e.target.closest('.ibx-js-activitysee');
+		if (seeSent) {
+			Dolibarr.executeHook('inbox:mail:goto', { folder: +seeSent.dataset.folder, mail: +seeSent.dataset.mail });
 			return;
 		}
 		const rqBtn = e.target.closest('.ibx-js-createrequest');

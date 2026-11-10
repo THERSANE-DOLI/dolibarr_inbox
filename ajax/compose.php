@@ -150,7 +150,9 @@ switch ($action) {
 	case 'send':
 		// at: date of a sending scheduled; record: pieces (« type:id ») to record the sending on
 		$record = inboxAjaxParam('record', 'none');
-		$res = $composer->send($user, $token, inboxComposeTyped(), array('at' => (int) inboxAjaxParam('at', 'int'), 'record' => is_array($record) ? array_map('strval', $record) : array()));
+		// force: « Send anyway » after an answer of a colleague was said (lot E2, 1.77.0)
+		$res = $composer->send($user, $token, inboxComposeTyped(), array('at' => (int) inboxAjaxParam('at', 'int'), 'record' => is_array($record) ? array_map('strval', $record) : array(),
+			'force' => (int) inboxAjaxParam('force', 'int') === 1));
 		if ($res === null) {
 			inboxComposeFail($composer);
 		}
