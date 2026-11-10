@@ -2249,3 +2249,6 @@ InboxCronEverySec = every %s seconds
 InboxDays = days
 InboxErrorServerValue = Value not valid
 InboxSetupServerMoved = These settings are now in the inbox application, Settings > Server:
+InboxUpdated = Inbox was updated (version %s): reload the page to use it.
+InboxReload = Reload
+InboxLater = Later

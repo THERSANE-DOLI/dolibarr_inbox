@@ -2241,3 +2241,10 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-readhead__tags:focus-visible { box-shadow: 0 0 0 2px var(--ibx-accent); }
 .ibx-readhead__tagadd { display: inline-flex; align-items: center; justify-content: center; width: 1.125rem; height: 1.125rem; border: 1px dashed var(--ibx-border-strong, var(--ibx-border)); border-radius: var(--ibx-radius-sm); }
 .ibx-readhead__tagadd .ibx-icon { width: 0.75rem; height: 0.75rem; }
+
+/* Inbox updated on the server while the page is open (1.58.0): a bar at the top, until reloaded or closed */
+.ibx-updatebar { position: fixed; top: var(--ibx-s2); left: 50%; transform: translateX(-50%); z-index: 120; display: flex; align-items: center; gap: var(--ibx-s2);
+	padding: var(--ibx-s2) var(--ibx-s3); max-width: calc(100vw - 2 * var(--ibx-s3)); color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); box-shadow: 0 4px 16px rgb(0 0 0 / 18%); font-size: var(--ibx-fs-sm); }
+.ibx-updatebar > .ibx-icon { flex: none; color: var(--ibx-accent); }
+.ibx-updatebar > span { min-width: 0; }
+

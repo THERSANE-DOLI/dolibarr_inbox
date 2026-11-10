@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: a page left open while inbox is updated offers to reload :   1.58.0
+  - every ajax answer gives the version of inbox on the server (header X-Inbox-Version); when it differs from the one
+    of the page, a bar « Inbox was updated: Reload » shows once (closable, never shown again on that page).
+  - never reloaded by itself: a mail being written stays, the writing asks before leaving when it is not saved.
+
 - NEW: tags at hand in the mail read, and their colour in the menu of the tags :   1.57.0
   - button « Tag » in the bar of the mail (between the star and Archive), its menu under it.
   - the tags beside the subject open the same menu (checked ones removed in one click), with a « + » to add one;

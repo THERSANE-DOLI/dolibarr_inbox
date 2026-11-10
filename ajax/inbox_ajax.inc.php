@@ -78,6 +78,23 @@ $langs->loadLangs(array('inbox@inbox'));
 dol_include_once('/inbox/class/inboxaccess.class.php');
 
 /**
+ * Version of inbox on the server, read from its descriptor (the same as the one given to the page)
+ *
+ * @return string
+ */
+function inboxAjaxVersion()
+{
+	$text = (string) @file_get_contents(dirname(__DIR__).'/core/modules/modInbox.class.php', false, null, 0, 8192);
+
+	return preg_match("/->version\s*=\s*'([^']+)'/", $text, $m) ? $m[1] : '';
+}
+
+// In every answer: a page loaded before an update of inbox (window left open) offers to reload (1.58.0)
+if (!headers_sent()) {
+	header('X-Inbox-Version: '.inboxAjaxVersion());
+}
+
+/**
  * Answer and stop
  *
  * @param array<string,mixed>|list<mixed> $data Data
