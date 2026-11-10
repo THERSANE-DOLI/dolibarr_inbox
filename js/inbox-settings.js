@@ -33,6 +33,8 @@
 	const isAdmin = () => !!rights().account_admin;
 	/** Settings > Server (1.54.0): admins of Dolibarr only (master password of the mail server, scheduled jobs) */
 	const isDolibarrAdmin = () => !!rights().dolibarr_admin;
+	/** Settings > Recognized domains (1.59.0): right « Manage the recognized domains » */
+	const isTrustManager = () => !!rights().trusted_domain;
 
 
 	/** Skeleton while loading (state "loading", interface §9) */
@@ -121,7 +123,7 @@
 					pointSection(main, a.dataset.goto);
 				});
 			}
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, server: renderServer, me: renderMe, notifications: renderNotifications };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, server: renderServer, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -181,6 +183,7 @@
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
 			+ (isDolibarrAdmin() ? link('server', 'server', 'InboxNavServer') : '')
+			+ (isTrustManager() ? link('trusted', 'trusted', 'InboxNavTrustedDomains') : '')
 			+ '<div class="ibx-settings__navgroup">' + th('InboxNavPersonal') + '</div>'
 			+ link('me', 'account', 'InboxNavMe')
 			+ link('notifications', 'bell', 'InboxNavNotifications');
@@ -2722,6 +2725,107 @@
 		}
 		return t('InboxCronEverySec', sec);
 	}
+
+	/**
+	 * Settings > Recognized domains (1.59.0): the short list of domains of organisations shown on the senders
+	 * (authenticated mails) and the links, and the reference of the lookalikes. Analysis: analyse-domaines-reconnus.md
+	 */
+	async function renderTrusted(main) {
+		if (!isTrustManager()) {
+			I.go('#/settings/accounts');
+			return;
+		}
+		main.innerHTML = skeleton();
+		let r;
+		try {
+			r = await api('trusteddomain', 'list');
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderTrusted(main)));
+			return;
+		}
+		const date = ts => new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
+		const list = r.domains || [];
+		let html = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavTrustedDomains') + '</h1></div>'
+			+ '<p class="ibx-page__intro">' + th('InboxTrustedDomainsHelp') + '</p>';
+		if (list.length > r.many) {
+			html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxTrustedManyDomains') + '</div></div>';
+		}
+		if (list.length > 10) {
+			html += '<div class="ibx-formrow"><input class="ibx-field ibx-field--medium ibx-js-tdfilter" type="search" placeholder="' + th('InboxTrustedFilter') + '" aria-label="' + th('InboxTrustedFilter') + '" spellcheck="false"></div>';
+		}
+		if (!list.length) {
+			html += '<div class="ibx-empty" style="height:auto">' + ic('trusted', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxTrustedNone') + '</div><div>' + th('InboxTrustedNoneHelp') + '</div></div>';
+		} else {
+			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxTrustedDomain') + '</th><th>' + th('InboxTrustedLabel') + '</th><th>' + th('InboxTrustedAddedBy') + '</th><th></th></tr></thead><tbody>'
+				+ list.map(d => '<tr data-row="' + d.id + '" data-search="' + esc((d.domain + ' ' + d.label + ' ' + d.note).toLowerCase()) + '"><td><b>' + esc(d.domain) + '</b>'
+					+ (d.subdomains ? '<div class="ibx-muted">' + th('InboxTrustedWithSubdomains') + '</div>' : '') + '</td>'
+					+ '<td>' + esc(d.label) + (d.note ? '<div class="ibx-muted">' + esc(d.note) + '</div>' : '') + '</td>'
+					+ '<td class="ibx-muted">' + esc(d.user_creat || '-') + '<div>' + esc(date(d.date_creation)) + '</div></td>'
+					+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-edit="' + d.id + '">' + th('InboxEdit') + '</button> '
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-del="' + d.id + '" title="' + th('InboxDelete') + '" aria-label="' + th('InboxDelete') + ' ' + esc(d.domain) + '">' + ic('delete') + '</button></td></tr>').join('')
+				+ '</tbody></table>';
+		}
+		html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-tdadd">' + ic('plus') + ' ' + th('InboxTrustedAdd') + '</button></div></div>';
+		main.innerHTML = html;
+		$('.ibx-js-tdadd', main).addEventListener('click', () => trustedDialog(main, { id: 0, domain: '', label: '', subdomains: 1, note: '' }));
+		const filter = $('.ibx-js-tdfilter', main);
+		if (filter) {
+			filter.addEventListener('input', () => {
+				const q = filter.value.trim().toLowerCase();
+				$$('[data-row]', main).forEach(tr => {
+					tr.hidden = !!q && !tr.dataset.search.includes(q);
+				});
+			});
+		}
+		main.onclick = async e => {
+			const ed = e.target.closest('[data-edit]');
+			if (ed) {
+				trustedDialog(main, list.find(d => d.id === +ed.dataset.edit));
+				return;
+			}
+			const del = e.target.closest('[data-del]');
+			if (!del) {
+				return;
+			}
+			const d = list.find(x => x.id === +del.dataset.del);
+			if (await confirmDialog({ title: t('InboxTrustedDeleteTitle', d.domain), text: t('InboxTrustedDeleteText', d.label), confirm: t('InboxDelete'), danger: true })) {
+				try {
+					await post('trusteddomain', 'delete', { domain_id: d.id });
+					toast(t('InboxTrustedDeleted', d.domain));
+					renderTrusted(main);
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			}
+		};
+	}
+
+	function trustedDialog(main, d) {
+		const body = '<form class="ibx-form" novalidate>'
+			+ field('domain', t('InboxTrustedDomain'), d.domain, { required: true, autocomplete: 'off', placeholder: 'exemple.com', help: t('InboxTrustedDomainFieldHelp') })
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div><label class="ibx-check"><input type="checkbox" name="subdomains"' + (d.subdomains ? ' checked' : '') + '> ' + th('InboxTrustedWithSubdomains') + '</label></div></div>'
+			+ field('label', t('InboxTrustedLabel'), d.label, { required: true, autocomplete: 'off', help: t('InboxTrustedLabelHelp') })
+			+ field('note', t('InboxTrustedNote'), d.note, { autocomplete: 'off', help: t('InboxTrustedNoteHelp') })
+			+ '</form>';
+		dialog({
+			title: d.id ? t('InboxTrustedEdit', d.domain) : t('InboxTrustedAdd'),
+			body,
+			actions: [{ label: d.id ? t('InboxSave') : t('InboxTrustedAddButton'), primary: true, run: async dlg => {
+				const values = formValues($('form', dlg));
+				try {
+					await post('trusteddomain', d.id ? 'update' : 'create', Object.assign({ domain_id: d.id }, values));
+				} catch (err) {
+					// The dialog stays open with what was typed
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxSaved'));
+				renderTrusted(main);
+			} }],
+			onOpen: dlg => $('[name="' + (d.id ? 'label' : 'domain') + '"]', dlg).focus(),
+		});
+	}
+
 
 	async function renderServer(main, parts) {
 		if (!isDolibarrAdmin()) {

@@ -113,6 +113,8 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_tag WHERE fk_account = 0 AND keyword LIKE 'zz_test%'");
+		// Recognized domains (1.59.0) of the tests
+		$db->query("DELETE FROM ".$p."inbox_trusted_domain WHERE label LIKE 'ZzTrusted%'");
 		// Virtual views (1.31.0) of the test users and their shares
 		$views = "SELECT rowid FROM ".$p."inbox_view WHERE fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%') OR label LIKE 'ZzView%'";
 		$db->query("DELETE FROM ".$p."inbox_view_share WHERE fk_view IN (".$views.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");

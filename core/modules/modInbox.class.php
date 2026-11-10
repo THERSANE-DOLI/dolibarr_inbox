@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.58.0';
+		$this->version = '1.59.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -198,6 +198,12 @@ class modInbox extends DolibarrModules
 		$this->rights[$r][1] = 'InboxRightAccountAdmin';
 		$this->rights[$r][4] = 'account';
 		$this->rights[$r][5] = 'admin';
+		$r++;
+		// Recognized domains (1.59.0): the short list of domains of organisations shown on the senders and the links
+		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'InboxRightTrustedDomainWrite';
+		$this->rights[$r][4] = 'trusteddomain';
+		$this->rights[$r][5] = 'write';
 		$r++;
 
 		$this->menu = array();

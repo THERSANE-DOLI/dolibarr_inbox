@@ -49,7 +49,8 @@ class InboxModuleTest extends InboxTestCase
 		activateModule('modInbox');
 		activateModule('modInbox');
 		$this->assertSame($before, $count());
-		$this->assertSame(3, $before[2]);
+		// Rights: messages, webmail, mailboxes, recognized domains (1.59.0)
+		$this->assertSame(4, $before[2]);
 	}
 
 	/**

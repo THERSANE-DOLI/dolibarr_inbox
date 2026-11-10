@@ -153,6 +153,7 @@
 		"mail-bitcoin": ["mail-bitcoin", "outline"],
 		"mail-bolt": ["mail-bolt", "outline"],
 		"shield": ["shield", "outline"],
+		"trusted": ["shield-check", "outline"],
 		"snail": ["snail", "outline"],
 		"skull": ["skull", "outline"],
 		"speakerphone": ["speakerphone", "outline"],

@@ -1,5 +1,21 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: recognized domains and lookalike domains :   1.59.0
+  - Settings > Recognized domains (new right « Manage the recognized domains »): a short list of domains of
+    organisations with their name and the source of the check; public suffixes, free mail, emailing, hosting and
+    short link services refused (Public Suffix List embedded, dev/build-publicsuffix.php), and the own domains.
+  - an authenticated sender of a recognized domain (DMARC, or DKIM of its domain) gets a badge with the name of the
+    organisation, its details on click (answers to another domain said); a recognized domain whose authentication
+    failed gets a red banner; nothing is said when the mail cannot be verified.
+  - lookalikes of the recognized domains (same name with another extension, confusable letters, typing mistake,
+    and for the sender a name that contains the recognized one): banner on the sender, warning before opening a link.
+  - links: a bar of inbox outside the mail shows the real address under the pointer, with the organisation of a
+    recognized domain or the warning of a lookalike (long press on a phone); replaces the title of each link. The
+    misleading link warning is not shown when the text and the link belong to the same recognized organisation.
+  - « Recognize this domain… » in the menu of a mail: the domain of the authenticated sender checked, the domains of
+    the links offered unchecked, a lookalike never checked; nothing written before « Recognize ».
+  - matching is exact (the domain or its subdomains), never « contains »; verdicts computed by the server.
+
 - NEW: a page left open while inbox is updated offers to reload :   1.58.0
   - every ajax answer gives the version of inbox on the server (header X-Inbox-Version); when it differs from the one
     of the page, a bar « Inbox was updated: Reload » shows once (closable, never shown again on that page).
