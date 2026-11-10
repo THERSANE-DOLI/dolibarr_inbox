@@ -4668,11 +4668,13 @@
 			return;
 		}
 		box._data = res;
+		box._situation = null;
 		paintDolibar(box);
 		if (!box._bound) {
 			box._bound = true;
 			box.addEventListener('click', e => dolibarClick(box, e));
 		}
+		loadSituation(box);
 		loadCited(box);
 		loadPanels(box);
 	}
@@ -4849,6 +4851,349 @@
 		const sorted = alerts.slice().sort((a, b) => (b.level === 'danger') - (a.level === 'danger'));
 		holder.insertAdjacentHTML('afterbegin', sorted.map(a => banner(a.level, a.level === 'danger' ? 'spoof' : 'warning', esc(a.text)).replace('class="ibx-banner', 'class="ibx-js-dolalert ibx-banner')).join(''));
 	}
+	// ---------- Card of the thirdparty and of the contact (usage of the mailbox, 1.67.0) ----------
+	/**
+	 * Situation of the thirdparty by the usage of the mailbox, asked after the panel (nothing shown while it comes: the
+	 * line of the signal may not exist)
+	 * @param {HTMLElement} box Panel
+	 */
+	async function loadSituation(box) {
+		const d = box._data;
+		const soc = d && d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
+		box._situation = null;
+		if (!soc || d.usage === 'none') {
+			return;
+		}
+		const mail = box.dataset.mail;
+		let res;
+		try {
+			res = await api('dolibarr', 'situation', { id: +mail, soc: soc.id });
+		} catch (err) {
+			box._situation = { error: err.message, indicators: [] };
+			return;
+		}
+		if (!box.isConnected || box.dataset.mail !== mail || box._data !== d) {
+			return;
+		}
+		box._situation = res;
+		paintDolibar(box);
+	}
+	/** Signals of the closed card: the levels above normal, alerts first then in the order of the list */
+	function socSignals(box) {
+		const s = box._situation;
+		const list = s && !s.error ? s.indicators.filter(x => x.level !== 'normal') : [];
+		return list.map((x, i) => ({ x, i })).sort((a, b) => (a.x.level === 'alert' ? 0 : 1) - (b.x.level === 'alert' ? 0 : 1) || a.i - b.i).map(o => o.x);
+	}
+	/**
+	 * One way to reach: the value is the action (tel: link, new message, map); the copy icon floats after it on hover
+	 * or keyboard focus of the line (always shown without hover)
+	 */
+	function reachHtml(icon, value, kind, extra) {
+		if (!value) {
+			return '';
+		}
+		const href = kind === 'tel' ? 'tel:' + value.replace(/[^\d+]/g, '') : (kind === 'map' ? extra : '#');
+		const title = t(kind === 'tel' ? 'InboxReachCall' : (kind === 'mail' ? 'InboxReachWrite' : 'InboxReachMap'), value);
+		return '<div class="ibx-reach">' + ic(icon)
+			+ '<span class="ibx-reach__wrap"><a class="ibx-reach__val' + (kind === 'mail' ? ' ibx-js-reachwrite' : '') + '" href="' + esc(href) + '"' + (kind === 'map' ? ' target="_blank" rel="noopener noreferrer"' : '')
+			+ ' data-val="' + esc(value) + '" title="' + esc(title) + '">' + esc(value) + '</a>'
+			+ (kind !== 'map' ? '<button type="button" class="ibx-reach__copy ibx-js-reachcopy" data-val="' + esc(value) + '" aria-label="' + esc(t('InboxCopyValue', value)) + '" title="' + th('InboxCopy') + '">' + ic('copy') + '</button>' : '')
+			+ '</span></div>';
+	}
+	/** Customer (C), prospect (P), supplier (F) of a thirdparty, as in Dolibarr */
+	function socKinds(r) {
+		const out = [];
+		if (r.client === 1 || r.client === 3) {
+			out.push('<span class="ibx-soccard__kind ibx-soccard__kind--c" title="' + th('InboxKindCustomer') + '">' + th('InboxKindCustomerShort') + '</span>');
+		}
+		if (r.client === 2 || r.client === 3) {
+			out.push('<span class="ibx-soccard__kind ibx-soccard__kind--p" title="' + th('InboxKindProspect') + '">' + th('InboxKindProspectShort') + '</span>');
+		}
+		if (r.supplier) {
+			out.push('<span class="ibx-soccard__kind ibx-soccard__kind--f" title="' + th('InboxKindSupplier') + '">' + th('InboxKindSupplierShort') + '</span>');
+		}
+		return out.join('');
+	}
+	/**
+	 * Card of the thirdparty (card = 'soc') or of the contact ('contact'): its name is the link to its card in Dolibarr
+	 * (zone 2), the rest of its head folds and unfolds the detail (zone 1, the chevron for the keyboard); open, the whole
+	 * card floats over the panel at its place (placeSocCard)
+	 */
+	function socCardHtml(box, x, card) {
+		const d = box._data;
+		const open = box._open === card;
+		const socId = d.sender.soc && d.sender.soc.readable ? d.sender.soc.id : 0;
+		const sub = card === 'contact' ? pieceSub(x, socId) : '';
+		const sig = card === 'soc' ? socSignals(box) : [];
+		const first = sig[0];
+		const tip = objTipKey(x);
+		const r = x.reach || {};
+		let html = '<div class="ibx-soccard-slot"><div class="ibx-soccard' + (open ? ' is-open' : '') + '" data-card="' + card + '">'
+			+ '<div class="ibx-soccard__top ibx-js-soczone" data-card="' + card + '" title="' + th(open ? 'InboxCardFold' : 'InboxCardUnfold') + '">'
+			+ '<div class="ibx-soccard__head">' + ic(x.icon)
+			+ '<span class="ibx-soccard__namecell"><a class="ibx-soccard__name" href="' + esc(x.url || '#') + '" target="_blank" rel="noopener"' + (tip ? ' data-objtip="' + esc(tip) + '"' : ' title="' + esc(x.kind + ' ' + (x.ref || '')) + '"') + '>' + esc(x.ref || '') + '</a>'
+			+ (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + statusBadge(x)
+			+ (first ? '<span class="ibx-soccard__sig ibx-soccard__sig--' + first.level + '">' + ic(first.level === 'alert' ? 'warning' : 'info') + '<span>' + esc(first.short) + '</span>'
+				+ (sig.length > 1 ? '<span class="ibx-soccard__more" title="' + esc(sig.slice(1).map(s => s.short).join(' · ')) + '">+' + (sig.length - 1) + '</span>' : '') + '</span>' : '')
+			+ '</div>'
+			+ '<button type="button" class="ibx-soccard__chevbtn ibx-js-socfold" data-card="' + card + '" aria-expanded="' + open + '" aria-label="' + esc(t(open ? 'InboxCardFoldOf' : 'InboxCardUnfoldOf', x.ref || '')) + '">' + ic('chevron-down') + '</button>'
+			+ '</div>';
+		if (open) {
+			html += '<div class="ibx-soccard__body">'
+				+ '<div class="ibx-soccard__group">' + th('InboxReach') + (card === 'soc' ? ' ' + socKinds(r) : '') + '</div>'
+				+ (r.phone || r.mobile || r.email || r.address
+					? reachHtml('phone', r.phone, 'tel') + reachHtml('phone', r.mobile, 'tel') + reachHtml('mail', r.email, 'mail') + reachHtml('map-pin', r.address, 'map', r.map)
+					: '<div class="ibx-soccard__none">' + th('InboxReachNone') + '</div>');
+			if (card === 'soc' && d.usage !== 'none') {
+				const s = box._situation;
+				const shown = s && s.usage === 'auto' ? t('InboxUsageAutoShown', (s.shown || []).map(u => t('InboxUsage_' + u)).join(' + ') || t('InboxUsage_none'))
+					: t('InboxUsage_' + (s ? s.usage : d.usage));
+				html += '<div class="ibx-soccard__group">' + th('InboxSituation') + ' <small>· ' + esc(t('InboxUsageOf', shown)) + '</small></div>';
+				if (!s) {
+					html += '<div class="ibx-soccard__none"><span class="ibx-spinner" aria-hidden="true"></span> ' + th('InboxPanelLoading') + '</div>';
+				} else if (s.error) {
+					html += '<div class="ibx-soccard__none">' + ic('warning') + ' ' + esc(s.error) + '</div>';
+				} else if (!s.indicators.length) {
+					html += '<div class="ibx-soccard__none">' + th('InboxSituationNone') + '</div>';
+				} else {
+					html += s.indicators.map(i => '<a class="ibx-ind ibx-ind--' + i.level + '" href="' + esc(i.url) + '" target="_blank" rel="noopener" title="' + esc(t('InboxOpenList') + (i.detail ? ' · ' + i.detail : '')) + '">'
+						+ '<span class="ibx-ind__label">' + esc(i.label) + '</span>' + (i.level === 'alert' ? '<span class="ibx-ind__lvl">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxAlert') + '</span></span>' : '')
+						+ '<span class="ibx-ind__val">' + esc(i.value) + '</span>' + ic('external') + '</a>').join('');
+				}
+			}
+			if (card === 'soc' && d.level) {
+				html += '<div class="ibx-soccard__foot"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-resoc">' + ic('arrows-exchange') + ' ' + th('InboxNotTheRightSoc') + '</button></div>';
+			}
+			html += '</div>';
+		}
+		return html + '</div></div>';
+	}
+	/**
+	 * Open card: floats exactly over its slot (the slot keeps the height of the closed card), 20rem wide at least
+	 * (grows to the left near the right edge); only its detail scrolls when the window is short
+	 */
+	function placeSocCard(box) {
+		const card = $('.ibx-soccard.is-open', box);
+		if (!card) {
+			return;
+		}
+		const slot = card.parentElement;
+		slot.style.height = ($('.ibx-soccard__top', card).offsetHeight + 2) + 'px';
+		const r = slot.getBoundingClientRect();
+		const w = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
+		card.style.width = w + 'px';
+		card.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+		card.style.top = r.top + 'px';
+		card.style.maxHeight = Math.max(160, window.innerHeight - r.top - 8) + 'px';
+	}
+	/** Open or close a card (one open at a time); focus back on its chevron when asked */
+	function socCardToggle(box, card, focus) {
+		box._open = box._open === card ? '' : card;
+		paintDolibar(box);
+		if (focus) {
+			const b = $('.ibx-js-socfold[data-card="' + card + '"]', box);
+			if (b) {
+				b.focus();
+			}
+		}
+	}
+	function socCardCloseAll(focus) {
+		$$('.ibx-js-dolibar').forEach(box => {
+			if (box._open) {
+				const card = box._open;
+				box._open = '';
+				paintDolibar(box);
+				const b = focus && $('.ibx-js-socfold[data-card="' + card + '"]', box);
+				if (b) {
+					b.focus();
+				}
+			}
+		});
+	}
+	// An open card closes on a click elsewhere, Escape, a scroll of the reading; follows the window when it changes
+	(() => {
+		const anyOpen = () => $$('.ibx-js-dolibar').some(b => b._open);
+		document.addEventListener('pointerdown', e => {
+			if (anyOpen() && !e.target.closest('.ibx-soccard.is-open, dialog, .ibx-toasts, .ibx-objtip')) {
+				socCardCloseAll(false);
+			}
+		});
+		document.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && anyOpen() && !document.querySelector('dialog[open]')) {
+				socCardCloseAll(true);
+			}
+		});
+		window.addEventListener('scroll', e => {
+			if (anyOpen() && !(e.target.closest && e.target.closest('.ibx-soccard__body'))) {
+				socCardCloseAll(false);
+			}
+		}, true);
+		window.addEventListener('resize', () => $$('.ibx-js-dolibar').forEach(b => b._open && placeSocCard(b)));
+	})();
+	/** Copy a value; the icon shows a check for a moment (read by the screen readers) */
+	async function reachCopy(btn) {
+		try {
+			await navigator.clipboard.writeText(btn.dataset.val);
+		} catch (err) {
+			toast(t('InboxCopyFailed'), { error: true });
+			return;
+		}
+		btn.classList.add('is-done');
+		btn.innerHTML = ic('check');
+		btn.setAttribute('aria-label', t('InboxCopied'));
+		setTimeout(() => {
+			btn.classList.remove('is-done');
+			btn.innerHTML = ic('copy');
+			btn.setAttribute('aria-label', t('InboxCopyValue', btn.dataset.val));
+		}, 1400);
+	}
+	/**
+	 * The thirdparty shown on the rows of the list after « Not the right thirdparty? »: the mail and its conversation,
+	 * the other mails of the address when it was remembered (as the server did)
+	 */
+	function resocRows(mailId, soc, email) {
+		const row = S.rows.find(r => r.id === mailId);
+		const key = row && row.thread ? row.thread.key : '';
+		const addr = String(email || '').toLowerCase();
+		S.rows.forEach(r => {
+			if (r.id === mailId || (key && r.thread && r.thread.key === key && r.account === row.account) || (addr && String(r.from_email || '').toLowerCase() === addr)) {
+				r.soc = { id: soc.id, name: soc.ref };
+			}
+		});
+		renderList();
+	}
+	/**
+	 * « Not the right thirdparty? »: search, choice, nothing written before « Attach »; the conversation only, or the
+	 * next mails of the address too
+	 * @param {HTMLElement} box Panel
+	 */
+	function resocDialog(box) {
+		const d = box._data;
+		const before = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
+		const email = String((box._mail && box._mail.from_email) || d.from || '');
+		let chosen = null;
+		const dlg = dialog({
+			title: t(before ? 'InboxResocTitle' : 'InboxResocTitleNone'),
+			body: (before ? '<p class="ibx-formrow__help" style="margin-top:0">' + th('InboxResocNow') + ' <b>' + esc(before.ref) + '</b></p>' : '')
+				+ '<input type="search" class="ibx-field ibx-js-resocq" autocomplete="off" placeholder="' + th('InboxResocSearch') + '" aria-label="' + th('InboxResocSearch') + '">'
+				+ '<div class="ibx-picklist ibx-js-resoclist" role="listbox" aria-label="' + th('InboxThirdparties') + '"></div>'
+				+ '<label class="ibx-check" style="margin-top:var(--ibx-s3)"><input type="checkbox" class="ibx-js-resocremember"> ' + (email ? th('InboxResocRemember', email) : th('InboxResocRememberAddress')) + '</label>'
+				+ '<p class="ibx-formrow__help">' + th('InboxResocHelp') + '</p>',
+			actions: [{ label: t('InboxResocDo'), primary: true, run: async dl => {
+				if (!chosen) {
+					return false;
+				}
+				const remember = $('.ibx-js-resocremember', dl).checked;
+				await post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: chosen.id, remember: remember ? 1 : 0 });
+				box._open = '';
+				loadDolibar(box);
+				resocRows(+box.dataset.mail, chosen, remember ? email : '');
+				toast(t(remember ? 'InboxResocDoneRemember' : 'InboxResocDone', chosen.ref, email), before && !remember ? { action: t('InboxUndo'), onAction: async () => {
+					try {
+						await post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: before.id, remember: 0 });
+						loadDolibar(box);
+						resocRows(+box.dataset.mail, before, '');
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+				} } : {});
+				return true;
+			} }],
+		});
+		const input = $('.ibx-js-resocq', dlg);
+		const list = $('.ibx-js-resoclist', dlg);
+		const ok = () => {
+			const b = $('.ibx-dialog__foot .ibx-btn--primary', dlg);
+			if (b) {
+				b.setAttribute('aria-disabled', chosen ? 'false' : 'true');
+			}
+		};
+		let found = [];
+		const paint = () => {
+			list.innerHTML = found.length ? found.map(x => '<div class="ibx-picklist__item" role="option" data-id="' + x.id + '" aria-selected="' + (chosen && chosen.id === x.id) + '"' + (before && before.id === x.id ? ' aria-disabled="true"' : '') + '>'
+				+ ic(x.icon || 'company') + ' <span class="ibx-ellipsis"><b>' + esc(x.ref) + '</b>' + (x.label ? ' <span class="ibx-muted">' + esc(x.label) + '</span>' : '') + '</span>' + statusBadge(x) + '</div>').join('')
+				: '<div class="ibx-muted ibx-picklist__empty">' + th(input.value.trim() ? 'InboxResocNoneFound' : 'InboxTypeToSearch') + '</div>';
+			ok();
+		};
+		let seq = 0;
+		let timer = 0;
+		const search = async () => {
+			const mine = ++seq;
+			const q = input.value.trim();
+			if (q.length < 2) {
+				found = [];
+				paint();
+				return;
+			}
+			let res;
+			try {
+				res = await api('dolibarr', 'search', { q, types: 'societe' });
+			} catch (err) {
+				list.innerHTML = '<div class="ibx-picklist__empty">' + esc(err.message) + '</div>';
+				return;
+			}
+			if (mine === seq) {
+				found = res.results || [];
+				chosen = chosen && found.some(x => x.id === chosen.id) ? chosen : null;
+				paint();
+			}
+		};
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(search, 250);
+		});
+		const choose = it => {
+			if (it && it.getAttribute('aria-disabled') !== 'true') {
+				chosen = found.find(x => x.id === +it.dataset.id) || null;
+				paint();
+			}
+		};
+		list.addEventListener('click', e => choose(e.target.closest('[data-id]')));
+		input.addEventListener('keydown', e => {
+			const items = $$('[data-id]:not([aria-disabled="true"])', list);
+			if (!items.length || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) {
+				return;
+			}
+			e.preventDefault();
+			const i = items.findIndex(it => chosen && +it.dataset.id === chosen.id);
+			choose(items[Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))]);
+		});
+		paint();
+		input.focus();
+	}
+	/**
+	 * Clicks in a card: the name (zone 2) and the links follow; the rest of the head folds and unfolds (zone 1); copy,
+	 * write, « Not the right thirdparty? »
+	 * @returns {boolean} The click was for a card
+	 */
+	function socCardClick(box, e) {
+		if (e.target.closest('.ibx-js-resoc')) {
+			resocDialog(box);
+			return true;
+		}
+		const copy = e.target.closest('.ibx-js-reachcopy');
+		if (copy) {
+			reachCopy(copy);
+			return true;
+		}
+		const write = e.target.closest('.ibx-js-reachwrite');
+		if (write) {
+			e.preventDefault();
+			if (I.compose) {
+				I.compose({ mode: 'new', to: write.dataset.val });
+			}
+			return true;
+		}
+		const zone = e.target.closest('.ibx-js-soczone');
+		if (!zone) {
+			return false;
+		}
+		if (e.target.closest('a, button:not(.ibx-js-socfold)')) {
+			return true;
+		}
+		socCardToggle(box, zone.dataset.card, !!e.target.closest('.ibx-js-socfold'));
+		return true;
+	}
 	function paintDolibar(box) {
 		const d = box._data;
 		const folded = params.dolibar_folded === '1';
@@ -4863,12 +5208,14 @@
 			+ ic(right ? (folded ? 'chevron-left' : 'chevron-right') : (folded ? 'chevron-right' : 'chevron-down')) + ic('dolibarr')
 			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '') + '</button>';
 		if (!folded) {
+			// The thirdparty and the contact as cards (1.67.0): reach them, situation by the usage of the mailbox
 			const sender = [];
 			if (d.sender.soc) {
-				sender.push(pieceHtml(d.sender.soc, 0) + (d.sender.by === 'domain' ? ' <span class="ibx-muted">' + th('InboxKnownByDomain') + '</span>' : ''));
+				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0))
+					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' : ''));
 			}
 			if (d.sender.contact) {
-				sender.push(pieceHtml(d.sender.contact, 0, '', socId));
+				sender.push(d.sender.contact.readable ? socCardHtml(box, d.sender.contact, 'contact') : pieceHtml(d.sender.contact, 0, '', socId));
 			}
 			if (d.sender.user) {
 				sender.push('<span class="ibx-piece"><span class="ibx-piece__link">' + ic('account') + esc(t('InboxDolibarrUser', d.sender.user.name)) + '</span></span>');
@@ -4885,7 +5232,8 @@
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			html += '<div class="ibx-dolibar__body">'
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
-				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>') + '</span></div>'
+				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>'
+					+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-resoc">' + ic('arrows-exchange') + ' ' + th('InboxResocAttach') + '</button></span>' : '')) + '</span></div>'
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
@@ -4907,6 +5255,7 @@
 				+ '</div></div>';
 		}
 		box.innerHTML = html;
+		placeSocCard(box);
 		hydrateUserPhotos(box);
 		I.mount(box);
 		box.classList.toggle('is-folded', folded);
@@ -5020,6 +5369,9 @@
 	}
 	async function dolibarClick(box, e) {
 		const mailId = +box.dataset.mail;
+		if (socCardClick(box, e)) {
+			return;
+		}
 		if (e.target.closest('.ibx-js-doltoggle')) {
 			saveParam('dolibar_folded', params.dolibar_folded === '1' ? '0' : '1');
 			paintDolibar(box);

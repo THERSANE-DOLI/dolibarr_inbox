@@ -56,8 +56,15 @@ class InboxContactMatcher
 		$p = $this->db->prefix();
 		$e = $this->db->escape($email);
 		$out = array('fk_soc' => 0, 'fk_socpeople' => 0);
-		$contact = $this->db->getRow("SELECT rowid, fk_soc FROM ".$p."socpeople WHERE LOWER(email) = '".$e."' AND entity IN (".getEntity('contact').") AND statut = 1 ORDER BY rowid");
-		if (is_object($contact)) {
+		// Attached by hand to a thirdparty (« Not the right thirdparty? », 1.67.0): first; its contact of this address
+		// when there is one
+		$byHand = $this->db->getRow("SELECT a.fk_soc FROM ".$p."inbox_address_soc as a INNER JOIN ".$p."societe as s ON s.rowid = a.fk_soc"
+			." WHERE a.entity = ".((int) $GLOBALS['conf']->entity)." AND a.email = '".$e."'");
+		$contact = $this->db->getRow("SELECT rowid, fk_soc FROM ".$p."socpeople WHERE LOWER(email) = '".$e."' AND entity IN (".getEntity('contact').") AND statut = 1"
+			.(is_object($byHand) ? " AND fk_soc = ".((int) $byHand->fk_soc) : "")." ORDER BY rowid");
+		if (is_object($byHand)) {
+			$out = array('fk_soc' => (int) $byHand->fk_soc, 'fk_socpeople' => is_object($contact) ? (int) $contact->rowid : 0);
+		} elseif (is_object($contact)) {
 			$out = array('fk_soc' => (int) $contact->fk_soc, 'fk_socpeople' => (int) $contact->rowid);
 		} else {
 			$soc = $this->db->getRow("SELECT rowid FROM ".$p."societe WHERE LOWER(email) = '".$e."' AND entity IN (".getEntity('societe').") AND status = 1 ORDER BY rowid");
@@ -127,7 +134,8 @@ class InboxContactMatcher
 		unset($this->cache[strtolower(trim((string) $email))]);
 		$m = $this->match($email);
 		$sql = "UPDATE ".$this->db->prefix()."inbox_mail SET fk_soc = ".($m['fk_soc'] ? (int) $m['fk_soc'] : 'NULL').", fk_socpeople = ".($m['fk_socpeople'] ? (int) $m['fk_socpeople'] : 'NULL');
-		$sql .= " WHERE from_email = '".$this->db->escape(strtolower(trim((string) $email)))."'";
+		// Never the mails whose thirdparty was chosen by hand
+		$sql .= " WHERE from_email = '".$this->db->escape(strtolower(trim((string) $email)))."' AND soc_manual = 0";
 
 		return $this->db->query($sql) ? (int) $this->db->affected_rows(true) : 0;
 	}

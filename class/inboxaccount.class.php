@@ -97,6 +97,8 @@ class InboxAccount extends CommonObject
 		'sync_max_days' => array('type' => 'integer', 'label' => 'InboxSyncMaxDays', 'enabled' => 1, 'position' => 150, 'notnull' => 0, 'default' => '0', 'visible' => 0),
 		'sync_max_mails' => array('type' => 'integer', 'label' => 'InboxSyncMaxMails', 'enabled' => 1, 'position' => 151, 'notnull' => 0, 'default' => '0', 'visible' => 0),
 		'tags_mode' => array('type' => 'varchar(8)', 'label' => 'InboxTagsMode', 'enabled' => 1, 'position' => 160, 'notnull' => 1, 'default' => 'global', 'visible' => 0),
+		'usage_profile' => array('type' => 'varchar(16)', 'label' => 'InboxUsage', 'enabled' => 1, 'position' => 162, 'notnull' => 1, 'default' => 'auto', 'visible' => 0),
+		'usage_indicators' => array('type' => 'text', 'label' => 'InboxUsageIndicators', 'enabled' => 1, 'position' => 163, 'notnull' => 0, 'visible' => 0),
 		'color' => array('type' => 'varchar(7)', 'label' => 'InboxColor', 'enabled' => 1, 'position' => 161, 'notnull' => 0, 'visible' => 0),
 		'icon' => array('type' => 'varchar(48)', 'label' => 'InboxIcon', 'enabled' => 1, 'position' => 162, 'notnull' => 0, 'visible' => 0),
 		'status' => array('type' => 'integer', 'label' => 'Status', 'enabled' => 1, 'position' => 500, 'notnull' => 1, 'default' => '0', 'visible' => 1, 'arrayofkeyval' => array(0 => 'Draft', 1 => 'Enabled', 9 => 'Disabled')),
@@ -166,6 +168,10 @@ class InboxAccount extends CommonObject
 	public $sync_max_mails = 0;
 	/** @var string global|own */
 	public $tags_mode = 'global';
+	/** @var string Usage of the mailbox (1.67.0): what the card of the thirdparty shows, see InboxSituation::USAGES */
+	public $usage_profile = 'auto';
+	/** @var string|null Own list of indicators (JSON), null = the list of the usage */
+	public $usage_indicators;
 	/** @var string|null Colour of the mailbox (#rrggbb), shared by its users, null = by default */
 	public $color;
 	/** @var string|null Icon of the mailbox (usage name of img/inbox-icon-choices.json), null = the at sign */
@@ -560,6 +566,9 @@ class InboxAccount extends CommonObject
 		if (!in_array($this->tags_mode, array('global', 'own'), true)) {
 			$this->errors[] = 'InboxErrorAccountTagsMode';
 		}
+		if ((string) $this->usage_profile === '') {
+			$this->usage_profile = 'auto';
+		}
 		if (!in_array((int) $this->status, array(self::STATUS_DRAFT, self::STATUS_ACTIVE, self::STATUS_DISABLED), true)) {
 			$this->errors[] = 'InboxErrorAccountStatus';
 		}
@@ -860,6 +869,7 @@ class InboxAccount extends CommonObject
 			'sync_max_days' => (int) $this->sync_max_days,
 			'sync_max_mails' => (int) $this->sync_max_mails,
 			'tags_mode' => (string) $this->tags_mode,
+			'usage_profile' => (string) ($this->usage_profile ?: 'auto'),
 			'status' => (int) $this->status,
 			'date_last_test' => $this->date_last_test ? (int) $this->date_last_test : null,
 			'last_test_result' => (string) $this->last_test_result,

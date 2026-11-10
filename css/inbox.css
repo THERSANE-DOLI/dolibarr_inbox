@@ -1398,6 +1398,94 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-pane--read[data-dolibar="right"] .ibx-piece__foot { grid-area: foot; display: flex; align-items: center; gap: 0.375rem; min-width: 0; padding-left: calc(1em + 0.375rem); }
 .ibx-pane--read[data-dolibar="right"] .ibx-piece__sub { flex: 1; font-size: var(--ibx-fs-sm); }
 .ibx-pane--read[data-dolibar="right"] .ibx-piece__act { margin: -0.125rem -0.25rem -0.125rem auto; }
+/* ===== Tab « Usage » of a mailbox (1.67.0) ===== */
+.ibx-usage { display: grid; gap: var(--ibx-s2); max-width: 44rem; }
+.ibx-usage__opt { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 0.25rem var(--ibx-s3); align-items: start; padding: var(--ibx-s3);
+	border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-lg); background: var(--ibx-bg); cursor: pointer; }
+.ibx-usage__opt:hover { border-color: var(--ibx-border-strong); }
+.ibx-usage__opt:has(input:checked) { border-color: var(--ibx-accent); box-shadow: inset 0 0 0 1px var(--ibx-accent); background: var(--ibx-accent-softer); }
+.ibx-usage__opt input { margin: 0.2rem 0 0; accent-color: var(--ibx-accent); }
+.ibx-usage__opt > .ibx-icon { margin-top: 0.15rem; font-size: 1.125rem; color: var(--ibx-text-muted); }
+.ibx-usage__name { font-weight: 600; }
+.ibx-usage__name em { font-style: normal; font-weight: 400; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-usage__desc { display: block; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-usage__list { margin: var(--ibx-s2) 0 0; padding-left: 1.5rem; }
+.ibx-usage__list li { padding: 0.125rem 0; }
+.ibx-usage__auto { display: grid; gap: var(--ibx-s3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); max-width: 44rem; }
+.ibx-usage__auto h4 { margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+
+/* ===== Card of the thirdparty and of the contact of the sender (1.67.0) =====
+   Zone 2 (the name): link to the card of Dolibarr; zone 1 (the rest of the head): folds and unfolds the detail. Open,
+   the whole card floats over the panel at its place (one block, one outline, a thin line before the detail), its slot
+   keeping the height of the closed card: nothing moves below. One open at a time. */
+.ibx-soccard-slot { position: relative; min-width: 0; flex: 0 1 20rem; }
+.ibx-pane--read[data-dolibar="right"] .ibx-soccard-slot { flex: none; width: 100%; }
+.ibx-soccard { box-sizing: border-box; min-width: 0; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg); }
+.ibx-soccard__top { display: flex; align-items: center; gap: 0.25rem; min-width: 0; border-radius: var(--ibx-radius); cursor: pointer; }
+.ibx-soccard__top:hover { background: var(--ibx-bg-hover); }
+.ibx-soccard__head { flex: 1; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ic name st" ". sig sig";
+	column-gap: 0.375rem; row-gap: 0.125rem; align-items: center; padding: 0.3125rem 0 0.3125rem 0.5rem; }
+.ibx-soccard__head > .ibx-icon { grid-area: ic; color: var(--ibx-text-muted); }
+.ibx-soccard__namecell { grid-area: name; min-width: 0; display: flex; align-items: baseline; gap: 0.25rem; overflow: hidden; white-space: nowrap; }
+.ibx-soccard__name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 700; color: inherit; text-decoration: none; }
+.ibx-soccard__name:hover, .ibx-soccard__name:focus-visible { text-decoration: underline; }
+.ibx-soccard__namecell small { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+.ibx-soccard__head > .ibx-st { grid-area: st; }
+.ibx-soccard__sig { grid-area: sig; display: flex; align-items: center; gap: 0.25rem; min-width: 0; font-size: var(--ibx-fs-sm); }
+.ibx-soccard__sig > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-soccard__sig--alert { color: var(--ibx-warning); font-weight: 600; }
+.ibx-soccard__sig--attention { color: var(--ibx-text-muted); }
+.ibx-soccard__more { flex: none; padding: 0 0.3125rem; border-radius: 999px; font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); background: var(--ibx-bg-sunken); }
+.ibx-soccard__chevbtn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; margin-right: 0.125rem; padding: 0;
+	color: var(--ibx-text-muted); background: none; border: 0; border-radius: var(--ibx-radius-sm); cursor: pointer; }
+.ibx-soccard__chevbtn:focus-visible { outline: 2px solid var(--ibx-accent); }
+.ibx-soccard__chevbtn > .ibx-icon { transition: transform var(--ibx-dur); }
+.ibx-soccard.is-open .ibx-soccard__chevbtn > .ibx-icon { transform: rotate(180deg); }
+.ibx-soccard.is-open { position: fixed; z-index: 60; display: flex; flex-direction: column; border-color: var(--ibx-border-strong); border-radius: var(--ibx-radius-lg);
+	box-shadow: var(--ibx-shadow-float); }
+.ibx-soccard.is-open .ibx-soccard__top { flex: none; border-radius: var(--ibx-radius-lg) var(--ibx-radius-lg) 0 0; }
+.ibx-soccard__body { min-height: 0; overflow: auto; padding: 0 0.625rem 0.5rem; border-top: 1px solid var(--ibx-border); }
+.ibx-soccard__group { display: flex; align-items: center; gap: 0.25rem; margin: var(--ibx-s2) 0 0.125rem; font-size: var(--ibx-fs-xs); font-weight: 700; text-transform: uppercase;
+	letter-spacing: .04em; color: var(--ibx-text-muted); }
+.ibx-soccard__group small { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.ibx-soccard__kind { display: inline-block; min-width: 1.25em; padding: 0 0.25rem; border-radius: 0.25rem; font-size: var(--ibx-fs-xs); font-weight: 600; line-height: 1.5;
+	text-align: center; letter-spacing: 0; color: #fff; }
+.ibx-soccard__kind--c { background: #55955d; }
+.ibx-soccard__kind--p { background: #55955d; opacity: .7; }
+.ibx-soccard__kind--f { background: #599caf; }
+.ibx-soccard__none { padding: 0.25rem 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-soccard__foot { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: var(--ibx-s2); padding-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
+.ibx-soccard__by { font-size: var(--ibx-fs-xs); }
+/* A way to reach: the value is the action; the copy icon floats after it (takes no room) on hover or keyboard focus of
+   the line, always shown without hover */
+.ibx-reach { display: flex; align-items: center; gap: 0.375rem; min-height: 2rem; }
+.ibx-reach > .ibx-icon { flex: none; color: var(--ibx-text-muted); }
+.ibx-reach__wrap { position: relative; flex: 0 1 auto; min-width: 0; display: flex; }
+.ibx-reach__val { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; }
+.ibx-reach__val:hover, .ibx-reach__val:focus-visible { color: var(--ibx-accent); text-decoration: underline; }
+.ibx-reach__copy { position: absolute; top: 50%; left: 100%; z-index: 1; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center;
+	width: 1.75rem; height: 1.75rem; margin-left: 0.125rem; padding: 0; color: var(--ibx-text-muted); background: var(--ibx-bg); border: 0; border-radius: var(--ibx-radius-sm);
+	cursor: pointer; opacity: 0; transition: opacity var(--ibx-dur); }
+.ibx-reach:hover .ibx-reach__copy, .ibx-reach:focus-within .ibx-reach__copy { opacity: 1; }
+.ibx-reach__copy:hover { color: var(--ibx-text); background: var(--ibx-bg-hover); }
+.ibx-reach__copy:focus-visible { outline: 2px solid var(--ibx-accent); }
+.ibx-reach__copy.is-done { color: var(--ibx-success); opacity: 1; }
+/* An indicator of the situation: its list in Dolibarr */
+.ibx-ind { display: flex; align-items: center; gap: 0.375rem; min-height: 2rem; margin: 0 -0.25rem; padding: 0 0.25rem; color: inherit; text-decoration: none; border-radius: var(--ibx-radius-sm); }
+.ibx-ind:hover, .ibx-ind:focus-visible { background: var(--ibx-bg-hover); }
+.ibx-ind__label { flex: 1; min-width: 0; }
+.ibx-ind__val { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ibx-ind > .ibx-icon { flex: none; color: var(--ibx-text-faint); }
+.ibx-ind--normal { color: var(--ibx-text-muted); }
+.ibx-ind--normal .ibx-ind__val { font-weight: 400; }
+.ibx-ind--alert .ibx-ind__val, .ibx-ind__lvl { color: var(--ibx-warning); }
+.ibx-ind__lvl { flex: none; display: inline-flex; }
+@media (hover: none) {
+	.ibx-reach__copy { opacity: 1; width: 2.75rem; height: 2.75rem; }
+}
+@media (pointer: coarse) {
+	.ibx-soccard__chevbtn { width: 2.75rem; height: 2.75rem; }
+}
 .ibx-pane--read[data-dolibar="right"] .ibx-js-linkpiece { align-self: flex-start; }
 /* The notes as a thread: the oldest on top, the last one in view, the field to write stuck under them */
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar__notes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
