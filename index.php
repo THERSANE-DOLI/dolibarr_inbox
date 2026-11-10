@@ -117,7 +117,7 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-invite.js').'" de
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-rules.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-import-qr.js').'" defer></script>'."\n";
 print '</head>'."\n";
-print '<body>'."\n";
+print '<body class="ibx-body">'."\n";
 // Empty shell: the rail and the spaces are built by inbox.js (nothing works without JavaScript, said plainly)
 print '<div class="ibx-app" id="ibx-app" data-loading="1"><noscript><p class="ibx-notice ibx-notice--error">'.dol_escape_htmltag($langs->trans('InboxNeedJavascript')).'</p></noscript></div>'."\n";
 print '<div class="ibx-toasts" id="ibx-toasts" role="status" aria-live="polite"></div>'."\n";

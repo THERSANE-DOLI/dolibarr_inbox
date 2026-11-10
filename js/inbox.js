@@ -231,9 +231,14 @@
 		const el = document.createElement('div');
 		el.className = 'ibx-toast' + (o.error ? ' ibx-toast--error' : '');
 		el.setAttribute('role', o.error ? 'alert' : 'status');
-		el.innerHTML = '<span>' + esc(text) + '</span>' + (o.action ? '<button type="button" class="ibx-btn ibx-btn--sm">' + esc(o.action) + '</button>' : '');
+		el.innerHTML = '<span>' + esc(text) + '</span>' + (o.action ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-toastaction">' + esc(o.action) + '</button>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-toastclose" aria-label="' + th('InboxCloseWindow') + '" title="' + th('InboxCloseWindow') + '">' + ic('close') + '</button>';
+		$('.ibx-js-toastclose', el).addEventListener('click', () => {
+			clearTimeout(el._ibxTimer);
+			el.remove();
+		});
 		if (o.action) {
-			$('button', el).addEventListener('click', () => {
+			$('.ibx-js-toastaction', el).addEventListener('click', () => {
 				el.remove();
 				if (o.onAction) {
 					o.onAction();
@@ -245,9 +250,10 @@
 		}
 		box.appendChild(el);
 		// The last two only: older ones are not worth stacking (their « Undo » stays in the journal)
-		while (box.children.length > 2) {
-			clearTimeout(box.firstElementChild._ibxTimer);
-			box.firstElementChild.remove();
+		const shown = box.querySelectorAll(':scope > .ibx-toast');
+		for (let i = 0; i < shown.length - 2; i++) {
+			clearTimeout(shown[i]._ibxTimer);
+			shown[i].remove();
 		}
 		el._ibxTimer = setTimeout(() => el.remove(), o.duration || (o.action ? 8000 : 4000));
 		return el;

@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: toasts and sending bars can be closed :   1.50.1
+  - a cross closes every toast, and the bar of a sent, failed or scheduled mail (not the countdown before sending).
+  - the sending bar takes the font of the inbox (it showed in the browser serif font) and is stacked under the
+    toasts instead of hiding them.
+  - the page of the inbox gets its font on the body: no element added to the page in the font of the browser
+    (Times New Roman under Windows).
+
 - NEW: mailboxes in the panel chosen from the menu of the folders panel :   1.50.0
   - the « ⋯ » menu of the panel offers the choice of My account: automatic (by screen size), all the mailboxes,
     one mailbox at a time; the panel is drawn again at once, the choice kept for the user.
