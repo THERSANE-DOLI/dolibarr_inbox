@@ -2073,6 +2073,8 @@
 					return t('InboxLogCreate');
 				case 'usage':
 					return t('InboxLogUsage', t('InboxUsage_' + (l.before.usage || 'auto')), t('InboxUsage_' + (l.after.usage || 'auto')));
+				case 'indicators':
+					return t(l.after && l.after.ids ? 'InboxLogIndicatorsOwn' : 'InboxLogIndicatorsReset');
 				default:
 					return l.action;
 			}
@@ -2194,43 +2196,66 @@
 			+ '<p class="ibx-formrow__help">' + th('InboxTagsThunderbirdAfter') + '</p></div></details>';
 	}
 
-	// ---------- Mailbox: usage (1.67.0) ----------
+	// ---------- Mailbox: usage (1.67.0) and its own list of indicators (1.68.0) ----------
 	const USAGE_ICONS = { auto: 'magic', sales: 'quote', accounting: 'calculator', support: 'tool', purchase: 'order', transport: 'truck', none: 'close' };
 	/**
 	 * What the card of the thirdparty of a mail shows in this mailbox: one usage, saved at once (undo in the toast);
-	 * its indicators listed (their own list per mailbox comes later)
+	 * the indicators of a usage with a list may be added, removed and moved (drag and drop, arrows on the grip), saved
+	 * at once too; « Back to the list of the usage » when the mailbox has its own
 	 */
 	function tabUsage(box, account) {
 		const usages = Object.keys(account.usages || {});
-		const labels = account.indicators || {};
-		const list = ids => '<ol class="ibx-usage__list">' + ids.map(id => '<li>' + esc(labels[id] || id) + '</li>').join('') + '</ol>';
-		const paint = () => {
-			const cur = account.usage_profile || 'auto';
+		const cat = account.indicators || {};
+		const label = id => (cat[id] ? cat[id].label : id);
+		const plain = ids => '<ol class="ibx-usage__list">' + ids.map(id => '<li>' + esc(label(id)) + '</li>').join('') + '</ol>';
+		const cur = () => account.usage_profile || 'auto';
+		const list = () => (account.usage_own || account.usages[cur()] || []).slice();
+		const listHtml = () => {
+			const ids = list();
+			return '<p class="ibx-section__help">' + th('InboxUsageListHelp') + (account.usage_own ? ' <b>' + th('InboxUsageOwnList') + '</b>' : '') + '</p>'
+				+ (ids.length ? '<ol class="ibx-indlist">' + ids.map((id, n) => '<li class="ibx-indlist__item" data-id="' + esc(id) + '" draggable="true">'
+					+ '<button type="button" class="ibx-indlist__grip ibx-js-indgrip" aria-label="' + esc(t('InboxIndMove', label(id))) + '" title="' + th('InboxIndMoveHelp') + '">' + ic('more-v') + '</button>'
+					+ '<span class="ibx-indlist__label">' + esc(label(id)) + '</span>'
+					+ (cat[id] && cat[id].rule ? '<span class="ibx-indlist__rule">' + esc(cat[id].rule) + '</span>' : '')
+					+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-js-inddel" data-n="' + n + '" aria-label="' + esc(t('InboxIndRemove', label(id))) + '" title="' + th('InboxIndRemoveShort') + '">' + ic('close') + '</button>'
+					+ '</li>').join('') + '</ol>' : '<p class="ibx-muted">' + th('InboxUsageListEmpty') + '</p>')
+				+ '<div class="ibx-usage__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-indadd">' + ic('plus') + ' ' + th('InboxIndAdd') + '</button>'
+				+ (account.usage_own ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-indreset">' + th('InboxIndReset', t('InboxUsage_' + cur())) + '</button>' : '') + '</div>';
+		};
+		const paint = focusId => {
+			const u = cur();
 			let indicators;
-			if (cur === 'none') {
+			if (u === 'none') {
 				indicators = '<p class="ibx-muted">' + th('InboxUsageNoneHelp') + '</p>';
-			} else if (cur === 'auto') {
+			} else if (u === 'auto') {
 				indicators = '<p class="ibx-section__help">' + th('InboxUsageAutoHelp') + '</p><div class="ibx-usage__auto">'
-					+ '<div><h4>' + th('InboxUsageAutoCustomer') + '</h4>' + list(account.usages.sales) + '</div>'
-					+ '<div><h4>' + th('InboxUsageAutoSupplier') + '</h4>' + list(account.usages.purchase) + '</div></div>';
+					+ '<div><h4>' + th('InboxUsageAutoCustomer') + '</h4>' + plain(account.usages.sales || []) + '</div>'
+					+ '<div><h4>' + th('InboxUsageAutoSupplier') + '</h4>' + plain(account.usages.purchase || []) + '</div></div>';
 			} else {
-				indicators = '<p class="ibx-section__help">' + th('InboxUsageListHelp') + '</p>' + list(account.usages[cur]);
+				indicators = listHtml();
 			}
 			box.innerHTML = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxUsage') + '</h2>'
 				+ '<p class="ibx-section__help">' + th('InboxUsageHelp') + '</p>'
 				+ '<div class="ibx-usage" role="radiogroup" aria-label="' + th('InboxUsage') + '">'
-				+ usages.map(u => '<label class="ibx-usage__opt"><input type="radio" name="usage" value="' + esc(u) + '"' + (u === cur ? ' checked' : '') + '>' + ic(USAGE_ICONS[u] || 'magic')
-					+ '<span><span class="ibx-usage__name">' + th('InboxUsage_' + u) + (u === 'auto' ? ' <em>' + th('InboxByDefault') + '</em>' : '') + '</span>'
-					+ '<span class="ibx-usage__desc">' + th('InboxUsageDesc_' + u) + '</span></span></label>').join('')
+				+ usages.map(x => '<label class="ibx-usage__opt"><input type="radio" name="usage" value="' + esc(x) + '"' + (x === u ? ' checked' : '') + '>' + ic(USAGE_ICONS[x] || 'magic')
+					+ '<span><span class="ibx-usage__name">' + th('InboxUsage_' + x) + (x === 'auto' ? ' <em>' + th('InboxByDefault') + '</em>' : '') + '</span>'
+					+ '<span class="ibx-usage__desc">' + th('InboxUsageDesc_' + x) + '</span></span></label>').join('')
 				+ '</div></section>'
 				+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxUsageIndicators') + '</h2>' + indicators + '</section>';
 			I.mount(box);
+			if (focusId) {
+				const g = $('.ibx-indlist__item[data-id="' + CSS.escape(focusId) + '"] .ibx-js-indgrip', box);
+				if (g) {
+					g.focus();
+				}
+			}
 		};
-		const save = async (usage, undo) => {
-			const before = account.usage_profile || 'auto';
+		const saveUsage = async (usage, undo) => {
+			const before = { usage: cur(), own: account.usage_own };
 			try {
 				const res = await post('account', 'usage', { id: account.id, usage });
 				account.usage_profile = res.usage;
+				account.usage_own = null;
 			} catch (err) {
 				toast(err.message, { error: true });
 				paint();
@@ -2238,14 +2263,143 @@
 			}
 			paint();
 			if (!undo) {
-				toast(t('InboxUsageSaved', t('InboxUsage_' + usage)), { action: t('InboxUndo'), onAction: () => save(before, true) });
+				toast(t('InboxUsageSaved', t('InboxUsage_' + usage)), { action: t('InboxUndo'), onAction: async () => {
+					await saveUsage(before.usage, true);
+					if (before.own) {
+						saveList(before.own, '', true);
+					}
+				} });
+			}
+		};
+		const saveList = async (ids, message, undo, focusId) => {
+			const before = list();
+			try {
+				const res = await post('account', 'indicators', { id: account.id, ids: ids.join(',') });
+				account.usage_own = res.usage_own;
+			} catch (err) {
+				toast(err.message, { error: true });
+				paint();
+				return;
+			}
+			paint(focusId);
+			if (!undo && message) {
+				toast(message, { action: t('InboxUndo'), onAction: () => saveList(before, '', true) });
 			}
 		};
 		box.addEventListener('change', e => {
 			if (e.target.name === 'usage') {
-				save(e.target.value, false);
+				saveUsage(e.target.value, false);
 			}
 		});
+		box.addEventListener('click', e => {
+			const del = e.target.closest('.ibx-js-inddel');
+			if (del) {
+				const ids = list();
+				const [gone] = ids.splice(+del.dataset.n, 1);
+				saveList(ids, t('InboxIndRemoved', label(gone)));
+				return;
+			}
+			if (e.target.closest('.ibx-js-indreset')) {
+				saveList(account.usages[cur()] || [], t('InboxIndResetDone'));
+				return;
+			}
+			if (e.target.closest('.ibx-js-indadd')) {
+				addIndicator();
+			}
+		});
+		// Keyboard: arrows up and down on the grip move the indicator
+		box.addEventListener('keydown', e => {
+			const grip = e.target.closest('.ibx-js-indgrip');
+			if (!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) {
+				return;
+			}
+			e.preventDefault();
+			const id = grip.closest('[data-id]').dataset.id;
+			const ids = list();
+			const i = ids.indexOf(id);
+			const j = i + (e.key === 'ArrowUp' ? -1 : 1);
+			if (j < 0 || j >= ids.length) {
+				return;
+			}
+			ids.splice(i, 1);
+			ids.splice(j, 0, id);
+			saveList(ids, t('InboxIndOrderSaved'), false, id);
+		});
+		// Drag and drop: the indicator goes before the one it is dropped on
+		let drag = '';
+		box.addEventListener('dragstart', e => {
+			const li = e.target.closest('.ibx-indlist__item');
+			if (li) {
+				drag = li.dataset.id;
+				li.classList.add('is-dragging');
+				e.dataTransfer.effectAllowed = 'move';
+			}
+		});
+		box.addEventListener('dragend', () => $$('.ibx-indlist__item', box).forEach(x => x.classList.remove('is-dragging', 'is-over')));
+		box.addEventListener('dragover', e => {
+			const li = e.target.closest('.ibx-indlist__item');
+			if (li && drag) {
+				e.preventDefault();
+				$$('.is-over', box).forEach(x => x !== li && x.classList.remove('is-over'));
+				li.classList.add('is-over');
+			}
+		});
+		box.addEventListener('drop', e => {
+			const li = e.target.closest('.ibx-indlist__item');
+			if (!li || !drag || li.dataset.id === drag) {
+				return;
+			}
+			e.preventDefault();
+			const ids = list().filter(x => x !== drag);
+			ids.splice(ids.indexOf(li.dataset.id), 0, drag);
+			drag = '';
+			saveList(ids, t('InboxIndOrderSaved'));
+		});
+		/** Add an indicator: the ones not in the list, searched; added at the end */
+		const addIndicator = () => {
+			const current = list();
+			const d = dialog({
+				title: t('InboxIndAddTitle'),
+				noCancel: false,
+				body: '<input type="search" class="ibx-field ibx-js-indq" autocomplete="off" placeholder="' + th('InboxIndSearch') + '" aria-label="' + th('InboxIndSearch') + '">'
+					+ '<div class="ibx-picklist ibx-js-indpick" role="listbox" aria-label="' + th('InboxUsageIndicators') + '"></div>'
+					+ '<p class="ibx-formrow__help">' + th('InboxIndAddHelp') + '</p>',
+			});
+			const q = $('.ibx-js-indq', d);
+			const pick = $('.ibx-js-indpick', d);
+			const paintPick = () => {
+				const s = q.value.trim().toLowerCase();
+				const ids = Object.keys(cat).filter(id => !current.includes(id) && (!s || label(id).toLowerCase().includes(s)));
+				pick.innerHTML = ids.length ? ids.map(id => '<div class="ibx-picklist__item" role="option" tabindex="-1" aria-selected="false" data-id="' + esc(id) + '"><span class="ibx-ellipsis" style="flex:1">' + esc(label(id)) + '</span>'
+					+ (cat[id].rule ? '<span class="ibx-muted ibx-indpick__rule">' + esc(cat[id].rule) + '</span>' : '') + '</div>').join('')
+					: '<div class="ibx-muted ibx-picklist__empty">' + th(current.length >= Object.keys(cat).length ? 'InboxIndAllIn' : 'InboxIndNoneFound') + '</div>';
+			};
+			const choose = it => {
+				if (it) {
+					d.close();
+					saveList(current.concat(it.dataset.id), t('InboxIndAdded', label(it.dataset.id)));
+				}
+			};
+			q.addEventListener('input', paintPick);
+			pick.addEventListener('click', e => choose(e.target.closest('[data-id]')));
+			q.addEventListener('keydown', e => {
+				const items = $$('[data-id]', pick);
+				if (!items.length) {
+					return;
+				}
+				const i = items.findIndex(x => x.getAttribute('aria-selected') === 'true');
+				if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+					e.preventDefault();
+					items.forEach(x => x.setAttribute('aria-selected', 'false'));
+					items[Math.max(0, Math.min(items.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))].setAttribute('aria-selected', 'true');
+				} else if (e.key === 'Enter' && i >= 0) {
+					e.preventDefault();
+					choose(items[i]);
+				}
+			});
+			paintPick();
+			q.focus();
+		};
 		paint();
 	}
 

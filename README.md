@@ -15,8 +15,8 @@ README.txt saying so.
 Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolcontext (JavaScript context of Dolibarr 24).
 
 Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `inboxAccountImportSources`,
-`inboxConnectors`, `addInboxHtmlHeader` (context `inbox`), the module_parts `inboxcss` and `inboxjs` (see « Extend the
-application ») and the triggers of its objects.
+`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators` (context `inbox`), the module_parts `inboxcss` and
+`inboxjs` (see « Extend the application ») and the triggers of its objects.
 
 Licence: GPLv3, see COPYING.
 
@@ -52,6 +52,28 @@ Rules for the styles of a module:
   `--ibx-warning`, `--ibx-danger`, `--ibx-info` and their `-soft`; spaces `--ibx-s1` to `--ibx-s6`; text sizes
   `--ibx-fs-xs`, `-sm`, `-md`, `-body`, `-lg`, `-xl`; `--ibx-font`, `--ibx-font-mono`; corners `--ibx-radius-sm`,
   `--ibx-radius`, `--ibx-radius-lg`; `--ibx-shadow-float`.
+
+Indicators of the card of the thirdparty (Settings > Mailboxes > Usage): hook `inboxSituationIndicators`, context
+`inbox`, called twice with `$parameters['mode']`:
+
+```php
+public function inboxSituationIndicators($parameters, &$object, &$action, $hookmanager)
+{
+	if ($parameters['mode'] === 'catalogue') {
+		// Id prefixed by the name of the module; usages whose list has it by default (sales, accounting, support,
+		// purchase, transport)
+		$this->results['indicators'] = array('mymodule_prepaid' => array('label' => 'Prepaid time left', 'rule' => 'alert at 0', 'usages' => array('support')));
+	} elseif ($parameters['mode'] === 'compute' && in_array('mymodule_prepaid', $parameters['ids'], true)) {
+		// $parameters['socid'], $parameters['user']: check the rights here, give nothing without them
+		$this->results['values'] = array('mymodule_prepaid' => array('value' => '0 h', 'level' => 'alert', 'short' => 'No prepaid time left',
+			'url' => dol_buildpath('/mymodule/list.php', 1).'?socid='.(int) $parameters['socid']));
+	}
+	return 0;
+}
+```
+
+Level `alert`, `attention` or `normal` (only the first two show on the closed card, `short` is that text); the
+address stays inside Dolibarr; values of other modules are never shown for an indicator the user cannot read.
 
 ## Development
 

@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: own list of indicators per mailbox, indicators of the other modules :   1.68.0
+  - Settings > Mailboxes > Usage: the indicators of a usage with a list may be added (search), removed and moved
+    (drag and drop, arrows up and down on the grip), saved at once with undo, written in the journal of the mailbox;
+    « Back to the list » when the mailbox has its own. A new usage starts again from its own list.
+  - hook inboxSituationIndicators (context inbox): the other modules add indicators (catalogue: label, rule, usages
+    where they are by default; compute: value, level, short text, address inside Dolibarr, their rights). README.
+
 - NEW: usage of a mailbox and card of the thirdparty of the sender :   1.67.0
   - Settings > Mailboxes > tab « Usage » (managers of the mailbox): Automatic (by default: Sales for a customer,
     Purchasing for a supplier), Sales, Accounting, Support, Purchasing, Transport, None; saved at once, undo, written in

@@ -86,6 +86,52 @@ class InboxSituationTest extends InboxTestCase
 	}
 
 	/**
+	 * Own list of a mailbox (1.68.0)
+	 *
+	 * @return void
+	 */
+	public function testOwnList()
+	{
+		$a = $this->box(true);
+		$s = new InboxSituation($this->db);
+		$this->assertLessThan(0, $s->setIndicators($this->admin, $a, array('inv_late')), 'no list in automatic');
+		$s->setUsage($this->admin, $a, 'sales');
+		$this->assertSame(1, $s->setIndicators($this->admin, $a, array('outstanding', 'inv_late', 'ship_open')));
+		$this->assertSame(array('outstanding', 'inv_late', 'ship_open'), InboxSituation::listFor($a, 1, 0)['ids'], 'own list in its order');
+		$this->assertSame(0, $s->setIndicators($this->admin, $a, array('outstanding', 'inv_late', 'ship_open')), 'unchanged');
+		$this->assertLessThan(0, $s->setIndicators($this->admin, $a, array('nonsense')), 'unknown indicator refused');
+		$this->assertSame(1, $s->setIndicators($this->admin, $a, InboxSituation::defaults('sales')));
+		$this->assertNull(InboxSituation::ownList($a), 'the list of the usage itself: no own list');
+		$s->setIndicators($this->admin, $a, array('ship_open'));
+		$s->setUsage($this->admin, $a, 'accounting');
+		$this->assertNull(InboxSituation::ownList($a), 'a new usage takes its own list');
+		$again = new InboxAccount($this->db);
+		$again->fetch((int) $a->id);
+		$this->assertNull($again->usage_indicators, 'saved');
+		$this->assertSame(2, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$this->db->prefix()."inbox_account_log WHERE fk_account = ".((int) $a->id)." AND action = 'indicators' AND value_after LIKE '%ship_open%'")->n, 'two own lists with ship_open written in the journal');
+	}
+
+	/**
+	 * Indicators of the other modules (1.68.0): in the catalogue, in the lists of their usages
+	 *
+	 * @return void
+	 */
+	public function testModuleIndicators()
+	{
+		$r = new ReflectionProperty('InboxSituation', 'modules');
+		$r->setAccessible(true);
+		$r->setValue(null, array('mymodule_prepaid' => array('label' => 'Prepaid time', 'rule' => 'alert at 0', 'usages' => array('support'))));
+		try {
+			$this->assertArrayHasKey('mymodule_prepaid', InboxSituation::catalogue());
+			$this->assertSame(array_merge(InboxSituation::USAGES['support'], array('mymodule_prepaid')), InboxSituation::defaults('support'));
+			$this->assertNotContains('mymodule_prepaid', InboxSituation::defaults('sales'));
+			$this->assertSame(array(), InboxSituation::defaults('auto'));
+		} finally {
+			InboxSituation::reset();
+		}
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testCompute()

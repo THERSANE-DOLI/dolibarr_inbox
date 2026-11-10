@@ -1413,6 +1413,22 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-usage__list li { padding: 0.125rem 0; }
 .ibx-usage__auto { display: grid; gap: var(--ibx-s3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); max-width: 44rem; }
 .ibx-usage__auto h4 { margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+/* Own list of indicators of a mailbox (1.68.0): drag and drop, arrows on the grip, remove */
+.ibx-indlist { list-style: none; max-width: 44rem; margin: var(--ibx-s2) 0 0; padding: 0; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-lg); overflow: hidden; }
+.ibx-indlist__item { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.75rem; padding: 0 var(--ibx-s2) 0 var(--ibx-s1); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); }
+.ibx-indlist__item:last-child { border-bottom: 0; }
+.ibx-indlist__item.is-dragging { opacity: .4; }
+.ibx-indlist__item.is-over { box-shadow: inset 0 2px 0 var(--ibx-accent); }
+.ibx-indlist__grip { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 2.25rem; padding: 0; color: var(--ibx-text-faint); background: none; border: 0;
+	border-radius: var(--ibx-radius-sm); cursor: grab; }
+.ibx-indlist__grip:focus-visible { outline: 2px solid var(--ibx-accent); }
+.ibx-indlist__label { flex: 1; min-width: 0; }
+.ibx-indlist__rule { flex: none; max-width: 50%; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-usage__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin-top: var(--ibx-s2); }
+.ibx-indpick__rule { flex: none; font-size: var(--ibx-fs-sm); }
+@media (pointer: coarse) {
+	.ibx-indlist__grip { width: 2.75rem; height: 2.75rem; }
+}
 
 /* ===== Card of the thirdparty and of the contact of the sender (1.67.0) =====
    Zone 2 (the name): link to the card of Dolibarr; zone 1 (the rest of the head): folds and unfolds the detail. Open,
