@@ -176,7 +176,7 @@ class InboxComposer
 	 * Identities the user may send with: active identities of the mailboxes where the user has the level « send »
 	 *
 	 * @param User $user User
-	 * @return array<int,array{id:int,account:int,email:string,name:string,mailbox:string,signature:string,default:int}>
+	 * @return array<int,array{id:int,account:int,email:string,name:string,reply_to:string,mailbox:string,mailbox_label:string,signature:string,default:int}>
 	 */
 	public function identities(User $user)
 	{
@@ -186,14 +186,15 @@ class InboxComposer
 			$identity = new InboxIdentity($this->db);
 			$list = $identity->listForAccount((int) $accountId, true);
 			foreach ($list as $i) {
-				$out[] = array('id' => (int) $i->id, 'account' => (int) $accountId, 'email' => (string) $i->email, 'name' => (string) $i->name,
-					'mailbox' => (string) $account->email, 'signature' => (string) $i->signature, 'default' => (int) $i->is_default);
+				$out[] = array('id' => (int) $i->id, 'account' => (int) $accountId, 'email' => (string) $i->email, 'name' => (string) $i->name, 'reply_to' => (string) $i->reply_to,
+					'mailbox' => (string) $account->email, 'mailbox_label' => (string) $account->label, 'signature' => (string) $i->signature, 'default' => (int) $i->is_default);
 			}
 			// A mailbox without identity sends with its own address (as any mail software), no signature: id = -mailbox
 			if (!$list) {
 				$label = trim((string) $account->label);
 				$out[] = array('id' => -((int) $accountId), 'account' => (int) $accountId, 'email' => (string) $account->email,
-					'name' => $label !== '' && strcasecmp($label, (string) $account->email) !== 0 ? $label : '', 'mailbox' => (string) $account->email, 'signature' => '', 'default' => 1);
+					'name' => $label !== '' && strcasecmp($label, (string) $account->email) !== 0 ? $label : '', 'reply_to' => '', 'mailbox' => (string) $account->email, 'mailbox_label' => $label,
+					'signature' => '', 'default' => 1);
 			}
 		}
 
@@ -399,6 +400,12 @@ class InboxComposer
 		$out['token'] = $token;
 		$out['mode'] = (string) $state['mode'];
 		$out['identity'] = $identityId;
+		// The signatures shown as they will be sent: their variables replaced (identity, user, company, modules)
+		require_once __DIR__.'/inboxtemplates.class.php';
+		$signed = (new InboxTemplates($this->db))->signatures($user, $identities);
+		foreach ($identities as $n => $i) {
+			$identities[$n]['signature'] = InboxMailBuilder::cleanHtml($signed[(int) $i['id']] ?? (string) $i['signature']);
+		}
 		$out['identities'] = $identities;
 		$out['quote'] = !empty($state['quote']) ? (string) @file_get_contents($dir.'/quote.html') : '';
 		$out['attachments'] = self::attachmentsView($state);
@@ -1266,7 +1273,10 @@ class InboxComposer
 		}
 		$html = InboxMailBuilder::cleanHtml($html, (bool) $draft);
 		if (!empty($data['signature']) && trim($identity['signature']) !== '') {
-			$html .= '<div class="inbox-signature">-- <br>'.InboxMailBuilder::cleanHtml($identity['signature']).'</div>';
+			// Its variables replaced (1.53.0), as the writing showed it
+			require_once __DIR__.'/inboxtemplates.class.php';
+			$signed = (new InboxTemplates($this->db))->signatures($user, array($identity));
+			$html .= '<div class="inbox-signature">-- <br>'.InboxMailBuilder::cleanHtml($signed[(int) $identity['id']] ?? $identity['signature']).'</div>';
 		}
 		if (!empty($state['quote']) && !empty($data['quote']) && is_file($dir.'/quote.html')) {
 			$html .= '<br>'.(string) file_get_contents($dir.'/quote.html');
