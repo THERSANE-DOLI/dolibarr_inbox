@@ -1466,6 +1466,15 @@
 	function forwarded(row) {
 		return (row.tags || []).some(k => String(k).toLowerCase() === '$forwarded');
 	}
+	/**
+	 * Tags beside the subject of a mail read (1.57.0): one button opening the menu of the tags, with a « + » to add one
+	 * (click handled once for the whole space, the head is painted again after each change)
+	 */
+	function headTagsHtml(mailId, row) {
+		return '<button type="button" class="ibx-readhead__tags ibx-js-tagedit" data-mail="' + (+mailId) + '" title="' + th('InboxTagMenu') + '" aria-label="' + th('InboxTagMenu') + '" aria-haspopup="menu">'
+			+ tagsHtml(row) + '<span class="ibx-readhead__tagadd">' + ic('plus') + '</span></button>';
+	}
+
 	function tagsHtml(row) {
 		const entry = S.folders.get(row.folder);
 		const defs = entry ? entry.account.tags : [];
@@ -3421,7 +3430,7 @@
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			+ (partial || inThread ? '' : assignLine([m.id], m.assignees || [], m.has_message_id !== false))
-			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + tagsHtml({ folder: m.folder, tags: m.tags }) + '</h2>';
+			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
 
 	// ---------- Actions on mails (lot W4: write on the server, checked, undo 8 s) ----------
@@ -3835,7 +3844,7 @@
 		}
 		const subject = $('.ibx-readhead__subject', root);
 		if (subject) {
-			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + tagsHtml({ folder: S.mail.folder, tags: S.mail.tags });
+			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + headTagsHtml(S.mail.id, { folder: S.mail.folder, tags: S.mail.tags });
 		}
 	}
 
@@ -3919,13 +3928,22 @@
 		return runAction('tag', ids, all ? { remove: [keyword] } : { add: [keyword] }, { quiet: ids.length < 2 });
 	}
 
+	/** Dot of a tag for the menus: its colour (adapted to the theme), its border style when it has one */
+	function tagDot(d) {
+		const C = Dolibarr.tools.inboxColors;
+		const c = C.isColor(d.view) ? d.view : (C.isColor(d.color) ? d.color : '');
+		const border = C.BORDERS.includes(d.border) && d.border !== 'none' ? ' ibx-tagdot--b-' + d.border : '';
+		return '<span class="ibx-menu__icon ibx-tagdot' + border + '" aria-hidden="true"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + '></span>';
+	}
+
 	/** Menu of the tags of the mailbox, checked when every mail has it */
 	function tagMenu(anchor, ids, at) {
 		const rows = ids.map(rowOf).filter(Boolean);
 		const a = accountOfRow(rows[0]);
 		const defs = a ? (a.tags || []) : [];
 		const why = refusal('tag', ids);
-		const items = defs.map((d, i) => ({ icon: 'tag', label: d.label, key: i < 9 ? String(i + 1) : '', checked: rows.every(r => (r.tags || []).some(k => k.toLowerCase() === d.keyword.toLowerCase())),
+		// Each tag with a dot of its colour and its border: the one to put is seen at once (the label stays written)
+		const items = defs.map((d, i) => ({ swatch: tagDot(d), label: d.label, key: i < 9 ? String(i + 1) : '', checked: rows.every(r => (r.tags || []).some(k => k.toLowerCase() === d.keyword.toLowerCase())),
 			disabled: !!why, run: () => toggleTag(ids, d.keyword) }));
 		if (!items.length) {
 			items.push({ note: t('InboxNoTags') });
@@ -6015,7 +6033,9 @@
 		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
-			list.push(Object.assign({}, a, { button: ['flag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(anchor(), [m.id]) : a.run }));
+			// Tags at hand (1.57.0): a button of the bar, its menu under it
+			const tagAnchor = () => $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
+			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
 		list.push(
 			{ sep: true },
@@ -6060,7 +6080,7 @@
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
 			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
 			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
-			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="' + (it.checked !== undefined ? 'menuitemcheckbox" aria-checked="' + !!it.checked : 'menuitem') + '" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
+			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="' + (it.checked !== undefined ? 'menuitemcheckbox" aria-checked="' + !!it.checked : 'menuitem') + '" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.swatch ? it.swatch : it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		// From a modal dialog (« Extend to » of « Link »): inside it, else the menu is under it and inert
 		const host = anchor && anchor.closest ? anchor.closest('dialog[open]') : null;
@@ -6164,7 +6184,7 @@
 		const last = mails[mails.length - 1];
 		pane.innerHTML = '<article class="ibx-reading ibx-convo" aria-label="' + esc(row.subject || t('InboxNoSubject')) + '">'
 			+ '<header class="ibx-readhead ibx-convo__head"><div class="ibx-readhead__top"><div class="ibx-readhead__who"><h2 class="ibx-readhead__subject">' + esc(last.subject || row.subject || t('InboxNoSubject'))
-			+ ' ' + tagsHtml(row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
+			+ ' ' + headTagsHtml(row.id, row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			+ assignLine([row.id], row.assignees || [], row.has_mid !== 0) + '</div>'
 			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
 			+ dolibarSlot(id, true)
@@ -8136,6 +8156,19 @@
 	}
 
 	function bindContextMenus() {
+		// Tags beside the subject of a mail read: the menu of the tags under them
+		S.el.addEventListener('click', e => {
+			const b = e.target.closest('.ibx-js-tagedit');
+			if (!b || !S.el.contains(b)) {
+				return;
+			}
+			const why = refusal('tag', [+b.dataset.mail]);
+			if (why) {
+				toast(why, { error: true });
+				return;
+			}
+			tagMenu(b, [+b.dataset.mail]);
+		});
 		S.el.addEventListener('contextmenu', e => {
 			if (!contextEnabled(e) || inField(e)) {
 				return;
