@@ -104,6 +104,18 @@ class InboxSignatureVarsTest extends InboxTestCase
 			$this->assertContains($k, $r['keys']);
 		}
 		$this->assertContains('USER_FULLNAME', $r['keys']);
+		// What each key gives, for the picker (1.53.3): plain text, every key; a secret-looking key never shown
+		$this->assertSame('devis@inbox-test.invalid', $r['values']['INBOX_IDENTITY_EMAIL']);
+		$this->assertSame($r['keys'], array_keys($r['values']));
+		foreach ($r['values'] as $k => $v) {
+			$this->assertTrue($v === null || (strpos($v, '<') === false && mb_strlen($v) <= 80), $k);
+		}
+		foreach (array('MYMODULE_API_TOKEN', 'SMTP_PASSWORD', 'OAUTH_SECRET', 'STRIPE_KEY', 'APIKEY', 'USER_PASS') as $k) {
+			$this->assertTrue(InboxTemplates::secretKey($k), $k);
+		}
+		foreach (array('USER_FULLNAME', 'MYCOMPANY_NAME', 'INBOX_IDENTITY_EMAIL', 'KEYWORDS', 'MONKEY_NAME') as $k) {
+			$this->assertFalse(InboxTemplates::secretKey($k), $k);
+		}
 	}
 
 	/**
