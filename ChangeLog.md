@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: mails sent by a site or an application for a requester (data sources) :   1.72.0
+  - Settings > Data sources (admins of Dolibarr): trusted senders (addresses or domains), header of the address of
+    the requester, header of the data in JSON, one header per field, keys of the JSON mapped to the fields, kind of
+    request (quote, order, thirdparty, ticket); test on the pasted headers of a mail. An example source
+    X-Quotation-Mail / X-Quotation-Data is installed disabled, without trusted sender.
+  - believed only for a trusted sender that is authenticated (DMARC or DKIM of its domain), each header once, JSON of
+    2000 characters at most, values cleaned; the synchronisation asks these headers only when a source is active,
+    the reading reads them again (mails indexed before the source).
+  - the thirdparty is looked for on the requester (never the site again, even when its contacts change); the list
+    shows the requester with the badge of the source (the site in its tooltip); the panel shows the requester, his
+    data, the number of the request and « Create the quote » (or order, thirdparty, ticket); the creation pages are
+    filled with his data (name, phone, SIREN, VAT, address); « Reply » writes to the requester.
+
 - FIX: panel of the rules, nothing opened any more after a change :   1.71.1
   - after a rule saved from the panel (created, applied, turned on or off, moved), « New rule » and a click on a rule
     opened nothing: the reply of the save had no folders, tags nor addresses of the mailbox. Every reply that gives

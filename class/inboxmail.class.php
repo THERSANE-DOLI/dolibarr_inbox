@@ -23,6 +23,7 @@
 
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxcontactmatcher.class.php';
+require_once __DIR__.'/inboxdatasource.class.php';
 require_once __DIR__.'/inboxthreader.class.php';
 
 /**
@@ -35,6 +36,9 @@ class InboxMail
 
 	/** @var InboxContactMatcher|null */
 	protected $matcher = null;
+
+	/** @var InboxDataSource|null */
+	protected $sources = null;
 
 	/** @var int Mails of the last addMany() the database refused (other than already there) */
 	public $failed = 0;
@@ -111,7 +115,15 @@ class InboxMail
 				$this->updateFlags($folderId, array($m));
 				continue;
 			}
-			$match = $this->matcher->match((string) $m['from_email']);
+			// Data sources (1.72.0): a mail sent by a site for a requester is matched on the requester
+			$requester = null;
+			if (!empty($m['source_header'])) {
+				if ($this->sources === null) {
+					$this->sources = new InboxDataSource($this->db);
+				}
+				$requester = $this->sources->detectRaw((string) $m['source_header'], (string) $m['from_email']);
+			}
+			$match = $this->matcher->match(!empty($requester['ok']) ? (string) $requester['email'] : (string) $m['from_email']);
 			$date = function ($ts) {
 				return $ts > 0 ? "'".$this->db->idate((int) $ts)."'" : 'NULL';
 			};
@@ -140,6 +152,9 @@ class InboxMail
 				continue;
 			}
 			$mailId = (int) $this->db->last_insert_id($p.'inbox_mail');
+			if (!empty($requester['ok'])) {
+				$this->sources->store((object) array('rowid' => $mailId, 'from_email' => (string) $m['from_email'], 'soc_manual' => 0), $requester);
+			}
 			$this->addAddresses($mailId, $m);
 			$newIds[] = $mailId;
 			$added++;

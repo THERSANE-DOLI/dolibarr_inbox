@@ -2397,3 +2397,9 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-linkbar__ok { color: var(--ibx-success); }
 .ibx-linkbar__warn { color: var(--ibx-warning-text); }
 .ibx-trustlike { display: flex; align-items: center; gap: .25rem; margin: 0 0 var(--ibx-s1) 1.6rem; font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-warning-text); }
+
+/* Data sources (1.72.0): the source beside the requester of a mail sent by a site */
+.ibx-via { height: 1.125rem; padding: 0 0.3125rem; font-size: var(--ibx-fs-xs); vertical-align: middle; }
+.ibx-via .ibx-icon { width: 0.75rem; height: 0.75rem; }
+.ibx-mailcard__from .ibx-via { flex: none; margin-left: 0.25rem; }
+.ibx-requester__who { font-weight: 600; }

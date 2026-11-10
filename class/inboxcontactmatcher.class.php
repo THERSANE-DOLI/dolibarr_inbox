@@ -135,8 +135,23 @@ class InboxContactMatcher
 		$m = $this->match($email);
 		$sql = "UPDATE ".$this->db->prefix()."inbox_mail SET fk_soc = ".($m['fk_soc'] ? (int) $m['fk_soc'] : 'NULL').", fk_socpeople = ".($m['fk_socpeople'] ? (int) $m['fk_socpeople'] : 'NULL');
 		// Never the mails whose thirdparty was chosen by hand
-		$sql .= " WHERE from_email = '".$this->db->escape(strtolower(trim((string) $email)))."' AND soc_manual = 0";
+		$sql .= " WHERE ".self::addressWhere($this->db, $email)." AND soc_manual = 0";
 
 		return $this->db->query($sql) ? (int) $this->db->affected_rows(true) : 0;
+	}
+
+	/**
+	 * Mails of the index whose correspondent is an address: its own mails, but the ones sent by a site for another
+	 * requester, and the ones sent by a site for it (data sources, 1.72.0)
+	 *
+	 * @param DoliDB $db    Database
+	 * @param string $email Address
+	 * @return string        Condition on inbox_mail (no alias)
+	 */
+	public static function addressWhere($db, $email)
+	{
+		$e = $db->escape(strtolower(trim((string) $email)));
+
+		return "((from_email = '".$e."' AND requester_email IS NULL) OR requester_email = '".$e."')";
 	}
 }

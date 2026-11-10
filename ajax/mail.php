@@ -74,7 +74,7 @@ switch ($action) {
 		$list = array();
 		if ($key !== '') {
 			$p = $db->prefix();
-			$rows = $db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.seen, m.answered,"
+			$rows = $db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.from_email, m.from_name, m.requester_email, m.requester_name, m.to_text, m.subject, m.snippet, m.date_received, m.date_mail, m.seen, m.answered,"
 				." m.flagged, m.has_attachments, f.role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
 				." WHERE m.fk_account = ".((int) $reader->row->fk_account)." AND m.thread_key = '".$db->escape($key)."'"
 				// In the order the mails were written (Date header), the arrival when it is missing
@@ -88,7 +88,7 @@ switch ($action) {
 				}
 				$date = $r->date_mail ? $r->date_mail : $r->date_received;
 				$byMsg[$id] = array('bad' => $bad, 'mail' => array(
-					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) $r->from_email, 'from_name' => (string) $r->from_name,
+					'id' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'role' => (string) $r->role, 'from_email' => (string) ($r->requester_email ?: $r->from_email), 'from_name' => (string) ($r->requester_email ? ($r->requester_name ?: $r->requester_email) : $r->from_name),
 					'to' => dol_trunc((string) $r->to_text, 300, 'right', 'UTF-8', 1), 'subject' => (string) $r->subject, 'snippet' => (string) $r->snippet,
 					'date' => $date ? (int) $db->jdate($date) : 0, 'seen' => (int) $r->seen, 'answered' => (int) $r->answered, 'flagged' => (int) $r->flagged,
 					'attachments' => (int) $r->has_attachments, 'has_mid' => 1,

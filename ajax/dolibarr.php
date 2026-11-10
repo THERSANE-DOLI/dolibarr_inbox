@@ -26,6 +26,7 @@ dol_include_once('/inbox/class/inboxreader.class.php');
 dol_include_once('/inbox/class/inboxlink.class.php');
 dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
+dol_include_once('/inbox/class/inboxdatasource.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
@@ -158,7 +159,10 @@ switch ($action) {
 		}
 		// Sender: the contact or thirdparty of its address (index), else of its domain; a user of Dolibarr
 		$sender = array('soc' => null, 'contact' => null, 'user' => null, 'by' => '');
-		$email = strtolower((string) $row->from_email);
+		// Mail sent by a site for a requester (data sources, 1.72.0): the requester is the sender here
+		$sources = new InboxDataSource($db);
+		$requester = $sources->ofRow($row);
+		$email = strtolower($requester ? $requester['email'] : (string) $row->from_email);
 		$socId = (int) $row->fk_soc;
 		$contactId = (int) $row->fk_socpeople;
 		if (!$socId && $email !== '') {
@@ -260,7 +264,11 @@ switch ($action) {
 				}
 			}
 		}
-		inboxAjaxReply(array('sender' => $sender, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
+		if ($requester) {
+			// The piece the source offers to create, when the user may
+			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
+		}
+		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
