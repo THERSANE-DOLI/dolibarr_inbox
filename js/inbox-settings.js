@@ -1311,16 +1311,31 @@
 			+ field('name', t('InboxIdentityName'), identity.name, { autocomplete: 'off' })
 			+ field('reply_to', t('InboxIdentityReplyTo'), identity.reply_to, { type: 'email', autocomplete: 'off' })
 			+ field('bcc', t('InboxIdentityBcc'), identity.bcc, { type: 'email', autocomplete: 'off', help: t('InboxIdentityBccHelp') })
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="f-signature">' + th('InboxIdentitySignature') + '</label><div><textarea class="ibx-field" id="f-signature" name="signature" rows="6">' + esc(identity.signature) + '</textarea>'
-			+ '<div class="ibx-formrow__help">' + th('InboxSignatureHelp') + '</div><div class="ibx-inline" style="margin-top:.5rem"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-profiles">' + ic('download') + ' ' + th('InboxImportFromDolibarr') + '</button></div></div></div>'
+			// Signature (1.51.0): the editor of the writing, faithful to the inline styles; the textarea stays the value of
+			// the form and the HTML source mode
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="f-signature-label">' + th('InboxIdentitySignature') + '</span><div>'
+			+ '<div class="ibx-tpledit__tools ibx-js-sigtools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '">'
+			+ [['bold', 'fmt-bold', 'InboxFmtBold'], ['italic', 'fmt-italic', 'InboxFmtItalic'], ['underline', 'fmt-underline', 'InboxFmtUnderline'], ['color', 'fmt-color', 'InboxFmtColor'], null,
+				['link', 'link', 'InboxFmtLink'], ['image', 'file-image', 'InboxSignatureImage'], ['clearFormat', 'fmt-clear', 'InboxFmtClear'], null,
+				['undo', 'undo', 'InboxFmtUndo'], ['redo', 'redo', 'InboxFmtRedo'], null, ['source', 'fmt-source', 'InboxFmtSource']]
+				.map(x => (x ? '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '"' + (x[0] === 'source' ? ' aria-pressed="false"' : '') + '>' + ic(x[1], 'ibx-tbtn__icon') + '</button>' : '<span class="ibx-compose__sep" aria-hidden="true"></span>')).join('')
+			+ '<input type="color" class="ibx-sigcolor ibx-js-sigcolor" tabindex="-1" aria-hidden="true" value="#d31b11"></div>'
+			+ '<div class="ibx-tpledit__editor ibx-js-sigeditor" aria-labelledby="f-signature-label"></div>'
+			+ '<textarea class="ibx-field ibx-sigsource" id="f-signature" name="signature" rows="12" spellcheck="false" aria-labelledby="f-signature-label" hidden>' + esc(identity.signature) + '</textarea>'
+			+ '<div class="ibx-formrow__help">' + th('InboxSignatureHelp') + '</div><div class="ibx-inline" style="margin-top:.5rem"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-profiles">' + ic('download') + ' ' + th('InboxImportFromDolibarr') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigfile">' + ic('source') + ' ' + th('InboxImportHtmlFile') + '</button><input type="file" class="ibx-js-sigfileinput" accept=".html,.htm,text/html" hidden></div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxOptions') + '</span><div><label class="ibx-check"><input type="checkbox" name="is_default"' + (identity.is_default ? ' checked' : '') + '> ' + th('InboxIdentityDefault') + '</label><br>'
 			+ '<label class="ibx-check"><input type="checkbox" name="status"' + (identity.status ? ' checked' : '') + '> ' + th('InboxIdentityActive') + '</label></div></div>'
 			+ '</form>';
-		dialog({
+		let sig = null;
+		const dlg = dialog({
 			title: identity.id ? t('InboxEditIdentity') : t('InboxAddIdentity'),
 			wide: true,
 			body,
 			actions: [{ label: t('InboxSave'), primary: true, run: async d => {
+				if (sig) {
+					sig.sync();
+				}
 				const values = formValues($('form', d));
 				try {
 					await post('identity', 'save', Object.assign({ id: account.id, identity_id: identity.id || 0 }, values));
@@ -1335,8 +1350,146 @@
 			} }],
 			onOpen: d => {
 				$('.ibx-js-profiles', d).addEventListener('click', () => profilesDialog(account, d));
+				$('.ibx-js-sigfile', d).addEventListener('click', () => $('.ibx-js-sigfileinput', d).click());
+				$('.ibx-js-sigfileinput', d).addEventListener('change', e => {
+					const file = e.target.files[0];
+					e.target.value = '';
+					if (file) {
+						importSignatureFile(file, d);
+					}
+				});
 			},
 		});
+		dlg.addEventListener('close', () => sig && sig.destroy());
+		signatureEditor(dlg).then(ed => {
+			sig = ed;
+		});
+	}
+
+	/**
+	 * Editor of the signature in the dialog of an identity: the textarea name="signature" holds the value (save, import
+	 * from Dolibarr or from a file write into it and fire « change »), shown as it is in the HTML source mode
+	 * @param {HTMLElement} d Dialog
+	 * @returns {Promise<object|null>} {sync(), destroy()}
+	 */
+	async function signatureEditor(d) {
+		const ta = $('[name="signature"]', d);
+		const box = $('.ibx-js-sigeditor', d);
+		const tools = $('.ibx-js-sigtools', d);
+		let editor;
+		try {
+			editor = await I.editors.create(box, { html: ta.value, label: t('InboxIdentitySignature') });
+		} catch (err) {
+			// No editor: the HTML source, as before
+			tools.hidden = true;
+			box.hidden = true;
+			ta.hidden = false;
+			toast(t('InboxComposeEditorFailed'), { error: true });
+			return null;
+		}
+		let source = false;
+		const sync = () => {
+			if (!source) {
+				ta.value = editor.isEmpty() ? '' : editor.getHtml();
+			}
+		};
+		const setSource = on => {
+			sync();
+			source = on;
+			$('[data-cmd="source"]', tools).setAttribute('aria-pressed', on ? 'true' : 'false');
+			$$('[data-cmd]:not([data-cmd="source"])', tools).forEach(b => {
+				b.disabled = on;
+			});
+			box.hidden = on;
+			ta.hidden = !on;
+			if (on) {
+				ta.focus();
+			} else {
+				editor.setHtml(ta.value);
+				editor.focus();
+			}
+		};
+		const color = $('.ibx-js-sigcolor', tools);
+		color.addEventListener('input', () => editor.exec('color', color.value));
+		tools.addEventListener('click', e => {
+			const b = e.target.closest('[data-cmd]');
+			if (!b || b.disabled) {
+				return;
+			}
+			const cmd = b.dataset.cmd;
+			if (cmd === 'source') {
+				setSource(!source);
+			} else if (cmd === 'color') {
+				color.click();
+			} else if (cmd === 'link') {
+				urlDialog(t('InboxFmtLink'), t('InboxComposeLinkUrl'), editor.linkAt ? editor.linkAt() : '', v => editor.exec('link', v && !/^(https?:\/\/|mailto:|tel:)/i.test(v) ? 'https://' + v : v));
+			} else if (cmd === 'image') {
+				urlDialog(t('InboxSignatureImage'), t('InboxSignatureImageUrl'), '', v => {
+					if (v) {
+						editor.raw().chain().focus().setImage({ src: v, alt: '' }).run();
+					}
+				}, true);
+			} else {
+				editor.exec(cmd);
+			}
+		});
+		// Written into the textarea from outside (import): shown at once
+		ta.addEventListener('change', () => {
+			if (!source) {
+				editor.setHtml(ta.value);
+			}
+		});
+		return { sync, destroy: () => editor.destroy() };
+	}
+
+	/** A web address asked in a small dialog (link, picture of the signature); a picture needs https:// */
+	function urlDialog(title, label, value, done, https) {
+		dialog({
+			title,
+			body: '<label class="ibx-formrow__label" for="ibx-url-field">' + esc(label) + '</label><input id="ibx-url-field" class="ibx-field" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" value="' + esc(value) + '">',
+			actions: [{ label: t('InboxSave'), primary: true, run: d => {
+				const v = $('#ibx-url-field', d).value.trim();
+				if (https && v && !/^https:\/\//i.test(v)) {
+					$('#ibx-url-field', d).focus();
+					toast(t('InboxSignatureImageHttps'), { error: true });
+					return false;
+				}
+				done(v);
+			} }],
+			onOpen: d => $('#ibx-url-field', d).focus(),
+		});
+	}
+
+	/**
+	 * Signature from an HTML file (made by a generator of signatures, exported from another mail software): its body
+	 * only, read here in an inert document (nothing of it runs), cleaned by the server at the save
+	 */
+	async function importSignatureFile(file, d) {
+		if (file.size > 1048576) {
+			toast(t('InboxImportHtmlFileTooBig'), { error: true });
+			return;
+		}
+		const doc = new DOMParser().parseFromString(await file.text(), 'text/html');
+		doc.querySelectorAll('script, style, link, meta, title, base, iframe, object, embed, form').forEach(n => n.parentNode.removeChild(n));
+		const html = doc.body.innerHTML.trim();
+		if (!html) {
+			toast(t('InboxImportHtmlFileEmpty'), { error: true });
+			return;
+		}
+		const ta = $('[name="signature"]', d);
+		if (ta.value.trim() !== '') {
+			const ok = await confirmDialog({ title: t('InboxReplaceSignatureTitle'), text: t('InboxReplaceSignatureFileText'), confirm: t('InboxReplace') });
+			if (!ok) {
+				return;
+			}
+		}
+		ta.value = html;
+		ta.dispatchEvent(new Event('change'));
+		// Pictures with a relative address (next to the file on the disk): no mail software can show them
+		const relative = Array.from(doc.querySelectorAll('img')).filter(i => !/^(https?:|data:|cid:)/i.test(i.getAttribute('src') || '')).length;
+		if (relative) {
+			toast(t('InboxImportHtmlFileRelativeImages', relative), { error: true, duration: 12000 });
+		}
 	}
 
 	async function profilesDialog(account, parent) {
@@ -1367,6 +1520,7 @@
 				}
 				$('[name="name"]', parent).value = r.name;
 				sig.value = r.signature;
+				sig.dispatchEvent(new Event('change'));
 				if (!$('[name="email"]', parent).value) {
 					$('[name="email"]', parent).value = r.email;
 				}
