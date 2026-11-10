@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a mail whose body part says « Content-Disposition: inline » was shown empty, its body listed as a file
+  « piece-jointe » (the IMAP library takes any part with a disposition for an attachment) :   1.79.1
+
 - NEW: new customer from a mail (lot A1, level 1) :   1.79.0
   - on a mail of an unknown sender, « New customer » in the Dolibarr band opens a side panel on the left, the mail
     left readable on the right. Values read in the mail, each with its source and its line of the mail lit on hover,

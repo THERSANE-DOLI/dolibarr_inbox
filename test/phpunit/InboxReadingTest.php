@@ -460,6 +460,23 @@ class InboxReadingTest extends InboxTestCase
 	}
 
 	/**
+	 * A body part marked « Content-Disposition: inline » is the body, not an attachment (1.79.0: a mail whose only
+	 * HTML part said « inline » was shown empty); a named part stays a file
+	 *
+	 * @return void
+	 */
+	public function testInlineBodyPart()
+	{
+		$raw = "From: a@example.invalid\r\nTo: b@example.invalid\r\nSubject: Certificat\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"XX\"\r\n\r\n"
+			."--XX\r\nContent-Disposition: inline\r\nContent-Type: text/html; charset=\"utf-8\"\r\nContent-Description: Certificat\r\n\r\nMadame, Monsieur,<BR/>ci-joint les certificats.<BR/>\r\n"
+			."--XX\r\nContent-Disposition: inline; filename=\"note.txt\"\r\nContent-Type: text/plain\r\n\r\nfile\r\n"
+			."--XX\r\nContent-Disposition: attachment; filename=\"c.pdf\"\r\nContent-Type: application/pdf\r\n\r\n%PDF-1.4 x\r\n--XX--\r\n";
+		$m = InboxMimeParser::parse($raw);
+		$this->assertStringContainsString('ci-joint les certificats', $m->bodyHtml);
+		$this->assertSame(array('note.txt', 'c.pdf'), array_column($m->attachments, 'name'), 'the body is not a file; a named inline part is');
+	}
+
+	/**
 	 * Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin, Rspamd, the topmost header only
 	 *
 	 * @return void

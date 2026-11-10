@@ -96,8 +96,13 @@ class InboxMimeParser
 		foreach ($structure->parts as $part) {
 			$content = self::decode($part);
 			$named = ($part->filename !== null && $part->filename !== '') || ($part->name !== null && $part->name !== '');
-			$isAttachment = $part->isAttachment() || $named;
 			$subtype = strtolower((string) $part->subtype);
+			// A text or HTML part without a file name, « inline » or without disposition, is the body: the library
+			// takes any part with a disposition for an attachment (a mail whose only HTML part says « inline » was
+			// shown empty, its body as a file « piece-jointe »)
+			$disposition = strtolower(trim(explode(' ', str_replace(';', ' ', (string) $part->disposition))[0]));
+			$body = !$named && (int) $part->type === \Webklex\PHPIMAP\IMAP::MESSAGE_TYPE_TEXT && in_array($subtype, array('plain', 'html', ''), true) && in_array($disposition, array('', 'inline'), true);
+			$isAttachment = !$body && ($part->isAttachment() || $named);
 			if (!$named && stripos((string) $part->content_type, 'text/calendar') === 0) {
 				// Invitation of Outlook, Google... (the library takes it for an attachment): read by InboxInvite, never
 				// shown as the text of the mail nor as a file
