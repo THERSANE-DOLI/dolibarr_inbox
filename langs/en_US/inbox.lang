@@ -2185,6 +2185,7 @@ InboxRuleSpam = Anti-spam rule
 InboxRuleSpamHelp = Move into the junk the mails marked as spam by the filter of the server (SpamAssassin, Rspamd)
 InboxRuleSpamName = Spam marked by the server
 InboxOpenNewTab = Open in a new tab
+InboxOpenWith = Open with %s
 InboxAttScanning = Antivirus scan…
 InboxAttScanLong = Antivirus scan still running…
 InboxAttScanFailed = Antivirus scan impossible.

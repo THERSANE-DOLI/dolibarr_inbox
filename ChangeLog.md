@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: « Open with… » for the attachments, with the viewers of other modules (C1) :   1.55.0
+  - hook inboxAttachmentViewers: a module says what it can open (office server, Office preview, PDF tools...), inbox
+    shows it in the menu of the attachment and in its own viewer window; inbox never knows the name of the module.
+  - an attachment inbox does not show itself (Word, Excel, PowerPoint, OpenDocument...) opens in the first viewer of
+    a module instead of « No preview », in a window of the size of a document.
+  - read-only access for these modules (class InboxAttachmentFile): rights of the user on the mailbox, antivirus first
+    (an infected attachment is never given, a not scanned one only after « Open anyway »), nothing written; only
+    addresses of this site are opened.
+
 - FIX: button « N other(s) » of a conversation on one line in the foot of a card :   1.54.1
   - it shrank with the piece and the mailbox beside it and its text went on two lines: it keeps its width, the
     names of the piece and of the mailbox give way.

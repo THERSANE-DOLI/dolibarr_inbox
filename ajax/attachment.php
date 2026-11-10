@@ -78,6 +78,40 @@ function inboxAttList(InboxMessage $message)
 	return $out;
 }
 
+// Viewers of other modules for the attachments (hook inboxAttachmentViewers, C1). A module answers in its results:
+// array('inboxAttachmentViewers' => array(part => array(array('code' => ..., 'label' => ..., 'url' => '/relative?...'))))
+// Only relative addresses of this site are kept; inbox adds « force=1 » itself when the user opens an attachment not
+// scanned by the antivirus anyway. The module loads the attachment with InboxAttachmentFile (read only).
+if ($mode === 'viewers') {
+	$atts = array();
+	foreach (inboxAttList($message) as $i => $a) {
+		$pos = strrpos($a['name'], '.');
+		$atts[$i] = array('part' => $i, 'name' => $a['name'], 'extension' => $pos === false ? '' : strtolower(substr($a['name'], $pos + 1)), 'size' => strlen($a['content']));
+	}
+	$viewers = array();
+	if ($atts) {
+		$hookmanager->initHooks(array('inboxattachment'));
+		$parameters = array('mail' => (int) $reader->row->rowid, 'attachments' => $atts);
+		$hookAction = 'viewers';
+		$hookObject = null;
+		$hookmanager->executeHooks('inboxAttachmentViewers', $parameters, $hookObject, $hookAction);
+		$found = isset($hookmanager->resArray['inboxAttachmentViewers']) && is_array($hookmanager->resArray['inboxAttachmentViewers']) ? $hookmanager->resArray['inboxAttachmentViewers'] : array();
+		foreach ($found as $p => $list) {
+			if (!isset($atts[$p]) || !is_array($list)) {
+				continue;
+			}
+			foreach ($list as $v) {
+				$url = is_array($v) && isset($v['url']) ? (string) $v['url'] : '';
+				if ($url === '' || $url[0] !== '/' || (isset($url[1]) && ($url[1] === '/' || $url[1] === '\\')) || preg_match('/[\r\n]/', $url) || empty($v['label'])) {
+					continue;
+				}
+				$viewers[$p][] = array('code' => preg_replace('/[^a-z0-9_]/', '', (string) ($v['code'] ?? '')), 'label' => dol_trunc((string) $v['label'], 80), 'url' => $url);
+			}
+		}
+	}
+	inboxAjaxReply(array('viewers' => (object) $viewers));
+}
+
 if ($mode === 'check' && $part === -1) {
 	$out = array();
 	foreach (inboxAttList($message) as $i => $a) {
