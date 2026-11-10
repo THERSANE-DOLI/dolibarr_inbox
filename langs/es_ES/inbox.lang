@@ -947,8 +947,9 @@ InboxJournal_empty = Vaciada
 
 # Newsletters, threads ignored or watched (1.11.0)
 InboxNewsletter = Boletín: puede dar de baja el buzón.
+InboxNewsletterByMail = Boletín: el remitente solo ofrece la baja por correo, aún no gestionada aquí.
+InboxCopyUnsubscribeAddress = Copiar la dirección de baja
 InboxUnsubscribe = Darse de baja
-InboxUnsubscribeByMailLater = La baja por correo llegará con la redacción de correos.
 InboxUnsubscribeTitle = ¿Dar de baja el buzón?
 InboxUnsubscribeText = El remitente « %s » sabrá que esta dirección se lee. inbox envía la solicitud él mismo, el enlace del correo nunca se abre.
 InboxUnsubscribed = Solicitud de baja enviada a « %s »

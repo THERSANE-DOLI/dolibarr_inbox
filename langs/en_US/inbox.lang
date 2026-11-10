@@ -947,8 +947,9 @@ InboxJournal_empty = Emptied
 
 # Newsletters, threads ignored or watched (1.11.0)
 InboxNewsletter = Newsletter: you can unsubscribe the mailbox.
+InboxNewsletterByMail = Newsletter: the sender only offers unsubscribing by mail, not handled here yet.
+InboxCopyUnsubscribeAddress = Copy the unsubscribe address
 InboxUnsubscribe = Unsubscribe
-InboxUnsubscribeByMailLater = Unsubscribing by mail will come with the writing of the mails.
 InboxUnsubscribeTitle = Unsubscribe the mailbox?
 InboxUnsubscribeText = The sender « %s » will learn that this address is read. inbox sends the request itself, the link of the mail is never opened.
 InboxUnsubscribed = Unsubscribe request sent to « %s »

@@ -458,7 +458,10 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); margin: var(--ibx-s3) 0 0;
 	font-size: var(--ibx-fs-md); background: var(--ibx-bg-sunken); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius);
 }
-.ibx-banner__text { flex: 1; min-width: 0; }
+.ibx-banner { flex-wrap: wrap; }
+.ibx-banner__text { flex: 1 1 16rem; min-width: 0; }
+.ibx-banner > .ibx-btn { flex: none; white-space: nowrap; }
+.ibx-banner__detail { overflow-wrap: anywhere; font-size: var(--ibx-fs-sm); }
 .ibx-banner--warning { background: var(--ibx-warning-soft); border-color: color-mix(in srgb, var(--ibx-warning) 40%, transparent); }
 .ibx-banner--warning > .ibx-icon { color: var(--ibx-warning); }
 .ibx-banner--danger { color: var(--ibx-danger); background: var(--ibx-danger-soft); border-color: var(--ibx-danger); font-weight: 600; }

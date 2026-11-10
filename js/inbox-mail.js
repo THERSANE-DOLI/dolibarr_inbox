@@ -6328,11 +6328,19 @@
 		if (m.unsubscribe && !opts.inline) {
 			// Newsletter (B4): one-click by the server, never the link opened; by mail when the composer comes (W6)
 			const u = m.unsubscribe;
-			const why = !u.oneclick ? t('InboxUnsubscribeByMailLater') : (!u.signed ? t('InboxErrorUnsubscribeNotSigned') : (m.level !== 'manage' ? t('InboxReadOnlyOn', m.mailbox) : ''));
-			banners += '<div class="ibx-banner ibx-banner--info ibx-js-unsubbar">' + ic('unsubscribe') + '<div class="ibx-banner__text">' + th('InboxNewsletter')
-				+ (why ? ' <span class="ibx-muted">' + esc(why) + '</span>' : '') + '</div>'
-				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-unsubscribe"' + (why ? ' aria-disabled="true" title="' + esc(why) + '"' : '') + '>' + th('InboxUnsubscribe') + '</button>'
-				+ (u.mailto && !u.oneclick ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyAddress', u.mailto) + '</button>' : '') + '</div>';
+			banners += '<div class="ibx-banner ibx-banner--info ibx-js-unsubbar">' + ic('unsubscribe');
+			if (!u.oneclick) {
+				// By mail only: no dead button, the address copied (shown in full on its own line, never squeezing the text)
+				banners += '<div class="ibx-banner__text">' + th('InboxNewsletterByMail')
+					+ (u.mailto ? '<div class="ibx-muted ibx-banner__detail">' + esc(u.mailto) + '</div>' : '') + '</div>'
+					+ (u.mailto ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyUnsubscribeAddress') + '</button>' : '');
+			} else {
+				const why = !u.signed ? t('InboxErrorUnsubscribeNotSigned') : (m.level !== 'manage' ? t('InboxReadOnlyOn', m.mailbox) : '');
+				banners += '<div class="ibx-banner__text">' + th('InboxNewsletter')
+					+ (why ? '<div class="ibx-muted">' + esc(why) + '</div>' : '') + '</div>'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-unsubscribe"' + (why ? ' aria-disabled="true" title="' + esc(why) + '"' : '') + '>' + th('InboxUnsubscribe') + '</button>';
+			}
+			banners += '</div>';
 		}
 		// Invitation and read receipt (lot W8 1.22.0, js/inbox-invite.js)
 		if (I.mailExtrasHtml) {

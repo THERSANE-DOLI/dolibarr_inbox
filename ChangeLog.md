@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: newsletter banner readable when the sender only offers unsubscribing by mail :   1.51.1
+  - the text was squeezed into a one-word column by the copy button holding the whole address: the buttons go
+    under the text when space is short (every reading banner), the address is shown on its own line.
+  - no more greyed « Unsubscribe » button that could do nothing, the banner says it is by mail only and offers
+    « Copy the unsubscribe address ».
+
 - NEW: signature edited formatted, inline styles kept by the editor, signature imported from an HTML file :   1.51.0
   - the signature of an identity is edited with the editor of the writing (bold, italic, underline, colour, link,
     picture by its web address, undo), its HTML source one button away.
