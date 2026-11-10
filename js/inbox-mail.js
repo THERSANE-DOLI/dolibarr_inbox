@@ -5288,8 +5288,10 @@
 			// A piece linked though cited for another thirdparty keeps its warning
 			const pieces = d.links.map(l => {
 				const c = citedOf(l);
-				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId);
+				// Linked by its conversation (lot A3, 1.73.0): said under the piece
+				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId, l.origin === 'thread' ? { theirs: t('InboxLinkedByThread') } : {});
 			}).concat(d.extra.map(x => pieceHtml(x, 0, '', socId)));
+			const convo = d.conversation || { others: 0, detached: false };
 			const canWrite = !!d.level;
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			// Mail sent by a site for a requester (data sources, 1.72.0): who asked, through which source, and the piece
@@ -5311,7 +5313,10 @@
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
-					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
+					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '')
+					+ (convo.detached ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threadattach" title="' + th('InboxThreadDetachedHelp') + '">' + ic('thread') + ' ' + th('InboxThreadAttach') + '</button>'
+						: (convo.others && !+box.dataset.thread ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threaddetach" title="' + th('InboxThreadDetachHelp') + '">' + ic('unlink') + ' ' + th('InboxThreadDetach') + '</button>' : ''))
+					+ '</span>' : '') + '</span></div>'
 				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
 					+ suggest.map(c => pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '', socId, {
 						theirs: c.theirs ? t('InboxCitedTheirRef', c.cited) : (c.tracking ? t('InboxCitedTracking', c.cited) : ''),
@@ -5465,11 +5470,40 @@
 			// A piece cited in the mail, of the thirdparty of the writer: linked in one click
 			citedBtn.disabled = true;
 			try {
-				await post('dolibarr', 'link', { id: mailId, type: citedBtn.dataset.type, element: +citedBtn.dataset.id });
+				const conv = box._data.conversation;
+				const res = await post('dolibarr', 'link', { id: mailId, type: citedBtn.dataset.type, element: +citedBtn.dataset.id, thread: conv && conv.others && !conv.detached ? 1 : 0 });
+				threadLinkedToast(res);
 			} catch (err) {
 				citedBtn.disabled = false;
 				return;
 			}
+			loadDolibar(box);
+			return;
+		}
+		if (e.target.closest('.ibx-js-threaddetach')) {
+			// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go, undo
+			let res;
+			try {
+				res = await post('dolibarr', 'detach', { id: mailId });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			await loadDolibar(box);
+			toast(t('InboxThreadDetached', (res.removed || []).length), { action: t('InboxUndo'), onAction: async () => {
+				await post('dolibarr', 'attach_thread', { id: mailId, links: res.removed || [] });
+				loadDolibar(box);
+			} });
+			return;
+		}
+		if (e.target.closest('.ibx-js-threadattach')) {
+			try {
+				await post('dolibarr', 'attach_thread', { id: mailId, links: [] });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			toast(t('InboxThreadAttached'));
 			loadDolibar(box);
 			return;
 		}
@@ -5644,6 +5678,12 @@
 		// Back in inbox: the piece created is shown linked
 		window.addEventListener('focus', () => loadDolibar(box), { once: true });
 	}
+	/** Toast of a link given to the other mails of the conversation too */
+	function threadLinkedToast(res) {
+		if (res && res.others) {
+			toast(t('InboxLinkedThreadToo', res.others));
+		}
+	}
 	/** « + Link »: the pieces of the thirdparty recognized first, then searched as you type */
 	function linkDialog(box, opts) {
 		opts = opts || {};
@@ -5672,11 +5712,17 @@
 					await attachToPiece(box, opts.attach.m, opts.attach.a, cur.dataset.type, +cur.dataset.id);
 					return true;
 				}
-				await post('dolibarr', 'link', { id: +box.dataset.mail, type: cur.dataset.type, element: +cur.dataset.id });
+				const also = $('.ibx-js-linkthread', dl);
+				threadLinkedToast(await post('dolibarr', 'link', { id: +box.dataset.mail, type: cur.dataset.type, element: +cur.dataset.id, thread: also && also.checked ? 1 : 0 }));
 				loadDolibar(box);
 				return true;
 			} }],
 		});
+		// The link follows the conversation (lot A3, 1.73.0): ticked by default, the other mails of the conversation
+		const conv = d.conversation;
+		if (!opts.attach && !opts.annotate && conv && conv.others && !conv.detached) {
+			$('.ibx-js-piecelist', dlg).insertAdjacentHTML('afterend', '<label class="ibx-inline ibx-linkthread"><input type="checkbox" class="ibx-js-linkthread" checked> ' + th('InboxLinkThreadToo', conv.others) + '</label>');
+		}
 		const input = $('.ibx-js-piecesearch', dlg);
 		const list = $('.ibx-js-piecelist', dlg);
 		// To link: the pieces linked already are greyed; to put a file in a piece: every piece may receive it

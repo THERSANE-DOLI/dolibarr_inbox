@@ -2546,3 +2546,13 @@ InboxSourceErrorLine = Ligne non comprise : « %s ».
 InboxSourceErrorNoHeader = Indiquez au moins un en-tête à lire.
 InboxSourceErrorMany = %s sources au plus.
 InboxSourceExampleLabel = Demande de devis (exemple)
+# The link follows the conversation (lot A3, 1.73.0)
+InboxLinkedByThread = lié par la conversation
+InboxLinkThreadToo = Lier aussi les %s autres mails de la conversation
+InboxLinkedThreadToo = Lié, ainsi que les %s autres mails de la conversation
+InboxThreadDetach = Détacher du fil
+InboxThreadDetachHelp = La conversation a dérivé vers un autre client : ce mail perd les liens faits par la conversation et n'en reçoit plus
+InboxThreadDetached = Mail détaché de sa conversation (%s liens retirés)
+InboxThreadAttach = Rattacher au fil
+InboxThreadDetachedHelp = Ce mail a été détaché de sa conversation : les liens de la conversation ne l'atteignent pas
+InboxThreadAttached = Mail rattaché à sa conversation : les prochains liens le suivront

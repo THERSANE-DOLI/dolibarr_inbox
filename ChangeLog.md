@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the link follows the conversation :   1.73.0
+  - linking a mail to a piece offers « Link also the N other mails of the conversation », ticked by default (the
+    cited pieces linked in one click too); the mails of the trash and the junk are left out.
+  - the mails that come in a linked conversation (answers sent included) are linked at the synchronisation; these
+    links say « linked by the conversation » under the piece.
+  - « Detach from the conversation » when it moves to another customer: the mail loses the links of the conversation,
+    gets no new one and gives none, kept by its Message-ID; undo in the toast, « Back in the conversation » later.
+
 - NEW: mails sent by a site or an application for a requester (data sources) :   1.72.0
   - Settings > Data sources (admins of Dolibarr): trusted senders (addresses or domains), header of the address of
     the requester, header of the data in JSON, one header per field, keys of the JSON mapped to the fields, kind of

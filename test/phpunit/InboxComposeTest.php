@@ -392,7 +392,10 @@ class InboxComposeTest extends InboxImapTestCase
 		$event = $this->db->getRow("SELECT fk_soc, code FROM ".$p."actioncomm WHERE email_msgid = '".$this->db->escape($sent['message_id'])."'");
 		$this->assertSame($socid, (int) $event->fk_soc);
 		$sentRef = $refs->fetchOrCreateByMessageId($sent['message_id']);
-		$this->assertCount(1, $links->listFor(array($sentRef)), 'the mail sent is linked to the piece');
+		// The links of its conversation may follow it too (lot A3, 1.73.0): the piece recorded is among them
+		$this->assertContains('societe:'.$socid, array_map(function ($l) {
+			return $l['type'].':'.$l['element'];
+		}, $links->listFor(array($sentRef))), 'the mail sent is linked to the piece');
 		$this->db->query("DELETE FROM ".$p."inbox_link WHERE element_type = 'societe' AND fk_element = ".$socid);
 	}
 

@@ -2546,3 +2546,13 @@ InboxSourceErrorLine = Línea no entendida: « %s ».
 InboxSourceErrorNoHeader = Indique al menos una cabecera que leer.
 InboxSourceErrorMany = %s fuentes como máximo.
 InboxSourceExampleLabel = Solicitud de presupuesto (ejemplo)
+# The link follows the conversation (lot A3, 1.73.0)
+InboxLinkedByThread = vinculado por la conversación
+InboxLinkThreadToo = Vincular también los otros %s correos de la conversación
+InboxLinkedThreadToo = Vinculado, junto con los otros %s correos de la conversación
+InboxThreadDetach = Separar de la conversación
+InboxThreadDetachHelp = La conversación ha pasado a otro cliente: este correo pierde los vínculos hechos por la conversación y ya no recibe más
+InboxThreadDetached = Correo separado de su conversación (%s vínculos quitados)
+InboxThreadAttach = Volver a la conversación
+InboxThreadDetachedHelp = Este correo se separó de su conversación: los vínculos de la conversación no le llegan
+InboxThreadAttached = Correo de nuevo en su conversación: los próximos vínculos lo seguirán

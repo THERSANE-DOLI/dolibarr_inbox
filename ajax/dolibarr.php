@@ -27,6 +27,7 @@ dol_include_once('/inbox/class/inboxlink.class.php');
 dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
 dol_include_once('/inbox/class/inboxdatasource.class.php');
+dol_include_once('/inbox/class/inboxthreadlink.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
@@ -34,7 +35,7 @@ dol_include_once('/inbox/class/inboxcited.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
+inboxAjaxStart(in_array($action, array('link', 'unlink', 'detach', 'attach_thread', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
 $langs->loadLangs(array('companies', 'propal', 'orders', 'bills', 'projects', 'ticket', 'interventions', 'sendings', 'supplier_proposal', 'suppliers'));
 $elements = new InboxElements($db);
 $refs = new InboxMailRef($db);
@@ -268,7 +269,7 @@ switch ($action) {
 			// The piece the source offers to create, when the user may
 			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
 		}
-		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
+		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
@@ -367,17 +368,52 @@ switch ($action) {
 			inboxDolibarrFail($refs->error ?: 'InboxErrorNoMessageId');
 		}
 		$linker = new InboxLink($db);
-		$id = $linker->link($refId, (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('element', 'int'), $user);
+		$type = (string) inboxAjaxParam('type', 'aZ09');
+		$element = (int) inboxAjaxParam('element', 'int');
+		$id = $linker->link($refId, $type, $element, $user);
 		if ($id < 0) {
 			inboxDolibarrFail($linker->error);
 		}
-		inboxAjaxReply(array('link' => $id));
+		// « Link also the other mails of the conversation » (lot A3, 1.73.0), ticked by default
+		$others = 0;
+		if ((int) inboxAjaxParam('thread', 'int') === 1) {
+			$others = max(0, (new InboxThreadLink($db))->linkThread($user, $reader->row, $type, $element));
+		}
+		inboxAjaxReply(array('link' => $id, 'others' => $others));
 		// no break
 
 	case 'unlink':
 		$linker = new InboxLink($db);
 		if ($linker->unlink((int) inboxAjaxParam('link', 'int'), $user) < 0) {
 			inboxDolibarrFail($linker->error);
+		}
+		inboxAjaxReply(array('done' => 1));
+		// no break
+
+	case 'detach':
+		// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go
+		$reader = inboxDolibarrMail();
+		if (!$reader->level) {
+			inboxAjaxNotFound();
+		}
+		$threads = new InboxThreadLink($db);
+		$removed = $threads->detach($user, $reader->row);
+		if ($removed === null) {
+			inboxDolibarrFail($threads->error);
+		}
+		inboxAjaxReply(array('removed' => $removed));
+		// no break
+
+	case 'attach_thread':
+		// Undo of the detachment: back in its conversation, the links given back
+		$reader = inboxDolibarrMail();
+		if (!$reader->level) {
+			inboxAjaxNotFound();
+		}
+		$links = inboxAjaxParam('links', 'none');
+		$threads = new InboxThreadLink($db);
+		if ($threads->attach($user, $reader->row, is_array($links) ? $links : array()) < 0) {
+			inboxDolibarrFail($threads->error);
 		}
 		inboxAjaxReply(array('done' => 1));
 		// no break
