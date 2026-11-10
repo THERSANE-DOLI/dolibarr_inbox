@@ -210,6 +210,7 @@
 			+ (list.length ? '<ul class="ibx-checklist">' + list.map(([p, ts]) => '<li class="ibx-checklist__item">' + ic('mic') + '<div>' + th('InboxDictationMineGiven', t(p === 'server' && r.local ? 'InboxDictateProvider_serverlocal' : 'InboxDictateProvider_' + p, r.host || ''), date(ts)) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-dictrevoke" data-provider="' + esc(p) + '">' + th('InboxDictationRevoke') + '</button></li>').join('') + '</ul>'
 				: '<p class="ibx-section__help">' + th('InboxDictationMineNone') + '</p>');
+		I.mount(box);
 		$$('.ibx-js-dictrevoke', box).forEach(b => b.addEventListener('click', async () => {
 			try {
 				await post('dictation', 'revoke', { provider: b.dataset.provider });
@@ -275,6 +276,7 @@
 			html += '</tbody></table>';
 		}
 		main.innerHTML = html + '</div>';
+		I.mount(main);
 		acctKeep.clear();
 		if (rows.length && isAdmin()) {
 			bindAccountsPick(main, parts, rows);
@@ -694,6 +696,7 @@
 				+ (disabled ? ' aria-disabled="true" title="' + th('InboxSaveFirst') + '"' : '') + '>' + th(x.key) + '</a>';
 		}).join('') + '</div><div class="ibx-js-tab"></div></div>';
 		main.innerHTML = html;
+		I.mount(main);
 		$$('.ibx-tab[aria-disabled="true"]', main).forEach(a => a.addEventListener('click', e => e.preventDefault()));
 		if (account) {
 			bindStatusSwitch(main, account, tab);
@@ -900,6 +903,7 @@
 			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + th(account ? 'InboxSave' : 'InboxCreate') + '</button></div>'
 			+ '</form>';
 		box.innerHTML = html;
+		I.mount(box);
 		const form = $('form', box);
 		// Fields that depend on others
 		const sync = () => {
@@ -1206,6 +1210,7 @@
 				}).join('') + '</tbody></table>';
 		}
 		box.innerHTML = html;
+		I.mount(box);
 		$('.ibx-js-retention', box).addEventListener('submit', async e => {
 			e.preventDefault();
 			const v = formValues(e.target);
@@ -1289,6 +1294,7 @@
 		}
 		html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-add">' + ic('plus') + ' ' + th('InboxAddIdentity') + '</button></div>';
 		box.innerHTML = html;
+		I.mount(box);
 		$('.ibx-js-add', box).addEventListener('click', () => identityDialog(box, account, { email: list.length ? '' : account.email, name: '', reply_to: '', bcc: '', signature: '', is_default: list.length ? 0 : 1, status: 1 }));
 		box.onclick = async e => {
 			const ed = e.target.closest('[data-edit]');

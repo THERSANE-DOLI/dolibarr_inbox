@@ -284,6 +284,23 @@
 		return el;
 	}
 
+	/**
+	 * HTML injected by the application: the widgets of Dolibarr inside it started (tooltips of getNomUrl, ajax
+	 * tooltips...). Dolibarr.initNewContent is native from Dolibarr 24, given by backportdolcontext before: nothing done
+	 * without it (the title of the links stays)
+	 * @param {Element} el Container of the new HTML
+	 */
+	function mount(el) {
+		if (!el || typeof Dolibarr === 'undefined' || typeof Dolibarr.initNewContent !== 'function') {
+			return;
+		}
+		try {
+			Dolibarr.initNewContent(el);
+		} catch (err) {
+			console.error(err);
+		}
+	}
+
 	// ---------- Dialogs ----------
 	/**
 	 * Native <dialog>, modal: Cancel on the left, main action on the right (principle P27)
@@ -309,6 +326,7 @@
 			+ (o.actions || []).map((a, i) => '<button type="button" class="ibx-btn' + (a.primary ? ' ibx-btn--primary' : '') + (a.danger ? ' ibx-btn--danger' : '') + '" data-i="' + i + '">' + esc(a.label) + '</button>').join('')
 			+ '</div>';
 		document.body.appendChild(dlg);
+		mount(dlg);
 		dlg.addEventListener('close', () => dlg.remove());
 		dlg.addEventListener('cancel', e => {
 			if (o.noCancel) {
@@ -604,7 +622,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,

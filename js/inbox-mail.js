@@ -1915,6 +1915,7 @@
 		body.innerHTML = html;
 		bindTableHead(body);
 		hydrateAvatars(body);
+		I.mount(body);
 		if (anchorId && body.querySelector('[data-mail="' + anchorId + '"]')) {
 			body.scrollTop += body.querySelector('[data-mail="' + anchorId + '"]').getBoundingClientRect().top - anchorTop;
 		} else {
@@ -3307,6 +3308,135 @@
 
 	// ---------- Card of a user of Dolibarr (hover or focus of his name, tap on a phone) ----------
 	const UC = { el: null, timer: 0, for: null };
+
+	/**
+	 * Card of a Dolibarr object on hover or keyboard focus of its link: the tooltip of Dolibarr (content of
+	 * getTooltipContent, hooks of the modules included) in a light card of the application. The page loads neither the
+	 * JS of the footer of Dolibarr nor its icons: the parameters of the ajax tooltip of getNomUrl (data-params) are sent
+	 * to core/ajax/ajaxtooltip.php here (rights checked there), or its content is given whole when the ajax tooltip is
+	 * off. Asked once per object and page. A phone opens the card of the object, no hover there.
+	 */
+	const OT = { src: new Map(), cache: new Map(), el: null, for: null, show: 0, hide: 0 };
+	/** Key of the tooltip of a piece ('' when Dolibarr gives none), its source kept aside */
+	function objTipKey(d) {
+		if (!d.tip_params && !d.tip_html) {
+			return '';
+		}
+		const key = d.type + ':' + d.id;
+		OT.src.set(key, { params: d.tip_params || null, html: d.tip_html || '', title: d.kind + ' ' + (d.ref || '') });
+		return key;
+	}
+	function objTipLoad(key) {
+		if (!OT.cache.has(key)) {
+			const src = OT.src.get(key) || {};
+			let p;
+			if (src.params) {
+				const url = I.ctx('INBOX_TOOLTIP_URL', '') + '?' + new URLSearchParams(Object.entries(src.params).map(([k, v]) => [k, String(v)])).toString();
+				p = fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+					.then(r => (r.ok ? r.text() : ''))
+					.catch(() => '');
+			} else {
+				p = Promise.resolve(src.html || '');
+			}
+			// A failure is asked again at the next hover
+			p.then(html => {
+				if (!html) {
+					OT.cache.delete(key);
+				}
+			});
+			OT.cache.set(key, p);
+		}
+		return OT.cache.get(key);
+	}
+	function objTipHide() {
+		clearTimeout(OT.show);
+		clearTimeout(OT.hide);
+		if (OT.el) {
+			OT.el.remove();
+			OT.el = null;
+		}
+		if (OT.for) {
+			OT.for.removeAttribute('aria-describedby');
+			OT.for = null;
+		}
+	}
+	function objTipPlace(anchor) {
+		const el = OT.el;
+		const r = anchor.getBoundingClientRect();
+		const w = el.offsetWidth;
+		const h = el.offsetHeight;
+		el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+		el.style.top = (r.bottom + h + 12 > window.innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+	}
+	async function objTipShow(anchor) {
+		const key = anchor.dataset.objtip;
+		if (!key || OT.for === anchor) {
+			return;
+		}
+		objTipHide();
+		OT.for = anchor;
+		const el = document.createElement('div');
+		el.className = 'ibx-objtip';
+		el.id = 'ibx-objtip';
+		el.setAttribute('role', 'tooltip');
+		el.innerHTML = '<span class="ibx-muted"><span class="ibx-spinner" aria-hidden="true"></span> ' + th('InboxPanelLoading') + '</span>';
+		document.body.appendChild(el);
+		OT.el = el;
+		anchor.setAttribute('aria-describedby', el.id);
+		objTipPlace(anchor);
+		el.addEventListener('pointerenter', () => clearTimeout(OT.hide));
+		el.addEventListener('pointerleave', () => {
+			OT.hide = setTimeout(objTipHide, 200);
+		});
+		const html = await objTipLoad(key);
+		if (OT.for !== anchor || OT.el !== el) {
+			return;
+		}
+		if (!html) {
+			objTipHide();
+			return;
+		}
+		// HTML of Dolibarr (same trust as its pages): its icons are not loaded here, hidden by the CSS
+		el.innerHTML = '<div class="ibx-objtip__body">' + html + '</div>';
+		I.mount(el);
+		objTipPlace(anchor);
+	}
+	(() => {
+		document.addEventListener('pointerover', e => {
+			const a = e.target.closest && e.target.closest('[data-objtip]');
+			if (!a || e.pointerType === 'touch') {
+				return;
+			}
+			clearTimeout(OT.hide);
+			if (OT.for !== a) {
+				clearTimeout(OT.show);
+				OT.show = setTimeout(() => objTipShow(a), 350);
+			}
+		});
+		document.addEventListener('pointerout', e => {
+			const a = e.target.closest && e.target.closest('[data-objtip]');
+			if (!a || (e.relatedTarget && a.contains(e.relatedTarget))) {
+				return;
+			}
+			clearTimeout(OT.show);
+			OT.hide = setTimeout(objTipHide, 200);
+		});
+		document.addEventListener('focusin', e => {
+			const a = e.target.closest && e.target.closest('[data-objtip]');
+			if (a && a.matches(':focus-visible')) {
+				objTipShow(a);
+			} else if (OT.el && !(e.target.closest && e.target.closest('.ibx-objtip'))) {
+				objTipHide();
+			}
+		});
+		document.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && OT.el) {
+				objTipHide();
+			}
+		});
+		window.addEventListener('scroll', () => OT.el && objTipHide(), true);
+		window.addEventListener('resize', () => OT.el && objTipHide());
+	})();
 	function userCardHtml(p) {
 		const line = (icon, html) => '<div class="ibx-usercard__line">' + ic(icon) + '<span>' + html + '</span></div>';
 		return userAvatar(p, 'ibx-usercard__avatar') + '<div class="ibx-usercard__main"><div class="ibx-usercard__name">' + esc(p.name) + '</div>'
@@ -3342,6 +3472,7 @@
 		el.innerHTML = userCardHtml(p);
 		document.body.appendChild(el);
 		hydrateUserPhotos(el);
+		I.mount(el);
 		const r = anchor.getBoundingClientRect();
 		const w = el.offsetWidth;
 		el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
@@ -4624,8 +4755,11 @@
 		const foot = sub || more.action
 			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + (more.action || '') + '</span>'
 			: '';
+		// Tooltip of Dolibarr in a card of the application (objTip) when getNomUrl gives one; else a plain title
+		const tip = objTipKey(d);
 		return '<span class="ibx-piece"' + attrs + '>'
-			+ '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener" title="' + esc(d.kind + ' ' + (d.ref || '') + (d.label ? ' · ' + d.label : '') + (d.status ? ' · ' + d.status : '')) + '">'
+			+ '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener"'
+			+ (tip ? ' data-objtip="' + esc(tip) + '"' : ' title="' + esc(d.kind + ' ' + (d.ref || '') + (d.label ? ' · ' + d.label : '') + (d.status ? ' · ' + d.status : '')) + '"') + '>'
 			+ ic(d.icon) + '<b class="ibx-piece__ref">' + esc(d.ref || '') + '</b></a>'
 			+ statusBadge(d) + citedWarnHtml(warn || '')
 			+ (unlink ? '<button type="button" class="ibx-piece__x ibx-js-unlink" data-link="' + unlink + '" title="' + th('InboxUnlink') + '" aria-label="' + esc(t('InboxUnlinkPiece', d.ref || d.kind)) + '">' + ic('close') + '</button>' : '')
@@ -4715,6 +4849,7 @@
 		}
 		box.innerHTML = html;
 		hydrateUserPhotos(box);
+		I.mount(box);
 		box.classList.toggle('is-folded', folded);
 		const reading = box.closest('.ibx-reading');
 		if (reading) {
@@ -6253,6 +6388,7 @@
 			+ '<section class="ibx-attbar ibx-attbar--answers ibx-convo__foot" aria-label="' + th('InboxQuickReply') + '"><div class="ibx-attbar__head">' + quickReplyHtml(last.id, '') + '</div></section></article>';
 		bindQuickReply(pane);
 		hydrateAvatars(pane);
+		I.mount(pane);
 		loadDolibar($('.ibx-js-dolibar', pane));
 		$$('.ibx-js-expand', pane).forEach(b => b.addEventListener('click', () => {
 			const item = b.closest('[data-mailblock]');
@@ -6309,6 +6445,7 @@
 		body.innerHTML = '<div class="ibx-readhead ibx-readhead--compact">' + headHtml(m, true, true) + '</div>' + mailBodyHtml(m, { fold: !first, inline: true });
 		bindMail(m, item);
 		hydrateAvatars(item);
+		I.mount(item);
 		// A click on the head of an unfolded mail folds it again (the line comes back)
 		const top = $('.ibx-readhead__top', body);
 		top.setAttribute('role', 'button');
@@ -6375,6 +6512,7 @@
 		bindQuickReply(pane);
 		bindMail(m, pane);
 		hydrateAvatars(pane);
+		I.mount(pane);
 		loadDolibar($('.ibx-js-dolibar', pane));
 	}
 

@@ -104,6 +104,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_VERSION' => $moduleVersion,
 		'INBOX_URL' => dol_buildpath('/inbox/index.php', 1),
 		'INBOX_AJAX_URL' => dol_buildpath('/inbox/ajax/', 1),
+		// Tooltips of the Dolibarr objects (parameters given by getNomUrl)
+		'INBOX_TOOLTIP_URL' => DOL_URL_ROOT.'/core/ajax/ajaxtooltip.php',
 		'INBOX_ICONS_URL' => dol_buildpath('/inbox/img/inbox-icons.svg', 1).'?v='.urlencode($moduleVersion).'-'.@filemtime(dirname(__DIR__).'/img/inbox-icons.svg'),
 		'INBOX_TOKEN' => currentToken(),
 		// The JS context only takes strings, numbers and booleans: flat keys, JSON text for the settings
@@ -254,4 +256,43 @@ function inboxAccentCss($hex, $darkHex = '', $greys = 'neutral')
 	return ':root:not([data-ibx-theme="contrast"]){'.$css($t['light']).'}'
 		.'@media (prefers-color-scheme: dark){:root:not([data-ibx-theme="light"]):not([data-ibx-theme="contrast"]){'.$d.'}}'
 		.':root[data-ibx-theme="dark"]{'.$d.'}';
+}
+
+/**
+ * Files of the other modules for the application, declared in their descriptor like the parts 'css' and 'js' of
+ * Dolibarr: module_parts 'inboxcss' and 'inboxjs' => array('/mymodule/css/inbox.css', ...). Own keys: the files 'css'
+ * and 'js' of the modules are written for the pages of Dolibarr (theme, jQuery), never loaded here.
+ *
+ * @param string $part 'inboxcss' or 'inboxjs'
+ * @return int         Files printed
+ */
+function inboxPrintModuleFiles($part)
+{
+	global $conf;
+
+	$n = 0;
+	$parts = isset($conf->modules_parts[$part]) ? (array) $conf->modules_parts[$part] : array();
+	foreach ($parts as $module => $files) {
+		foreach ((array) $files as $file) {
+			$file = (string) $file;
+			// A path inside Dolibarr only, as the parts of the core (relative url starting with /)
+			if ($file === '' || $file[0] !== '/' || preg_match('#^//|\.\.|[\s<>"\']#', $file)) {
+				dol_syslog('inbox: module '.$module.' declared a wrong '.$part.' path: '.$file, LOG_WARNING);
+				continue;
+			}
+			$url = dol_buildpath($file, 1);
+			$path = dol_buildpath(preg_replace('/\?.*$/', '', $file), 0);
+			// Address changing with the file (no stale file after an update of the module)
+			$url .= (strpos($url, '?') === false ? '?' : '&').'v='.(is_file($path) ? filemtime($path) : urlencode((string) DOL_VERSION));
+			print '<!-- '.dol_escape_htmltag($part.' of module '.$module).' -->'."\n";
+			if ($part === 'inboxjs') {
+				print '<script nonce="'.getNonce().'" src="'.dol_escape_htmltag($url).'" defer></script>'."\n";
+			} else {
+				print '<link rel="stylesheet" href="'.dol_escape_htmltag($url).'">'."\n";
+			}
+			$n++;
+		}
+	}
+
+	return $n;
 }
