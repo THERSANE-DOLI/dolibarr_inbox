@@ -125,6 +125,35 @@ class InboxCreate
 	}
 
 	/**
+	 * Full page of creation of a thirdparty from the panel « New customer » (lot A1, 1.79.0): the intent keeps the
+	 * contact of the panel, created when the thirdparty is saved
+	 *
+	 * @param User                      $user    User
+	 * @param InboxReader               $reader  Mail loaded (access checked)
+	 * @param string                    $url     Page of creation, filled
+	 * @param array<string,string>|null $contact Contact of the panel
+	 * @return string Address of the page, '' if refused
+	 */
+	public function leadIntent(User $user, InboxReader $reader, $url, $contact)
+	{
+		if (!InboxElements::canWriteType($user, 'societe')) {
+			$this->error = 'InboxErrorCannotCreate';
+			return '';
+		}
+		$refId = (new InboxMailRef($this->db))->fetchOrCreate($reader->row, $user);
+		if ($refId <= 0) {
+			$this->error = 'InboxErrorNoMessageId';
+			return '';
+		}
+		$intents = $this->intents($user);
+		$intents[] = array('type' => 'societe', 'mailref' => $refId, 'mail' => (int) $reader->row->rowid, 'subject' => (string) $reader->row->subject, 'file' => '', 'at' => dol_now(),
+			'lead' => 1, 'contact' => is_array($contact) ? $contact : null);
+		$this->saveIntents($user, array_slice($intents, -10));
+
+		return $url;
+	}
+
+	/**
 	 * Address of the page of creation, filled from the mail
 	 *
 	 * @param string                     $type  Type
@@ -229,6 +258,11 @@ class InboxCreate
 		$this->saveIntents($user, array_values($intents));
 		$linker = new InboxLink($this->db);
 		$linker->link((int) $found['mailref'], $type, (int) $object->id, $user, 'inbox');
+		// From the panel « New customer » (A1): its contact, the conversation
+		if (!empty($found['lead'])) {
+			require_once __DIR__.'/inboxlead.class.php';
+			(new InboxLead($this->db))->afterFullPage($user, (int) $found['mail'], (int) $object->id, $found['contact'] ?? null);
+		}
 		if ($this->ownTempFile((string) $found['file'])) {
 			$name = dol_sanitizeFileName(dol_trunc('mail '.dol_print_date(dol_now(), '%Y-%m-%d').' '.($found['subject'] ?: 'mail'), 120, 'right', 'UTF-8', 1)).'.eml';
 			$this->putFile($type, $object, $name, (string) file_get_contents($found['file']));

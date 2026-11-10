@@ -64,6 +64,9 @@ class InboxUserParam
 			'text_size' => array('100', 'int:90:150'),
 			'theme' => array('auto', array('auto', 'light', 'dark', 'contrast')),
 			'attachments_open' => array('0', 'int:0:1'),
+			// New customer from a mail (lot A1 1.79.0): last choices of the panel; contacts left to create after a full page
+			'lead_last' => array('', 'json'),
+			'lead_pending' => array('', 'json'),
 			// Mail space (lot W3): folders folded, sort of the lists, quick filter bar, preview windows, zoom of the
 			// text of the mails
 			'tree_collapsed' => array('', 'json'),

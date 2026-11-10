@@ -1,5 +1,23 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: new customer from a mail (lot A1, level 1) :   1.79.0
+  - on a mail of an unknown sender, « New customer » in the Dolibarr band opens a side panel on the left, the mail
+    left readable on the right. Values read in the mail, each with its source and its line of the mail lit on hover,
+    the other values offered: data source headers, attached vCard, display name (« Swap first and last name »),
+    signature (phones sorted mobile or not, SIRET / SIREN checked by their key, VAT computed, address, job, site;
+    never the quoted mail), « Label: value » lines in 5 languages, domain (never a public, disposable or shared one).
+  - thirdparties that may be the same one (domain, phone, SIREN, VAT, near name) with « Use this one » (the contact
+    is added to it).
+  - « Create »: the thirdparty (nature, form, type, automatic code, coordinates, identifiers; sales representative,
+    categories, VAT under « More fields »), its contact, the mail and its conversation linked to both, all or
+    nothing; « Undo » in the toast. « Full page… »: the page of Dolibarr filled, the contact created when the
+    thirdparty is saved; a contact that needs its own page is offered in the band. No copy of the mail is kept.
+  - the panel asks what the page of creation asks (rules of the core, mandatory settings, mandatory extrafields,
+    mandatory fields per page of Setup > Default values), checked again on the server; a field it cannot fill sends
+    to the full page. The default values of the forms are its first values, the last choices are kept.
+  - modules: hook inboxLeadExtract (values and fields) and the browser event inbox:lead:render (a block of the
+    module in the panel), see README.
+
 - NEW: remote pictures of a quote and security settings (lot F1) :   1.78.0
   - the quote of an answer or a forward no longer carries the tracking pictures of the mail quoted (1 x 1 pictures,
     known tracking addresses): kept, the reader of the answer told the first sender that it was answered, and the
