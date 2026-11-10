@@ -2227,3 +2227,17 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-tablewrap { overflow-x: auto; }
 .ibx-crontable td:first-child a { display: inline-flex; align-items: center; gap: var(--ibx-s1); }
 .ibx-crontable .ibx-formrow__error { max-width: 28rem; }
+
+/* Tags at hand (1.57.0). Dot of a tag in its menu: its colour, its border style drawn around it in the colour of the
+   text (same marks as the badges, the colour is never the only sign: the label stays written) */
+.ibx-tagdot { width: 0.75rem; height: 0.75rem; margin-inline: 0.125rem; border-radius: 50%; background: var(--ibx-tag-color, var(--ibx-tag-4)); align-self: center; }
+.ibx-tagdot--b-solid { outline: 1.5px solid var(--ibx-text); outline-offset: 1px; }
+.ibx-tagdot--b-dashed { outline: 1.5px dashed var(--ibx-text); outline-offset: 1px; }
+.ibx-tagdot--b-dotted { outline: 2px dotted var(--ibx-text); outline-offset: 1px; }
+.ibx-tagdot--b-double { outline: 3px double var(--ibx-text); outline-offset: 1px; }
+/* Tags of the open mail beside its subject: one button opening the menu of the tags, « + » to add one */
+.ibx-readhead__tags { display: inline-flex; align-items: center; gap: var(--ibx-s1); padding: 0.125rem 0.25rem; margin: 0; font: inherit; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); background: transparent; border: 1px solid transparent; border-radius: var(--ibx-radius-sm); cursor: pointer; }
+.ibx-readhead__tags:hover, .ibx-readhead__tags:focus-visible { border-color: var(--ibx-border); background: var(--ibx-bg-hover); outline: none; }
+.ibx-readhead__tags:focus-visible { box-shadow: 0 0 0 2px var(--ibx-accent); }
+.ibx-readhead__tagadd { display: inline-flex; align-items: center; justify-content: center; width: 1.125rem; height: 1.125rem; border: 1px dashed var(--ibx-border-strong, var(--ibx-border)); border-radius: var(--ibx-radius-sm); }
+.ibx-readhead__tagadd .ibx-icon { width: 0.75rem; height: 0.75rem; }

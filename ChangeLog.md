@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: tags at hand in the mail read, and their colour in the menu of the tags :   1.57.0
+  - button « Tag » in the bar of the mail (between the star and Archive), its menu under it.
+  - the tags beside the subject open the same menu (checked ones removed in one click), with a « + » to add one;
+    in the head of a conversation too.
+  - in the menu, a dot of the colour of each tag with its border style before its name: the tag to put is seen at
+    once (the name stays written, the colour is never the only sign).
+
 - NEW: « Annotate and file in a piece… » for the attachments, with the editors of other modules (C2) :   1.56.0
   - in the menu of an attachment when a module declares an editor for its type (hook inboxAttachmentViewers, results
     inboxAttachmentEditors): antivirus first, then the piece is chosen like « Put in the documents of », then the
