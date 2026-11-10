@@ -187,6 +187,10 @@ class InboxElements
 		if (preg_match('/href="([^"]+)"/', $html, $m)) {
 			$url = html_entity_decode($m[1], ENT_QUOTES);
 		}
+		// Thirdparty of the piece apart (socid) and title of a project or ticket: the application leaves the thirdparty out
+		// when it is the one of the sender (label kept whole for the other uses)
+		$socId = 0;
+		$title = '';
 		if ($type === 'societe') {
 			$ref = (string) $o->name;
 			$label = (string) ($o->name_alias ?? '');
@@ -194,6 +198,7 @@ class InboxElements
 			$ref = trim((string) $o->getFullName($langs));
 			$label = '';
 			if ((int) $o->socid > 0) {
+				$socId = (int) $o->socid;
 				$soc = fetchObjectByElement((int) $o->socid, 'societe', '', 1, 50);
 				$label = is_object($soc) ? (string) $soc->name : '';
 			}
@@ -206,11 +211,11 @@ class InboxElements
 				$label = is_object($soc) ? (string) $soc->name : '';
 			}
 			if ($type === 'project' || $type === 'ticket') {
-				$title = (string) ($o->title ?? ($o->subject ?? ''));
+				$title = trim((string) ($o->title ?? ($o->subject ?? '')));
 				$label = trim($title.($label !== '' ? ' · '.$label : ''));
 			}
 		}
-		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'status' => '', 'url' => $url, 'icon' => $icon, 'kind' => $kind);
+		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'socid' => $socId, 'title' => $title, 'status' => '', 'url' => $url, 'icon' => $icon, 'kind' => $kind);
 		if (method_exists($o, 'getLibStatut')) {
 			$out = array_merge($out, self::statusOf((string) $o->getLibStatut(0), (string) $o->getLibStatut(5)));
 		}

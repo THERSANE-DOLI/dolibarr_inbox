@@ -337,17 +337,7 @@ class InboxReader
 	 */
 	public static function userPhotoUrl($userId, $photo, $entity)
 	{
-		global $db;
-
-		if ($userId <= 0 || $photo === '' || !dolIsAllowedForPreview($photo)) {
-			return '';
-		}
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
-		$u = new User($db);
-		$u->id = $userId;
-		$file = get_exdir(0, 0, 0, 0, $u, 'user').'photos/'.getImageFileNameForSize($photo, '_small');
-
-		return DOL_URL_ROOT.'/viewimage.php?modulepart=userphoto&entity='.((int) $entity ?: 1).'&file='.urlencode($file);
+		return InboxAccess::userPhotoUrl($userId, $photo, $entity);
 	}
 
 	/**

@@ -61,7 +61,8 @@ switch ($action) {
 		$assign = new InboxAssign($db);
 		$assignees = $assign->forRows(array($reader->row));
 		$out['assignees'] = $assignees[(int) $reader->row->rowid] ?? array();
-		$out['people'] = (object) $assign->names($assignees);
+		// Own key: « people » are the users of Dolibarr among the addresses of the mail (head of the reading)
+		$out['assignee_people'] = (object) $assign->cards($assignees);
 		$out['has_message_id'] = true;
 		inboxAjaxReply($out);
 		// no break
@@ -110,7 +111,7 @@ switch ($action) {
 		foreach ($list as $i => $m) {
 			$list[$i]['assignees'] = $assignees[(int) $m['id']] ?? array();
 		}
-		inboxAjaxReply(array('key' => $key, 'mails' => $list, 'people' => (object) $assign->names($assignees)));
+		inboxAjaxReply(array('key' => $key, 'mails' => $list, 'people' => (object) $assign->cards($assignees)));
 		// no break
 
 	case 'seen':

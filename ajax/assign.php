@@ -41,7 +41,7 @@ switch ($action) {
 			inboxAjaxNotFound();
 		}
 		inboxAjaxReply(array('people' => array_values(array_map(function ($p) {
-			return array('id' => $p['id'], 'name' => $p['name']);
+			return array('id' => $p['id'], 'name' => $p['name'], 'photo' => $p['photo']);
 		}, $assign->people($accountId)))));
 		// no break
 

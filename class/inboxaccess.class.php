@@ -92,6 +92,32 @@ class InboxAccess
 	}
 
 	/**
+	 * Address of the small photo of a user ('' when none): the same file the cards of Dolibarr show
+	 *
+	 * @param int    $userId User
+	 * @param string $photo  File name of the photo
+	 * @param int    $entity Entity of the user
+	 * @return string
+	 */
+	public static function userPhotoUrl($userId, $photo, $entity)
+	{
+		global $db;
+
+		$userId = (int) $userId;
+		$photo = (string) $photo;
+		if ($userId <= 0 || $photo === '' || !dolIsAllowedForPreview($photo)) {
+			return '';
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
+		require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+		$u = new User($db);
+		$u->id = $userId;
+		$file = get_exdir(0, 0, 0, 0, $u, 'user').'photos/'.getImageFileNameForSize($photo, '_small');
+
+		return DOL_URL_ROOT.'/viewimage.php?modulepart=userphoto&entity='.((int) $entity ?: 1).'&file='.urlencode($file);
+	}
+
+	/**
 	 * Levels of a user on the active mailboxes of the entity that the user can use
 	 *
 	 * @param User $user User
@@ -271,11 +297,12 @@ class InboxAccess
 			return array();
 		}
 		$out = array();
-		$users = $this->db->getRows("SELECT rowid, firstname, lastname, login FROM ".$prefix."user WHERE rowid IN (".implode(',', array_keys($levels)).")"
+		$users = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, photo FROM ".$prefix."user WHERE rowid IN (".implode(',', array_keys($levels)).")"
 			." AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) ORDER BY lastname, firstname, login LIMIT 100000");
 		foreach (is_array($users) ? $users : array() as $u) {
 			$name = trim($u->firstname.' '.$u->lastname);
-			$out[(int) $u->rowid] = array('id' => (int) $u->rowid, 'name' => $name !== '' ? $name : (string) $u->login, 'level' => $levels[(int) $u->rowid]);
+			$out[(int) $u->rowid] = array('id' => (int) $u->rowid, 'name' => $name !== '' ? $name : (string) $u->login, 'level' => $levels[(int) $u->rowid],
+				'photo' => self::userPhotoUrl((int) $u->rowid, (string) $u->photo, (int) $u->entity));
 		}
 
 		return $out;

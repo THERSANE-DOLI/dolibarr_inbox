@@ -90,7 +90,7 @@ class InboxAssign
 	 * @param int[] $add     Users to assign
 	 * @param int[] $remove  Users to remove
 	 * @param int[] $expand  Rows of conversations folded in the list: all their mails of the folder
-	 * @return array{ok:bool,count:int,error:string,assignees:array<int,int[]>,people:array<int,string>,skipped:int}
+	 * @return array{ok:bool,count:int,error:string,assignees:array<int,int[]>,people:array<int,array{name:string,photo:string}>,skipped:int}
 	 */
 	public function set(User $user, array $mailIds, array $add, array $remove, array $expand = array())
 	{
@@ -235,7 +235,7 @@ class InboxAssign
 		}
 		$out['ok'] = true;
 		$out['assignees'] = $this->forRows($rows);
-		$out['people'] = $this->names($out['assignees']);
+		$out['people'] = $this->cards($out['assignees']);
 
 		return $out;
 	}
@@ -282,7 +282,7 @@ class InboxAssign
 	 *
 	 * @param array<int,array<string,mixed>> $rows     Rows formatted for the application (id, folder, thread)
 	 * @param bool                           $threads  Lines of conversations
-	 * @return array<int,string> Names of the people shown (user => name)
+	 * @return array<int,array{name:string,photo:string}> People shown (user => name, photo)
 	 */
 	public function decorate(array &$rows, $threads = false)
 	{
@@ -322,7 +322,7 @@ class InboxAssign
 			$shown[(int) $r['id']] = $list;
 		}
 
-		return $this->names($shown);
+		return $this->cards($shown);
 	}
 
 	/**
@@ -332,6 +332,20 @@ class InboxAssign
 	 * @return array<int,string> User => name
 	 */
 	public function names(array $assignees)
+	{
+		return array_map(function ($c) {
+			return $c['name'];
+		}, $this->cards($assignees));
+	}
+
+	/**
+	 * Name and photo of the people of a list of assignments, for the application (the photo of Dolibarr, else the
+	 * initials)
+	 *
+	 * @param array<int,int[]> $assignees Row => users
+	 * @return array<int,array{name:string,photo:string}> User => name, photo ('' when none)
+	 */
+	public function cards(array $assignees)
 	{
 		$ids = array();
 		foreach ($assignees as $list) {
@@ -343,10 +357,11 @@ class InboxAssign
 			return array();
 		}
 		$out = array();
-		$users = $this->db->getRows("SELECT rowid, firstname, lastname, login FROM ".$this->db->prefix()."user WHERE rowid IN (".implode(',', $ids).") LIMIT 10000");
+		$users = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, photo FROM ".$this->db->prefix()."user WHERE rowid IN (".implode(',', $ids).") LIMIT 10000");
 		foreach (is_array($users) ? $users : array() as $u) {
 			$name = trim($u->firstname.' '.$u->lastname);
-			$out[(int) $u->rowid] = $name !== '' ? $name : (string) $u->login;
+			$out[(int) $u->rowid] = array('name' => $name !== '' ? $name : (string) $u->login,
+				'photo' => InboxAccess::userPhotoUrl((int) $u->rowid, (string) $u->photo, (int) $u->entity));
 		}
 
 		return $out;

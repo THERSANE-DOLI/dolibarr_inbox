@@ -434,11 +434,12 @@ switch ($action) {
 				$mine = $writing > 0 ? substr($key, 0, -1).',"w":1}' : $key;
 				// The others on the same mail, reading it or writing an answer (same key, « w » added)
 				$like = $db->escape($db->escapeforlike(substr($key, 0, -1)));
-				$others = $db->getRows("SELECT u.rowid, u.firstname, u.lastname, u.login, p.value FROM ".$db->prefix()."inbox_userparam as p INNER JOIN ".$db->prefix()."user as u ON u.rowid = p.fk_user"
+				$others = $db->getRows("SELECT u.rowid, u.entity, u.firstname, u.lastname, u.login, u.photo, p.value FROM ".$db->prefix()."inbox_userparam as p INNER JOIN ".$db->prefix()."user as u ON u.rowid = p.fk_user"
 					." WHERE p.param = 'presence' AND p.fk_account = 0 AND p.fk_user <> ".((int) $user->id)." AND (p.value = '".$db->escape($key)."' OR p.value LIKE '".$like."%')"
 					." AND p.tms > '".$db->idate(dol_now() - 60)."' AND u.statut = 1 LIMIT 20");
 				$out['presence'] = array('mail' => $mailId, 'users' => array_map(function ($u) {
-					return array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login, 'writing' => strpos((string) $u->value, '"w":1') !== false);
+					return array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login, 'writing' => strpos((string) $u->value, '"w":1') !== false,
+						'photo' => InboxAccess::userPhotoUrl((int) $u->rowid, (string) $u->photo, (int) $u->entity));
 				}, is_array($others) ? $others : array()));
 			}
 		}

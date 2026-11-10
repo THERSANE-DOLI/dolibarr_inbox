@@ -60,8 +60,10 @@
 		// Meilisearch (lot W7 1.20.0): state given by the last list, crops of the text per row
 		ft: null,
 		crops: {},
-		// Names of the people assigned seen in the lists (user => name), and the user (lot W4 1.9.0)
+		// Names of the people assigned seen in the lists (user => name), their photo of Dolibarr (user => address,
+		// '' when none), and the user (lot W4 1.9.0)
 		people: {},
+		photos: {},
 		me: +(I.ctx('INBOX_USER_ID', 0) || 0),
 		rows: [],
 		next: '',
@@ -3193,7 +3195,7 @@
 			return;
 		}
 		S.mail = mail;
-		learnPeople(mail.people);
+		learnPeople(mail.assignee_people);
 		renderMail(mail);
 		presenceSoon();
 		Dolibarr.executeHook('inbox:mail:open', { account: mail.account, messageId: mail.message_id, subject: mail.subject, from: mail.from });
@@ -4090,8 +4092,16 @@
 	// ---------- Assignment (lot W4 1.9.0, webmail §5.4 quinquies): who handles a mail ----------
 	function learnPeople(map) {
 		Object.keys(map || {}).forEach(k => {
-			S.people[+k] = map[k];
+			const p = map[k];
+			S.people[+k] = typeof p === 'string' ? p : (p.name || '');
+			if (p && typeof p === 'object') {
+				S.photos[+k] = p.photo || '';
+			}
 		});
+	}
+	/** Avatar of a user of Dolibarr: the photo of the card first, else the initials */
+	function personAvatar(id) {
+		return userAvatar({ id, name: S.people[id] || '', email: '', photo: S.photos[id] || '' }, 'ibx-avatar--xs' + (id === S.me ? ' is-me' : ''));
 	}
 	function personName(id) {
 		return id === S.me ? t('InboxMe') : (S.people[id] || '#' + id);
@@ -4104,7 +4114,7 @@
 		}
 		const text = t('InboxAssignedTo', list.map(personName).join(', '));
 		return ' <span class="ibx-assignees' + (cls ? ' ' + cls : '') + '" title="' + esc(text) + '">'
-			+ list.slice(0, 3).map(id => avatar(S.people[id] || '', 'u' + id, 'ibx-avatar--xs' + (id === S.me ? ' is-me' : ''))).join('')
+			+ list.slice(0, 3).map(id => personAvatar(id)).join('')
 			+ (list.length > 3 ? '<span class="ibx-assignees__more" aria-hidden="true">+' + (list.length - 3) + '</span>' : '')
 			+ '<span class="ibx-sr-only">' + esc(text) + '</span></span>';
 	}
@@ -4114,7 +4124,7 @@
 		return '<div class="ibx-readhead__line ibx-assignline ibx-js-assignline" data-ids="' + ids.join(',') + '">'
 			// Nobody: « Not assigned » alone (« Assigned to Nobody » would read like a name)
 			+ (list.length ? '<span class="ibx-assignline__label">' + th('InboxAssignedToLabel') + '</span>' : '')
-			+ (list.length ? list.map(id => '<span class="ibx-assignline__person' + (id === S.me ? ' is-me' : '') + '">' + avatar(S.people[id] || '', 'u' + id, 'ibx-avatar--xs' + (id === S.me ? ' is-me' : ''))
+			+ (list.length ? list.map(id => '<span class="ibx-assignline__person' + (id === S.me ? ' is-me' : '') + '">' + personAvatar(id)
 				+ esc(personName(id)) + '</span>').join('') : '<span class="ibx-muted">' + th('InboxAssignedNobody') + '</span>')
 			+ (hasRef ? '<span class="ibx-assignline__actions"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-assignme" aria-keyshortcuts="Space">' + ic('user-plus') + ' ' + th(mine ? 'InboxUnassignMe' : 'InboxAssignMe') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-assignto" aria-haspopup="dialog">' + th('InboxAssignEdit') + '</button></span>'
@@ -4140,6 +4150,7 @@
 			}
 			if (fresh) {
 				line.outerHTML = fresh;
+				hydrateUserPhotos($('.ibx-pane--read .ibx-js-assignline', S.el));
 			}
 		}
 		renderBulkBar();
@@ -4263,6 +4274,7 @@
 		}
 		people.forEach(p => {
 			S.people[p.id] = p.name;
+			S.photos[p.id] = p.photo || '';
 		});
 		// Me first, then by name
 		people.sort((a, b) => (b.id === S.me) - (a.id === S.me) || a.name.localeCompare(b.name));
@@ -4276,10 +4288,11 @@
 			body: (rows.length > 1 ? '<p class="ibx-formrow__help">' + th('InboxSelectedCount', rows.length) + '</p>' : '')
 				+ '<input type="search" class="ibx-field ibx-js-pq" placeholder="' + th('InboxAssignSearch') + '" aria-label="' + th('InboxAssignSearch') + '" autocomplete="off">'
 				+ '<ul class="ibx-assignpick" role="list">' + people.map(p => '<li data-name="' + esc(p.name.toLowerCase()) + '"><label class="ibx-assignpick__row">'
-					+ '<input type="checkbox" data-user="' + p.id + '"> ' + avatar(p.name, 'u' + p.id, 'ibx-avatar--xs' + (p.id === S.me ? ' is-me' : '')) + ' <span>' + esc(p.id === S.me ? t('InboxMe') + ' (' + p.name + ')' : p.name) + '</span></label></li>').join('')
+					+ '<input type="checkbox" data-user="' + p.id + '"> ' + personAvatar(p.id) + ' <span>' + esc(p.id === S.me ? t('InboxMe') + ' (' + p.name + ')' : p.name) + '</span></label></li>').join('')
 				+ '</ul><p class="ibx-muted ibx-js-pnone" hidden>' + th('InboxAssignNoMatch') + '</p>',
 			actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }],
 		});
+		hydrateUserPhotos(d);
 		const paint = () => $$('[data-user]', d).forEach(cb => {
 			const st = state(+cb.dataset.user);
 			cb.checked = st === 'true';
@@ -4577,13 +4590,46 @@
 		const type = Number.isInteger(d.status_type) && d.status_type >= 0 && d.status_type <= 9 ? d.status_type : -1;
 		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
 	}
-	/** A piece as a pill: icon, ref, thirdparty, status, link to its card; « not accessible » without anything else */
-	function pieceHtml(d, unlink, warn) {
-		const inner = d.readable
-			? '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener" title="' + esc(d.kind + ' ' + (d.ref || '') + (d.status ? ' · ' + d.status : '')) + '">'
-				+ ic(d.icon) + '<b>' + esc(d.ref || '') + '</b>' + (d.label ? ' <span class="ibx-muted">' + esc(d.label) + '</span>' : '') + statusBadge(d) + '</a>' + citedWarnHtml(warn || '')
-			: '<span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span>';
-		return '<span class="ibx-piece"' + (d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '') + '>' + inner + (unlink ? '<button type="button" class="ibx-piece__x ibx-js-unlink" data-link="' + unlink + '" title="' + th('InboxUnlink') + '" aria-label="' + esc(t('InboxUnlinkPiece', d.ref || d.kind)) + '">' + ic('close') + '</button>' : '') + '</span>';
+	/**
+	 * Second line of a piece: its thirdparty, left out when it is the one of the sender (the title of a project or ticket
+	 * stays); a piece of another thirdparty stands out by it
+	 * @param {object} d     Piece {label, socid, title}
+	 * @param {number} socId Thirdparty of the sender, 0 if none
+	 * @returns {string} text
+	 */
+	function pieceSub(d, socId) {
+		if (socId > 0 && d.socid === socId) {
+			return d.title || '';
+		}
+		return d.label || '';
+	}
+	/**
+	 * A piece as a pill: icon, ref (link to its card), thirdparty, status, unlink; « not accessible » without anything
+	 * else. In the column on the right a card of two lines at most: ref, status and warning on the first, the
+	 * thirdparty, « their ref » and the action on the second (no line for a lonely button)
+	 * @param {object} d      Piece
+	 * @param {number} unlink Link to remove (0 = no unlink button)
+	 * @param {string} warn   Warning of a cited piece ('' = none)
+	 * @param {number} socId  Thirdparty of the sender (left out of the second line)
+	 * @param {object} [more] {theirs: text of the second line, action: html of a button}
+	 * @returns {string} html
+	 */
+	function pieceHtml(d, unlink, warn, socId, more) {
+		more = more || {};
+		const attrs = d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '';
+		if (!d.readable) {
+			return '<span class="ibx-piece"' + attrs + '><span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span></span>';
+		}
+		const sub = [pieceSub(d, socId || 0), more.theirs || ''].filter(Boolean).join(' · ');
+		const foot = sub || more.action
+			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + (more.action || '') + '</span>'
+			: '';
+		return '<span class="ibx-piece"' + attrs + '>'
+			+ '<a class="ibx-piece__link" href="' + esc(d.url || '#') + '" target="_blank" rel="noopener" title="' + esc(d.kind + ' ' + (d.ref || '') + (d.label ? ' · ' + d.label : '') + (d.status ? ' · ' + d.status : '')) + '">'
+			+ ic(d.icon) + '<b class="ibx-piece__ref">' + esc(d.ref || '') + '</b></a>'
+			+ statusBadge(d) + citedWarnHtml(warn || '')
+			+ (unlink ? '<button type="button" class="ibx-piece__x ibx-js-unlink" data-link="' + unlink + '" title="' + th('InboxUnlink') + '" aria-label="' + esc(t('InboxUnlinkPiece', d.ref || d.kind)) + '">' + ic('close') + '</button>' : '')
+			+ foot + '</span>';
 	}
 	function linkify(text) {
 		return esc(text).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>').replace(/\n/g, '<br>');
@@ -4614,6 +4660,7 @@
 		const d = box._data;
 		const folded = params.dolibar_folded === '1';
 		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
+		const socId = soc ? soc.id : 0;
 		const summary = [soc ? soc.ref : '', d.links.length + d.extra.length ? t('InboxPiecesCount', d.links.length + d.extra.length) : '', d.notes.length ? t('InboxNotesCount', d.notes.length) : '']
 			.filter(Boolean).join(' · ');
 		showDolAlerts(box, d.alerts);
@@ -4628,7 +4675,7 @@
 				sender.push(pieceHtml(d.sender.soc, 0) + (d.sender.by === 'domain' ? ' <span class="ibx-muted">' + th('InboxKnownByDomain') + '</span>' : ''));
 			}
 			if (d.sender.contact) {
-				sender.push(pieceHtml(d.sender.contact, 0));
+				sender.push(pieceHtml(d.sender.contact, 0, '', socId));
 			}
 			if (d.sender.user) {
 				sender.push('<span class="ibx-piece"><span class="ibx-piece__link">' + ic('account') + esc(t('InboxDolibarrUser', d.sender.user.name)) + '</span></span>');
@@ -4639,8 +4686,8 @@
 			// A piece linked though cited for another thirdparty keeps its warning
 			const pieces = d.links.map(l => {
 				const c = citedOf(l);
-				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '');
-			}).concat(d.extra.map(x => pieceHtml(x, 0)));
+				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId);
+			}).concat(d.extra.map(x => pieceHtml(x, 0, '', socId)));
 			const canWrite = !!d.level;
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			html += '<div class="ibx-dolibar__body">'
@@ -4651,9 +4698,10 @@
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
 					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
 				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
-					+ suggest.map(c => '<span class="ibx-cited__item">' + pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '')
-						+ (c.theirs ? ' <span class="ibx-muted ibx-cited__theirs">' + esc(t('InboxCitedTheirRef', c.cited)) + '</span>' : '')
-						+ ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '">' + ic('link') + ' ' + th('InboxLink') + '</button></span>').join('')
+					+ suggest.map(c => pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '', socId, {
+						theirs: c.theirs ? t('InboxCitedTheirRef', c.cited) : '',
+						action: '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-piece__act ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '" aria-label="' + esc(t('InboxLink') + ' ' + (c.ref || '')) + '">' + ic('link') + ' ' + th('InboxLink') + '</button>',
+					})).join('')
 					+ '</span></div>' : '')
 				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
 					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
@@ -8706,10 +8754,11 @@
 		// « is writing an answer » first (lot W6): two people should not answer the same mail
 		const writers = users.filter(u => u.writing);
 		const readers = users.filter(u => !u.writing);
-		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => avatar(u.name, 'u' + u.id, 'ibx-avatar--xs')).join('') + '</span> '
+		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => userAvatar(u, 'ibx-avatar--xs')).join('') + '</span> '
 			+ esc([writers.length ? (writers.length === 1 ? t('InboxPresenceWritingOne', writers[0].name) : t('InboxPresenceWritingMany', writers.map(u => u.name).join(', '))) : '',
 				readers.length ? (readers.length === 1 ? t('InboxPresenceOne', readers[0].name) : t('InboxPresenceMany', readers.map(u => u.name).join(', '))) : ''].filter(Boolean).join(' · '));
 		box.classList.toggle('ibx-presence--writing', writers.length > 0);
+		hydrateUserPhotos(box);
 	}
 
 	// ---------- Keyboard (interface §11, read only keys of lot W3) ----------

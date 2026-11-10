@@ -179,14 +179,7 @@ class InboxNote
 	 */
 	protected function photoUrl($userId, $photo, $entity)
 	{
-		if ($userId <= 0 || $photo === '' || !dolIsAllowedForPreview($photo)) {
-			return '';
-		}
-		$u = new User($this->db);
-		$u->id = $userId;
-		$file = get_exdir(0, 0, 0, 0, $u, 'user').'photos/'.getImageFileNameForSize($photo, '_small');
-
-		return DOL_URL_ROOT.'/viewimage.php?modulepart=userphoto&entity='.((int) $entity ?: 1).'&file='.urlencode($file);
+		return InboxAccess::userPhotoUrl($userId, $photo, $entity);
 	}
 
 	/**
