@@ -2308,4 +2308,7 @@ InboxTrustDialogLookalike = Looks like %s (%s): check it twice before recognizin
 InboxTrustDialogSenderOwn = %s is the domain of your mailboxes: inbox knows it already, it is never added to this list.
 InboxTrustDialogSenderOpen = %s is a service open to anyone (mail, emailing, hosting): it cannot be recognized.
 InboxTrustDialogSenderUnproven = %s is not offered: this mail is not authenticated for it (DMARC or DKIM). Add it in Settings > Recognized domains after checking it.
+InboxLookalikeOwnSender = The address looks like your domain %s but comes from %s. If this domain is yours, recognize it in Settings > Recognized domains.
+InboxLookalikeOwnLink = This link looks like your domain %s but goes to %s. Open it only if you are sure of this address.
+InboxLookalikeOwnShort = Looks like your domain %s
 InboxTrustDialogDone = Recognized: %s

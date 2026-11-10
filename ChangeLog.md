@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: lookalikes of our own domain :   1.60.0
+  - the domains of the mailboxes are references of the lookalikes too, beside the recognized domains: a sender
+    imitating our domain gets a banner (red, orange when its name only contains ours), a link a warning in the bar of
+    the links and before opening it.
+  - never an open service (a mailbox on gmail.com) nor a name shorter than 5 characters; a domain of ours elsewhere
+    (other extension) is recognized in Settings > Recognized domains and is no more a lookalike, the banner says so.
+
 - FIX: « Recognize this domain… » offered the social networks of a signature, and the sender left out silently :   1.59.1
   - social networks and public platforms (facebook.com, linkedin.com, x.com, youtube.com, google.com...) are open
     services: refused, never offered.

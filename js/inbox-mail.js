@@ -6398,7 +6398,8 @@
 		if (tr && tr.state === 'unproven') {
 			banners = banner('danger', 'spoof', '<b>' + th('InboxTrustedUnprovenTitle') + '</b> ' + th('InboxTrustedUnproven', tr.label, tr.host)) + banners;
 		} else if (tr && tr.state === 'lookalike') {
-			const b = banner(tr.level === 'danger' ? 'danger' : 'warning', 'spoof', th('InboxLookalikeSender', tr.domain, tr.label, tr.host));
+			// Our own domain imitated (1.60.0): said as such
+			const b = banner(tr.level === 'danger' ? 'danger' : 'warning', 'spoof', tr.own ? th('InboxLookalikeOwnSender', tr.domain, tr.host) : th('InboxLookalikeSender', tr.domain, tr.label, tr.host));
 			banners = tr.level === 'danger' ? b + banners : banners + b;
 		}
 		// Verdict of the anti-spam filter of the server (1.44.0): a mail judged spam but not in the junk says it, with
@@ -6701,7 +6702,7 @@
 				e.preventDefault();
 				dialog({
 					title: t('InboxLookalikeLinkTitle'),
-					body: '<div class="ibx-notice ibx-notice--warning">' + ic('spoof') + '<div class="ibx-notice__text">' + th('InboxLookalikeLink', vReal.domain, vReal.label, real) + '</div></div>'
+					body: '<div class="ibx-notice ibx-notice--warning">' + ic('spoof') + '<div class="ibx-notice__text">' + (vReal.own ? th('InboxLookalikeOwnLink', vReal.domain, real) : th('InboxLookalikeLink', vReal.domain, vReal.label, real)) + '</div></div>'
 						+ '<p class="ibx-muted ibx-breakall">' + esc(href) + '</p>',
 					actions: [{ label: t('InboxOpenAnyway'), run: () => window.open(href, '_blank', 'noopener,noreferrer') }],
 				});
@@ -6794,7 +6795,7 @@
 			if (v && v.t === 'trusted') {
 				html += '<span class="ibx-linkbar__ok">' + ic('trusted') + ' ' + esc(v.label) + '</span>';
 			} else if (v && v.t === 'lookalike') {
-				html += '<span class="ibx-linkbar__warn">' + ic('warning') + ' ' + th('InboxLookalikeShort', v.label) + '</span>';
+				html += '<span class="ibx-linkbar__warn">' + ic('warning') + ' ' + (v.own ? th('InboxLookalikeOwnShort', v.domain) : th('InboxLookalikeShort', v.label)) + '</span>';
 			}
 		} else {
 			bar.hidden = true;

@@ -2308,4 +2308,7 @@ InboxTrustDialogLookalike = Ähnelt %s (%s): Prüfen Sie es doppelt, bevor Sie e
 InboxTrustDialogSenderOwn = %s ist die Domain Ihrer Postfächer: Inbox kennt sie bereits, sie wird nie in diese Liste aufgenommen.
 InboxTrustDialogSenderOpen = %s ist ein für alle offener Dienst (E-Mail, E-Mail-Marketing, Hosting): Er kann nicht anerkannt werden.
 InboxTrustDialogSenderUnproven = %s wird nicht angeboten: Diese E-Mail ist für diese Domain nicht authentifiziert (DMARC oder DKIM). Fügen Sie sie nach der Prüfung unter Einstellungen > Anerkannte Domains hinzu.
+InboxLookalikeOwnSender = Die Adresse ähnelt Ihrer Domain %s, stammt aber von %s. Wenn diese Domain Ihnen gehört, erkennen Sie sie unter Einstellungen > Anerkannte Domains an.
+InboxLookalikeOwnLink = Dieser Link ähnelt Ihrer Domain %s, führt aber zu %s. Öffnen Sie ihn nur, wenn Sie sich dieser Adresse sicher sind.
+InboxLookalikeOwnShort = Ähnelt Ihrer Domain %s
 InboxTrustDialogDone = Anerkannt: %s

@@ -254,7 +254,7 @@ class InboxReader
 		$parent = InboxTrustedDomain::registrable($host);
 
 		return array('domain' => $host, 'parent' => ($parent !== $host && InboxTrustedDomain::refusal($parent, $own) === '') ? $parent : '',
-			'like' => InboxTrustedDomain::likeOf($host, $trusted->fetchAll(), $own));
+			'like' => InboxTrustedDomain::likeOf($host, array_merge($trusted->fetchAll(), $trusted->ownRefs()), $own));
 	}
 
 	/**
