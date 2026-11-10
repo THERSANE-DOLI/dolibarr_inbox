@@ -41,6 +41,7 @@ CREATE TABLE llx_inbox_mail(
 	keywords varchar(1024) DEFAULT NULL,
 	fk_soc integer DEFAULT NULL,
 	fk_socpeople integer DEFAULT NULL,
+	soc_manual smallint DEFAULT 0 NOT NULL,
 	junk_hint varchar(16) DEFAULT NULL,
 	junk_detail varchar(255) DEFAULT NULL,
 	junk_check smallint DEFAULT 0 NOT NULL,

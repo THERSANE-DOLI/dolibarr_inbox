@@ -25,9 +25,10 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxservertester.class.php');
 dol_include_once('/inbox/class/inboxidentity.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
+dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention'), true);
+$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -184,6 +185,11 @@ switch ($action) {
 		$data = $account->toArrayForClient();
 		$data['summary'] = inboxAccountSummary($account, InboxAccess::LEVEL_MANAGE);
 		$data['admin'] = $isAdmin;
+		// Usages and their indicators (tab « Usage », 1.67.0): the list of the server, labels translated
+		$data['usages'] = InboxSituation::USAGES;
+		$data['indicators'] = array_map(function ($i) use ($langs) {
+			return $langs->transnoentities($i['label']);
+		}, InboxSituation::INDICATORS);
 		inboxAjaxReply(array('account' => $data));
 		// no break
 
@@ -280,6 +286,16 @@ switch ($action) {
 		dol_include_once('/inbox/class/inboxretention.class.php');
 		inboxAjaxReply(array('folders' => $folders, 'roles' => $account->getFolderRoles(), 'chosen' => array_keys($account->getChosenRoles()), 'kept' => array_values((array) ($config['twins_kept'] ?? array())),
 			'retention' => array('trash' => InboxRetention::daysOf($account, 'trash'), 'junk' => InboxRetention::daysOf($account, 'junk'), 'choices' => InboxRetention::CHOICES)));
+		// no break
+
+	case 'usage':
+		// Usage of the mailbox (1.67.0): its managers and the admins
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$situation = new InboxSituation($db);
+		if ($situation->setUsage($user, $account, (string) inboxAjaxParam('usage', 'aZ09')) < 0) {
+			inboxAjaxError($situation->error, 422);
+		}
+		inboxAjaxReply(array('usage' => (string) $account->usage_profile));
 		// no break
 
 	case 'retention':

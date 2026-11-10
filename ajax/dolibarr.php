@@ -30,9 +30,10 @@ dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
 dol_include_once('/inbox/class/inboxcited.class.php');
+dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach'), true));
+inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc'), true));
 $langs->loadLangs(array('companies', 'propal', 'orders', 'bills', 'projects', 'ticket', 'interventions', 'sendings', 'supplier_proposal', 'suppliers'));
 $elements = new InboxElements($db);
 $refs = new InboxMailRef($db);
@@ -70,7 +71,55 @@ function inboxDolibarrMail()
 	return $reader;
 }
 
+/**
+ * Usage of the mailbox of a mail (1.67.0), 'auto' by default
+ *
+ * @param int $accountId Mailbox
+ * @return string
+ */
+function inboxDolibarrUsage($accountId)
+{
+	global $db;
+
+	$row = $db->getRow("SELECT usage_profile FROM ".$db->prefix()."inbox_account WHERE rowid = ".((int) $accountId));
+
+	return is_object($row) && InboxSituation::isUsage($row->usage_profile) ? (string) $row->usage_profile : 'auto';
+}
+
 switch ($action) {
+	case 'situation':
+		// Situation of the thirdparty of a mail by the usage of its mailbox (1.67.0), asked after the panel
+		$reader = inboxDolibarrMail();
+		$socId = (int) inboxAjaxParam('soc', 'int');
+		if ($socId <= 0 || !InboxElements::canRead($user, 'societe', $socId)) {
+			inboxAjaxNotFound();
+		}
+		$account = new InboxAccount($db);
+		if ($account->fetch((int) $reader->row->fk_account) <= 0) {
+			inboxAjaxNotFound();
+		}
+		$situation = new InboxSituation($db);
+		$kind = $situation->reach('societe', $socId);
+		$list = InboxSituation::listFor($account, (int) ($kind['client'] ?? 0), (int) ($kind['supplier'] ?? 0));
+		inboxAjaxReply(array('usage' => $list['usage'], 'shown' => $list['shown'], 'indicators' => $situation->compute($user, $socId, $list['ids'])));
+		// no break
+
+	case 'resoc':
+		// « Not the right thirdparty? » (1.67.0): the thirdparty of the conversation chosen by hand
+		$reader = inboxDolibarrMail();
+		$socId = (int) inboxAjaxParam('soc', 'int');
+		if ($socId <= 0 || !InboxElements::canRead($user, 'societe', $socId)) {
+			inboxDolibarrFail('InboxErrorPieceNotReadable');
+		}
+		$situation = new InboxSituation($db);
+		$n = $situation->setThirdparty($user, $reader->row, $socId, (int) inboxAjaxParam('remember', 'int') === 1);
+		if ($n < 0) {
+			inboxDolibarrFail($situation->error);
+		}
+		InboxActionLog::add($db, $user, (int) $reader->row->fk_account, 'resoc', array($reader->row), '', '', 0, (string) (($elements->describe($user, 'societe', $socId) ?? array())['ref'] ?? ''));
+		inboxAjaxReply(array('done' => $n));
+		// no break
+
 	case 'panel':
 		// Everything the bandeau shows for a mail, or for its conversation (thread=1: links and notes of its mails)
 		$reader = inboxDolibarrMail();
@@ -103,12 +152,21 @@ switch ($action) {
 			}
 		}
 		$sender['by'] = $sender['by'] ?: ($socId || $contactId ? 'address' : '');
+		// Their ways to reach them (card of the thirdparty, 1.67.0) when the user may read them
+		$situation = new InboxSituation($db);
 		if ($socId) {
 			$sender['soc'] = $elements->describe($user, 'societe', $socId);
+			if (!empty($sender['soc']['readable'])) {
+				$sender['soc']['reach'] = $situation->reach('societe', $socId);
+			}
 		}
 		if ($contactId) {
 			$sender['contact'] = $elements->describe($user, 'contact', $contactId);
+			if (!empty($sender['contact']['readable'])) {
+				$sender['contact']['reach'] = $situation->reach('contact', $contactId);
+			}
 		}
+		$sender['manual'] = (int) ($row->soc_manual ?? 0);
 		if ($email !== '') {
 			$u = $db->getRow("SELECT rowid, firstname, lastname, login FROM ".$p."user WHERE LOWER(email) = '".$db->escape($email)."' AND statut = 1 AND entity IN (0, ".((int) $conf->entity).")");
 			if (is_object($u)) {
@@ -183,7 +241,7 @@ switch ($action) {
 			}
 		}
 		inboxAjaxReply(array('sender' => $sender, 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
-			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId),
+			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
 			}))));

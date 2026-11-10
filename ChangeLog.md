@@ -1,5 +1,20 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: usage of a mailbox and card of the thirdparty of the sender :   1.67.0
+  - Settings > Mailboxes > tab « Usage » (managers of the mailbox): Automatic (by default: Sales for a customer,
+    Purchasing for a supplier), Sales, Accounting, Support, Purchasing, Transport, None; saved at once, undo, written in
+    the journal of the mailbox.
+  - the thirdparty and the contact of the sender become cards: the name is the link to the card of Dolibarr, the rest
+    of the head unfolds the detail over the panel (one block, nothing moves below); closed, one line of signal at most
+    (the most serious, « +N »), only when something is not normal.
+  - detail: ways to reach (the phone calls, the email writes, the address opens a map; copy next to the value on
+    hover), situation of the thirdparty by the usage (12 indicators: late invoices, outstanding over the limit, next due
+    date, open proposals, orders in progress, tickets, interventions, supplier orders, supplier invoices to pay, orders
+    to ship, shipments and receptions late), each one shown only with its right and module, opening its list.
+  - « Not the right thirdparty? » (and « Attach to a thirdparty… » for an unknown sender): the conversation attached by
+    hand to another thirdparty, kept when the contacts change; « Remember for the next mails of this address » first
+    in the recognition (table llx_inbox_address_soc); undo, journal.
+
 - NEW: keyword $labelN of Thunderbird read as the tag of the key N when no tag of the list has it :   1.66.0
   - a tag of Thunderbird with the name of a tag of the list but the keyword $labelN (e.g. $label8 for the tag of
     the key 8, keyword demande_fournisseur_ok) is shown as this tag, found by its filter, and removed with it (both

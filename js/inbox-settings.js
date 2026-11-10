@@ -610,6 +610,7 @@
 		{ id: 'templates', key: 'InboxTabTemplates', admin: false },
 		{ id: 'access', key: 'InboxTabAccess', admin: true },
 		{ id: 'tags', key: 'InboxTabTags', admin: false },
+		{ id: 'usage', key: 'InboxTabUsage', admin: false },
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
 		{ id: 'rules', key: 'InboxTabRules', admin: false },
 		{ id: 'away', key: 'InboxTabAway', admin: false },
@@ -618,7 +619,7 @@
 
 	/** Card on screen: the same mailbox in another tab keeps its head and tabs, only the content of the tab changes */
 	let card = null;
-	const TAB_FNS = () => ({ server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), journal: tabJournal });
+	const TAB_FNS = () => ({ server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), journal: tabJournal });
 
 	/**
 	 * Content of a tab, without flash: made aside and put in place once loaded (or after 300 ms, then with its
@@ -709,7 +710,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -2070,6 +2071,8 @@
 					return t('InboxLogPassword');
 				case 'create':
 					return t('InboxLogCreate');
+				case 'usage':
+					return t('InboxLogUsage', t('InboxUsage_' + (l.before.usage || 'auto')), t('InboxUsage_' + (l.after.usage || 'auto')));
 				default:
 					return l.action;
 			}
@@ -2189,6 +2192,61 @@
 		return '<details class="ibx-guide__part" style="margin-top:1rem"><summary>' + th('InboxTagsThunderbird') + '</summary><div class="ibx-guide__body">'
 			+ '<p>' + th('InboxTagsThunderbirdWhy') + '</p><p>' + th('InboxTagsThunderbirdHow') + '</p>' + guideCode(lines)
 			+ '<p class="ibx-formrow__help">' + th('InboxTagsThunderbirdAfter') + '</p></div></details>';
+	}
+
+	// ---------- Mailbox: usage (1.67.0) ----------
+	const USAGE_ICONS = { auto: 'magic', sales: 'quote', accounting: 'calculator', support: 'tool', purchase: 'order', transport: 'truck', none: 'close' };
+	/**
+	 * What the card of the thirdparty of a mail shows in this mailbox: one usage, saved at once (undo in the toast);
+	 * its indicators listed (their own list per mailbox comes later)
+	 */
+	function tabUsage(box, account) {
+		const usages = Object.keys(account.usages || {});
+		const labels = account.indicators || {};
+		const list = ids => '<ol class="ibx-usage__list">' + ids.map(id => '<li>' + esc(labels[id] || id) + '</li>').join('') + '</ol>';
+		const paint = () => {
+			const cur = account.usage_profile || 'auto';
+			let indicators;
+			if (cur === 'none') {
+				indicators = '<p class="ibx-muted">' + th('InboxUsageNoneHelp') + '</p>';
+			} else if (cur === 'auto') {
+				indicators = '<p class="ibx-section__help">' + th('InboxUsageAutoHelp') + '</p><div class="ibx-usage__auto">'
+					+ '<div><h4>' + th('InboxUsageAutoCustomer') + '</h4>' + list(account.usages.sales) + '</div>'
+					+ '<div><h4>' + th('InboxUsageAutoSupplier') + '</h4>' + list(account.usages.purchase) + '</div></div>';
+			} else {
+				indicators = '<p class="ibx-section__help">' + th('InboxUsageListHelp') + '</p>' + list(account.usages[cur]);
+			}
+			box.innerHTML = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxUsage') + '</h2>'
+				+ '<p class="ibx-section__help">' + th('InboxUsageHelp') + '</p>'
+				+ '<div class="ibx-usage" role="radiogroup" aria-label="' + th('InboxUsage') + '">'
+				+ usages.map(u => '<label class="ibx-usage__opt"><input type="radio" name="usage" value="' + esc(u) + '"' + (u === cur ? ' checked' : '') + '>' + ic(USAGE_ICONS[u] || 'magic')
+					+ '<span><span class="ibx-usage__name">' + th('InboxUsage_' + u) + (u === 'auto' ? ' <em>' + th('InboxByDefault') + '</em>' : '') + '</span>'
+					+ '<span class="ibx-usage__desc">' + th('InboxUsageDesc_' + u) + '</span></span></label>').join('')
+				+ '</div></section>'
+				+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxUsageIndicators') + '</h2>' + indicators + '</section>';
+			I.mount(box);
+		};
+		const save = async (usage, undo) => {
+			const before = account.usage_profile || 'auto';
+			try {
+				const res = await post('account', 'usage', { id: account.id, usage });
+				account.usage_profile = res.usage;
+			} catch (err) {
+				toast(err.message, { error: true });
+				paint();
+				return;
+			}
+			paint();
+			if (!undo) {
+				toast(t('InboxUsageSaved', t('InboxUsage_' + usage)), { action: t('InboxUndo'), onAction: () => save(before, true) });
+			}
+		};
+		box.addEventListener('change', e => {
+			if (e.target.name === 'usage') {
+				save(e.target.value, false);
+			}
+		});
+		paint();
 	}
 
 	async function tabTags(box, account) {
