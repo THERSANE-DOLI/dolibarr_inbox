@@ -15,7 +15,8 @@ README.txt saying so.
 Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolcontext (JavaScript context of Dolibarr 24).
 
 Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `inboxAccountImportSources`,
-`inboxConnectors` (context `inbox`) and the triggers of its objects.
+`inboxConnectors`, `addInboxHtmlHeader` (context `inbox`), the module_parts `inboxcss` and `inboxjs` (see « Extend the
+application ») and the triggers of its objects.
 
 Licence: GPLv3, see COPYING.
 
@@ -23,6 +24,34 @@ Licence: GPLv3, see COPYING.
 
 `index.php` opens the application (right « Use the webmail »): Settings > Mailboxes (right « Manage the mailboxes »),
 General, My account. The reading of the mails comes with the next lots.
+
+## Extend the application
+
+The page of the application has its own head: neither the theme of Dolibarr, nor jQuery, nor the parts `css` and
+`js` of the modules (written for the pages of Dolibarr) are loaded there. A module adds its files the same way:
+
+```php
+// Descriptor of the module (deactivate and activate the module again after a change, as for any module_parts)
+$this->module_parts = array(
+	'inboxcss' => array('/mymodule/css/inbox.css'),	// after the styles of the application
+	'inboxjs' => array('/mymodule/js/inbox.js'),	// after its scripts: Dolibarr.tools.inbox is ready
+);
+```
+
+Dynamic header (CSS computed from a setting...): hook `addInboxHtmlHeader`, context `inbox`, printed before
+`</head>` like `addHtmlHeader` of Dolibarr (`$this->resprints`, `getNonce()` on the `<style>` and `<script>`). Own
+name on purpose: the modules on `addHtmlHeader` (often context `all`, code for jQuery) never enter the application.
+
+Rules for the styles of a module:
+
+- its own classes, prefixed by the name of the module; never restyle the `.ibx-*` classes of the application;
+- the variables of the application, its public API: they follow the light, dark and high contrast themes, the accent
+  colour and the density. Surfaces `--ibx-bg`, `--ibx-bg-pane`, `--ibx-bg-sunken`, `--ibx-bg-hover`; text
+  `--ibx-text`, `--ibx-text-muted`, `--ibx-text-faint`; lines `--ibx-border`, `--ibx-border-strong`; accent
+  `--ibx-accent`, `--ibx-accent-hover`, `--ibx-accent-soft`, `--ibx-accent-softer`; states `--ibx-success`,
+  `--ibx-warning`, `--ibx-danger`, `--ibx-info` and their `-soft`; spaces `--ibx-s1` to `--ibx-s6`; text sizes
+  `--ibx-fs-xs`, `-sm`, `-md`, `-body`, `-lg`, `-xl`; `--ibx-font`, `--ibx-font-mono`; corners `--ibx-radius-sm`,
+  `--ibx-radius`, `--ibx-radius-lg`; `--ibx-shadow-float`.
 
 ## Development
 

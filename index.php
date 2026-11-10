@@ -58,6 +58,7 @@ if (!$res) {
 /**
  * @var Conf $conf
  * @var DoliDB $db
+ * @var HookManager $hookmanager
  * @var Translate $langs
  * @var User $user
  */
@@ -101,6 +102,15 @@ print '<link rel="icon" type="image/svg+xml" href="'.dol_buildpath('/inbox/img/f
 print '<link rel="apple-touch-icon" href="'.dol_buildpath('/inbox/img/app-192.png', 1).'">'."\n";
 print '<link rel="stylesheet" href="'.$asset('/css/inbox.css').'">'."\n";
 print '<style nonce="'.getNonce().'" id="ibx-accent-css">'.inboxAccentCss($accent, getDolGlobalString('INBOX_ACCENT_DARK'), getDolGlobalString('INBOX_GREYS', 'neutral')).'</style>'."\n";
+// Styles of the other modules, after the ones of the application (module_parts 'inboxcss'), then their dynamic header
+// (hook addInboxHtmlHeader, context inbox): see README « Extend the application »
+inboxPrintModuleFiles('inboxcss');
+$hookmanager->initHooks(array('inbox'));
+$parameters = array();
+$reshook = $hookmanager->executeHooks('addInboxHtmlHeader', $parameters);
+if ($reshook >= 0 && !empty($hookmanager->resPrint)) {
+	print $hookmanager->resPrint."\n";
+}
 if (!inboxPrintJsContext($vars)) {
 	print '</head><body class="ibx-doc"><p class="ibx-notice ibx-notice--error">'.dol_escape_htmltag($langs->trans('InboxNeedBackportDolContext')).'</p></body></html>';
 	exit;
@@ -116,6 +126,8 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" d
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-invite.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-rules.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-import-qr.js').'" defer></script>'."\n";
+// Scripts of the other modules after the ones of the application (Dolibarr.tools.inbox ready for them)
+inboxPrintModuleFiles('inboxjs');
 print '</head>'."\n";
 print '<body class="ibx-body">'."\n";
 // Empty shell: the rail and the spaces are built by inbox.js (nothing works without JavaScript, said plainly)

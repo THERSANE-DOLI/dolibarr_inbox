@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the other modules add their styles and scripts to the application :   1.63.0
+  - module_parts `inboxcss` and `inboxjs` in their descriptor, loaded after the styles and the scripts of the
+    application (like the parts css and js of Dolibarr, own keys: those are written for the pages of Dolibarr).
+  - hook `addInboxHtmlHeader` (context inbox) for a dynamic header, printed before </head>; own name so that the
+    modules on addHtmlHeader never enter the application.
+  - README « Extend the application »: example, rules, the variables of the application as public API.
+
 - NEW: card of a Dolibarr object on its link, widgets of Dolibarr started in the application :   1.62.0
   - hover (or keyboard focus) on the ref of a piece: the tooltip of Dolibarr (its content and what the other modules
     add) in a light card of the application; asked to core/ajax/ajaxtooltip.php with the parameters given by
