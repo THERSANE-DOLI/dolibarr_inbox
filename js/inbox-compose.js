@@ -655,7 +655,8 @@
 			box.className = 'ibx-sendbars';
 			box.setAttribute('role', 'status');
 			box.setAttribute('aria-live', 'polite');
-			document.body.appendChild(box);
+			// In the column of the toasts when there is one: stacked under them instead of drawn over them
+			($('#ibx-toasts') || document.body).appendChild(box);
 		}
 		return box;
 	}
@@ -706,8 +707,14 @@
 			b.el.innerHTML = ic('sent') + '<span class="ibx-sendbar__text">' + esc(b.sending ? t('InboxComposeSending') : t('InboxSendIn', left)) + '</span>' + subject
 				+ (b.sending ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxUndo') + '</button><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-barnow">' + th('InboxSendNow') + '</button>') + recordButton(b);
 		}
+		// Closable once nothing is pending (the countdown drives the sending: no cross there)
+		if (b.state === 'sent' || b.state === 'error' || b.scheduled) {
+			b.el.insertAdjacentHTML('beforeend', '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-sendbar__close ibx-js-barclose" aria-label="' + th('InboxCloseWindow') + '" title="' + th('InboxCloseWindow') + '">' + ic('close') + '</button>');
+		}
 		b.el.onclick = e => {
-			if (e.target.closest('.ibx-js-barundo')) {
+			if (e.target.closest('.ibx-js-barclose')) {
+				removeBar(b);
+			} else if (e.target.closest('.ibx-js-barundo')) {
 				undo(b);
 			} else if (e.target.closest('.ibx-js-barnow')) {
 				clearInterval(b.timer);

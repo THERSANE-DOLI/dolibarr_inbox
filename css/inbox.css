@@ -156,7 +156,7 @@
 }
 
 /* ===== 2. Base ===== */
-.ibx-app, .ibx-doc, .ibx-window, .ibx-dock, .ibx-toasts, .ibx-menu {
+.ibx-app, .ibx-doc, .ibx-window, .ibx-dock, .ibx-toasts, .ibx-sendbars, .ibx-menu {
 	font-family: var(--ibx-font);
 	font-size: var(--ibx-fs-md);
 	line-height: var(--ibx-lh);
@@ -164,7 +164,10 @@
 	background: var(--ibx-bg);
 	-webkit-font-smoothing: antialiased;
 }
-.ibx-app *, .ibx-doc *, .ibx-window, .ibx-window *, .ibx-dock *, .ibx-toasts *, .ibx-dialog, .ibx-dialog *, .ibx-notifpanel *, .ibx-menu, .ibx-menu * { box-sizing: border-box; }
+/* Page of the inbox: its body has the font too, for every element added to it (tooltip, drag ghost, bars...);
+   else the default font of the browser (Times New Roman under Windows) */
+.ibx-body { font-family: var(--ibx-font); }
+.ibx-app *, .ibx-doc *, .ibx-window, .ibx-window *, .ibx-dock *, .ibx-toasts *, .ibx-sendbars *, .ibx-dialog, .ibx-dialog *, .ibx-notifpanel *, .ibx-menu, .ibx-menu * { box-sizing: border-box; }
 .ibx-app :focus-visible, .ibx-doc :focus-visible, .ibx-dialog :focus-visible { outline: none; box-shadow: var(--ibx-focus); }
 .ibx-app [hidden], .ibx-doc [hidden], .ibx-window [hidden], .ibx-dialog [hidden] { display: none !important; }
 .ibx-muted { color: var(--ibx-text-muted); }
@@ -1201,7 +1204,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-toast > .ibx-btn { flex: none; white-space: nowrap; }
 /* Label of the gesture beside the card: on one line (beside the card its available width is 0, it wrapped at each word) */
 /* The box of the toasts spans the width (centring): no background of its own, only the toasts are drawn */
-.ibx-toasts { background: transparent; }
+.ibx-toasts, .ibx-sendbars { background: transparent; }
 /* Scrollbars in the colors of the theme (Chrome 121+, Firefox): thumb of the borders, track transparent */
 .ibx-app, .ibx-app *, .ibx-dialog, .ibx-dialog *, .ibx-menu { scrollbar-color: var(--ibx-border-strong) transparent; }
 /* Bottom line of a card (tags, thread, attachment, star): only when it holds something, in compact and normal
@@ -1721,11 +1724,15 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-sendbar__text { font-weight: 600; white-space: nowrap; }
 .ibx-sendbar__subject { max-width: 16rem; opacity: 0.8; }
 .ibx-sendbar .ibx-btn { --_bg: transparent; --_fg: var(--ibx-bg); --_bd: color-mix(in srgb, var(--ibx-bg) 40%, transparent); --_bg-h: color-mix(in srgb, var(--ibx-bg) 15%, transparent); }
+.ibx-sendbar .ibx-sendbar__close, .ibx-toast .ibx-js-toastclose { --_bd: transparent; flex: none; font-weight: normal; }
 .ibx-sendbar .ibx-btn--primary { --_bg: var(--ibx-bg); --_fg: var(--ibx-text); --_bd: var(--ibx-bg); --_bg-h: var(--ibx-bg); }
 .ibx-compose__record { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s3); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-sm); }
 .ibx-compose__warn { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-warning, #b26a00); background: var(--ibx-warning-soft); }
+/* Inside the column of the toasts: under them, laid out by the column */
+.ibx-toasts > .ibx-sendbars { position: static; order: 1; transform: none; max-width: 100%; pointer-events: auto; }
 @media (max-width: 39.9375rem) {
 	.ibx-sendbars { left: var(--ibx-s3); right: var(--ibx-s3); transform: none; width: auto; }
+	.ibx-toasts > .ibx-sendbars { width: 100%; }
 	.ibx-sendbar { flex-wrap: wrap; }
 	.ibx-sendbar__subject { display: none; }
 }
