@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: button « N other(s) » of a conversation on one line in the foot of a card :   1.54.1
+  - it shrank with the piece and the mailbox beside it and its text went on two lines: it keeps its width, the
+    names of the piece and of the mailbox give way.
+
 - NEW: Settings > Server in the application, with the scheduled jobs of the module :   1.54.0
   - a page of its own beside General, for the admins of Dolibarr: keeping of the cache and of the journals, timeouts
     of the mail servers, master user of the mail server (password encrypted, never shown again), each number saved

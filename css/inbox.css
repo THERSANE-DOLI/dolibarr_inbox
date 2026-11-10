@@ -434,7 +434,7 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-thread { margin: 0 0 var(--ibx-s2) 1.25rem; padding-left: var(--ibx-s3); border-left: 2px dotted var(--ibx-border-strong); }
 .ibx-thread > .ibx-mailcard { padding-top: 0.375rem; padding-bottom: 0.375rem; }
 .ibx-threadtoggle {
-	display: inline-flex; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0 0.375rem; font: inherit; font-size: var(--ibx-fs-sm);
+	display: inline-flex; flex: none; align-items: center; gap: 0.25rem; height: 1.25rem; padding: 0 0.375rem; font: inherit; font-size: var(--ibx-fs-sm); white-space: nowrap;
 	color: var(--ibx-text-muted); background: none; border: 1px solid transparent; border-radius: var(--ibx-radius-sm); cursor: pointer;
 }
 .ibx-threadtoggle:hover, .ibx-threadtoggle[aria-expanded="true"] { border-color: var(--ibx-accent); color: var(--ibx-accent); }
@@ -2067,8 +2067,8 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Mailbox of a mail in a list of several mailboxes (1.29.0): its icon in its colour, then its name */
 .ibx-boxof { display: inline-flex; align-items: center; gap: var(--ibx-s1); min-width: 0; max-width: 100%; vertical-align: middle; }
 .ibx-boxof__icon { flex: none; width: 0.875rem; height: 0.875rem; }
-/* In the foot of a card the tags come first: never cut nor on two lines; the name of the mailbox gives way, down to
-   its icon alone (its name in the title) */
+/* In the foot of a card the tags and the button of the thread (1.54.1) come first: never cut nor on two lines; the
+   name of the mailbox gives way, down to its icon alone (its name in the title) */
 .ibx-mailcard__foot > .ibx-tag { flex: none; white-space: nowrap; }
 .ibx-mailcard__foot > .ibx-boxof { flex: 1 1 auto; min-width: 1rem; }
 .ibx-boxof__name { flex: 1 1 auto; min-width: 0; }
