@@ -66,6 +66,12 @@ Rules for the styles of a module:
   on a test database only (the bootstrap refuses the others). The HTTP tests need `INBOX_TEST_URL`,
   `INBOX_TEST_LOGIN`, `INBOX_TEST_PASSWORD` of a test instance.
 - Catalogue of the components: `ux.php`.
+- Copies of Dolibarr to keep in step at each major version of Dolibarr:
+  - `css/inbox-doltip.css`: the classes of the theme eldy met in the tooltips of Dolibarr (`getTooltipContent`),
+    redrawn with the variables of the application for the cards of the objects. A class renamed or added in the
+    tooltips of Dolibarr is changed there.
+  - the card of an object calls `core/ajax/ajaxtooltip.php` with the `data-params` read in `getNomUrl()`
+    (`InboxElements::describe()`): to check if the core changes this attribute or this page.
 
 Credits: icons [Tabler Icons](https://tabler.io/icons) (MIT).
 
