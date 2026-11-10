@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: conversations no longer joined by the subject alone when the only common address is the mailbox :   1.53.1
+  - the fallback on the subject (same subject, same correspondent, 30 days) took the mailbox itself for the
+    correspondent: a mail sent matched every mail received with the same subject (all written to the mailbox), and
+    a mail written to oneself (« test ») joined, even merged, unrelated conversations.
+  - the correspondent is now the other side: the sender of a mail received, the recipients of a mail sent, never
+    an address of the mailbox (account, identities); a mail to oneself never joins by the subject.
+  - conversations already joined stay as they are.
+
 - NEW: unsubscribing by mail, when the newsletter offers no one-click :   1.53.0
   - « Unsubscribe » prepares a writing to the address of List-Unsubscribe (mailto), with the subject and text the
     list asks for, from the address that got the newsletter, without signature: the user checks it and sends it.

@@ -27,7 +27,9 @@
  * 2. its copies in other folders (same Message-ID);
  * 3. the answers that arrived before it (their In-Reply-To is its Message-ID);
  * 4. otherwise the same normalised subject (RE:, TR:, Fwd:, AW:... removed), the same correspondent and less than
- *    30 days between the two mails.
+ *    30 days between the two mails. The correspondent is the other side: the sender of a mail received, the
+ *    recipients of a mail sent; the addresses of the mailbox (account, identities) never count, else every mail
+ *    sent would match every mail received (all written to the mailbox).
  * When a mail links two threads, they become one (the oldest key is kept). The key is opaque.
  */
 class InboxThreader
@@ -40,6 +42,9 @@ class InboxThreader
 
 	/** @var DoliDB */
 	protected $db;
+
+	/** @var array<int,string[]> Addresses of each mailbox (account and identities), lower case */
+	protected $own = array();
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -69,6 +74,51 @@ class InboxThreader
 	}
 
 	/**
+	 * Addresses of a mailbox: its account and its identities (active or not: a mail sent stays one of the mailbox)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return string[] Lower case
+	 */
+	protected function ownAddresses($accountId)
+	{
+		if (!isset($this->own[$accountId])) {
+			$p = $this->db->prefix();
+			$list = array();
+			$rows = $this->db->getRows("SELECT email FROM ".$p."inbox_account WHERE rowid = ".((int) $accountId)
+				." UNION SELECT email FROM ".$p."inbox_identity WHERE fk_account = ".((int) $accountId)." LIMIT 500");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if ((string) $r->email !== '') {
+					$list[] = strtolower(trim((string) $r->email));
+				}
+			}
+			$this->own[$accountId] = array_values(array_unique($list));
+		}
+
+		return $this->own[$accountId];
+	}
+
+	/**
+	 * The other side of a mail: its sender when the mailbox got it, else its recipients (to and cc); never an
+	 * address of the mailbox
+	 *
+	 * @param string   $from   Sender
+	 * @param string   $toText Recipients (« Name <a@b>, c@d »)
+	 * @param string   $ccText Copies
+	 * @param string[] $own    Addresses of the mailbox
+	 * @return string[] Lower case, empty for a mail written to oneself
+	 */
+	public static function correspondents($from, $toText, $ccText, array $own)
+	{
+		$from = strtolower(trim((string) $from));
+		if ($from !== '' && !in_array($from, $own, true)) {
+			return array($from);
+		}
+		preg_match_all('/[^\s<>,;"\']+@[^\s<>,;"\']+/', $toText.', '.$ccText, $m);
+
+		return array_values(array_diff(array_unique(array_map('strtolower', $m[0])), $own));
+	}
+
+	/**
 	 * Key of the thread of mails of the index, and threads merged when a mail links them
 	 *
 	 * @param int   $accountId Mailbox
@@ -81,7 +131,7 @@ class InboxThreader
 		$accountId = (int) $accountId;
 		$done = 0;
 		foreach (array_chunk(array_map('intval', $mailIds), 200) as $chunk) {
-			$rows = $this->db->getRows("SELECT rowid, message_id, in_reply_to, refs, subject, from_email, to_text, date_received, date_mail FROM ".$p."inbox_mail"
+			$rows = $this->db->getRows("SELECT rowid, message_id, in_reply_to, refs, subject, from_email, to_text, cc_text, date_received, date_mail FROM ".$p."inbox_mail"
 				." WHERE rowid IN (".implode(',', $chunk).") ORDER BY COALESCE(date_received, date_mail) ASC LIMIT 1000");
 			foreach (is_array($rows) ? $rows : array() as $r) {
 				$this->assignOne($accountId, $r);
@@ -130,20 +180,20 @@ class InboxThreader
 		if (!$keys) {
 			$norm = self::normalizeSubject($r->subject);
 			$date = $r->date_received ? $r->date_received : $r->date_mail;
-			$from = strtolower((string) $r->from_email);
-			if (mb_strlen($norm, 'UTF-8') >= 4 && $date && $from !== '') {
+			$own = $this->ownAddresses($accountId);
+			$mine = self::correspondents((string) $r->from_email, (string) $r->to_text, (string) $r->cc_text, $own);
+			if (mb_strlen($norm, 'UTF-8') >= 4 && $date && $mine) {
 				$ts = (int) $this->db->jdate($date);
 				$like = "%".$this->db->escapeforlike($norm)."%";
-				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
+				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, cc_text, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
 					." AND thread_key IS NOT NULL AND subject LIKE '".$this->db->escape($like)."'"
 					." AND COALESCE(date_received, date_mail) BETWEEN '".$this->db->idate($ts - self::SUBJECT_DAYS * 86400)."' AND '".$this->db->idate($ts + self::SUBJECT_DAYS * 86400)."' LIMIT 200");
 				foreach (is_array($cands) ? $cands : array() as $c) {
 					if (self::normalizeSubject($c->subject) !== $norm) {
 						continue;
 					}
-					$cFrom = strtolower((string) $c->from_email);
-					// Same correspondent: same sender, or one wrote to the other
-					if ($cFrom === $from || stripos((string) $c->to_text, $from) !== false || ($cFrom !== '' && stripos((string) $r->to_text, $cFrom) !== false)) {
+					// Same correspondent on the other side (the mailbox itself never counts)
+					if (array_intersect($mine, self::correspondents((string) $c->from_email, (string) $c->to_text, (string) $c->cc_text, $own))) {
 						$keys[(string) $c->thread_key] = true;
 					}
 				}

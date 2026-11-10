@@ -114,6 +114,11 @@ class InboxConversationTest extends InboxTestCase
 		$this->assertSame('devis brides dn80', InboxThreader::normalizeSubject('RE: TR: Re[2]: Fwd: AW: Devis  brides DN80'));
 		$this->assertSame('réf. commande', InboxThreader::normalizeSubject('Réf: Réf. commande'), 'only the prefix « Réf: » goes');
 		$this->assertSame('', InboxThreader::normalizeSubject('RE:'));
+		// The other side of a mail, never the mailbox (1.53.1)
+		$own = array('box@inbox-test.invalid', 'alias@inbox-test.invalid');
+		$this->assertSame(array('sophie@example.invalid'), InboxThreader::correspondents('Sophie@Example.invalid', 'Box <box@inbox-test.invalid>', '', $own), 'received: the sender');
+		$this->assertSame(array('client@example.invalid', 'copie@example.invalid'), InboxThreader::correspondents('alias@inbox-test.invalid', 'Client <client@example.invalid>, box@inbox-test.invalid', 'copie@example.invalid', $own), 'sent: the recipients');
+		$this->assertSame(array(), InboxThreader::correspondents('box@inbox-test.invalid', 'Moi <box@inbox-test.invalid>', '', $own), 'to oneself: nobody');
 	}
 
 	/**
@@ -136,6 +141,8 @@ class InboxConversationTest extends InboxTestCase
 		$this->append('INBOX', 'conv-d@inbox-test.invalid', $c, 'TR: Devis brides', array(), $t + 180);
 		// Other correspondent, same subject: another thread
 		$this->append('INBOX', 'conv-e@inbox-test.invalid', 'Autre <autre@other.example.invalid>', 'Devis brides', array(), $t + 240);
+		// Written by the mailbox to itself, same subject: the mailbox is never the correspondent (1.53.1)
+		$this->append('INBOX', 'conv-f@inbox-test.invalid', self::BOX, 'Devis brides', array(), $t + 300);
 		$s = new InboxSync($this->db);
 		$a->fetch($a->id);
 		$this->assertGreaterThanOrEqual(0, $s->run($a, microtime(true) + 30, array('force' => true)), $s->error);
@@ -145,6 +152,8 @@ class InboxConversationTest extends InboxTestCase
 			$this->assertSame($k, $this->key($a, $id.'@inbox-test.invalid'), $id.' in the conversation');
 		}
 		$this->assertNotSame($k, $this->key($a, 'conv-e@inbox-test.invalid'), 'another correspondent: another conversation');
+		$this->assertNotSame($k, $this->key($a, 'conv-f@inbox-test.invalid'), 'a mail to oneself never joins by the subject');
+		$this->assertNotSame($this->key($a, 'conv-e@inbox-test.invalid'), $this->key($a, 'conv-f@inbox-test.invalid'));
 
 		$inbox = (int) $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $a->id)." AND role = 'inbox'")->rowid;
 		$engine = new InboxSearchSql($this->db);
