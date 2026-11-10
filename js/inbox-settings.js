@@ -1319,11 +1319,15 @@
 				['link', 'link', 'InboxFmtLink'], ['image', 'file-image', 'InboxSignatureImage'], ['clearFormat', 'fmt-clear', 'InboxFmtClear'], null,
 				['undo', 'undo', 'InboxFmtUndo'], ['redo', 'redo', 'InboxFmtRedo'], null, ['source', 'fmt-source', 'InboxFmtSource']]
 				.map(x => (x ? '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '"' + (x[0] === 'source' ? ' aria-pressed="false"' : '') + '>' + ic(x[1], 'ibx-tbtn__icon') + '</button>' : '<span class="ibx-compose__sep" aria-hidden="true"></span>')).join('')
-			+ '<input type="color" class="ibx-sigcolor ibx-js-sigcolor" tabindex="-1" aria-hidden="true" value="#d31b11"></div>'
+			+ '<input type="color" class="ibx-sigcolor ibx-js-sigcolor" tabindex="-1" aria-hidden="true" value="#d31b11">'
+			// Variables (1.53.0): of the identity, of the user who sends, of the company, of the other modules
+			+ '<label class="ibx-sr-only" for="ibx-sig-var">' + th('InboxVarInsert') + '</label><select class="ibx-field ibx-field--medium ibx-js-sigvar" id="ibx-sig-var" disabled><option value="">' + th('InboxVarInsert') + '</option></select></div>'
 			+ '<div class="ibx-tpledit__editor ibx-js-sigeditor" aria-labelledby="f-signature-label"></div>'
 			+ '<textarea class="ibx-field ibx-sigsource" id="f-signature" name="signature" rows="12" spellcheck="false" aria-labelledby="f-signature-label" hidden>' + esc(identity.signature) + '</textarea>'
 			+ '<div class="ibx-formrow__help">' + th('InboxSignatureHelp') + '</div><div class="ibx-inline" style="margin-top:.5rem"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-profiles">' + ic('download') + ' ' + th('InboxImportFromDolibarr') + '</button>'
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigfile">' + ic('source') + ' ' + th('InboxImportHtmlFile') + '</button><input type="file" class="ibx-js-sigfileinput" accept=".html,.htm,text/html" hidden></div></div></div>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigfile">' + ic('source') + ' ' + th('InboxImportHtmlFile') + '</button><input type="file" class="ibx-js-sigfileinput" accept=".html,.htm,text/html" hidden>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigprev">' + ic('open') + ' ' + th('InboxTemplatePreviewRun') + '</button></div>'
+			+ '<div class="ibx-tpledit__preview ibx-js-sigprevbox" hidden></div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxOptions') + '</span><div><label class="ibx-check"><input type="checkbox" name="is_default"' + (identity.is_default ? ' checked' : '') + '> ' + th('InboxIdentityDefault') + '</label><br>'
 			+ '<label class="ibx-check"><input type="checkbox" name="status"' + (identity.status ? ' checked' : '') + '> ' + th('InboxIdentityActive') + '</label></div></div>'
 			+ '</form>';
@@ -1361,7 +1365,7 @@
 			},
 		});
 		dlg.addEventListener('close', () => sig && sig.destroy());
-		signatureEditor(dlg).then(ed => {
+		signatureEditor(dlg, account).then(ed => {
 			sig = ed;
 		});
 	}
@@ -1369,10 +1373,11 @@
 	/**
 	 * Editor of the signature in the dialog of an identity: the textarea name="signature" holds the value (save, import
 	 * from Dolibarr or from a file write into it and fire « change »), shown as it is in the HTML source mode
-	 * @param {HTMLElement} d Dialog
+	 * @param {HTMLElement} d       Dialog
+	 * @param {object}      account Mailbox of the identity
 	 * @returns {Promise<object|null>} {sync(), destroy()}
 	 */
-	async function signatureEditor(d) {
+	async function signatureEditor(d, account) {
 		const ta = $('[name="signature"]', d);
 		const box = $('.ibx-js-sigeditor', d);
 		const tools = $('.ibx-js-sigtools', d);
@@ -1397,8 +1402,8 @@
 			sync();
 			source = on;
 			$('[data-cmd="source"]', tools).setAttribute('aria-pressed', on ? 'true' : 'false');
-			$$('[data-cmd]:not([data-cmd="source"])', tools).forEach(b => {
-				b.disabled = on;
+			$$('[data-cmd]:not([data-cmd="source"]), .ibx-js-sigvar', tools).forEach(b => {
+				b.disabled = on || (b.tagName === 'SELECT' && b.options.length < 2);
 			});
 			box.hidden = on;
 			ta.hidden = !on;
@@ -1437,6 +1442,45 @@
 		ta.addEventListener('change', () => {
 			if (!source) {
 				editor.setHtml(ta.value);
+			}
+		});
+		// Preview as the writing will show it (1.53.0): the variables replaced for the user, those nothing replaces named
+		const form = $('form', d);
+		const prevBox = $('.ibx-js-sigprevbox', d);
+		const preview = async () => {
+			sync();
+			return post('identity', 'preview', { id: account.id, name: form.elements.name.value, email: form.elements.email.value, reply_to: form.elements.reply_to.value, signature: ta.value });
+		};
+		$('.ibx-js-sigprev', d).addEventListener('click', async () => {
+			prevBox.hidden = false;
+			prevBox.innerHTML = '<p class="ibx-muted">' + th('InboxTemplatePreviewLoading') + '</p>';
+			let r;
+			try {
+				r = await preview();
+			} catch (err) {
+				prevBox.innerHTML = '<p class="ibx-formrow__error">' + esc(err.message) + '</p>';
+				return;
+			}
+			// Cleaned by the allow list of the mails on the server (no script, no event)
+			prevBox.innerHTML = (r.unknown.length ? '<p class="ibx-formrow__error">' + th('InboxSignatureUnknownVars', r.unknown.map(k => '__' + k + '__').join(', ')) + '</p>' : '')
+				+ '<div class="ibx-tpledit__prevbody"></div>';
+			$('.ibx-tpledit__prevbody', prevBox).innerHTML = r.html || '<p class="ibx-muted">' + th('InboxSignatureNo') + '</p>';
+		});
+		// The keys, from the server (those of the other modules too); the identity first
+		const pick = $('.ibx-js-sigvar', tools);
+		preview().then(r => {
+			const opts = list => list.map(k => '<option value="' + esc(k) + '">' + esc('__' + k + '__') + '</option>').join('');
+			pick.insertAdjacentHTML('beforeend', '<optgroup label="' + th('InboxSignatureVarsIdentity') + '">' + opts(r.keys.filter(k => k.indexOf('INBOX_') === 0)) + '</optgroup>'
+				+ '<optgroup label="' + th('InboxSignatureVarsOther') + '">' + opts(r.keys.filter(k => k.indexOf('INBOX_') !== 0)) + '</optgroup>');
+			pick.disabled = source;
+		}).catch(() => {
+			// No list: the variables can still be typed
+		});
+		pick.addEventListener('change', () => {
+			if (pick.value) {
+				// Written as __KEY__, plain text, as Dolibarr and the other modules write their signatures
+				editor.raw().chain().focus().insertContent('__' + pick.value + '__').run();
+				pick.value = '';
 			}
 		});
 		return { sync, destroy: () => editor.destroy() };

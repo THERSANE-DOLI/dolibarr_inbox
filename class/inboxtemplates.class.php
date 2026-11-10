@@ -52,7 +52,11 @@ class InboxTemplates
 	const DROP = array('CHECK_READ');
 
 	/** Variables of inbox (help of the editor of a template) */
-	const OWN = array('INBOX_SUBJECT', 'INBOX_DATE', 'INBOX_FROM', 'INBOX_MAILBOX', 'INBOX_IDENTITY', 'CONTACT_FIRSTNAME', 'CONTACT_LASTNAME', 'CONTACT_NAME', 'CONTACTCIVNAME');
+	const OWN = array('INBOX_SUBJECT', 'INBOX_DATE', 'INBOX_FROM', 'INBOX_MAILBOX', 'INBOX_IDENTITY', 'CONTACT_FIRSTNAME', 'CONTACT_LASTNAME', 'CONTACT_NAME', 'CONTACTCIVNAME',
+		'INBOX_IDENTITY_NAME', 'INBOX_IDENTITY_EMAIL', 'INBOX_IDENTITY_REPLYTO', 'INBOX_MAILBOX_EMAIL', 'INBOX_MAILBOX_LABEL');
+
+	/** Variables of the identity, the only ones of inbox that a signature can hold (1.53.0) */
+	const IDENTITY_KEYS = array('INBOX_IDENTITY_NAME', 'INBOX_IDENTITY_EMAIL', 'INBOX_IDENTITY_REPLYTO', 'INBOX_MAILBOX_EMAIL', 'INBOX_MAILBOX_LABEL');
 
 	/** @var DoliDB */
 	protected $db;
@@ -259,6 +263,11 @@ class InboxTemplates
 		}
 		$base = $object ?: $soc;
 		$arr = getCommonSubstitutionArray($outputlangs, 0, null, $base);
+		// The identity before the other modules: a substitution of another module (a signature made in a module of
+		// templates) that holds __INBOX_IDENTITY_NAME__ gets it
+		foreach (self::identityValues((array) ($ctx['identity'] ?? array())) as $k => $v) {
+			$arr['__'.$k.'__'] = $v;
+		}
 		complete_substitutions_array($arr, $outputlangs, $base, array('mode' => 'formemail'));
 		// Contacts of the piece, as its card gives them (__CONTACT_NAME_BILLING__...)
 		if ($object && method_exists($object, 'liste_contact')) {
@@ -298,8 +307,127 @@ class InboxTemplates
 			}
 			$out[$m[1]] = (string) $v;
 		}
+		// The signature put by a template, its own variables replaced as the writing replaces them (1.53.0)
+		if (strpos($out['SENDEREMAIL_SIGNATURE'], '__') !== false) {
+			$out['SENDEREMAIL_SIGNATURE'] = self::fillHtml(self::fillHtml($out['SENDEREMAIL_SIGNATURE'], $out), $out);
+		}
 
 		return $out;
+	}
+
+	/**
+	 * Values of the variables of an identity (1.53.0), as text
+	 *
+	 * @param array<string,mixed> $identity Identity (InboxComposer::identities()): name, email, reply_to, mailbox, mailbox_label
+	 * @return array<string,string> KEY => text
+	 */
+	public static function identityValues(array $identity)
+	{
+		return array(
+			'INBOX_IDENTITY_NAME' => (string) ($identity['name'] ?? ''),
+			'INBOX_IDENTITY_EMAIL' => (string) ($identity['email'] ?? ''),
+			'INBOX_IDENTITY_REPLYTO' => (string) ($identity['reply_to'] ?? ''),
+			'INBOX_MAILBOX_EMAIL' => (string) ($identity['mailbox'] ?? ''),
+			'INBOX_MAILBOX_LABEL' => (string) ($identity['mailbox_label'] ?? ''),
+		);
+	}
+
+	/**
+	 * Signatures with their variables replaced (1.53.0): those of the identity, of the user who sends, of the company
+	 * and of the other modules (a signature kept in a module of templates, __MY_SIGNATURE__). Two passes: the value of
+	 * a variable may hold variables (a signature of a module holding __INBOX_IDENTITY_NAME__). Never a recipient nor a
+	 * piece: a signature is the same in every mail of the identity. An unknown variable stays as it is (seen in the
+	 * preview).
+	 *
+	 * @param User                           $user       User who sends
+	 * @param array<int,array<string,mixed>> $identities Identities (InboxComposer::identities())
+	 * @return array<int,string> id of the identity => HTML
+	 */
+	public function signatures(User $user, array $identities)
+	{
+		$out = array();
+		$base = null;
+		foreach ($identities as $i) {
+			$sig = (string) ($i['signature'] ?? '');
+			if (trim($sig) === '' || strpos($sig, '__') === false) {
+				$out[(int) $i['id']] = $sig;
+				continue;
+			}
+			if ($base === null) {
+				$base = self::signatureBase();
+			}
+			$values = array_merge($base, self::identityValues($i));
+			$out[(int) $i['id']] = self::fillHtml(self::fillHtml($sig, $values), $values);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Values a signature can use besides its identity: the user who sends, the company, the other modules (no piece,
+	 * no recipient)
+	 *
+	 * @return array<string,string> KEY => value
+	 */
+	public static function signatureBase()
+	{
+		global $langs;
+
+		$arr = getCommonSubstitutionArray($langs, 0, null, null);
+		complete_substitutions_array($arr, $langs, null, array('mode' => 'formemail'));
+		$base = array();
+		foreach ($arr as $k => $v) {
+			if (preg_match('/^__([A-Z0-9_]+)__$/', (string) $k, $m) && !in_array($m[1], self::DROP, true) && !is_array($v) && !is_object($v)) {
+				$base[$m[1]] = (string) $v;
+			}
+		}
+
+		return $base;
+	}
+
+	/**
+	 * Preview of a signature being written in the dialog of an identity: as the writing will show it, and the
+	 * variables it holds that nothing replaces (a mistyped key)
+	 *
+	 * @param User                $user     User
+	 * @param array<string,mixed> $identity name, email, reply_to, mailbox, mailbox_label, signature
+	 * @return array{html:string,unknown:string[],keys:string[]}
+	 */
+	public function signaturePreview(User $user, array $identity)
+	{
+		$base = self::signatureBase();
+		$values = array_merge($base, self::identityValues($identity));
+		$html = self::fillHtml(self::fillHtml((string) ($identity['signature'] ?? ''), $values), $values);
+		preg_match_all('/__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/', $html, $m);
+		$keys = array_values(array_unique(array_merge(self::IDENTITY_KEYS, array_keys($base))));
+		sort($keys);
+
+		return array('html' => InboxMailBuilder::cleanHtml($html), 'unknown' => array_values(array_unique($m[1])), 'keys' => $keys);
+	}
+
+	/**
+	 * HTML with its variables replaced: an HTML value (a signature of another module) put as it is, a text escaped
+	 * (a name with « & » or « < » stays text); an unknown variable kept
+	 *
+	 * @param string               $html   HTML
+	 * @param array<string,string> $values KEY => value
+	 * @return string
+	 */
+	public static function fillHtml($html, array $values)
+	{
+		return (string) preg_replace_callback('/__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/', function ($m) use ($values) {
+			if (in_array($m[1], self::DROP, true)) {
+				return '';
+			}
+			if (!array_key_exists($m[1], $values)) {
+				return $m[0];
+			}
+			$v = (string) $values[$m[1]];
+			// The identity is typed text, always escaped (a name « R&D <Ventes> » would look like HTML)
+			$isText = in_array($m[1], self::IDENTITY_KEYS, true) || in_array($m[1], array('INBOX_IDENTITY', 'INBOX_MAILBOX'), true);
+
+			return !$isText && dol_textishtml($v) ? $v : dol_escape_htmltag($v, 0, 1);
+		}, (string) $html);
 	}
 
 	/**
@@ -325,7 +453,8 @@ class InboxTemplates
 				$ctx['mailbox'] = (string) $account->email;
 				$ids = (new InboxIdentity($this->db))->listForAccount((int) $accountId, true);
 				if ($ids) {
-					$ctx['identity'] = array('name' => (string) $ids[0]->name, 'email' => (string) $ids[0]->email, 'signature' => (string) $ids[0]->signature);
+					$ctx['identity'] = array('name' => (string) $ids[0]->name, 'email' => (string) $ids[0]->email, 'reply_to' => (string) $ids[0]->reply_to, 'signature' => (string) $ids[0]->signature,
+						'mailbox' => (string) $account->email, 'mailbox_label' => (string) $account->label);
 				}
 			}
 		}
@@ -360,7 +489,7 @@ class InboxTemplates
 	 */
 	public static function fill($text, array $values)
 	{
-		return (string) preg_replace_callback('/__([A-Z0-9_]+)__/', function ($m) use ($values) {
+		return (string) preg_replace_callback('/__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/', function ($m) use ($values) {
 			if (in_array($m[1], self::DROP, true)) {
 				return '';
 			}
@@ -398,7 +527,7 @@ class InboxTemplates
 			}
 		}
 		foreach (iterator_to_array($xpath->query('//text()')) as $text) {
-			$parts = preg_split('/__([A-Z0-9_]+)__/', $text->nodeValue, -1, PREG_SPLIT_DELIM_CAPTURE);
+			$parts = preg_split('/__([A-Z0-9]+(?:_[A-Z0-9]+)*)__/', $text->nodeValue, -1, PREG_SPLIT_DELIM_CAPTURE);
 			if (count($parts) < 2) {
 				continue;
 			}

@@ -25,7 +25,7 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxidentity.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('save', 'delete'), true));
+inboxAjaxStart(in_array($action, array('save', 'delete', 'preview'), true));
 $account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
 $identities = new InboxIdentity($db);
 
@@ -76,6 +76,15 @@ switch ($action) {
 		inboxAjaxReply(array('identities' => inboxIdentityList($identities, (int) $account->id)));
 		// no break
 
+	case 'preview':
+		// Signature being written, as the writing will show it (1.53.0): nothing saved here
+		require_once __DIR__.'/../class/inboxtemplates.class.php';
+		require_once __DIR__.'/../class/inboxmailbuilder.class.php';
+		$templates = new InboxTemplates($db);
+		inboxAjaxReply($templates->signaturePreview($user, array('name' => (string) inboxAjaxParam('name'), 'email' => (string) inboxAjaxParam('email'),
+			'reply_to' => (string) inboxAjaxParam('reply_to'), 'mailbox' => (string) $account->email, 'mailbox_label' => (string) $account->label,
+			'signature' => (string) inboxAjaxParam('signature', 'restricthtml'))));
+		// no break
 	case 'profiles':
 		inboxAjaxReply(array('profiles' => $identities->listSenderProfiles($account->email)));
 		// no break

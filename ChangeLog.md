@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: variables in the signatures (identity, user who sends, company, other modules) :   1.52.0
+  - the signature of an identity is filled in the writing and at the sending: __INBOX_IDENTITY_NAME__,
+    __INBOX_IDENTITY_EMAIL__, __INBOX_IDENTITY_REPLYTO__, __INBOX_MAILBOX_EMAIL__, __INBOX_MAILBOX_LABEL__ (the old
+    __INBOX_IDENTITY__ and __INBOX_MAILBOX__ kept), those of the user who sends, of the company and of the other
+    modules (a signature kept in a module of mail templates); a variable holding variables filled too.
+  - the identity is known before the other modules complete the variables: a substitution of another module holding
+    __INBOX_IDENTITY_NAME__ gets it, in the templates too; __SENDEREMAIL_SIGNATURE__ of a template comes filled.
+  - values of the identity always escaped (a name « R&D <Sales> » stays text); an unknown variable kept as it is.
+  - two variables side by side read as two (« __A____B__ » was one unknown key), in the templates too.
+  - dialog of an identity: « Insert a variable » (identity first) and « Preview » of the signature as it will be
+    sent, naming the variables that nothing replaces.
+
 - FIX: newsletter banner readable when the sender only offers unsubscribing by mail :   1.51.1
   - the text was squeezed into a one-word column by the copy button holding the whole address: the buttons go
     under the text when space is short (every reading banner), the address is shown on its own line.
