@@ -123,7 +123,7 @@ class InboxLeadTest extends InboxTestCase
 		$this->assertSame(array('06 12 34 56 78'), self::values($f, 'contact', 'phone_mobile'));
 		$this->assertSame('signature', $f['contact']['phone_mobile'][0]['source']);
 		$this->assertStringContainsString('Mobile 06 12 34 56 78', $f['contact']['phone_mobile'][0]['quote'], 'the line of the mail, to highlight it');
-		$this->assertSame(array('999 100 001 00075'), self::values($f, 'soc', 'idprof2'), 'a SIRET checked by its key; the one of the quote is not taken');
+		$this->assertSame(array('99910000100075'), self::values($f, 'soc', 'idprof2'), 'a SIRET checked by its key, without spaces; the one of the quote is not taken');
 		$this->assertSame(array('999100001'), self::values($f, 'soc', 'idprof1'));
 		$this->assertSame(array('FR15999100001'), self::values($f, 'soc', 'tva_intra'), 'VAT computed from the SIREN');
 		$this->assertSame('12 rue des Artisans', $f['soc']['address'][0]['value']);
@@ -172,6 +172,19 @@ class InboxLeadTest extends InboxTestCase
 		$this->assertSame(array('5 avenue Foch'), $v['soc']['address'], 'a folded line joined');
 		$this->assertSame(array('75016'), $v['soc']['zipcode']);
 		$this->assertSame(array('zzlead.example'), $v['soc']['url']);
+
+		// Values cleaned (lot A1, 1.79.1): target of a link of a HTML converted, phones written plainly, a street without
+		// its zip code, the company named by the domain
+		$this->assertSame('+33 1 99 00 12 34', InboxLead::cleanValue('phone', '+ 33 199 00 12 34<tel: %20+%2033 199%2000%2012%2034>'));
+		$this->assertSame('01 99 00 12 34', InboxLead::formatPhone('01.99.00.12.34'));
+		$this->assertSame('+4930123456', InboxLead::formatPhone('0049 (0)30 123 456'));
+		$this->assertSame('', InboxLead::formatPhone('12 34'));
+		$this->assertSame('', InboxLead::cleanValue('email', 'not an address'));
+		$this->assertSame('www.zzlead.example', InboxLead::cleanValue('url', 'https://www.Zzlead.example/contact'), 'no scheme, no path, lower case');
+		$sig = InboxLead::parseSignature(InboxLead::plainLines("ZZLEAD SERVICE SOLUTIONS\nZ.A.C. Des Essais Nord\n56, rue des lilas\nTel:  + 33 199 00 12 34<tel: %20+%2033>\n[cid:image002.png@01]"), array('domain_label' => 'zzlead'));
+		$this->assertSame('ZZLEAD SERVICE SOLUTIONS', $sig['soc']['name'][0][0]);
+		$this->assertSame('56, rue des lilas, Z.A.C. Des Essais Nord', $sig['soc']['address'][0][0]);
+		$this->assertSame('+ 33 199 00 12 34', $sig['soc']['phone'][0][0]);
 
 		$this->assertSame("Merci\n--\nPaul", InboxLead::ownText("Merci\n-- \nPaul\n\nOn Mon, 10 Nov 2026, Bob <b@x.invalid> wrote:\n> old"));
 	}

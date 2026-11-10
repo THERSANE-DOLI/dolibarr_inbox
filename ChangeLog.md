@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: panel « New customer », values cleaned before they are offered and when they are received: no target of a
+  link (« Tel: + 33 199 00 12 34<tel:...> » of a HTML mail), phones written plainly (+33 1 99 00 12 34), emails
+  checked, site without its scheme, identifiers without spaces; a street without its zip code and the company named
+  like the domain read in the signature :   1.79.2
+
 - FIX: a mail whose body part says « Content-Disposition: inline » was shown empty, its body listed as a file
   « piece-jointe » (the IMAP library takes any part with a disposition for an attachment) :   1.79.1
 

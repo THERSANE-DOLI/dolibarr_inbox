@@ -101,7 +101,7 @@ class InboxLead
 	{
 		$out = array('soc' => array(), 'contact' => array());
 		$add = function ($part, $field, $value, $source, $quote = '') use (&$out) {
-			$value = trim(preg_replace('/\s+/u', ' ', (string) $value));
+			$value = self::cleanValue($field, (string) $value);
 			if ($value === '' || mb_strlen($value, 'UTF-8') > 255) {
 				return;
 			}
@@ -153,8 +153,10 @@ class InboxLead
 		$add('contact', 'firstname', $dn['firstname'], 'name');
 		$add('contact', 'lastname', $dn['lastname'], 'name');
 		// 4. Signature of the mail (its own text, never the quoted one)
-		$own = self::ownText((string) $message->bodyText);
+		$own = self::plainLines(self::ownText((string) $message->bodyText));
 		$sig = self::signature($own);
+		$email0 = strtolower((string) $row->from_email);
+		$dn['domain_label'] = strpos($email0, '@') !== false ? explode('.', (string) InboxTrustedDomain::registrable(substr($email0, strrpos($email0, '@') + 1)))[0] : '';
 		foreach (self::parseSignature($sig, $dn) as $part => $fields) {
 			foreach ($fields as $field => $values) {
 				foreach ($values as $v) {
@@ -229,7 +231,10 @@ class InboxLead
 			if (!preg_match('/^[a-z0-9_]{1,64}$/', $field) || !is_scalar($v['value'] ?? null) || trim((string) $v['value']) === '') {
 				continue;
 			}
-			$out[$part][$field][] = array('value' => dol_trunc(trim((string) $v['value']), 255, 'right', 'UTF-8', 1), 'source' => dol_trunc((string) ($v['source'] ?? 'module'), 30, 'right', 'UTF-8', 1));
+			$value = self::cleanValue($field, (string) $v['value']);
+			if ($value !== '') {
+				$out[$part][$field][] = array('value' => dol_trunc($value, 255, 'right', 'UTF-8', 1), 'source' => dol_trunc((string) ($v['source'] ?? 'module'), 30, 'right', 'UTF-8', 1));
+			}
 		}
 		foreach ((array) ($hookmanager->resArray['fields'] ?? array()) as $f) {
 			$field = (string) ($f['field'] ?? '');
@@ -237,6 +242,88 @@ class InboxLead
 				$out['fields'][] = array('part' => ($f['part'] ?? '') === 'contact' ? 'contact' : 'soc', 'field' => $field, 'label' => dol_trunc((string) ($f['label'] ?? $field), 60, 'right', 'UTF-8', 1));
 			}
 		}
+	}
+
+	/**
+	 * Text of a mail ready to read: no target of a link (« Tel: 01 23<tel:0123> » of a HTML converted), no picture
+	 * (« [cid:image001.png] »), no control character
+	 *
+	 * @param string $text Text
+	 * @return string
+	 */
+	public static function plainLines($text)
+	{
+		$text = preg_replace('/<\s*(?:tel|mailto|https?|sip|callto|cid|ftp):[^>\n]*>/iu', ' ', (string) $text);
+		$text = preg_replace('/\[(?:cid|image)[^\]\n]*\]/iu', ' ', $text);
+		$text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text);
+
+		return preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+	}
+
+	/**
+	 * A value cleaned for its field, '' when it is not one: phones formatted, emails checked, site without its scheme,
+	 * identifiers without spaces, no target of a link, no tag, single spaces
+	 *
+	 * @param string $field Field
+	 * @param string $value Value
+	 * @return string
+	 */
+	public static function cleanValue($field, $value)
+	{
+		$v = self::plainLines(strip_tags((string) $value));
+		$v = trim(preg_replace('/\s+/u', ' ', $v), " \t,;:|*_-");
+		if ($v === '') {
+			return '';
+		}
+		switch ($field) {
+			case 'phone':
+			case 'phone_pro':
+			case 'phone_mobile':
+				return self::formatPhone($v);
+			case 'email':
+				$v = strtolower(preg_replace('/^mailto:/i', '', $v));
+				return isValidEmail($v) ? $v : '';
+			case 'url':
+				$v = strtolower(preg_replace('#^https?://#i', '', $v));
+				$v = rtrim(preg_replace('#[/?\#].*$#', '', $v), '.');
+				return preg_match('/^[a-z0-9.-]+\.[a-z]{2,24}$/', $v) ? $v : '';
+			case 'idprof1':
+			case 'idprof2':
+				return preg_replace('/\D/', '', $v);
+			case 'tva_intra':
+				return strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $v));
+			case 'zipcode':
+				return strtoupper($v);
+		}
+
+		return $v;
+	}
+
+	/**
+	 * A phone written plainly: « + 33 199 00 12 34 » => « +33 1 99 00 12 34 », « 01.99.00.12.34 » => « 01 99 00 12 34 »
+	 *
+	 * @param string $v Phone
+	 * @return string    '' when it is not a phone
+	 */
+	public static function formatPhone($v)
+	{
+		$v = preg_replace('/^(?:tel|t[ée]l|phone)\s*[.:]?\s*/iu', '', trim((string) $v));
+		$intl = (bool) preg_match('/^(\+|00)/', $v);
+		$digits = preg_replace('/\D/', '', preg_replace('/\(0\)/', '', $v));
+		if ($intl && strpos($v, '00') === 0) {
+			$digits = substr($digits, 2);
+		}
+		if (strlen($digits) < 8 || strlen($digits) > 15) {
+			return '';
+		}
+		if ($intl && strpos($digits, '33') === 0 && strlen($digits) === 11) {
+			return '+33 '.substr($digits, 2, 1).' '.implode(' ', str_split(substr($digits, 3), 2));
+		}
+		if (!$intl && strlen($digits) === 10 && $digits[0] === '0') {
+			return implode(' ', str_split($digits, 2));
+		}
+
+		return ($intl ? '+' : '').$digits;
 	}
 
 	/**
@@ -310,20 +397,22 @@ class InboxLead
 		$put = function ($part, $field, $value, $line) use (&$out) {
 			$out[$part][$field][] = array($value, $line);
 		};
+		$prev = '';
 		foreach (preg_split('/\n/', (string) $sig) as $line) {
 			$l = trim($line);
 			if ($l === '') {
+				$prev = '';
 				continue;
 			}
 			$plain = self::plain($l);
 			// Phones: the label of the line says mobile or fax; else a French 06 / 07 is a mobile
-			if (preg_match_all('/(?:(?:\+|00)\d{1,3}[\s.\-]?(?:\(0\)[\s.\-]?)?\d(?:[\s.\-]?\d){6,11}|\b0\d(?:[\s.\-]?\d{2}){4})\b/', $l, $m, PREG_OFFSET_CAPTURE)) {
+			if (preg_match_all('/(?:(?:\+\s?|\b00)\d{1,3}[\s.\-]?(?:\(0\)[\s.\-]?)?\d(?:[\s.\-]?\d){6,11}|\b0\d(?:[\s.\-]?\d{2}){4})\b/', $l, $m, PREG_OFFSET_CAPTURE)) {
 				foreach ($m[0] as $p) {
 					$before = self::plain(substr($l, max(0, $p[1] - 20), min(20, $p[1])));
 					if (preg_match('/fax|telecopie/', $before)) {
 						continue;
 					}
-					$digits = preg_replace('/\D/', '', preg_replace('/^(\+|00)33\s*(\(0\))?/', '0', $p[0]));
+					$digits = preg_replace('/\D/', '', preg_replace('/^(\+\s?|00)33\s*(\(0\))?/', '0', $p[0]));
 					$mobile = preg_match('/(mob|port|cell|gsm|handy|movil)/', $before) || preg_match('/^0[67]\d{8}$/', $digits);
 					if ($mobile) {
 						$put('contact', 'phone_mobile', trim($p[0]), $l);
@@ -360,17 +449,25 @@ class InboxLead
 				$put('soc', 'zipcode', $m[1], $l);
 				$put('soc', 'town', trim($m[2]), $l);
 			}
+			// Street without its zip code on the line: « 56, rue des lilas »; a zone just before joins it
+			if (preg_match('/^\d{1,4}\s*(bis|ter|[a-c])?\s*,?\s*(rue|avenue|av\.?|boulevard|bd|chemin|route|rte|place|all[ée]e|impasse|quai|cours|square|voie|lieu[- ]dit|chauss[ée]e|faubourg|street|road|lane|strasse|stra[ßs]e|str\.|weg|platz|via|viale|piazza|calle|avenida|plaza|carrer)\b/iu', $l) && !preg_match('/\d{5}/', $l)) {
+				$zone = $prev !== '' && preg_match('/^(z\.?\s?a\.?\s?c\.?|z\.?\s?[aie]\.?|zae|zone|parc|p[ôo]le|technop[ôo]le|r[ée]sidence|b[âa]timent|bat\.?)\b/iu', $prev) ? ', '.$prev : '';
+				$put('soc', 'address', $l.$zone, $l);
+			}
 			// Job: « Jean Dupont, Manager » or a short line of a job
 			if (preg_match('/^[^,|\-–]{2,60}[,|\-–]\s*([^,|]{2,60})$/u', $l, $m) && preg_match('/\b'.self::JOBS.'/', self::plain($m[1]))) {
 				$put('contact', 'poste', trim($m[1]), $l);
 			} elseif (mb_strlen($l, 'UTF-8') <= 50 && !preg_match('/\d|@/', $l) && preg_match('/^'.self::JOBS.'\b/', $plain)) {
 				$put('contact', 'poste', $l, $l);
 			}
-			// Company: a line naming the company of the display name, or a legal form
+			// Company: a line naming the company of the display name or the domain, or ending by a legal form
+			$label = (string) ($dn['domain_label'] ?? '');
 			if (!preg_match('/\d|@|:/', $l) && mb_strlen($l, 'UTF-8') <= 60
-				&& (($dn['company'] ?? '') !== '' && self::plain($dn['company']) === $plain || preg_match('/\b(sarl|sas|sasu|eurl|sa|sci|scop|gmbh|ag|kg|ug|srl|spa|s\.?l\.?|ltd|llc|inc|bv|nv)\b\.?$/i', $l))) {
+				&& (($dn['company'] ?? '') !== '' && self::plain($dn['company']) === $plain || (strlen($label) >= 3 && preg_match('/\b'.preg_quote($label, '/').'\b/', $plain))
+					|| preg_match('/\b(sarl|sas|sasu|eurl|sa|sci|scop|gmbh|ag|kg|ug|srl|spa|s\.?l\.?|ltd|llc|inc|bv|nv)\b\.?$/i', $l))) {
 				$put('soc', 'name', $l, $l);
 			}
+			$prev = $l;
 		}
 
 		return $out;
@@ -911,7 +1008,9 @@ class InboxLead
 		$out = array();
 		foreach ($data as $k => $v) {
 			if ((in_array($k, $allow, true) || preg_match('/^options_[a-z0-9_]{1,60}$/', (string) $k)) && is_scalar($v)) {
-				$out[$k] = dol_trunc(trim(strip_tags((string) $v)), 255, 'right', 'UTF-8', 1);
+				// Typed by the user: cleaned as the values found (a phone written as the user wants stays a phone)
+				$c = in_array($k, array('typent_id', 'country_id'), true) ? (string) (int) $v : self::cleanValue((string) $k, (string) $v);
+				$out[$k] = dol_trunc($c, 255, 'right', 'UTF-8', 1);
 			}
 		}
 
