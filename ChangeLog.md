@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: form of a data source guided, for an admin who does not know the headers :   1.74.0
+  - « From a mail of the site »: the source of a mail pasted, or « Make a data source from this mail » in the menu
+    of a mail (admins of Dolibarr only): its sender, whether it is authenticated, its own headers (X-...) with a role
+    guessed (address of the requester, data in JSON, one field, ignore) and the keys of its JSON with their value and
+    field guessed; « Use these settings » fills the form, saved only by its button.
+  - « Start from »: advised format X-Data-Form or quote request X-Quotation.
+  - headers per field and keys of the JSON as lines with a list of the fields by their name (a usual key may be
+    ignored on purpose); « ? » beside each setting opens its entry in the glossary: header, trusted sender,
+    authenticated, data (JSON), kind of request, and each field with what it fills in Dolibarr, an example and the key
+    names understood without setting.
+
 - NEW: the link follows the conversation :   1.73.0
   - linking a mail to a piece offers « Link also the N other mails of the conversation », ticked by default (the
     cited pieces linked in one click too); the mails of the trash and the junk are left out.

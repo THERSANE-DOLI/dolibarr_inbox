@@ -54,6 +54,8 @@ function inboxSourceInput()
 function inboxSourceReply(InboxDataSource $sources)
 {
 	return array('sources' => $sources->fetchAll(), 'fields' => InboxDataSource::FIELDS, 'types' => InboxDataSource::TYPES,
+		// Glossary and ready-made sources of the form (1.74.0)
+		'glossary' => InboxDataSource::glossary(), 'templates' => InboxDataSource::TEMPLATES,
 		// Without the receiving servers of the setup, the authentication read is the one of the topmost header
 		'auth_servers' => count(InboxKnownSenders::trustedServers()));
 }
@@ -88,6 +90,25 @@ switch ($action) {
 			'header_data' => trim($in['header_data']), 'header_fields' => $in['header_fields'], 'mapping' => $in['mapping']);
 		$found = $sources->detect($headers, (string) $from['address'], array($source));
 		inboxAjaxReply(array('from' => (string) $from['address'], 'result' => $found));
+		// no break
+
+	case 'analyze':
+		// « Make the source from a mail » (1.74.0): a mail of the index the admin may read, or pasted headers
+		$mailId = (int) inboxAjaxParam('mail', 'int');
+		if ($mailId > 0) {
+			$reader = new InboxReader($db);
+			if (!$reader->load($user, $mailId)) {
+				inboxAjaxNotFound();
+			}
+			$raw = $reader->raw($user);
+			if ($raw === null) {
+				inboxAjaxError($langs->transnoentities('InboxMailNotFound'), 404);
+			}
+			$headers = InboxReader::headers($raw);
+		} else {
+			$headers = InboxReader::headers(substr((string) inboxAjaxParam('headers', 'none'), 0, 262144)."\n\n");
+		}
+		inboxAjaxReply(InboxDataSource::analyze($headers));
 		// no break
 
 	default:

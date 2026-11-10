@@ -175,6 +175,42 @@ class InboxDataSourceTest extends InboxTestCase
 	}
 
 	/**
+	 * 1.74.0: the analysis of a mail of a site, the glossary, a usual key ignored on purpose
+	 *
+	 * @return void
+	 */
+	public function testAnalyzeAndGlossary()
+	{
+		$head = self::head("X-Mailer: PHPMailer\r\nX-Spam-Score: 0\r\nX-Form-Email: jean@client.inbox-test.invalid\r\nX-Form-Data: {\"prenom\":\"Jean\",\"nom_boite\":\"Acme\",\"tel\":\"0102\"}\r\nX-Form-Town: Lyon\r\nX-Form-Origin: web\r\n");
+		$an = InboxDataSource::analyze(InboxReader::headers($head."\r\n"));
+		$this->assertSame(self::SITE, $an['from']);
+		$this->assertSame('forms.inbox-test.invalid', $an['domain']);
+		$this->assertTrue($an['authenticated']);
+		$byName = array_column($an['headers'], null, 'name');
+		$this->assertSame(array('X-Form-Email', 'X-Form-Data', 'X-Form-Town', 'X-Form-Origin'), array_keys($byName), 'the headers of mail servers and filters left out');
+		$this->assertSame('email', $byName['X-Form-Email']['role']);
+		$this->assertSame('data', $byName['X-Form-Data']['role']);
+		$keys = array_column($byName['X-Form-Data']['keys'], null, 'key');
+		$this->assertSame('firstname', $keys['prenom']['field']);
+		$this->assertSame('', $keys['nom_boite']['field'], 'not a usual name: to choose');
+		$this->assertFalse($keys['nom_boite']['usual']);
+		$this->assertSame('phone', $keys['tel']['field']);
+		$this->assertSame(array('field', 'town'), array($byName['X-Form-Town']['role'], $byName['X-Form-Town']['field']));
+		$this->assertSame('ignore', $byName['X-Form-Origin']['role']);
+		$this->assertFalse(InboxDataSource::analyze(InboxReader::headers(self::head('', '')."\r\n"))['authenticated']);
+
+		$glossary = array_column(InboxDataSource::glossary(), 'names', 'code');
+		$this->assertSame(InboxDataSource::FIELDS, array_keys($glossary));
+		$this->assertContains('telephone', $glossary['phone']);
+
+		// A usual key left out on purpose
+		$this->source(array('mapping' => "tel = ignore\nnom_boite = company"));
+		$found = (new InboxDataSource($this->db))->detectRaw(self::head("X-Data-Form: {\"email\":\"a@client.inbox-test.invalid\",\"tel\":\"0102\",\"nom_boite\":\"Acme\"}\r\n"), self::SITE);
+		$this->assertArrayNotHasKey('phone', $found['data']);
+		$this->assertSame('Acme', $found['data']['company']);
+	}
+
+	/**
 	 * Index, thirdparty, creation page, answer, list
 	 *
 	 * @return void

@@ -59,6 +59,18 @@ class InboxDataSource
 		'ref' => 'ref', 'id' => 'ref', 'reference' => 'ref', 'number' => 'ref', 'requestid' => 'ref', 'quotationid' => 'ref', 'orderid' => 'ref', 'ticketid' => 'ref',
 	);
 
+	/**
+	 * Ready-made sources (1.74.0): the format advised by the documentation, and the X-Quotation-* headers written by
+	 * a quote module. Only the headers and the kind; the trusted senders stay to give.
+	 */
+	const TEMPLATES = array(
+		'dataform' => array('header_email' => 'X-Data-Form-Email', 'header_data' => 'X-Data-Form', 'type' => 'propal'),
+		'quotation' => array('header_email' => 'X-Quotation-Mail', 'header_data' => 'X-Quotation-Data', 'type' => 'propal'),
+	);
+
+	/** Headers never offered by the analysis of a mail: written by mail servers, filters and mailing tools */
+	const TECHNICAL_HEADERS = '/^x-(mailer|spam|rspamd|virus|originating|ms-|microsoft|google|gm-|received|forwarded|priority|msmail|mimeole|ses-|mailgun|sg-|mc-|feedback|report|auto-response|autoreply|php-originating|envelope|original|apple|proofpoint|ironport|barracuda|sender-id|antiabuse|authenticated|source|get-message|mime-autoconverted|csa|campaign|abuse|ovh|vr-|ovhremote|halon|pm-|postmark|mailjet|sib-|mid|pobox|smtpapi|ymail|yahoo|aol|binding|list|beenthere|mailman|uid|keywords|ham|bogosity|dspam|dkim|amp|accept|has-attach|tnef|ms-has|ms-tnef|ms-exchange|exchange)/i';
+
 	/** Longest JSON read (the headers of the reading are cut at 2000 characters) */
 	const MAX_JSON = 2000;
 
@@ -276,6 +288,75 @@ class InboxDataSource
 	}
 
 	/**
+	 * The fields with the names understood for each, for the glossary of the settings
+	 *
+	 * @return array<int,array{code:string,names:string[]}>
+	 */
+	public static function glossary()
+	{
+		$out = array();
+		foreach (self::FIELDS as $f) {
+			$out[] = array('code' => $f, 'names' => array_values(array_keys(array_filter(self::KEYS, function ($v) use ($f) {
+				return $v === $f;
+			}))));
+		}
+
+		return $out;
+	}
+
+	/**
+	 * What a mail of a site offers to make a source (1.74.0): its sender, whether it is authenticated, its own headers
+	 * (X-...) with a guessed role, and for a JSON its keys with their value and guessed field. Nothing is saved: the
+	 * admin checks and corrects in the form.
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers (InboxReader::headers)
+	 * @return array{from:string,domain:string,authenticated:bool,headers:array<int,array<string,mixed>>}
+	 */
+	public static function analyze(array $headers)
+	{
+		require_once __DIR__.'/inboxsenderauth.class.php';
+		$from = InboxSenderAuth::analyzeFrom(InboxSenderAuth::parseHeaders(implode("\r\n", array_map(function ($h) {
+			return $h[0].': '.$h[1];
+		}, $headers))));
+		$address = strtolower((string) $from['address']);
+		$out = array('from' => $address, 'domain' => (string) substr((string) strrchr($address, '@'), 1),
+			'authenticated' => $address !== '' && InboxReader::authPass(InboxReader::authResults($headers), $address), 'headers' => array());
+		$seen = array();
+		foreach ($headers as $h) {
+			$name = (string) $h[0];
+			if (!preg_match('/^x-/i', $name) || preg_match(self::TECHNICAL_HEADERS, $name) || !self::validHeaderName($name) || isset($seen[strtolower($name)])) {
+				continue;
+			}
+			$seen[strtolower($name)] = true;
+			$value = trim((string) $h[1]);
+			$item = array('name' => $name, 'value' => mb_substr($value, 0, 300, 'UTF-8'), 'role' => 'field', 'field' => '', 'keys' => array());
+			$json = strlen($value) <= self::MAX_JSON && $value !== '' && $value[0] === '{' ? json_decode($value, true, 4) : null;
+			if (is_array($json)) {
+				$item['role'] = 'data';
+				foreach (self::flatten($json) as $k => $v) {
+					$item['keys'][] = array('key' => (string) $k, 'value' => mb_substr(self::clean($v), 0, 120, 'UTF-8'), 'field' => self::fieldOf($k), 'usual' => self::fieldOf($k) !== '');
+				}
+			} else {
+				// The end of the name says the field: X-Form-Phone, X-Quotation-Mail
+				$parts = explode('-', $name);
+				$item['field'] = self::fieldOf((string) end($parts));
+				if (self::address($value) !== '' && ($item['field'] === 'email' || $item['field'] === '')) {
+					$item['role'] = 'email';
+					$item['field'] = '';
+				} elseif ($item['field'] === '') {
+					$item['role'] = 'ignore';
+				}
+			}
+			$out['headers'][] = $item;
+			if (count($out['headers']) >= 30) {
+				break;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Requester of a raw header (synchronisation: the headers asked only)
 	 *
 	 * @param string $rawHeader Raw header
@@ -397,7 +478,8 @@ class InboxDataSource
 		}
 		$keys = self::parsePairs((string) ($in['mapping'] ?? ''), false, $badLine);
 		foreach ($keys as $k => $f) {
-			if (!in_array($f, self::FIELDS, true)) {
+			// « ignore »: a key of usual name left out on purpose (1.74.0)
+			if (!in_array($f, self::FIELDS, true) && $f !== 'ignore') {
 				$badLine = $k.' = '.$f;
 			}
 		}

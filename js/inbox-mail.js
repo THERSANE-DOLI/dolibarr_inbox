@@ -8589,6 +8589,10 @@
 				items.push({ icon: 'copy', label: t('InboxCopyAddress', row.from_email), run: () => copyText(row.from_email) });
 				items.push({ icon: 'search', label: t('InboxMailsOf', row.from_name || row.from_email), run: () => searchFrom(row.from_email) });
 			}
+			// A mail of a site: a data source made from it (1.74.0), admins of Dolibarr only (checked again by the server)
+			if (I.rights().dolibarr_admin) {
+				items.push({ icon: 'redirect', label: t('InboxSourceFromThisMail'), run: () => I.go('#/settings/sources/new/' + row.id) });
+			}
 		}
 		// Actions of the other modules (same registry as the buttons, hook inbox:mail:actions), the mail being known
 		if (one && S.mail && S.mail.id === row.id) {
