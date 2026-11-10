@@ -684,6 +684,8 @@ a.ibx-btn, a.ibx-btn:hover { text-decoration: none; }
 .ibx-formrow__label { padding-top: 0.375rem; font-weight: 600; }
 .ibx-formrow__label .ibx-req { color: var(--ibx-danger); }
 .ibx-formrow__help { margin-top: var(--ibx-s1); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-formrow__warn { display: flex; gap: var(--ibx-s1); align-items: flex-start; color: var(--ibx-text); }
+.ibx-formrow__warn > .ibx-icon { color: var(--ibx-warning); flex: none; }
 .ibx-formrow__error { margin-top: var(--ibx-s1); font-size: var(--ibx-fs-sm); color: var(--ibx-danger); }
 .ibx-formrow.is-invalid .ibx-field { border-color: var(--ibx-danger); }
 .ibx-inline { display: flex; align-items: center; gap: var(--ibx-s2); flex-wrap: wrap; }
@@ -1710,6 +1712,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__body > .ibx-js-sigadd, .ibx-compose__body > .ibx-js-quoteon { align-self: flex-start; margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-compose__quote { margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-compose__quotebar { display: flex; gap: var(--ibx-s2); align-items: center; }
+.ibx-compose__quotenote { display: flex; gap: var(--ibx-s1); align-items: center; padding: 0 var(--ibx-s2); font-size: var(--ibx-fs-sm); }
 .ibx-compose__atts { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); list-style: none; border-top: 1px solid var(--ibx-border); }
 .ibx-compose__att { display: inline-flex; align-items: center; gap: var(--ibx-s2); max-width: 16rem; height: 2rem; padding: 0 0.125rem 0 var(--ibx-s2); background: var(--ibx-bg-sunken); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); font-size: var(--ibx-fs-sm); }
 .ibx-compose__att.is-pending { opacity: 0.7; }

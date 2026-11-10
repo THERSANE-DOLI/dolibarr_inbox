@@ -130,6 +130,11 @@ switch ($action) {
 			inboxAjaxError($langs->transnoentities('InboxErrorEmail'), 422);
 		}
 		$address = $what === 'domain' ? substr($email, strpos($email, '@')) : $email;
+		// Setting of the administrator (1.78.0): « never », or « by sender only » for a domain; forgetting always allowed
+		$always = InboxReader::imagesAlwaysMode();
+		if ((string) inboxAjaxParam('mode', 'aZ09') !== 'forget' && ($always === 'never' || ($always === 'sender' && $what === 'domain'))) {
+			inboxAjaxError($langs->transnoentities('InboxErrorImagesAlwaysOff'), 403);
+		}
 		$p = $db->prefix();
 		$db->query("DELETE FROM ".$p."inbox_image_allow WHERE fk_user = ".((int) $user->id)." AND address IN ('".$db->escape($email)."', '".$db->escape(substr($email, strpos($email, '@')))."')");
 		if ((string) inboxAjaxParam('mode', 'aZ09') !== 'forget') {

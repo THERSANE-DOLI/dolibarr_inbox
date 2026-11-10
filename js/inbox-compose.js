@@ -89,6 +89,18 @@
 		});
 		return out;
 	}
+	/** « 2 tracking pictures taken out of the quote » (lot F1 1.78.0), nothing when none */
+	function quoteRemovedHtml(r) {
+		const parts = [];
+		if (r && r.trackers) {
+			parts.push(th('InboxQuoteTrackersRemoved', r.trackers));
+		}
+		if (r && r.images) {
+			parts.push(th('InboxQuoteImagesRemoved', r.images));
+		}
+		return parts.length ? '<div class="ibx-compose__quotenote ibx-muted">' + ic('remote-blocked') + ' <span>' + parts.join(' ') + '</span></div>' : '';
+	}
+
 	function srcdoc(html, own) {
 		// The quote holds the mail answered: same rules as the reading, no script, no remote picture (audit INBX-021);
 		// a signature of the company (own) may show its remote logo
@@ -2028,6 +2040,8 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
 			+ (d.quote ? '<div class="ibx-compose__quote ibx-js-quote"><div class="ibx-compose__quotebar"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quotetoggle" aria-expanded="false">··· ' + th(w.mode === 'forward' ? 'InboxComposeShowForward' : 'InboxComposeShowQuote') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteoff">' + th(w.mode === 'forward' ? 'InboxComposeRemoveForward' : 'InboxComposeRemoveQuote') + '</button></div>'
+				// Remote pictures taken out of the quote by the server (lot F1 1.78.0): said, never a choice here
+				+ quoteRemovedHtml(d.quote_removed)
 				+ '<iframe sandbox="allow-same-origin" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteon" hidden>' + th('InboxComposePutQuoteBack') + '</button>' : '')
 			+ '<ul class="ibx-compose__atts ibx-js-atts" hidden aria-label="' + th('InboxAttachments') + '"></ul>'

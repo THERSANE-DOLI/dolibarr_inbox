@@ -222,7 +222,9 @@ class InboxReader
 			'answered' => (int) $this->row->answered,
 			'tags' => trim((string) $this->row->keywords) === '' ? array() : array_values(array_filter(explode(' ', (string) $this->row->keywords))),
 			'size' => strlen($raw),
-			'body' => array('html' => $message->bodyHtml !== '', 'text' => $message->bodyText !== '', 'remote' => $remote, 'trackers' => $trackers, 'images' => $allowImages),
+			'body' => array('html' => $message->bodyHtml !== '', 'text' => $message->bodyText !== '', 'remote' => $remote, 'trackers' => $trackers, 'images' => $allowImages,
+				// « Always show » offered for: domain (sender or domain), sender, never (setting 1.78.0)
+				'always' => self::imagesAlwaysMode()),
 			'attachments' => $attachments,
 			'headers' => $headers,
 			'auth' => $auth,
@@ -232,7 +234,8 @@ class InboxReader
 			'bounces' => $bounce->forMail($message->messageId, $readable),
 			'sender_check' => $senderCheck,
 			// Bank details in the mail (lot A6, 1.75.0): a lesson with its signals, never « all is fine »
-			'bank' => (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".($message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml)),
+			// Setting of the administrator (1.78.0): on by default
+			'bank' => !getDolGlobalInt('INBOX_BANK_CHECK', 1) ? null : (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".($message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml)),
 				array_column($attachments, 'name'), $passed, $senderCheck, (string) $message->replyToEmail),
 			'trusted' => $trusted->senderVerdict($message->fromEmail, (string) $message->replyToEmail, $auth, $passed),
 			'link_hosts' => (object) $links['hosts'],
@@ -441,6 +444,31 @@ class InboxReader
 	}
 
 	/**
+	 * Setting of the administrator (lot F1 1.78.0): « always show the pictures » for a sender or its domain, a sender
+	 * only, or never (each mail on a click)
+	 *
+	 * @return string domain, sender, never
+	 */
+	public static function imagesAlwaysMode()
+	{
+		$mode = getDolGlobalString('INBOX_IMAGES_ALWAYS', 'domain');
+
+		return in_array($mode, array('domain', 'sender', 'never'), true) ? $mode : 'domain';
+	}
+
+	/**
+	 * Setting of the administrator (lot F1 1.78.0): unsubscribe in one click or by mail, by mail only, or off
+	 *
+	 * @return string oneclick, mail, off
+	 */
+	public static function unsubscribeMode()
+	{
+		$mode = getDolGlobalString('INBOX_UNSUBSCRIBE', 'oneclick');
+
+		return in_array($mode, array('oneclick', 'mail', 'off'), true) ? $mode : 'oneclick';
+	}
+
+	/**
 	 * @param User   $user  User
 	 * @param string $email Sender
 	 * @return bool Remote pictures always shown for this sender or its domain
@@ -448,12 +476,17 @@ class InboxReader
 	public function imagesAllowed(User $user, $email)
 	{
 		$email = strtolower(trim((string) $email));
-		if ($email === '' || strpos($email, '@') === false) {
+		$mode = self::imagesAlwaysMode();
+		if ($email === '' || strpos($email, '@') === false || $mode === 'never') {
 			return false;
 		}
-		$domain = substr($email, strpos($email, '@'));
+		// Setting « by sender only » (1.78.0): the choices made for a whole domain no longer count
+		$addresses = array("'".$this->db->escape($email)."'");
+		if ($mode === 'domain') {
+			$addresses[] = "'".$this->db->escape(substr($email, strpos($email, '@')))."'";
+		}
 		$row = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_image_allow WHERE fk_user = ".((int) $user->id)
-			." AND address IN ('".$this->db->escape($email)."', '".$this->db->escape($domain)."')");
+			." AND address IN (".implode(', ', $addresses).")");
 
 		return is_object($row);
 	}
@@ -533,11 +566,17 @@ class InboxReader
 	public static function unsubscribeView(array $headers, array $auth)
 	{
 		$info = self::unsubscribeInfo($headers);
-		if (!$info) {
+		$mode = self::unsubscribeMode();
+		if (!$info || $mode === 'off') {
+			return null;
+		}
+		// By mail only (setting 1.78.0): no call of an address given by the sender; nothing to offer without a mailto
+		$oneclick = $info['oneclick'] && $mode === 'oneclick';
+		if (!$oneclick && $info['mailto'] === '') {
 			return null;
 		}
 
-		return array('oneclick' => $info['oneclick'], 'signed' => $auth['dkim'] === 'pass', 'mailto' => $info['mailto']);
+		return array('oneclick' => $oneclick, 'signed' => $auth['dkim'] === 'pass', 'mailto' => $info['mailto']);
 	}
 
 	/**
@@ -602,10 +641,10 @@ class InboxReader
 		}
 		$headers = self::headers($raw);
 		$info = self::unsubscribeInfo($headers);
-		if (!$info) {
+		if (!$info || self::unsubscribeMode() === 'off') {
 			return 'InboxErrorUnsubscribeNone';
 		}
-		if (!$info['oneclick']) {
+		if (!$info['oneclick'] || self::unsubscribeMode() !== 'oneclick') {
 			return 'InboxErrorUnsubscribeNoOneClick';
 		}
 		if (self::authResults($headers)['dkim'] !== 'pass') {
@@ -847,16 +886,25 @@ class InboxReader
 			return 0;
 		}
 		foreach ($m[0] as $tag) {
-			if (!preg_match('/\bsrc\s*=\s*["\']?\s*https?:/i', $tag)) {
-				continue;
-			}
-			$tiny = preg_match('/\b(width|height)\s*=\s*["\']?\s*[01](px)?\b/i', $tag) || preg_match('/(width|height)\s*:\s*[01]px/i', $tag);
-			$known = preg_match('#(/open\b|/track|/pixel|/beacon|/wf/open|list-manage\.com/track|/o\.gif|mailtrack|sendgrid\.net/wf|mandrillapp\.com/track|hubspot.*/e3t/|/e/o/)#i', $tag);
-			if ($tiny || $known) {
+			if (self::isTracker($tag)) {
 				$n++;
 			}
 		}
 
 		return $n;
+	}
+
+	/**
+	 * @param string $tag An <img> tag
+	 * @return bool       A remote picture that only tells the sender the mail was opened (1 x 1, known tracking address)
+	 */
+	public static function isTracker($tag)
+	{
+		if (!preg_match('/\bsrc\s*=\s*["\']?\s*https?:/i', (string) $tag)) {
+			return false;
+		}
+
+		return preg_match('/\b(width|height)\s*=\s*["\']?\s*[01](px)?\b/i', $tag) || preg_match('/(width|height)\s*:\s*[01]px/i', $tag)
+			|| preg_match('#(/open\b|/track|/pixel|/beacon|/wf/open|list-manage\.com/track|/o\.gif|mailtrack|sendgrid\.net/wf|mandrillapp\.com/track|hubspot.*/e3t/|/e/o/)#i', $tag);
 	}
 }

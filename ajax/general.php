@@ -62,6 +62,12 @@ function inboxGeneralSettings()
 		'INBOX_AI_WITH_MAIL' => array('default' => '1', 'check' => 'int:0:1'),
 		// Voice typing (1.28.0): off by default; each user then agrees once per receiver of the voice
 		'INBOX_DICTATION_ENABLED' => array('default' => '0', 'check' => 'int:0:1'),
+		// Security (lot F1 1.78.0): remote pictures of a quote (the tracking ones always go), « always show the
+		// pictures », unsubscribe, alert on bank details (A6)
+		'INBOX_QUOTE_REMOTE_IMAGES' => array('default' => 'keep', 'check' => array('keep', 'reply', 'all')),
+		'INBOX_IMAGES_ALWAYS' => array('default' => 'domain', 'check' => array('domain', 'sender', 'never')),
+		'INBOX_UNSUBSCRIBE' => array('default' => 'oneclick', 'check' => array('oneclick', 'mail', 'off')),
+		'INBOX_BANK_CHECK' => array('default' => '1', 'check' => 'int:0:1'),
 	);
 }
 

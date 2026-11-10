@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: remote pictures of a quote and security settings (lot F1) :   1.78.0
+  - the quote of an answer or a forward no longer carries the tracking pictures of the mail quoted (1 x 1 pictures,
+    known tracking addresses): kept, the reader of the answer told the first sender that it was answered, and the
+    copy in the Sent folder told it again to whoever showed its pictures. « 2 trackers taken out of the quote » is
+    said under it. The preview of the quote in the writing already blocked every remote picture (audit INBX-021).
+  - Settings > Security, new page (the trusted authentication servers and the size scanned by the
+    antivirus move there): remote pictures of the quote (keep, take out of the answers, of the answers and forwards;
+    a picture taken out leaves its alternative text), « always show the pictures » (for a sender or a domain, a
+    sender only, never), unsubscribe (one click or by mail, by mail only, off), alert on bank details (on by
+    default, a warning says what is lost when off). Each choice says what it protects from.
+
 - NEW: fil of a mail, the answers sent beside the internal notes (lot E2) :   1.77.0
   - the block of the notes in the panel becomes a fil by date: the notes and the mails sent from the mailbox in the
     conversation (tied by In-Reply-To, References or the conversation, never by the subject): « Paul answered »
