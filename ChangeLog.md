@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: tracking numbers of the shipments, carriers of a mailbox Transport :   1.70.0
+  - a tracking number of one of our shipments written in the mail: the shipment offered in « Cited in the mail »
+    with its customer and « tracking no. ... », whoever writes (the carrier about a parcel of a customer).
+  - usage Transport: category of the suppliers that are carriers (Settings > Mailboxes > Usage, written in the
+    journal); a carrier has no situation on its card, a note says where the shipment is.
+
 - NEW: phones of the signature compared with the card of the contact :   1.69.0
   - the numbers written in the signature (text before the quoted mails; never a reference, a date nor a fax) that the
     cards of the contact and of the thirdparty do not have: « Other phone in the signature » on the card of the

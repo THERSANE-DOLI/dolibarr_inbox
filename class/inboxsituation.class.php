@@ -295,6 +295,69 @@ class InboxSituation
 	}
 
 	/**
+	 * Category of the suppliers that are carriers (usage Transport, 1.70.0), written in the journal of the mailbox
+	 *
+	 * @param User         $user       User doing it
+	 * @param InboxAccount $account    Mailbox
+	 * @param int          $categoryId Category of suppliers, 0 = none
+	 * @return int 1 OK, 0 unchanged, < 0 KO
+	 */
+	public function setCarrierCategory(User $user, InboxAccount $account, $categoryId)
+	{
+		$categoryId = (int) $categoryId;
+		if ($categoryId > 0 && !is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."categorie WHERE rowid = ".$categoryId." AND type = 1 AND entity IN (".getEntity('category').")"))) {
+			$this->error = 'Not a category of suppliers';
+			return -1;
+		}
+		$before = (int) $account->carrier_category;
+		if ($before === $categoryId) {
+			return 0;
+		}
+		if (!$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET carrier_category = ".($categoryId > 0 ? $categoryId : 'NULL')." WHERE rowid = ".((int) $account->id))) {
+			$this->error = $this->db->lasterror();
+			return -2;
+		}
+		$account->carrier_category = $categoryId > 0 ? $categoryId : null;
+		$log = new InboxAccountLog($this->db);
+		$log->add((int) $account->id, $user, 'carriers', array('category' => $before), array('category' => $categoryId));
+
+		return 1;
+	}
+
+	/**
+	 * A carrier for this mailbox: usage Transport and the thirdparty in its category of carriers
+	 *
+	 * @param InboxAccount $account Mailbox
+	 * @param int          $socId   Thirdparty
+	 * @return bool
+	 */
+	public function isCarrier(InboxAccount $account, $socId)
+	{
+		if ($account->usage_profile !== 'transport' || (int) $account->carrier_category <= 0 || (int) $socId <= 0 || !isModEnabled('category')) {
+			return false;
+		}
+
+		return is_object($this->db->getRow("SELECT fk_soc FROM ".$this->db->prefix()."categorie_fournisseur WHERE fk_categorie = ".((int) $account->carrier_category)." AND fk_soc = ".((int) $socId)));
+	}
+
+	/**
+	 * Categories of suppliers offered as the category of the carriers
+	 *
+	 * @return array<int,array{id:int,label:string}>
+	 */
+	public function supplierCategories()
+	{
+		if (!isModEnabled('category')) {
+			return array();
+		}
+		$rows = $this->db->getRows("SELECT rowid, label FROM ".$this->db->prefix()."categorie WHERE type = 1 AND entity IN (".getEntity('category').") ORDER BY label LIMIT 500");
+
+		return array_map(function ($r) {
+			return array('id' => (int) $r->rowid, 'label' => (string) $r->label);
+		}, is_array($rows) ? $rows : array());
+	}
+
+	/**
 	 * Situation of a thirdparty for the indicators asked: the ones the user may read, in this order
 	 *
 	 * @param User     $user  User reading (rights of Dolibarr)

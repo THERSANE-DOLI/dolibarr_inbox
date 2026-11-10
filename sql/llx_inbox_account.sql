@@ -46,6 +46,7 @@ CREATE TABLE llx_inbox_account(
 	tags_mode varchar(8) DEFAULT 'global' NOT NULL,
 	usage_profile varchar(16) DEFAULT 'auto' NOT NULL,
 	usage_indicators text DEFAULT NULL,
+	carrier_category integer DEFAULT NULL,
 	color varchar(7) DEFAULT NULL,
 	icon varchar(48) DEFAULT NULL,
 	status smallint DEFAULT 0 NOT NULL,

@@ -2075,6 +2075,8 @@
 					return t('InboxLogUsage', t('InboxUsage_' + (l.before.usage || 'auto')), t('InboxUsage_' + (l.after.usage || 'auto')));
 				case 'indicators':
 					return t(l.after && l.after.ids ? 'InboxLogIndicatorsOwn' : 'InboxLogIndicatorsReset');
+				case 'carriers':
+					return t('InboxLogCarriers');
 				default:
 					return l.action;
 			}
@@ -2234,6 +2236,13 @@
 			} else {
 				indicators = listHtml();
 			}
+			// Usage Transport: the category of the suppliers that are carriers (1.70.0)
+			if (u === 'transport' && (account.carrier_categories || []).length) {
+				indicators += '<div class="ibx-formrow" style="margin-top:var(--ibx-s4)"><label class="ibx-formrow__label" for="ibx-carriers">' + th('InboxCarrierCategory') + '</label><div>'
+					+ '<select class="ibx-field ibx-js-carriers" id="ibx-carriers"><option value="0">' + th('InboxCarrierNone') + '</option>'
+					+ account.carrier_categories.map(c => '<option value="' + c.id + '"' + (c.id === account.carrier_category ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select>'
+					+ '<div class="ibx-formrow__help">' + th('InboxCarrierHelp') + '</div></div></div>';
+			}
 			box.innerHTML = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxUsage') + '</h2>'
 				+ '<p class="ibx-section__help">' + th('InboxUsageHelp') + '</p>'
 				+ '<div class="ibx-usage" role="radiogroup" aria-label="' + th('InboxUsage') + '">'
@@ -2286,9 +2295,20 @@
 				toast(message, { action: t('InboxUndo'), onAction: () => saveList(before, '', true) });
 			}
 		};
-		box.addEventListener('change', e => {
+		box.addEventListener('change', async e => {
 			if (e.target.name === 'usage') {
 				saveUsage(e.target.value, false);
+				return;
+			}
+			if (e.target.classList.contains('ibx-js-carriers')) {
+				try {
+					const res = await post('account', 'carriers', { id: account.id, category: +e.target.value });
+					account.carrier_category = res.carrier_category;
+					toast(t('InboxCarrierSaved'));
+				} catch (err) {
+					toast(err.message, { error: true });
+					paint();
+				}
 			}
 		});
 		box.addEventListener('click', e => {

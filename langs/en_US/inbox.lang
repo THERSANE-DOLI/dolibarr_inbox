@@ -2472,3 +2472,12 @@ InboxPhoneNow = Now: %s
 InboxPhoneEmpty = Empty now
 InboxPhoneReplaceDo = Replace
 InboxPhoneReplaced = Card of the contact updated
+
+# Tracking numbers, carriers (1.70.0)
+InboxCitedTracking = tracking no. %s
+InboxCarrierCategory = Carriers
+InboxCarrierNone = No category
+InboxCarrierHelp = Category of suppliers whose mails speak of our parcels: no situation on their card; the shipment of a tracking number of the mail is in « Cited in the mail ».
+InboxCarrierSaved = Category of the carriers saved
+InboxSituationCarrier = Carrier: no situation. The shipment of a tracking number of the mail is in « Cited in the mail ».
+InboxLogCarriers = Category of the carriers changed

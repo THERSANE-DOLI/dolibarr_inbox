@@ -99,6 +99,7 @@ class InboxAccount extends CommonObject
 		'tags_mode' => array('type' => 'varchar(8)', 'label' => 'InboxTagsMode', 'enabled' => 1, 'position' => 160, 'notnull' => 1, 'default' => 'global', 'visible' => 0),
 		'usage_profile' => array('type' => 'varchar(16)', 'label' => 'InboxUsage', 'enabled' => 1, 'position' => 162, 'notnull' => 1, 'default' => 'auto', 'visible' => 0),
 		'usage_indicators' => array('type' => 'text', 'label' => 'InboxUsageIndicators', 'enabled' => 1, 'position' => 163, 'notnull' => 0, 'visible' => 0),
+		'carrier_category' => array('type' => 'integer', 'label' => 'InboxCarrierCategory', 'enabled' => 1, 'position' => 164, 'notnull' => 0, 'visible' => 0),
 		'color' => array('type' => 'varchar(7)', 'label' => 'InboxColor', 'enabled' => 1, 'position' => 161, 'notnull' => 0, 'visible' => 0),
 		'icon' => array('type' => 'varchar(48)', 'label' => 'InboxIcon', 'enabled' => 1, 'position' => 162, 'notnull' => 0, 'visible' => 0),
 		'status' => array('type' => 'integer', 'label' => 'Status', 'enabled' => 1, 'position' => 500, 'notnull' => 1, 'default' => '0', 'visible' => 1, 'arrayofkeyval' => array(0 => 'Draft', 1 => 'Enabled', 9 => 'Disabled')),
@@ -172,6 +173,8 @@ class InboxAccount extends CommonObject
 	public $usage_profile = 'auto';
 	/** @var string|null Own list of indicators (JSON), null = the list of the usage */
 	public $usage_indicators;
+	/** @var int|null Category of suppliers that are carriers (usage Transport, 1.70.0): no situation for them */
+	public $carrier_category;
 	/** @var string|null Colour of the mailbox (#rrggbb), shared by its users, null = by default */
 	public $color;
 	/** @var string|null Icon of the mailbox (usage name of img/inbox-icon-choices.json), null = the at sign */

@@ -28,7 +28,7 @@ dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators'), true);
+$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators', 'carriers'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -193,6 +193,10 @@ switch ($action) {
 		}
 		$data['indicators'] = InboxSituation::catalogue();
 		$data['usage_own'] = InboxSituation::ownList($account);
+		// Category of the carriers (usage Transport, 1.70.0)
+		$situationOfBox = new InboxSituation($db);
+		$data['carrier_category'] = (int) $account->carrier_category;
+		$data['carrier_categories'] = $situationOfBox->supplierCategories();
 		inboxAjaxReply(array('account' => $data));
 		// no break
 
@@ -299,6 +303,16 @@ switch ($action) {
 			inboxAjaxError($situation->error, 422);
 		}
 		inboxAjaxReply(array('usage' => (string) $account->usage_profile));
+		// no break
+
+	case 'carriers':
+		// Category of the suppliers that are carriers (1.70.0): its managers and the admins
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$situation = new InboxSituation($db);
+		if ($situation->setCarrierCategory($user, $account, (int) inboxAjaxParam('category', 'int')) < 0) {
+			inboxAjaxError($situation->error, 422);
+		}
+		inboxAjaxReply(array('carrier_category' => (int) $account->carrier_category));
 		// no break
 
 	case 'indicators':

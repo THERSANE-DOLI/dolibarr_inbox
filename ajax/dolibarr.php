@@ -99,6 +99,10 @@ switch ($action) {
 			inboxAjaxNotFound();
 		}
 		$situation = new InboxSituation($db);
+		// A carrier writes about our parcels (usage Transport, 1.70.0): no situation, the shipment is in the cited pieces
+		if ($situation->isCarrier($account, $socId)) {
+			inboxAjaxReply(array('usage' => 'transport', 'shown' => array('transport'), 'indicators' => array(), 'carrier' => true));
+		}
 		$kind = $situation->reach('societe', $socId);
 		$list = InboxSituation::listFor($account, (int) ($kind['client'] ?? 0), (int) ($kind['supplier'] ?? 0));
 		inboxAjaxReply(array('usage' => $list['usage'], 'shown' => $list['shown'], 'indicators' => $situation->compute($user, $socId, $list['ids'])));
