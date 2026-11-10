@@ -26,7 +26,9 @@
  * - an attachment of the mail itself (pictures of the body and attachments of attached mails apart);
  * - antivirus: an infected attachment is never given; an attachment not scanned (or too big for the antivirus) only
  *   when the user chose to open it anyway (same « force » as the download of inbox).
- * Read only: a received attachment is not changed (no write method).
+ * Read only: a received attachment is not changed. A module may only put a new file made from it (annotated copy,
+ * C2) in the documents of a piece the user chose, with fileToRecord(): same checks and same link to the mail as the
+ * « Put in the documents of » of inbox.
  */
 
 require_once __DIR__.'/inboxreader.class.php';
@@ -56,6 +58,9 @@ class InboxAttachmentFile
 
 	/** @var string */
 	protected $content = '';
+
+	/** @var object|null Row of the mail in the index of inbox */
+	protected $row = null;
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -127,6 +132,7 @@ class InboxAttachmentFile
 			return -1;
 		}
 		$this->mailId = (int) $mailId;
+		$this->row = $reader->row;
 		$this->part = (int) $part;
 		$this->name = (string) $a['name'];
 		$this->content = (string) $a['content'];
@@ -166,5 +172,73 @@ class InboxAttachmentFile
 	public function getDownloadUrl()
 	{
 		return dol_buildpath('/inbox/ajax/attachment.php', 1).'?id='.$this->mailId.'&part='.$this->part.'&mode=download&force=1';
+	}
+
+	/**
+	 * Piece that may receive a copy of the attachment: the user may write on its type and read it
+	 *
+	 * @param User   $fuser User
+	 * @param string $type  Type of inbox (commande, propal, project, societe...)
+	 * @param int    $id    Id of the piece
+	 * @return array{type:string,id:int,kind:string,ref:string,label:string,url:string}|null Null when not allowed
+	 */
+	public function describeRecord(User $fuser, $type, $id)
+	{
+		require_once __DIR__.'/inboxelements.class.php';
+		$type = (string) $type;
+		if (!isset(InboxElements::TYPES[$type]) || (int) $id <= 0 || !InboxElements::canWriteType($fuser, $type) || !InboxElements::canRead($fuser, $type, (int) $id)) {
+			return null;
+		}
+		global $langs;
+		// Names of the kinds of pieces, outside the pages of inbox too
+		$langs->loadLangs(array('companies', 'propal', 'orders', 'bills', 'supplier_proposal', 'ticket', 'interventions', 'sendings'));
+		$elements = new InboxElements($this->db);
+		$d = $elements->describe($fuser, $type, (int) $id);
+		if (!is_array($d) || empty($d['readable'])) {
+			return null;
+		}
+
+		return array('type' => $type, 'id' => (int) $d['id'], 'kind' => (string) $d['kind'], 'ref' => (string) $d['ref'], 'label' => (string) $d['label'], 'url' => (string) $d['url']);
+	}
+
+	/**
+	 * Put a file made from the loaded attachment (annotated copy) in the documents of a piece: never over a file of the
+	 * same name (« name (2).pdf »), the piece is linked to the mail, written in the journal of the mailbox
+	 *
+	 * @param User   $fuser   User
+	 * @param string $type    Type of inbox
+	 * @param int    $id      Id of the piece
+	 * @param string $name    Name of the file
+	 * @param string $content Content (checked by the module that made it)
+	 * @return string Name written, '' with $this->error when refused
+	 */
+	public function fileToRecord(User $fuser, $type, $id, $name, $content)
+	{
+		global $langs;
+
+		require_once __DIR__.'/inboxcreate.class.php';
+		require_once __DIR__.'/inboxmailref.class.php';
+		require_once __DIR__.'/inboxlink.class.php';
+		require_once __DIR__.'/inboxactionlog.class.php';
+		$langs->load('inbox@inbox');
+		$this->error = '';
+		if ($this->row === null || $this->describeRecord($fuser, $type, $id) === null) {
+			$this->error = $langs->transnoentitiesnoconv('InboxErrorCannotAttach');
+			return '';
+		}
+		$creator = new InboxCreate($this->db);
+		$written = $creator->attach($fuser, (string) $type, (int) $id, (string) $name, (string) $content);
+		if ($written === '') {
+			$this->error = $langs->transnoentitiesnoconv($creator->error ?: 'InboxErrorCannotAttach');
+			return '';
+		}
+		$refs = new InboxMailRef($this->db);
+		$refId = $refs->fetchOrCreate($this->row, $fuser);
+		if ($refId > 0) {
+			(new InboxLink($this->db))->link($refId, (string) $type, (int) $id, $fuser);
+		}
+		InboxActionLog::add($this->db, $fuser, (int) $this->row->fk_account, 'attach', array($this->row), (string) $this->row->folder_path, '', 0, $written);
+
+		return $written;
 	}
 }

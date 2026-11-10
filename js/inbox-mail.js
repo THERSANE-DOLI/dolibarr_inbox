@@ -4868,6 +4868,41 @@
 		loadDolibar(box);
 	}
 	/**
+	 * « Annotate and file… » (C2): antivirus first, then the piece is chosen, then the editor opens in a new tab on the
+	 * attachment (read only); its saving puts a copy in the documents of the piece, the mail stays as it is
+	 */
+	async function annotateStart(box, m, a, editor) {
+		let v;
+		try {
+			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		if (v.blocked) {
+			dialog({ title: a.name, body: banner('danger', 'virus', th('InboxAttInfected', v.message)), noCancel: true, actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }] });
+			return;
+		}
+		if (v.warn) {
+			dialog({
+				title: a.name,
+				body: banner('warning', 'virus-off', th(v.state === 'too_big' ? 'InboxAttTooBig' : 'InboxAttUnscanned')),
+				actions: [{ label: t('InboxOpenAnyway'), primary: true, run: () => {
+					linkDialog(box, { annotate: { m, a, editor, force: true } });
+					return true;
+				} }],
+			});
+			return;
+		}
+		linkDialog(box, { annotate: { m, a, editor, force: false } });
+	}
+	/** The editor on the attachment, with the piece that receives the copy (tab opened at the click, else blocked) */
+	function annotateOpen(opts, type, id) {
+		const url = opts.editor.url.replace(/([?&])force=0(&|$)/, '$1force=' + (opts.force ? 1 : 0) + '$2')
+			+ '&record_type=' + encodeURIComponent(type) + '&record_id=' + encodeURIComponent(id);
+		window.open(url, '_blank', 'noopener');
+	}
+	/**
 	 * « Create ▾ »: the page of creation of Dolibarr opens in a new tab, filled from the mail; the piece saved there is
 	 * linked to the mail (and gets the mail in its documents when the box is ticked)
 	 */
@@ -4917,17 +4952,23 @@
 		const d = box._data;
 		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc.id : 0;
 		const dlg = dialog({
-			title: opts.attach ? t('InboxAttachToTitle', opts.attach.a.name) : t('InboxLinkPieceTitle'),
+			title: opts.annotate ? t('InboxAnnotateTitle', opts.annotate.a.name) : (opts.attach ? t('InboxAttachToTitle', opts.attach.a.name) : t('InboxLinkPieceTitle')),
 			body: '<div class="ibx-linksearch">'
 				+ '<span class="ibx-linksearch__field"><input type="search" class="ibx-field ibx-js-piecesearch" autocomplete="off" placeholder="' + th('InboxSearchPiece') + '" aria-label="' + th('InboxSearchPiece') + '">'
 				+ '<span class="ibx-spinner ibx-linksearch__spin" aria-hidden="true" hidden></span></span>'
 				+ '<button type="button" class="ibx-btn ibx-js-extend" aria-haspopup="menu">' + th('InboxSearchExtend') + ' ' + ic('chevron-down') + '</button></div>'
 				+ '<div class="ibx-linksearch__state ibx-muted" role="status"></div>'
 				+ '<div class="ibx-picklist ibx-js-piecelist" role="listbox" aria-label="' + th('InboxPiecesLinked') + '"></div>',
-			actions: [{ label: opts.attach ? t('InboxAttach') : t('InboxLink'), primary: true, run: async dl => {
+			actions: [{ label: opts.annotate ? t('InboxAnnotateOpen') : (opts.attach ? t('InboxAttach') : t('InboxLink')), primary: true, run: async dl => {
 				const cur = $('[aria-selected="true"]', dl);
 				if (!cur) {
 					return false;
+				}
+				if (opts.annotate) {
+					// Before any wait: a tab opened after an answer is blocked by the browser
+					annotateOpen(opts.annotate, cur.dataset.type, +cur.dataset.id);
+					toast(t('InboxAnnotateOpened'));
+					return true;
 				}
 				if (opts.attach) {
 					await attachToPiece(box, opts.attach.m, opts.attach.a, cur.dataset.type, +cur.dataset.id);
@@ -4941,7 +4982,7 @@
 		const input = $('.ibx-js-piecesearch', dlg);
 		const list = $('.ibx-js-piecelist', dlg);
 		// To link: the pieces linked already are greyed; to put a file in a piece: every piece may receive it
-		const linked = new Set(opts.attach ? [] : d.links.map(l => l.type + ':' + l.id));
+		const linked = new Set(opts.attach || opts.annotate ? [] : d.links.map(l => l.type + ':' + l.id));
 		const state = $('.ibx-linksearch__state', dlg);
 		const spin = $('.ibx-linksearch__spin', dlg);
 		const extendBtn = $('.ibx-js-extend', dlg);
@@ -6736,12 +6777,19 @@
 	 * @returns {Promise<object>}
 	 */
 	function viewersOf(m) {
-		if (!m._viewers) {
-			m._viewers = api('attachment', 'viewers', { id: m.id, part: -1, mode: 'viewers' })
-				.then(r => (r && r.viewers) || {})
-				.catch(() => ({}));
+		return openersOf(m).then(r => r.viewers);
+	}
+	/** Editors of other modules for an attachment, asked with the viewers (C2: annotate and file in a piece) */
+	function editorsOf(m) {
+		return openersOf(m).then(r => r.editors);
+	}
+	function openersOf(m) {
+		if (!m._openers) {
+			m._openers = api('attachment', 'viewers', { id: m.id, part: -1, mode: 'viewers' })
+				.then(r => ({ viewers: (r && r.viewers) || {}, editors: (r && r.editors) || {} }))
+				.catch(() => ({ viewers: {}, editors: {} }));
 		}
-		return m._viewers;
+		return m._openers;
 	}
 
 	/** Time after which the summary says the analysis is still running */
@@ -7990,12 +8038,15 @@
 		const pieces = box && box._data ? box._data.links.filter(l => l.readable) : [];
 		// « Open with… »: the viewers of other modules (office server, Office preview...), after the viewer of inbox
 		const others = ((await viewersOf(m))[a.part] || []).map(v => ({ icon: 'open', label: t('InboxOpenWith', v.label), run: () => openViewer({ mail: m, index, viewer: v }) }));
+		// « Annotate and file… »: the editor of another module, the copy goes in the documents of a piece (C2)
+		const editor = ((await editorsOf(m))[a.part] || [])[0] || null;
+		const annotate = box && editor ? [{ icon: 'compose', label: t('InboxAnnotateFile'), run: () => annotateStart(box, m, a, editor) }] : [];
 		menu(el, [
 			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
 		].concat(others, a.kind === 'pdf' || a.kind === 'image' ? [{ icon: 'external', label: t('InboxOpenNewTab'), key: 'Ctrl+clic', run: () => openInTab(m, index) }] : [], [
 			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
 		]).concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
-			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }]) : [], [HINT()]), at || rectPoint(el));
+			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }], annotate) : [], [HINT()]), at || rectPoint(el));
 	}
 
 	function addressMenu(email, name, el, at) {
