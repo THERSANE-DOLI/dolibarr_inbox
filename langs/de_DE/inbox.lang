@@ -2249,3 +2249,6 @@ InboxCronEverySec = alle %s Sekunden
 InboxDays = Tage
 InboxErrorServerValue = Ungültiger Wert
 InboxSetupServerMoved = Diese Einstellungen sind jetzt in der Anwendung inbox, Einstellungen > Server:
+InboxUpdated = Inbox wurde aktualisiert (Version %s): Laden Sie die Seite neu, um sie zu nutzen.
+InboxReload = Neu laden
+InboxLater = Später

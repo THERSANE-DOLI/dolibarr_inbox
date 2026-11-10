@@ -93,6 +93,7 @@
 			err.status = 0;
 			throw err;
 		}
+		checkVersion(resp.headers.get('X-Inbox-Version'));
 		let json = null;
 		try {
 			json = await resp.json();
@@ -120,6 +121,29 @@
 	}
 
 	/**
+	 * Inbox updated on the server while this page is open (1.58.0): a bar offers to reload, once. Never reloaded by
+	 * itself: a mail being written stays (the writing asks before leaving when it is not saved)
+	 * @param {string|null} server Version sent by the server (X-Inbox-Version)
+	 */
+	let updateShown = false;
+	function checkVersion(server) {
+		const loaded = String(ctx('INBOX_VERSION', ''));
+		if (updateShown || !server || !loaded || server === loaded) {
+			return;
+		}
+		updateShown = true;
+		const bar = document.createElement('div');
+		bar.className = 'ibx-updatebar';
+		bar.setAttribute('role', 'status');
+		bar.innerHTML = ic('info') + '<span>' + esc(t('InboxUpdated', server)) + '</span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-updatereload">' + esc(t('InboxReload')) + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-updateclose" aria-label="' + esc(t('InboxLater')) + '" title="' + esc(t('InboxLater')) + '">' + ic('close') + '</button>';
+		$('.ibx-js-updatereload', bar).addEventListener('click', () => window.location.reload());
+		$('.ibx-js-updateclose', bar).addEventListener('click', () => bar.remove());
+		document.body.appendChild(bar);
+	}
+
+	/**
 	 * Send a file (multipart POST, the token added): attachments of a writing (lot W6)
 	 * @param {string} endpoint File of ajax/ without .php
 	 * @param {string} action   Action
@@ -141,6 +165,7 @@
 			err.status = 0;
 			throw err;
 		}
+		checkVersion(resp.headers.get('X-Inbox-Version'));
 		let json = null;
 		try {
 			json = await resp.json();
