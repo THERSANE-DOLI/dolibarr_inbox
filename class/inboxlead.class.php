@@ -153,10 +153,14 @@ class InboxLead
 		$add('contact', 'firstname', $dn['firstname'], 'name');
 		$add('contact', 'lastname', $dn['lastname'], 'name');
 		// 4. Signature of the mail (its own text, never the quoted one)
-		$own = self::plainLines(self::ownText((string) $message->bodyText));
-		$sig = self::signature($own);
+		// The text the user sees: the HTML converted when there is one (a tool of signatures may put the signature in the
+		// HTML only, « Sent from ... as Plain Text » in the text part)
+		$body = (string) $message->bodyHtml !== '' ? InboxMimeParser::htmlToText((string) $message->bodyHtml) : (string) $message->bodyText;
+		$own = self::plainLines(self::ownText($body));
+		$sig = self::signature($own, $dn);
 		$email0 = strtolower((string) $row->from_email);
 		$dn['domain_label'] = strpos($email0, '@') !== false ? explode('.', (string) InboxTrustedDomain::registrable(substr($email0, strrpos($email0, '@') + 1)))[0] : '';
+		$dn['countries'] = $this->countryNames();
 		foreach (self::parseSignature($sig, $dn) as $part => $fields) {
 			foreach ($fields as $field => $values) {
 				foreach ($values as $v) {
@@ -192,6 +196,7 @@ class InboxLead
 				$add('soc', 'tva_intra', self::frenchVat($siren), 'computed');
 			}
 		}
+		$this->zipTown($out);
 		// A module adds its values and fields (hook inboxLeadExtract)
 		$this->moduleValues($row, $message, $out);
 		$out['private'] = $category === InboxDomains::PUBLIC && empty($out['soc']['name']);
@@ -241,6 +246,63 @@ class InboxLead
 			if (preg_match('/^[a-z0-9_]{1,64}$/', $field)) {
 				$out['fields'][] = array('part' => ($f['part'] ?? '') === 'contact' ? 'contact' : 'soc', 'field' => $field, 'label' => dol_trunc((string) ($f['label'] ?? $field), 60, 'right', 'UTF-8', 1));
 			}
+		}
+	}
+
+	/**
+	 * Countries of the dictionary by their names (English, the language of the user, codes): plain name => id
+	 *
+	 * @return array<string,int>
+	 */
+	protected function countryNames()
+	{
+		global $langs;
+
+		static $cache = null;
+		if ($cache !== null) {
+			return $cache;
+		}
+		$langs->load('dict');
+		$cache = array();
+		$rows = $this->db->getRows("SELECT rowid, code, label FROM ".$this->db->prefix()."c_country WHERE active = 1 AND code IS NOT NULL AND code <> '' LIMIT 400");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			foreach (array((string) $r->label, $langs->transnoentities('Country'.$r->code)) as $n) {
+				$n = self::plain($n);
+				if ($n !== '' && strpos($n, 'country') !== 0) {
+					$cache[$n] = (int) $r->rowid;
+				}
+			}
+		}
+
+		return $cache;
+	}
+
+	/**
+	 * Zip code of a town or town of a zip code from the dictionary of Dolibarr (Setup > Dictionaries > Zip codes),
+	 * when the answer is one
+	 *
+	 * @param array<string,mixed> $out Values found, completed
+	 * @return void
+	 */
+	protected function zipTown(array &$out)
+	{
+		$town = (string) ($out['soc']['town'][0]['value'] ?? '');
+		$zip = (string) ($out['soc']['zipcode'][0]['value'] ?? '');
+		if (($town === '') === ($zip === '')) {
+			return;
+		}
+		$p = $this->db->prefix();
+		$country = (int) ($out['soc']['country_id'][0]['value'] ?? 0);
+		$where = " WHERE active = 1".($country > 0 ? " AND fk_pays = ".$country : "");
+		if ($zip === '') {
+			$rows = $this->db->getRows("SELECT DISTINCT zip as v FROM ".$p."c_ziptown".$where." AND LOWER(town) = '".$this->db->escape(mb_strtolower($town, 'UTF-8'))."' LIMIT 2");
+			$field = 'zipcode';
+		} else {
+			$rows = $this->db->getRows("SELECT DISTINCT town as v FROM ".$p."c_ziptown".$where." AND zip = '".$this->db->escape($zip)."' LIMIT 2");
+			$field = 'town';
+		}
+		if (is_array($rows) && count($rows) === 1 && (string) $rows[0]->v !== '') {
+			$out['soc'][$field][] = array('value' => (string) $rows[0]->v, 'source' => 'dictionary');
 		}
 	}
 
@@ -322,8 +384,12 @@ class InboxLead
 		if (!$intl && strlen($digits) === 10 && $digits[0] === '0') {
 			return implode(' ', str_split($digits, 2));
 		}
+		// Elsewhere: the grouping of the writer kept (« +230 216 95 17 »), only digits, spaces and the « + »
+		$w = preg_replace('/\(0\)/', ' ', $v);
+		$w = preg_replace('/^00/', '+', trim($w));
+		$w = trim(preg_replace('/\s+/', ' ', preg_replace('/[^\d+ ]/', ' ', $w)));
 
-		return ($intl ? '+' : '').$digits;
+		return preg_replace('/^\+\s+/', '+', $w);
 	}
 
 	/**
@@ -369,16 +435,49 @@ class InboxLead
 	 * @param string $own Text of the sender
 	 * @return string
 	 */
-	public static function signature($own)
+	public static function signature($own, array $dn = array())
 	{
-		$lines = preg_split('/\n/', (string) $own);
+		// Lines of the text, without the footers (confidentiality, « Sent from », environment) nor the long lines
+		$lines = array();
+		foreach (preg_split('/\n/', (string) $own) as $l) {
+			$t = trim($l);
+			$p = self::plain($t);
+			if (mb_strlen($t, 'UTF-8') > 160 || preg_match('/^(disclaimer|disclamer|please consider|avant d.imprimer|ce (message|courriel|mail)|this (e-?mail|message)|confidential|confidentialit|sent from|envoye (de|depuis)|gesendet von|inviato da|enviado desde|le contenu de ce)/', $p)) {
+				continue;
+			}
+			$lines[] = $t;
+		}
+		$from = -1;
 		foreach ($lines as $i => $l) {
 			if (preg_match('/^--\s*$/', $l)) {
-				return trim(implode("\n", array_slice($lines, $i + 1, 15)));
+				$from = $i + 1;
 			}
 		}
+		// The line of the name of the sender, else a closing formula
+		$name = self::plain(trim(($dn['firstname'] ?? '').' '.($dn['lastname'] ?? '')));
+		$last = self::plain((string) ($dn['lastname'] ?? ''));
+		// The whole name first, then a short line holding the last name (never an address, a number, a list)
+		foreach (array(true, false) as $exact) {
+			for ($i = count($lines) - 1; $from < 0 && $name !== '' && $i >= 0; $i--) {
+				$p = self::plain($lines[$i]);
+				if ($exact ? $p === $name : (mb_strlen($p, 'UTF-8') <= 60 && mb_strlen($last, 'UTF-8') >= 3 && preg_match('/(^|\s)'.preg_quote($last, '/').'(\s|$)/u', $p)
+					&& strpos($p, ' ') !== false && !preg_match('/[@|\d]|[.!?:]$/', $p))) {
+					$from = $i;
+				}
+			}
+		}
+		for ($i = count($lines) - 1; $from < 0 && $i >= 0; $i--) {
+			if (preg_match('/^(cordialement|bien (a vous|cordialement)|salutations|best regards|kind regards|regards|best|cheers|mit freundlichen gr|viele gr|freundliche gr|cordiali saluti|distinti saluti|saluti|saludos|un saludo|atentamente)\b/', self::plain($lines[$i]))) {
+				$from = $i + 1;
+			}
+		}
+		if ($from >= 0) {
+			return implode("\n", array_slice(array_values(array_filter(array_slice($lines, $from), function ($l) {
+				return $l !== '';
+			})), 0, 15));
+		}
 		$lines = array_values(array_filter($lines, function ($l) {
-			return trim($l) !== '';
+			return $l !== '';
 		}));
 
 		return implode("\n", array_slice($lines, -8));
@@ -408,12 +507,14 @@ class InboxLead
 			// Phones: the label of the line says mobile or fax; else a French 06 / 07 is a mobile
 			if (preg_match_all('/(?:(?:\+\s?|\b00)\d{1,3}[\s.\-]?(?:\(0\)[\s.\-]?)?\d(?:[\s.\-]?\d){6,11}|\b0\d(?:[\s.\-]?\d{2}){4})\b/', $l, $m, PREG_OFFSET_CAPTURE)) {
 				foreach ($m[0] as $p) {
-					$before = self::plain(substr($l, max(0, $p[1] - 20), min(20, $p[1])));
-					if (preg_match('/fax|telecopie/', $before)) {
+					// The label of this piece of the line (« T : ... | M : ... »)
+					$pieces = preg_split('/\s[|\/]\s|\s\|/', substr($l, 0, $p[1]));
+					$before = self::plain(substr((string) end($pieces), -20));
+					if (preg_match('/fax|telecopie|\bf\s*[.:]/', $before)) {
 						continue;
 					}
 					$digits = preg_replace('/\D/', '', preg_replace('/^(\+\s?|00)33\s*(\(0\))?/', '0', $p[0]));
-					$mobile = preg_match('/(mob|port|cell|gsm|handy|movil)/', $before) || preg_match('/^0[67]\d{8}$/', $digits);
+					$mobile = preg_match('/(mob|port|cell|gsm|handy|movil|\bm\s*[.:])/', $before) || preg_match('/^0[67]\d{8}$/', $digits);
 					if ($mobile) {
 						$put('contact', 'phone_mobile', trim($p[0]), $l);
 					} else {
@@ -437,17 +538,53 @@ class InboxLead
 				$put('soc', 'tva_intra', str_replace(' ', '', $m[1]), $l);
 			}
 			// Site
-			if (preg_match('#\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9-]{1,63})*\.[a-z]{2,24})(/[^\s]*)?\b#i', $l, $m) && strpos($l, '@') === false) {
+			$noMail = preg_replace('/\S+@\S+/', ' ', $l);
+			if (preg_match('#\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9-]{1,63})*\.[a-z]{2,24})(/[^\s]*)?\b#i', $noMail, $m) && !preg_match('/^\d/', $m[1])) {
 				$put('soc', 'url', preg_replace('#^https?://#i', '', $m[1]), $l);
 			}
-			// French address: « street, 69003 Lyon » or the street on the line before
-			if (preg_match('/^(.*?)[,\s]+(\d{5})\s+([\p{L}\' \-]{2,60})$/u', $l, $m) && trim($m[1]) !== '' && !preg_match('/\d{6}/', $m[1])) {
+			// French address: « street, 69003 Lyon » or the street on the line before (a line in pieces « - » or with a
+			// label of zip code is read below)
+			$inPieces = (bool) preg_match('/\s-\s|\b(cp|c\.p\.|code postal|plz|zip|postcode|postal code)\b/iu', $l);
+			if ($inPieces) {
+				$m = array();
+			} elseif (preg_match('/^(.*?)[,\s]+(\d{5})\s+([\p{L}\' \-]{2,60})$/u', $l, $m) && trim($m[1]) !== '' && !preg_match('/\d{6}/', $m[1])) {
 				$put('soc', 'address', trim($m[1], " ,"), $l);
 				$put('soc', 'zipcode', $m[2], $l);
 				$put('soc', 'town', trim($m[3]), $l);
-			} elseif (preg_match('/^(\d{5})\s+([\p{L}\' \-]{2,60})$/u', $l, $m)) {
+			} elseif (!$inPieces && preg_match('/^(\d{5})\s+([\p{L}\' \-]{2,60})$/u', $l, $m)) {
 				$put('soc', 'zipcode', $m[1], $l);
 				$put('soc', 'town', trim($m[2]), $l);
+			}
+			// A line of address in pieces: « Freeport Zone N°11 - Mer Rouge Port Louis CP 11609 - Ile Maurice »: a country
+			// of the dictionary at the end, a zip code after its label, the town before it, the rest is the address
+			$segs = array_values(array_filter(array_map('trim', preg_split('/\s+-\s+|\s*,\s*|\s+\|\s+/u', $l)), 'strlen'));
+			$country = 0;
+			if (count($segs) >= 2 && !preg_match('/@/', $l)) {
+				$lastSeg = preg_replace('/^(ile|ile de|ile of|isle of|republic of|republique (de|du|d\')|the)\s+/', '', self::plain(end($segs)));
+				$country = (int) ($dn['countries'][$lastSeg] ?? 0);
+			}
+			if ($country > 0 || preg_match('/\b(cp|c\.p\.|code postal|plz|zip|postcode|postal code|cap)\s*[.:]?\s*((?=[a-z0-9]*\d)[a-z0-9]{3,10}(?:\s[0-9a-z]{3})?)\b/iu', $l)) {
+				if ($country > 0) {
+					$put('soc', 'country_id', (string) $country, $l);
+					array_pop($segs);
+				}
+				foreach ($segs as $k => $seg) {
+					if (preg_match('/^(.*?)\s*\b(?:cp|c\.p\.|code postal|plz|zip|postcode|postal code|cap)\s*[.:]?\s*((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{3,10}(?:\s[0-9A-Za-z]{3})?)\s*(.*)$/iu', $seg, $z)) {
+						$put('soc', 'zipcode', $z[2], $l);
+						$town = trim($z[3]) !== '' ? $z[3] : $z[1];
+						if (trim($town) !== '') {
+							$put('soc', 'town', trim($town), $l);
+						}
+						unset($segs[$k]);
+					} elseif (preg_match('/^(\d{4,5})\s+(\D{2,60})$/u', $seg, $z)) {
+						$put('soc', 'zipcode', $z[1], $l);
+						$put('soc', 'town', trim($z[2]), $l);
+						unset($segs[$k]);
+					}
+				}
+				if ($segs && preg_match('/\d/', implode(' ', $segs))) {
+					$put('soc', 'address', implode(', ', $segs), $l);
+				}
 			}
 			// Street without its zip code on the line: « 56, rue des lilas »; a zone just before joins it
 			if (preg_match('/^\d{1,4}\s*(bis|ter|[a-c])?\s*,?\s*(rue|avenue|av\.?|boulevard|bd|chemin|route|rte|place|all[ée]e|impasse|quai|cours|square|voie|lieu[- ]dit|chauss[ée]e|faubourg|street|road|lane|strasse|stra[ßs]e|str\.|weg|platz|via|viale|piazza|calle|avenida|plaza|carrer)\b/iu', $l) && !preg_match('/\d{5}/', $l)) {
@@ -493,7 +630,8 @@ class InboxLead
 			}
 		}
 
-		return $out;
+		// A form has several fields: one « Address: » in a mail written by hand is no form
+		return count(array_unique(array_column($out, 0))) >= 2 ? $out : array();
 	}
 
 	/**

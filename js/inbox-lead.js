@@ -36,7 +36,7 @@
 		['contact', 'firstname', 'InboxLeadFirstname', true], ['contact', 'lastname', 'InboxLeadLastname', true], ['contact', 'poste', 'InboxLeadJob', true],
 		['contact', 'phone_mobile', 'InboxLeadMobile', true], ['contact', 'phone_pro', 'InboxLeadPhonePro', false], ['contact', 'email', 'InboxLeadEmail', true],
 	];
-	const SOURCES = ['header', 'vcard', 'name', 'signature', 'form', 'domain', 'sender', 'computed'];
+	const SOURCES = ['header', 'vcard', 'name', 'signature', 'form', 'domain', 'sender', 'computed', 'dictionary'];
 
 	let current = null;
 

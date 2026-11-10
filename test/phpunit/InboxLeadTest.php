@@ -177,7 +177,21 @@ class InboxLeadTest extends InboxTestCase
 		// its zip code, the company named by the domain
 		$this->assertSame('+33 1 99 00 12 34', InboxLead::cleanValue('phone', '+ 33 199 00 12 34<tel: %20+%2033 199%2000%2012%2034>'));
 		$this->assertSame('01 99 00 12 34', InboxLead::formatPhone('01.99.00.12.34'));
-		$this->assertSame('+4930123456', InboxLead::formatPhone('0049 (0)30 123 456'));
+		$this->assertSame('+49 30 123 456', InboxLead::formatPhone('0049 (0)30 123 456'), 'the grouping of the writer kept');
+		// A signature without « -- » found by the name of the sender, footers left out; a line of address in pieces
+		$sig = InboxLead::signature("Merci,\nCordialement,\nAvnish APPA\nIngénieur Bureau d'Etudes\nFreeport Zone N°11 - Mer Rouge Port Louis CP 11609 - Ile Maurice\n"
+			."T : +230 216 95 17 | M : +230 5491 7493\na.appa@zzlead.example | www.zzlead.example |\nPlease consider the environment before printing this email", array('firstname' => 'Avnish', 'lastname' => 'APPA'));
+		$this->assertStringStartsWith('Avnish APPA', $sig);
+		$this->assertStringNotContainsString('environment', $sig);
+		$p = InboxLead::parseSignature($sig, array('countries' => array('maurice' => 152)));
+		$this->assertSame(array('Freeport Zone N°11'), array_column($p['soc']['address'], 0));
+		$this->assertSame(array('11609'), array_column($p['soc']['zipcode'], 0));
+		$this->assertSame(array('Mer Rouge Port Louis'), array_column($p['soc']['town'], 0));
+		$this->assertSame(array('152'), array_column($p['soc']['country_id'], 0));
+		$this->assertSame(array('+230 216 95 17'), array_column($p['soc']['phone'], 0), '« T : » a phone');
+		$this->assertSame(array('+230 5491 7493'), array_column($p['contact']['phone_mobile'], 0), '« M : » a mobile');
+		$this->assertSame(array('www.zzlead.example'), array_column($p['soc']['url'], 0), 'the site of a line with an address');
+		$this->assertSame(array(), InboxLead::labelPairs("Shipyard: CNOI\nAddress: Freeport Zone"), 'one known label is no form');
 		$this->assertSame('', InboxLead::formatPhone('12 34'));
 		$this->assertSame('', InboxLead::cleanValue('email', 'not an address'));
 		$this->assertSame('www.zzlead.example', InboxLead::cleanValue('url', 'https://www.Zzlead.example/contact'), 'no scheme, no path, lower case');

@@ -2828,6 +2828,7 @@ InboxLeadSource_form = Formular
 InboxLeadSource_domain = Domain
 InboxLeadSource_sender = Absender
 InboxLeadSource_computed = berechnet
+InboxLeadSource_dictionary = Wörterbuch
 InboxLeadDupTitle = Schon in Dolibarr?
 InboxLeadWhy_domain = gleiche Domain
 InboxLeadWhy_phone = gleiche Telefonnummer

@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: panel « New customer », signature found and read better :   1.79.3
+  - the HTML of the mail is read (a tool of signatures may leave « Sent from ... as Plain Text » in the text part);
+    the signature found after « -- », else from the line of the name of the sender, else after a closing formula,
+    never in the footers (confidentiality, environment, « Sent from »).
+  - short labels « T : » (phone) and « M : » (mobile) per piece of a line; the site of a line holding an email; a
+    line of address in pieces (« street - town CP 11609 - country »): zip code after its label, town, country of the
+    dictionary; zip code or town from the dictionary of zip codes when it gives one answer; phones of other
+    countries keep their grouping.
+  - « Label: value » lines kept only when the mail has two known labels at least (a form), never one « Address: »
+    of a mail written by hand.
+
 - FIX: panel « New customer », values cleaned before they are offered and when they are received: no target of a
   link (« Tel: + 33 199 00 12 34<tel:...> » of a HTML mail), phones written plainly (+33 1 99 00 12 34), emails
   checked, site without its scheme, identifiers without spaces; a street without its zip code and the company named
