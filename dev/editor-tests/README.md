@@ -12,7 +12,8 @@ Never shipped, never served (`dev/.htaccess`).
 - jsdom has no layout: what ProseMirror measures is given flat, and the pictures are « loaded » at 400 x 200.
 - What is covered (editor.test.mjs): pictures (data: source and size kept, corners to resize, bar of the picture:
   sizes, proportions, alternative text, removal), variables of a template, tables in inline styles, formatting,
-  selection read and replaced (AI of the writing).
+  selection read and replaced (AI of the writing), inline styles kept (signatures, templates, texts pasted from
+  Outlook or Word: styles of spans, links, old tables, text outside blocks, div holding blocks).
 - What is covered (dictation.test.mjs, js/inbox-dictation.js with a fake speech recognition): receiver of the voice
   told from the browser (Chrome, Edge, Safari, others, none in Firefox and Brave), button per mailbox, consent
   asked once and sent with the mailbox, refused by the server, words inserted at the cursor (escaped), what is being

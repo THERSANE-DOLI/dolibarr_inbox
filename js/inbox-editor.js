@@ -191,7 +191,12 @@
 					colwidth: Object.assign({}, parent.colwidth || {}, {
 						parseHTML: el => {
 							const c = el.getAttribute('data-colwidth') || el.getAttribute('width');
-							return c && /^[\d,]+$/.test(c) ? c.split(',').map(n => parseInt(n, 10)) : null;
+							if (c && /^[\d,]+$/.test(c)) {
+								return c.split(',').map(n => parseInt(n, 10));
+							}
+							// A width in px written as a style (a signature made elsewhere), on a cell of one column
+							const w = /^(\d{1,4})px$/.exec(el.style.width || '');
+							return w && (+el.getAttribute('colspan') || 1) === 1 ? [+w[1]] : null;
 						},
 						renderHTML: a => (a.colwidth ? { 'data-colwidth': a.colwidth.join(',') } : {}),
 					}),
@@ -206,6 +211,184 @@
 				});
 			},
 		});
+		// ---------- Inline styles kept (1.51.0) ----------
+		// A signature copied from Dolibarr, a template, a text pasted from another software carry inline styles (size,
+		// font, line height, colour of a link, width of a table) that no button of the editor makes: each node and mark
+		// keeps its style as written, except the properties an attribute of the editor already owns (written by it, the
+		// buttons change them). Kept as written (never el.style, which splits text-decoration into longhands Outlook
+		// does not read).
+		/** Declarations of a style attribute as written: [[property, value]] (a ; inside quotes or brackets kept) */
+		const declarations = css => {
+			const out = [];
+			let cur = '';
+			let depth = 0;
+			let quote = '';
+			for (const ch of String(css || '')) {
+				if (quote) {
+					quote = ch === quote ? '' : quote;
+				} else if (ch === '"' || ch === '\'') {
+					quote = ch;
+				} else if (ch === '(') {
+					depth++;
+				} else if (ch === ')') {
+					depth = Math.max(0, depth - 1);
+				} else if (ch === ';' && !depth) {
+					out.push(cur);
+					cur = '';
+					continue;
+				}
+				cur += ch;
+			}
+			out.push(cur);
+			return out.map(d => {
+				const i = d.indexOf(':');
+				return i > 0 ? [d.slice(0, i).trim().toLowerCase(), d.slice(i + 1).trim()] : null;
+			}).filter(d => d && d[0] && d[1] !== '');
+		};
+		/** Properties owned by an attribute of the editor, by node or mark */
+		const OWNED = {
+			textStyle: /^(color|background-color|background)$/,
+			paragraph: /^text-align$/,
+			heading: /^text-align$/,
+			tableCell: /^(background-color|background|border.*|padding.*|text-align|vertical-align|width)$/,
+			tableHeader: /^(background-color|background|border.*|padding.*|text-align|vertical-align|width)$/,
+			image: /^(width|height)$/,
+		};
+		/** Written by a mark of the editor (bold, italic, underline, strike): the button can take it off */
+		const MARKED = d => (d[0] === 'font-weight' && /^(bold(er)?|[5-9]\d{2,})$/i.test(d[1])) || (d[0] === 'font-style' && /^italic$/i.test(d[1]))
+			|| (d[0] === 'text-decoration' && /^(underline|line-through)$/i.test(d[1]));
+		const keptStyle = (type, el) => {
+			let decl = declarations(el.getAttribute('style'));
+			// Spans one inside the other make one mark: the styles of the spans around are taken in, the inner one wins
+			if (type === 'textStyle') {
+				for (let p = el.parentElement; p && p.tagName === 'SPAN'; p = p.parentElement) {
+					decl = declarations(p.getAttribute('style')).concat(decl);
+				}
+			}
+			const owned = OWNED[type];
+			const byName = new Map();
+			decl.forEach(d => {
+				if ((owned && owned.test(d[0])) || ((type === 'textStyle' || type === 'link') && MARKED(d))) {
+					return;
+				}
+				// The table: its full width and centring are attributes of the editor
+				if (type === 'table' && ((d[0] === 'width' && d[1] === '100%') || (/^margin-(left|right)$/.test(d[0]) && d[1] === 'auto'))) {
+					return;
+				}
+				byName.delete(d[0]);
+				byName.set(d[0], d[1]);
+			});
+			return byName.size ? Array.from(byName, d => d[0] + ':' + d[1]).join(';') : null;
+		};
+		const STYLED = ['textStyle', 'link', 'paragraph', 'heading', 'blockquote', 'bulletList', 'orderedList', 'listItem', 'table', 'tableRow', 'tableCell', 'tableHeader', 'image'];
+		const inlineStyles = T.Extension.create({
+			name: 'inboxInlineStyles',
+			addGlobalAttributes() {
+				// HTML attributes of the old tables of mails (spacing and borders of the browser else)
+				const html = name => ({ default: null, parseHTML: el => el.getAttribute(name), renderHTML: a => (a[name] !== null && a[name] !== undefined ? { [name]: a[name] } : {}) });
+				return STYLED.map(type => ({
+					types: [type],
+					attributes: {
+						inlineStyle: {
+							default: null,
+							parseHTML: el => keptStyle(type, el),
+							renderHTML: a => (a.inlineStyle ? { style: a.inlineStyle } : {}),
+						},
+					},
+				})).concat([
+					{ types: ['table'], attributes: { border: html('border'), cellpadding: html('cellpadding'), cellspacing: html('cellspacing') } },
+					{ types: ['tableCell', 'tableHeader'], attributes: { valign: html('valign'), height: html('height') } },
+				]);
+			},
+		});
+		/**
+		 * Paragraph that stays a <div> when it was one: a signature or a template made of divs keeps its spacing (a <p>
+		 * has margins in every mail software). A div holding blocks is not a paragraph: its content is read as it is.
+		 */
+		const paragraphNode = T.Node.create({
+			name: 'paragraph',
+			priority: 1000,
+			group: 'block',
+			content: 'inline*',
+			addAttributes() {
+				return { div: { default: false, parseHTML: el => el.tagName === 'DIV', renderHTML: () => ({}) } };
+			},
+			parseHTML() {
+				return [{ tag: 'p' }, { tag: 'div', getAttrs: el => (el.querySelector(':scope > :is(div, p, table, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, hr, pre)') ? false : null) }];
+			},
+			renderHTML({ node, HTMLAttributes }) {
+				return [node.attrs.div ? 'div' : 'p', HTMLAttributes, 0];
+			},
+			addCommands() {
+				return { setParagraph: () => ({ commands }) => commands.setNode(this.name) };
+			},
+			addKeyboardShortcuts() {
+				return { 'Mod-Alt-0': () => this.editor.commands.setParagraph() };
+			},
+		});
+		/**
+		 * Text outside any block (« <br>Thanks.<br>Regards. », a cell, the text after a table) put in <div>: the editor
+		 * would wrap it in <p>, whose margins move everything down
+		 */
+		const INHERITED = /^(font|font-family|font-size|font-style|font-weight|color|line-height|letter-spacing|text-align|text-transform)$/;
+		const BLOCK = /^(DIV|P|TABLE|THEAD|TBODY|TFOOT|TR|TD|TH|UL|OL|LI|BLOCKQUOTE|H[1-6]|HR|PRE|COLGROUP|COL|CAPTION)$/;
+		const looseInDivs = html => {
+			const s = String(html || '');
+			if (!s.includes('<')) {
+				return s;
+			}
+			const doc = new DOMParser().parseFromString('<body>' + s + '</body>', 'text/html');
+			// Ordinary blanks of a text made one space (the same for the browser): the editor drops a text « \n&nbsp;\n »
+			// as if it were a line break between tags, and an empty line of the signature went with it
+			const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+			for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+				if (!n.parentElement.closest('pre') && /[\t\r\n]/.test(n.nodeValue)) {
+					n.nodeValue = n.nodeValue.replace(/[ \t\r\n]+/g, ' ');
+				}
+			}
+			const wrap = parent => {
+				let run = [];
+				const flush = before => {
+					if (run.some(n => n.nodeType === 1 || n.textContent.trim() !== '')) {
+						const div = doc.createElement('div');
+						parent.insertBefore(div, before);
+						run.forEach(n => div.appendChild(n));
+					}
+					run = [];
+				};
+				Array.from(parent.childNodes).forEach(n => {
+					if (n.nodeType === 1 && BLOCK.test(n.tagName)) {
+						flush(n);
+					} else if (n.nodeType === 1 || n.nodeType === 3) {
+						run.push(n);
+					}
+				});
+				flush(null);
+			};
+			// Only where text and blocks can stand side by side (a <p> or a div of text is already a paragraph)
+			[doc.body].concat(Array.from(doc.body.querySelectorAll('td, th, li, blockquote, div'))).forEach(el => {
+				if (el.tagName !== 'DIV' || Array.from(el.children).some(c => BLOCK.test(c.tagName))) {
+					wrap(el);
+				}
+			});
+			// A div holding blocks is no node of the editor: what its style gives to its content (font, size, colour of a
+			// text pasted from Outlook or Word) goes down to its blocks, theirs winning
+			doc.body.querySelectorAll('div[style]').forEach(el => {
+				if (!Array.from(el.children).some(c => BLOCK.test(c.tagName))) {
+					return;
+				}
+				const inherited = declarations(el.getAttribute('style')).filter(d => INHERITED.test(d[0]));
+				if (!inherited.length) {
+					return;
+				}
+				Array.from(el.children).forEach(c => {
+					const own = declarations(c.getAttribute('style'));
+					const names = new Set(own.map(d => d[0]));
+					c.setAttribute('style', inherited.filter(d => !names.has(d[0])).concat(own).map(d => d[0] + ':' + d[1]).join(';'));
+				});
+			});
+			return doc.body.innerHTML;
+		};
 		const STRIPE = '#f6f8fa';
 		const HEAD = '#eef2f7';
 		/** Table around the cursor */
@@ -379,9 +562,10 @@
 				o = o || {};
 				editor = new T.Editor({
 					element: el,
-					content: o.html || '',
+					content: looseInDivs(o.html || ''),
 					extensions: [
 						T.StarterKit.configure({
+							paragraph: false,
 							heading: { levels: [2, 3, 4] },
 							link: { openOnClick: false, autolink: true, protocols: ['mailto', 'tel'], HTMLAttributes: { rel: 'noopener noreferrer', target: null } },
 						}),
@@ -398,6 +582,8 @@
 						cellExt(T.TableCell),
 						cellExt(T.TableHeader),
 						varNode,
+						paragraphNode,
+						inlineStyles,
 					],
 					editorProps: {
 						handlePaste: (view, ev) => {
@@ -435,16 +621,31 @@
 				}
 			},
 			getHtml() {
-				return editor ? editor.getHTML() : '';
+				if (!editor) {
+					return '';
+				}
+				const html = editor.getHTML();
+				if (!html.includes('data-colwidth')) {
+					return html;
+				}
+				// Width of a column chosen in the editor written as width="" too (read by every mail software, and by a
+				// signature, which the server does not rewrite); data-colwidth stays for the editor reopened
+				const box = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html').body;
+				box.querySelectorAll('td[data-colwidth], th[data-colwidth]').forEach(c => {
+					if (/^\d{1,4}$/.test(c.getAttribute('data-colwidth'))) {
+						c.setAttribute('width', c.getAttribute('data-colwidth'));
+					}
+				});
+				return box.innerHTML;
 			},
 			setHtml(html) {
 				if (editor) {
-					editor.commands.setContent(html || '', { emitUpdate: false });
+					editor.commands.setContent(looseInDivs(html || ''), { emitUpdate: false });
 				}
 			},
 			insertHtml(html) {
 				if (editor) {
-					chain().insertContent(tightBlocks(html)).run();
+					chain().insertContent(looseInDivs(tightBlocks(html))).run();
 				}
 			},
 			/** A variable of a template put at the cursor */

@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: signature edited formatted, inline styles kept by the editor, signature imported from an HTML file :   1.51.0
+  - the signature of an identity is edited with the editor of the writing (bold, italic, underline, colour, link,
+    picture by its web address, undo), its HTML source one button away.
+  - « Import an HTML file » next to « Import from Dolibarr »: the body of the file only, scripts and style sheets
+    left out; the pictures with a local address are named (they would not show in the mails).
+  - the editor keeps the inline styles that no button makes (size, font, line height, colour and decoration of a
+    link, width of a table) in signatures, templates and writings: a signature copied from Dolibarr is drawn as
+    before, checked on the signatures and mail templates of a real database.
+  - text outside any block kept in <div> instead of <p> (no margins added), an empty line « <br>&nbsp; » kept,
+    border/cellpadding/cellspacing/valign of the old tables kept, a cell width in px kept and written for the mail
+    software, the font of a div holding blocks given to them (a text pasted from Outlook or Word).
+
 - FIX: toasts and sending bars can be closed :   1.50.1
   - a cross closes every toast, and the bar of a sent, failed or scheduled mail (not the countdown before sending).
   - the sending bar takes the font of the inbox (it showed in the browser serif font) and is stacked under the

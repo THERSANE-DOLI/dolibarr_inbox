@@ -164,3 +164,68 @@ test('HTML with line breaks between blocks (an answer of the AI): no empty parag
 	assert.doesNotMatch(ed.getHtml(), /<p><\/p>/);
 });
 
+
+// ---------- Inline styles kept (1.51.0): signatures, templates, texts pasted from another software ----------
+/** Declarations of a style attribute, normalised (property: value), whatever the serialisation of the DOM */
+const styles = html => (html.match(/style="[^"]*"/g) || []).join(';').toLowerCase().replace(/\s+/g, '');
+
+test('inline styles that no button makes are kept: size, font, line height, colour and decoration of a link', async () => {
+	const { ed } = await editorWith('<div><span style="font-family:arial,helvetica,sans-serif"><span style="color:#d31b11"><span style="font-size:18px"><strong>Prénom NOM</strong></span></span></span><br>'
+		+ '<a href="https://example.com/" style="color:#666;text-decoration:none;line-height:15px">example.com</a></div>');
+	const s = styles(ed.getHtml());
+	assert.match(s, /font-size:18px/);
+	assert.match(s, /font-family:arial,helvetica,sans-serif/, 'the style of the spans around taken in');
+	assert.match(s, /text-decoration:none/);
+	assert.match(s, /line-height:15px/);
+	assert.match(ed.getHtml(), /<strong>Prénom NOM<\/strong>/);
+});
+
+test('text outside any block goes in a <div> (no margin of <p>), an empty line « <br>&nbsp; » kept', async () => {
+	const { ed } = await editorWith('<br />\nCordialement.<br />\n&nbsp;\n<table><tr><td>cellule</td></tr></table>\nAprès');
+	const html = ed.getHtml();
+	assert.match(html, /^<div><br>Cordialement\.<br>&nbsp;<\/div>/);
+	assert.match(html, /<td[^>]*><div>cellule<\/div><\/td>/);
+	assert.match(html, /<div>Après<\/div>$/);
+	assert.equal(ed.getHtml(), (await editorWith(html)).ed.getHtml(), 'the same once more through the editor');
+});
+
+test('a paragraph typed stays a <p>, a <div> read stays a <div>', async () => {
+	const { ed } = await editorWith('<p>Un</p><div style="text-align:left">Deux</div>');
+	assert.match(ed.getHtml(), /^<p>Un<\/p><div style="text-align: ?left;?">Deux<\/div>$/);
+});
+
+test('old tables of mails: border, cellpadding, cellspacing, valign and a width in px of a cell kept', async () => {
+	const { ed } = await editorWith('<table border="0" cellpadding="0" cellspacing="0" style="width:600px"><tr><td style="width:280px" valign="top">A</td><td>B</td></tr></table>');
+	const html = ed.getHtml();
+	assert.match(html, /border="0"/);
+	assert.match(html, /cellpadding="0"/);
+	assert.match(html, /cellspacing="0"/);
+	assert.match(html, /valign="top"/);
+	assert.match(styles(html), /width:600px/);
+	assert.match(html, /<td[^>]*width="280"/, 'width of the column written for the mail software');
+});
+
+test('a div holding blocks gives its font to them (a text pasted from Outlook or Word)', async () => {
+	const { ed } = await editorWith('<div style="font-family:Calibri,sans-serif;font-size:11pt"><p style="margin:0cm"><span style="color:#1F497D">Cordialement,</span></p><p style="margin:0cm;font-size:9pt">Nom</p></div>');
+	const html = ed.getHtml();
+	assert.equal((styles(html).match(/font-family:calibri,sans-serif/g) || []).length, 2, 'on both paragraphs');
+	assert.match(styles(html), /font-size:9pt/, 'the own style of a block wins');
+});
+
+test('bold, italic and underline written as styles become marks, never doubled', async () => {
+	const { ed } = await editorWith('<p><a href="https://example.com/" style="font-weight:bold;color:#d31b11">lien</a> <span style="font-style:italic;font-size:12px">it</span></p>');
+	const html = ed.getHtml();
+	assert.match(html, /<strong>lien<\/strong>/);
+	assert.match(html, /<em>it<\/em>/);
+	assert.doesNotMatch(styles(html), /font-weight|font-style/, 'the button can take them off');
+	assert.match(styles(html), /font-size:12px/);
+});
+
+test('the colour button changes a colour read from a style (owned by the editor, not doubled)', async () => {
+	const { ed } = await editorWith('<p><span style="color:#ff0000;font-size:14px">texte</span></p>');
+	ed.raw().commands.selectAll();
+	ed.exec('color', '#00ff00');
+	const s = styles(ed.getHtml());
+	assert.doesNotMatch(s, /#ff0000|rgb\(255,0,0\)/);
+	assert.match(s, /font-size:14px/);
+});
