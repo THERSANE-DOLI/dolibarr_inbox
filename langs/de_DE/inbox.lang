@@ -2305,4 +2305,7 @@ InboxTrustDialogLinksHelp = Haken Sie eine Domain der Links nur an, wenn sie zur
 InboxTrustDialogButton = Anerkennen
 InboxTrustDialogNone = Haken Sie mindestens eine Domain an.
 InboxTrustDialogLookalike = Ähnelt %s (%s): Prüfen Sie es doppelt, bevor Sie es anerkennen.
+InboxTrustDialogSenderOwn = %s ist die Domain Ihrer Postfächer: Inbox kennt sie bereits, sie wird nie in diese Liste aufgenommen.
+InboxTrustDialogSenderOpen = %s ist ein für alle offener Dienst (E-Mail, E-Mail-Marketing, Hosting): Er kann nicht anerkannt werden.
+InboxTrustDialogSenderUnproven = %s wird nicht angeboten: Diese E-Mail ist für diese Domain nicht authentifiziert (DMARC oder DKIM). Fügen Sie sie nach der Prüfung unter Einstellungen > Anerkannte Domains hinzu.
 InboxTrustDialogDone = Anerkannt: %s

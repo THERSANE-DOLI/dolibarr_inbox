@@ -6841,6 +6841,10 @@
 		const likeNote = like => like ? '<div class="ibx-trustlike">' + ic('warning') + ' ' + th('InboxTrustDialogLookalike', like.domain, like.label) + '</div>' : '';
 		const check = (value, checked, like, extra) => '<label class="ibx-check"><input type="checkbox" name="domains" value="' + esc(value) + '"' + (checked && !like ? ' checked' : '') + '> <b>' + esc(value) + '</b>' + (extra ? ' <span class="ibx-muted">' + extra + '</span>' : '') + '</label>' + likeNote(like);
 		let body = '<p class="ibx-section__help">' + th('InboxTrustDialogHelp') + '</p><form class="ibx-form" novalidate>';
+		if (!offer.sender && offer.sender_why) {
+			// Not offered, and why (own domain, open service, not authenticated)
+			body += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSender') + '</span><div class="ibx-muted">' + th(offer.sender_why, (m.from.email || '').split('@')[1] || '') + '</div></div>';
+		}
 		if (offer.sender) {
 			body += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSender') + '</span><div>'
 				+ check(offer.sender.domain, true, offer.sender.like, th('InboxTrustDialogAuth') + ' SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc))

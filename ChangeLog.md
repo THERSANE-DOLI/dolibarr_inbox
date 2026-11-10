@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « Recognize this domain… » offered the social networks of a signature, and the sender left out silently :   1.59.1
+  - social networks and public platforms (facebook.com, linkedin.com, x.com, youtube.com, google.com...) are open
+    services: refused, never offered.
+  - the dialog says why the sender is not offered: domain of your mailboxes, open service, or mail not authenticated.
+
 - NEW: recognized domains and lookalike domains :   1.59.0
   - Settings > Recognized domains (new right « Manage the recognized domains »): a short list of domains of
     organisations with their name and the source of the check; public suffixes, free mail, emailing, hosting and

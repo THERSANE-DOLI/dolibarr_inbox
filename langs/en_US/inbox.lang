@@ -2305,4 +2305,7 @@ InboxTrustDialogLinksHelp = Check a domain of the links only if it belongs to th
 InboxTrustDialogButton = Recognize
 InboxTrustDialogNone = Check at least one domain.
 InboxTrustDialogLookalike = Looks like %s (%s): check it twice before recognizing it.
+InboxTrustDialogSenderOwn = %s is the domain of your mailboxes: inbox knows it already, it is never added to this list.
+InboxTrustDialogSenderOpen = %s is a service open to anyone (mail, emailing, hosting): it cannot be recognized.
+InboxTrustDialogSenderUnproven = %s is not offered: this mail is not authenticated for it (DMARC or DKIM). Add it in Settings > Recognized domains after checking it.
 InboxTrustDialogDone = Recognized: %s
