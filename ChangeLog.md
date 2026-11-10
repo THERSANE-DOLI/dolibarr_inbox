@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: panel of the rules, nothing opened any more after a change :   1.71.1
+  - after a rule saved from the panel (created, applied, turned on or off, moved), « New rule » and a click on a rule
+    opened nothing: the reply of the save had no folders, tags nor addresses of the mailbox. Every reply that gives
+    the state of the rules (get, save, undo) has them now.
+
 - NEW: new logo, bolder and readable at small size :   1.71.0
   - the messenger bird on the envelope redrawn in solid shapes (the thin line vanished under 32 px), centred on the
     envelope; on the plum background of the application icons the wing is translucent white.
