@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: mailboxes in the panel chosen from the menu of the folders panel :   1.50.0
+  - the « ⋯ » menu of the panel offers the choice of My account: automatic (by screen size), all the mailboxes,
+    one mailbox at a time; the panel is drawn again at once, the choice kept for the user.
+
 - NEW: a mailbox clicked opens its Inbox, a folded mailbox stands for its Inbox :   1.49.0
   - only the arrow of a mailbox folds or unfolds it; a click on its name opens its Inbox without unfolding it.
   - folded, its row shows the unread of its Inbox, « +N » for the unread of its other folders (Sent, Drafts,

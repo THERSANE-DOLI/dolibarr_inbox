@@ -8749,7 +8749,16 @@
 				saveParam('folder_order', '{}');
 				renderTree();
 			} },
-		])));
+			// Mailboxes in the panel (1.50.0): the choice of My account, at hand
+			{ header: t('InboxTreeMode') },
+		].concat(['auto', 'all', 'single'].map(mode => ({ label: t('InboxTreeModeMenu_' + mode), checked: (params.tree_mode || 'auto') === mode, run: () => {
+			if ((params.tree_mode || 'auto') === mode) {
+				return;
+			}
+			saveParam('tree_mode', mode);
+			S.pickOpen = false;
+			renderTree();
+		} }))))));
 
 		const readPaneEl = $('.ibx-pane--read', el);
 		readPaneEl.addEventListener('dragstart', e => {
