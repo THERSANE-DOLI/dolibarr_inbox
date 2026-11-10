@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: « Annotate and file in a piece… » for the attachments, with the editors of other modules (C2) :   1.56.0
+  - in the menu of an attachment when a module declares an editor for its type (hook inboxAttachmentViewers, results
+    inboxAttachmentEditors): antivirus first, then the piece is chosen like « Put in the documents of », then the
+    editor opens in a new tab on the attachment, read only
+  - its saving puts a copy in the documents of the piece by inbox (InboxAttachmentFile::fileToRecord: write rights on
+    the piece, never over an existing file, piece linked to the mail, journal of the mailbox); the mail stays as it is
+
 - NEW: « Open with… » for the attachments, with the viewers of other modules (C1) :   1.55.0
   - hook inboxAttachmentViewers: a module says what it can open (office server, Office preview, PDF tools...), inbox
     shows it in the menu of the attachment and in its own viewer window; inbox never knows the name of the module.
