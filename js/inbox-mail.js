@@ -1483,10 +1483,18 @@
 		return (row.tags || []).map(k => {
 			const d = defs.find(x => x.keyword.toLowerCase() === String(k).toLowerCase());
 			if (!d) {
-				return '';
+				return userKeyword(k) ? '<span class="ibx-tag ibx-tag--unknown" title="' + th('InboxTagUnknown', String(k)) + '">' + esc(String(k)) + '</span>' : '';
 			}
 			return Dolibarr.tools.inboxColors.badge(d, d.view);
 		}).join(' ');
+	}
+	/**
+	 * Keyword set by a person in another software (a tag of Thunderbird not in the list: other keyword than the tag of
+	 * the same name), shown raw; never the system keywords ($Forwarded, $MDNSent, $Junk, Junk, NonJunk...)
+	 */
+	function userKeyword(k) {
+		const l = String(k).toLowerCase();
+		return /^\$label\d+$/.test(l) || (l !== '' && l[0] !== '$' && !['junk', 'nonjunk', 'notjunk'].includes(l));
 	}
 
 	/** Correspondent of a row: the recipient in Sent and Drafts */

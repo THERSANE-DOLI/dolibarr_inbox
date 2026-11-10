@@ -266,6 +266,9 @@
 }
 /* Dark text on a light colour (js/inbox-colors.js darkText) */
 .ibx-tag--dark { color: #111111; }
+.ibx-tagkeyword { font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); white-space: nowrap; }
+/* Keyword of another software, not in the list of the tags: neutral, dashed, the raw keyword */
+.ibx-tag--unknown { color: var(--ibx-text-muted, var(--ibx-text)); background: transparent; outline: 1px dashed var(--ibx-border); outline-offset: -1px; font-weight: 500; }
 /* Border chosen per tag: around the badge, in the colour of the text of the theme, a mark that does not rely on the
    colour (the background and the label stay as they are) */
 .ibx-tag--b-solid, .ibx-tag--b-dashed, .ibx-tag--b-dotted, .ibx-tag--b-double { outline-offset: 1px; margin-inline: 0.25rem; }

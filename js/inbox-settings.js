@@ -2168,6 +2168,29 @@
 		return dlg;
 	}
 
+	/**
+	 * Same tags in Thunderbird: a tag is recognised by its keyword, never by its name. A tag created in Thunderbird
+	 * gets a keyword made from its name (and keeps it when renamed): the lines of its configuration give it the keyword
+	 * of the list, for the Config Editor or the file user.js of the profile
+	 * @param {Array<Object>} tags Tags of the list
+	 * @return {string} HTML
+	 */
+	function thunderbirdTags(tags) {
+		const list = tags.filter(tg => tg.status);
+		if (!list.length) {
+			return '';
+		}
+		const lines = list.map((tg, n) => {
+			const k = 'mailnews.tags.' + String(tg.keyword).toLowerCase();
+			return 'user_pref(' + JSON.stringify(k + '.tag') + ', ' + JSON.stringify(tg.label) + ');\n'
+				+ 'user_pref(' + JSON.stringify(k + '.color') + ', ' + JSON.stringify(String(tg.color || '#888888').toUpperCase()) + ');\n'
+				+ 'user_pref(' + JSON.stringify(k + '.ordinal') + ', ' + JSON.stringify(String(n + 1).padStart(2, '0')) + ');';
+		}).join('\n');
+		return '<details class="ibx-guide__part" style="margin-top:1rem"><summary>' + th('InboxTagsThunderbird') + '</summary><div class="ibx-guide__body">'
+			+ '<p>' + th('InboxTagsThunderbirdWhy') + '</p><p>' + th('InboxTagsThunderbirdHow') + '</p>' + guideCode(lines)
+			+ '<p class="ibx-formrow__help">' + th('InboxTagsThunderbirdAfter') + '</p></div></details>';
+	}
+
 	async function tabTags(box, account) {
 		box.innerHTML = skeleton(5);
 		let data;
@@ -2188,11 +2211,12 @@
 				html += '<div class="ibx-notice ibx-notice--info" style="margin-top:1rem">' + ic('info') + '<div class="ibx-notice__text">' + th(isAdmin() ? 'InboxTagsGlobalHereAdmin' : 'InboxTagsGlobalHere') + '</div></div>';
 			}
 		}
-		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
+		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" data-tag="' + tg.id + '">'
 				+ '<td>' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
 				+ '<td>' + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
 				+ '<td>' + (editable ? '<input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '">' : C.badge(tg)) + '</td>'
+				+ '<td><code class="ibx-tagkeyword">' + esc(tg.keyword) + '</code></td>'
 				+ '<td>' + (editable ? '<input type="color" class="ibx-color" data-f="color" value="' + esc(tg.color || '#888888') + '" aria-label="' + th('InboxTagColor') + '">' : '') + '<span class="ibx-tagrisk" data-risk hidden title="' + th('InboxTagsCvdRow') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxTagsCvdRow') + '</span></span></td>'
 				+ '<td>' + (editable ? borderSelect(tg.border, 'data-f="border"') : th('InboxTagBorder_' + (tg.border || 'none'))) + '</td>'
 				+ '<td>' + (editable ? '<button type="button" class="ibx-switch" role="switch" data-f="status" aria-checked="' + (tg.status ? 'true' : 'false') + '" aria-label="' + th('InboxTagActive') + '"></button>' : (tg.status ? th('InboxAccountStatusActive') : th('InboxInactive'))) + '</td>'
@@ -2205,6 +2229,7 @@
 		if (editable) {
 			html += '<tfoot><tr class="ibx-tagadd"><td></td><td></td>'
 				+ '<td><input class="ibx-field" name="label" form="' + formId + '" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"></td>'
+				+ '<td></td>'
 				+ '<td><input type="color" class="ibx-color" name="color" form="' + formId + '" value="#0072b2" aria-label="' + th('InboxTagColor') + '"></td>'
 				+ '<td>' + borderSelect('none', 'name="border" form="' + formId + '"') + '</td><td></td>'
 				+ '<td class="ibx-table__actions"><button type="submit" form="' + formId + '" class="ibx-btn ibx-btn--primary ibx-btn--sm">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></td></tr></tfoot>';
@@ -2215,7 +2240,9 @@
 			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + '</p>';
 		}
 		html += '<div class="ibx-js-cvd" aria-live="polite"></div>';
+		html += thunderbirdTags(data.tags);
 		box.innerHTML = html;
+		copyCodeOn(box);
 		const params = account ? { id: account.id } : {};
 		const reload = () => {
 			I.changed('tag', account ? account.id : 0);
@@ -2971,6 +2998,15 @@
 	 */
 	function guideDialog(title, inner) {
 		const dlg = dialog({ title, wide: true, body: '<div class="ibx-guide"><div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxMeiliGuideWarn') + '</div></div>' + inner + '</div>' });
+		copyCodeOn(dlg);
+	}
+
+	/**
+	 * Buttons « Copy » of the code blocks of a zone (guideCode): the copy said in the button (a toast would be under a
+	 * dialog); outside https, the text selected for Ctrl+C
+	 * @param {HTMLElement} zone Zone listened
+	 */
+	function copyCodeOn(zone) {
 		const said = (b, key) => {
 			b.innerHTML = ic('check') + ' ' + th(key);
 			clearTimeout(b.again);
@@ -2978,7 +3014,7 @@
 				b.innerHTML = ic('copy') + ' ' + th('InboxCopy');
 			}, 2000);
 		};
-		dlg.addEventListener('click', async ev => {
+		zone.addEventListener('click', async ev => {
 			const b = ev.target.closest('.ibx-js-copycode');
 			if (!b) {
 				return;
