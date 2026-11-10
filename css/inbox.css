@@ -1260,7 +1260,8 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 
 /* ===== Assignment and bell (1.9.0, webmail §5.4 quinquies and sexies) ===== */
 /* My initials in the accent: seen at a glance among the people assigned */
-.ibx-avatar.is-me { color: var(--ibx-on-accent); background: var(--ibx-accent); }
+/* Not on a photo: the background shorthand reset its size and position (only a corner of the photo was seen) */
+.ibx-avatar.is-me:not(.has-picture) { color: var(--ibx-on-accent); background: var(--ibx-accent); }
 .ibx-assignees__more { margin-left: 0.125rem; font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); align-self: center; }
 .ibx-mailcard__assign { margin-left: auto; }
 .ibx-mailrow__assign { white-space: nowrap; }

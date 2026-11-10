@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: assignment, the user saw a grey circle instead of his own photo :   1.64.1
+  - his own avatar (marked "me", in the colour of the application) reset the size and the position of the photo:
+    only the top left corner of the image was seen. The colour of "me" is now kept for the initials only.
+
 - NEW: content of the cards of the Dolibarr objects drawn like in Dolibarr :   1.64.0
   - css/inbox-doltip.css: the classes of Dolibarr met in its tooltips (logo, status badges, customer / supplier,
     categories in their colour, icons aligned), drawn with the variables of the application (light, dark, contrast).
