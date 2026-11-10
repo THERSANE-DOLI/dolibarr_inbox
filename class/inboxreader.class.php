@@ -187,6 +187,8 @@ class InboxReader
 		$trusted = new InboxTrustedDomain($this->db);
 		$canTrust = $user->hasRight('inbox', 'trusteddomain', 'write');
 		$links = $trusted->linkVerdicts($message->bodyHtml, $message->bodyText, $canTrust);
+		$senderCheck = $this->senderCheck($raw);
+		require_once __DIR__.'/inboxbankcheck.class.php';
 		// Data sources (1.72.0): the requester read again from all the headers (a mail indexed before its source was
 		// declared, a source changed since); the index follows, so does its thirdparty unless chosen by hand
 		require_once __DIR__.'/inboxdatasource.class.php';
@@ -228,7 +230,10 @@ class InboxReader
 			// Delivery report (1.25.0): what happened per recipient and where the mail sent is; a mail sent: its failures
 			'report' => $bounce->view($raw, $readable),
 			'bounces' => $bounce->forMail($message->messageId, $readable),
-			'sender_check' => $this->senderCheck($raw),
+			'sender_check' => $senderCheck,
+			// Bank details in the mail (lot A6, 1.75.0): a lesson with its signals, never « all is fine »
+			'bank' => (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".($message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml)),
+				array_column($attachments, 'name'), $passed, $senderCheck, (string) $message->replyToEmail),
 			'trusted' => $trusted->senderVerdict($message->fromEmail, (string) $message->replyToEmail, $auth, $passed),
 			'link_hosts' => (object) $links['hosts'],
 			// The user may recognize domains: the domain of the sender when proven, the domains of the links

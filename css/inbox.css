@@ -2430,3 +2430,19 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	.ibx-srcrow { grid-template-columns: 1fr auto; }
 	.ibx-srcrow > .ibx-icon { display: none; }
 }
+
+/* Bank details in a mail (lot A6, 1.75.0): a lesson, never a green light */
+.ibx-bank .ibx-banner__text > p { margin: var(--ibx-s1) 0; }
+.ibx-bank__block { margin-top: var(--ibx-s2); }
+.ibx-bank__block > summary { cursor: pointer; font-weight: 600; }
+.ibx-bank__call { display: flex; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); padding: 0; margin: var(--ibx-s1) 0; list-style: none; }
+.ibx-bank__signals { display: grid; gap: var(--ibx-s1); padding: 0; margin: var(--ibx-s2) 0; list-style: none; }
+.ibx-bank__signal { display: flex; align-items: flex-start; gap: var(--ibx-s2); }
+.ibx-bank__signal > .ibx-icon { flex: none; margin-top: 0.125rem; }
+.ibx-bank__signal.is-ok > .ibx-icon { color: var(--ibx-success); }
+.ibx-bank__signal.is-warn > .ibx-icon { color: var(--ibx-warning); }
+.ibx-bank__signal.is-bad > .ibx-icon { color: var(--ibx-danger); }
+.ibx-bank__doubt { padding: var(--ibx-s2); margin: 0; background: var(--ibx-bg-pane); border-radius: var(--ibx-radius-sm); }
+.ibx-bank__steps { margin: var(--ibx-s2) 0 0; padding-left: 1.25rem; }
+.ibx-bank__steps li + li { margin-top: var(--ibx-s1); }
+.ibx-bank__foot { display: flex; justify-content: flex-end; margin-top: var(--ibx-s2); }
