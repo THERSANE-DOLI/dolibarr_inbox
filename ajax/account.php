@@ -28,7 +28,7 @@ dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage'), true);
+$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -185,11 +185,14 @@ switch ($action) {
 		$data = $account->toArrayForClient();
 		$data['summary'] = inboxAccountSummary($account, InboxAccess::LEVEL_MANAGE);
 		$data['admin'] = $isAdmin;
-		// Usages and their indicators (tab « Usage », 1.67.0): the list of the server, labels translated
-		$data['usages'] = InboxSituation::USAGES;
-		$data['indicators'] = array_map(function ($i) use ($langs) {
-			return $langs->transnoentities($i['label']);
-		}, InboxSituation::INDICATORS);
+		// Usages and their indicators (tab « Usage », 1.67.0): the lists of the server with the ones of the other modules
+		// (1.68.0), labels and rules translated, the own list of the mailbox
+		$data['usages'] = array();
+		foreach (array_keys(InboxSituation::USAGES) as $u) {
+			$data['usages'][$u] = InboxSituation::defaults($u);
+		}
+		$data['indicators'] = InboxSituation::catalogue();
+		$data['usage_own'] = InboxSituation::ownList($account);
 		inboxAjaxReply(array('account' => $data));
 		// no break
 
@@ -296,6 +299,17 @@ switch ($action) {
 			inboxAjaxError($situation->error, 422);
 		}
 		inboxAjaxReply(array('usage' => (string) $account->usage_profile));
+		// no break
+
+	case 'indicators':
+		// Own list of indicators of the mailbox (1.68.0): its managers and the admins; the list of the usage = none
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$situation = new InboxSituation($db);
+		$ids = array_values(array_filter(explode(',', (string) inboxAjaxParam('ids', 'aZ09comma'))));
+		if ($situation->setIndicators($user, $account, $ids) < 0) {
+			inboxAjaxError($situation->error, 422);
+		}
+		inboxAjaxReply(array('usage_own' => InboxSituation::ownList($account)));
 		// no break
 
 	case 'retention':

@@ -61,6 +61,9 @@ class InboxSituation
 	/** Days before a customer due date that make it worth a look */
 	const DUE_SOON_DAYS = 7;
 
+	/** @var array<string,array{label:string,rule:string,usages:string[]}>|null Indicators of the other modules (hook, once per request) */
+	protected static $modules = null;
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -85,6 +88,111 @@ class InboxSituation
 	}
 
 	/**
+	 * Indicators given by the other modules (1.68.0): hook inboxSituationIndicators, context inbox, parameter mode =
+	 * 'catalogue'; the module puts in $this->results['indicators'] an array id => array(label, rule, usages): id
+	 * prefixed by the name of the module (« mymodule_prepaid »), usages = the usages whose list has it by default
+	 *
+	 * @return array<string,array{label:string,rule:string,usages:string[]}>
+	 */
+	public static function moduleIndicators()
+	{
+		global $hookmanager, $db;
+
+		if (self::$modules !== null) {
+			return self::$modules;
+		}
+		self::$modules = array();
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($db);
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$params = array('mode' => 'catalogue');
+		$object = null;
+		$action = '';
+		if ($hookmanager->executeHooks('inboxSituationIndicators', $params, $object, $action) < 0 || !is_array($hookmanager->resArray['indicators'] ?? null)) {
+			return self::$modules;
+		}
+		foreach ($hookmanager->resArray['indicators'] as $id => $x) {
+			$id = (string) $id;
+			if (!preg_match('/^[a-z0-9]+_[a-z0-9_]{1,40}$/', $id) || isset(self::INDICATORS[$id]) || !is_array($x) || empty($x['label'])) {
+				continue;
+			}
+			self::$modules[$id] = array(
+				'label' => dol_trunc((string) $x['label'], 80, 'right', 'UTF-8', 1),
+				'rule' => dol_trunc((string) ($x['rule'] ?? ''), 120, 'right', 'UTF-8', 1),
+				'usages' => array_values(array_intersect(array_map('strval', (array) ($x['usages'] ?? array())), array_keys(self::USAGES))),
+			);
+		}
+
+		return self::$modules;
+	}
+
+	/**
+	 * Forget the indicators of the modules read in this request (tests)
+	 *
+	 * @return void
+	 */
+	public static function reset()
+	{
+		self::$modules = null;
+	}
+
+	/**
+	 * Every indicator: the ones of inbox, then the ones of the other modules
+	 *
+	 * @return array<string,array{label:string,rule:string}> Translated
+	 */
+	public static function catalogue()
+	{
+		global $langs;
+
+		$out = array();
+		foreach (self::INDICATORS as $id => $i) {
+			$out[$id] = array('label' => $langs->transnoentities($i['label']), 'rule' => $langs->transnoentities('InboxIndRule_'.$id));
+		}
+		foreach (self::moduleIndicators() as $id => $i) {
+			$out[$id] = array('label' => $i['label'], 'rule' => $i['rule']);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * List of a usage by default: its indicators, then the ones of the other modules for this usage
+	 *
+	 * @param string $usage Usage
+	 * @return string[]
+	 */
+	public static function defaults($usage)
+	{
+		if (!self::isUsage($usage) || $usage === 'auto' || $usage === 'none') {
+			return array();
+		}
+		$ids = self::USAGES[$usage];
+		foreach (self::moduleIndicators() as $id => $i) {
+			if (in_array($usage, $i['usages'], true)) {
+				$ids[] = $id;
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Own list of a mailbox ('' = none: the list of its usage)
+	 *
+	 * @param InboxAccount $account Mailbox
+	 * @return string[]|null Known indicators in its order, null when it has none
+	 */
+	public static function ownList(InboxAccount $account)
+	{
+		$own = json_decode((string) $account->usage_indicators, true);
+
+		return is_array($own) ? array_values(array_intersect(array_map('strval', $own), array_keys(self::catalogue()))) : null;
+	}
+
+	/**
 	 * Indicators of a mailbox for a thirdparty: the own list of the mailbox, else the one of its usage; « auto »: the
 	 * list Sales for a customer or a prospect, Purchase for a supplier, both for both
 	 *
@@ -101,16 +209,16 @@ class InboxSituation
 			$ids = array();
 			if ((int) $client > 0) {
 				$shown[] = 'sales';
-				$ids = self::USAGES['sales'];
+				$ids = self::defaults('sales');
 			}
 			if ((int) $supplier > 0) {
 				$shown[] = 'purchase';
-				$ids = array_values(array_unique(array_merge($ids, self::USAGES['purchase'])));
+				$ids = array_values(array_unique(array_merge($ids, self::defaults('purchase'))));
 			}
 			return array('usage' => $usage, 'shown' => $shown, 'ids' => $ids);
 		}
-		$own = json_decode((string) $account->usage_indicators, true);
-		$ids = is_array($own) ? array_values(array_intersect($own, array_keys(self::INDICATORS))) : self::USAGES[$usage];
+		$own = self::ownList($account);
+		$ids = $own !== null ? $own : self::defaults($usage);
 
 		return array('usage' => $usage, 'shown' => array($usage), 'ids' => $ids);
 	}
@@ -148,6 +256,45 @@ class InboxSituation
 	}
 
 	/**
+	 * Own list of indicators of a mailbox (1.68.0, its managers: checked by the caller), written in its journal; the
+	 * list of the usage itself = no own list. Only for a usage with a list (not auto nor none)
+	 *
+	 * @param User         $user    User doing it
+	 * @param InboxAccount $account Mailbox
+	 * @param string[]     $ids     Indicators in their order
+	 * @return int 1 OK, 0 unchanged, < 0 KO
+	 */
+	public function setIndicators(User $user, InboxAccount $account, array $ids)
+	{
+		$usage = (string) ($account->usage_profile ?: 'auto');
+		if ($usage === 'auto' || $usage === 'none' || !self::isUsage($usage)) {
+			$this->error = 'No list for this usage';
+			return -1;
+		}
+		$known = array_keys(self::catalogue());
+		$ids = array_values(array_unique(array_map('strval', $ids)));
+		if (array_diff($ids, $known)) {
+			$this->error = 'Unknown indicator';
+			return -2;
+		}
+		$before = self::ownList($account);
+		$value = $ids === self::defaults($usage) ? null : $ids;
+		if ($value === $before) {
+			return 0;
+		}
+		$json = $value === null ? 'NULL' : "'".$this->db->escape((string) json_encode($value))."'";
+		if (!$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET usage_indicators = ".$json." WHERE rowid = ".((int) $account->id))) {
+			$this->error = $this->db->lasterror();
+			return -3;
+		}
+		$account->usage_indicators = $value === null ? null : json_encode($value);
+		$log = new InboxAccountLog($this->db);
+		$log->add((int) $account->id, $user, 'indicators', array('ids' => $before), array('ids' => $value));
+
+		return 1;
+	}
+
+	/**
 	 * Situation of a thirdparty for the indicators asked: the ones the user may read, in this order
 	 *
 	 * @param User     $user  User reading (rights of Dolibarr)
@@ -165,7 +312,12 @@ class InboxSituation
 			return $out;
 		}
 		$langs->loadLangs(array('inbox@inbox', 'bills', 'companies'));
+		$fromModules = $this->moduleValues($user, $socId, array_values(array_intersect($ids, array_keys(self::moduleIndicators()))));
 		foreach ($ids as $id) {
+			if (isset($fromModules[$id])) {
+				$out[] = $fromModules[$id];
+				continue;
+			}
 			if (!isset(self::INDICATORS[$id]) || !InboxElements::canReadType($user, self::INDICATORS[$id]['type'])) {
 				continue;
 			}
@@ -176,6 +328,51 @@ class InboxSituation
 			$r = array_merge(array('id' => $id, 'label' => $langs->transnoentities(self::INDICATORS[$id]['label']), 'amount' => null, 'detail' => ''), $r);
 			$r['short'] = $r['level'] === 'normal' ? '' : $this->short($id, $r);
 			$out[] = $r;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Values of the indicators of the other modules: hook inboxSituationIndicators, mode = 'compute', socid, ids; the
+	 * module checks its rights and puts in $this->results['values'] an array id => array(value, level, url, short,
+	 * detail, count, amount); left out when it gives nothing (no right). Checked here: level, address inside Dolibarr,
+	 * lengths
+	 *
+	 * @param User     $user  User reading
+	 * @param int      $socId Thirdparty
+	 * @param string[] $ids   Indicators of the modules asked
+	 * @return array<string,array<string,mixed>>
+	 */
+	protected function moduleValues(User $user, $socId, array $ids)
+	{
+		global $hookmanager;
+
+		$out = array();
+		if (!$ids || !is_object($hookmanager)) {
+			return $out;
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$params = array('mode' => 'compute', 'socid' => (int) $socId, 'ids' => $ids, 'user' => $user);
+		$object = null;
+		$action = '';
+		if ($hookmanager->executeHooks('inboxSituationIndicators', $params, $object, $action) < 0 || !is_array($hookmanager->resArray['values'] ?? null)) {
+			return $out;
+		}
+		$modules = self::moduleIndicators();
+		foreach ($hookmanager->resArray['values'] as $id => $v) {
+			$id = (string) $id;
+			if (!in_array($id, $ids, true) || !is_array($v) || !isset($v['value'])) {
+				continue;
+			}
+			$level = in_array($v['level'] ?? '', array('alert', 'attention', 'normal'), true) ? (string) $v['level'] : 'normal';
+			$url = (string) ($v['url'] ?? '');
+			$inside = (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0 && !preg_match('/[\s<>"]/', $url);
+			$out[$id] = array('id' => $id, 'label' => $modules[$id]['label'], 'count' => (int) ($v['count'] ?? 0),
+				'amount' => isset($v['amount']) && is_numeric($v['amount']) ? (float) $v['amount'] : null,
+				'value' => dol_trunc((string) $v['value'], 60, 'right', 'UTF-8', 1), 'level' => $level,
+				'detail' => dol_trunc((string) ($v['detail'] ?? ''), 200, 'right', 'UTF-8', 1), 'url' => $inside ? $url : '',
+				'short' => $level === 'normal' ? '' : dol_trunc((string) ($v['short'] ?? $modules[$id]['label'].' : '.$v['value']), 80, 'right', 'UTF-8', 1));
 		}
 
 		return $out;
