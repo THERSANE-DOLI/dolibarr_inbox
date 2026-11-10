@@ -479,7 +479,7 @@ class InboxReader
 	 * List-Unsubscribe of a mail (RFC 2369) and its one-click form (RFC 8058: an https address and List-Unsubscribe-Post)
 	 *
 	 * @param array<int,array{0:string,1:string}> $headers Headers
-	 * @return array{https:string,mailto:string,oneclick:bool}|null Null when the mail offers nothing
+	 * @return array{https:string,mailto:string,mailto_subject:string,mailto_body:string,oneclick:bool}|null Null when the mail offers nothing
 	 */
 	public static function unsubscribeInfo(array $headers)
 	{
@@ -489,13 +489,28 @@ class InboxReader
 		}
 		$https = '';
 		$mailto = '';
+		$subject = '';
+		$body = '';
 		foreach ($m[1] as $uri) {
 			$uri = trim($uri);
 			if ($https === '' && preg_match('#^https://[^\s"<>]+$#i', $uri)) {
 				$https = $uri;
-			} elseif ($mailto === '' && preg_match('/^mailto:([^?\s]+)/i', $uri, $mm)) {
+			} elseif ($mailto === '' && preg_match('/^mailto:([^?\s]+)(?:\?(\S*))?/i', $uri, $mm)) {
 				$address = rawurldecode($mm[1]);
 				$mailto = isValidEmail($address) ? $address : '';
+				// Subject and text the list asks for (RFC 6068), plain text and short: never a recipient added
+				if ($mailto !== '' && !empty($mm[2])) {
+					foreach (explode('&', $mm[2]) as $pair) {
+						$kv = explode('=', $pair, 2);
+						$k = strtolower(rawurldecode($kv[0]));
+						$v = trim((string) preg_replace('/[\x00-\x09\x0B-\x1F\x7F]+/u', ' ', rawurldecode($kv[1] ?? '')));
+						if ($k === 'subject') {
+							$subject = dol_trunc((string) preg_replace('/\s+/u', ' ', $v), 200, 'right', 'UTF-8', 1);
+						} elseif ($k === 'body') {
+							$body = dol_trunc($v, 1000, 'right', 'UTF-8', 1);
+						}
+					}
+				}
 			}
 		}
 		if ($https === '' && $mailto === '') {
@@ -503,7 +518,7 @@ class InboxReader
 		}
 		$post = self::headerValue($headers, 'List-Unsubscribe-Post');
 
-		return array('https' => $https, 'mailto' => $mailto, 'oneclick' => $https !== '' && stripos($post, 'List-Unsubscribe=One-Click') !== false);
+		return array('https' => $https, 'mailto' => $mailto, 'mailto_subject' => $subject, 'mailto_body' => $body, 'oneclick' => $https !== '' && stripos($post, 'List-Unsubscribe=One-Click') !== false);
 	}
 
 	/**

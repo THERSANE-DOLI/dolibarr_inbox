@@ -42,12 +42,13 @@ function inboxComposeFail(InboxComposer $composer)
 
 	$code = (string) $composer->errorCode;
 	$http = array('already_sent' => 409, 'bad_date' => 422, 'not_found' => 404, 'no_send' => 403, 'bad_mode' => 400, 'bad_address' => 422, 'no_recipient' => 422, 'too_big' => 413,
-		'infected' => 422, 'mails_disabled' => 409, 'no_drafts' => 409);
+		'infected' => 422, 'mails_disabled' => 409, 'no_drafts' => 409, 'no_manage' => 403, 'unsub_none' => 404, 'unsub_unsigned' => 422);
 	$keys = array('already_sent' => 'InboxOutboxAlreadySent', 'bad_date' => 'InboxComposeBadDate', 'interrupted' => 'InboxOutboxInterrupted', 'not_found' => 'InboxComposeGone', 'no_send' => 'InboxErrorNeedSend', 'bad_address' => 'InboxComposeBadAddress',
 		'no_recipient' => 'InboxComposeNoRecipient', 'too_big' => 'InboxComposeTooBig', 'infected' => 'InboxComposeInfected',
 		'mails_disabled' => 'InboxComposeMailsDisabled', 'no_drafts' => 'InboxComposeNoDrafts', 'smtp_no_server' => 'InboxComposeSmtpNoServer',
 		'smtp_auth' => 'InboxComposeSmtpAuth', 'smtp_recipient' => 'InboxComposeSmtpRecipient', 'smtp_too_big' => 'InboxComposeTooBig',
-		'smtp_connect' => 'InboxComposeSmtpConnect', 'smtp_certificate' => 'InboxComposeSmtpCertificate', 'smtp_master' => 'InboxComposeSmtpMaster', 'smtp_no_password' => 'InboxComposeSmtpAuth', 'smtp_no_auth' => 'InboxComposeSmtpAuth', 'smtp_no_starttls' => 'InboxComposeSmtpCertificate', 'hook' => 'InboxComposeRefused');
+		'smtp_connect' => 'InboxComposeSmtpConnect', 'smtp_certificate' => 'InboxComposeSmtpCertificate', 'smtp_master' => 'InboxComposeSmtpMaster', 'smtp_no_password' => 'InboxComposeSmtpAuth', 'smtp_no_auth' => 'InboxComposeSmtpAuth', 'smtp_no_starttls' => 'InboxComposeSmtpCertificate', 'hook' => 'InboxComposeRefused',
+		'no_manage' => 'InboxErrorNeedManage', 'unsub_none' => 'InboxErrorUnsubscribeNone', 'unsub_unsigned' => 'InboxErrorUnsubscribeNotSigned');
 	$key = $keys[$code] ?? 'InboxComposeFailed';
 	$detail = in_array($code, array('smtp_recipient', 'smtp_refused', 'hook', 'error', 'smtp_connect'), true) ? (string) $composer->error : '';
 	dol_syslog('inbox compose '.$code.' '.$composer->error, LOG_WARNING);

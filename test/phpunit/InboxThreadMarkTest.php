@@ -124,7 +124,13 @@ class InboxThreadMarkTest extends InboxImapTestCase
 			return $out;
 		};
 		$info = InboxReader::unsubscribeInfo($h('<mailto:leave@list.invalid?subject=unsub>, <https://list.invalid/u?x=1>', 'List-Unsubscribe=One-Click'));
-		$this->assertSame(array('https' => 'https://list.invalid/u?x=1', 'mailto' => 'leave@list.invalid', 'oneclick' => true), $info);
+		$this->assertSame(array('https' => 'https://list.invalid/u?x=1', 'mailto' => 'leave@list.invalid', 'mailto_subject' => 'unsub', 'mailto_body' => '', 'oneclick' => true), $info);
+		// Unsubscribing by mail (1.53.0): subject and text of the mailto, never another recipient, no control character
+		$info = InboxReader::unsubscribeInfo($h('<mailto:leave@list.invalid?subject=Stop%20please%0D%0ABcc:%20x@evil.invalid&body=id%3D42&cc=spy@evil.invalid>'));
+		$this->assertSame('leave@list.invalid', $info['mailto']);
+		$this->assertSame('Stop please Bcc: x@evil.invalid', $info['mailto_subject'], 'one line, the header injection is plain text');
+		$this->assertSame('id=42', $info['mailto_body']);
+		$this->assertFalse($info['oneclick']);
 		$this->assertFalse(InboxReader::unsubscribeInfo($h('<https://list.invalid/u>'))['oneclick'], 'no List-Unsubscribe-Post');
 		$this->assertFalse(InboxReader::unsubscribeInfo($h('<http://list.invalid/u>, <mailto:a@list.invalid>', 'List-Unsubscribe=One-Click'))['oneclick'], 'http is never one-click');
 		$this->assertNull(InboxReader::unsubscribeInfo($h('<javascript:alert(1)>')));

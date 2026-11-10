@@ -573,6 +573,67 @@ class InboxComposeTest extends InboxImapTestCase
 	}
 
 	/**
+	 * Unsubscribing by mail (1.53.0): the address, subject and text of the mailto, from the mailbox that got the mail,
+	 * logged as unsubscribed; refused when unsigned or without a mailto
+	 *
+	 * @return void
+	 */
+	public function testUnsubscribeByMail()
+	{
+		$a = $this->ready();
+		if ($this->mailpit('/api/v1/messages', 'DELETE') === null) {
+			$this->markTestSkipped('Mailpit not started (dev/dovecot/run.sh)');
+		}
+		$identity = $this->identity($a);
+		$news = function ($id, $signed) {
+			return ($signed ? "Authentication-Results: mx.invalid; dkim=pass header.d=list.invalid\r\n" : '')
+				."Message-ID: <".$id.self::MARK.">\r\nFrom: List <news@list.invalid>\r\nTo: ".self::BOX."\r\nSubject: ZzAct ".$id."\r\n"
+				."List-Unsubscribe: <mailto:leave@list.invalid?subject=ZzCompose%20unsub&body=id%3D42&bcc=spy@evil.invalid>\r\n"
+				."Date: ".date('r', mktime(10, 0, 0, 3, 16, 2025))."\r\n\r\nNews ".$id."\r\n";
+		};
+		$p = $this->imap();
+		$p->appendMessage('INBOX.ZzActA', $news('n1', true));
+		$p->appendMessage('INBOX.ZzActA', $news('n2', false));
+		$this->sync($a);
+		$n1 = $this->row($a, 'n1');
+		$this->assertNotNull($n1);
+		$c = new InboxComposer($this->db);
+		$open = $c->open($this->admin, 'unsubscribe', (int) $n1->rowid);
+		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
+		$this->assertSame(array('leave@list.invalid'), array_column($open['to'], 'email'), 'the mailto only, never its bcc');
+		$this->assertSame(array(), $open['bcc']);
+		$this->assertSame('ZzCompose unsub', $open['subject']);
+		$this->assertStringContainsString('id=42', $open['html']);
+		$this->assertSame($identity, $open['identity'], 'from the address that got the newsletter');
+		$this->assertNull($open['source'], 'not an answer: no In-Reply-To, not marked answered');
+		$this->assertSame(1, (int) $open['signature_off']);
+
+		$sent = $c->send($this->admin, $open['token'], array('identity' => $identity, 'to' => $open['to'], 'subject' => $open['subject'], 'html' => $open['html'], 'signature' => 0));
+		$this->assertNotNull($sent, $c->errorCode.' '.$c->error);
+		$list = json_decode((string) $this->mailpit('/api/v1/messages'), true);
+		$this->assertSame(1, (int) $list['total']);
+		$this->assertSame('leave@list.invalid', $list['messages'][0]['To'][0]['Address']);
+		$raw = (string) $this->mailpit('/api/v1/message/'.$list['messages'][0]['ID'].'/raw');
+		$this->assertStringNotContainsString('In-Reply-To', $raw);
+		$pr = $this->db->prefix();
+		$log = $this->db->getRow("SELECT detail, folder_from FROM ".$pr."inbox_action_log WHERE action = 'unsubscribe' AND fk_account = ".((int) $a->id));
+		$this->assertTrue(is_object($log), 'logged as unsubscribed');
+		$this->assertSame('list.invalid', (string) $log->detail);
+		$this->assertSame(0, (int) $this->db->getRow("SELECT answered FROM ".$pr."inbox_mail WHERE rowid = ".((int) $n1->rowid))->answered);
+
+		// Refused: header not signed, no List-Unsubscribe, level below manage
+		$this->assertNull($c->open($this->admin, 'unsubscribe', (int) $this->row($a, 'n2')->rowid));
+		$this->assertSame('unsub_unsigned', $c->errorCode);
+		$this->assertNull($c->open($this->admin, 'unsubscribe', (int) $this->row($a, 'm1')->rowid));
+		$this->assertSame('unsub_none', $c->errorCode);
+		$sender = $this->user('inboxtest_reader');
+		(new InboxAccess($this->db))->grant($this->admin, $a->id, $sender->id, 0, InboxAccess::LEVEL_SEND);
+		InboxAccess::clearCache();
+		$this->assertNull($c->open($sender, 'unsubscribe', (int) $n1->rowid));
+		$this->assertSame('no_manage', $c->errorCode);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testRights()

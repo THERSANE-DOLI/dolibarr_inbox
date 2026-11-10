@@ -950,11 +950,13 @@ InboxJournal_empty = Geleert
 
 # Newsletters, threads ignored or watched (1.11.0)
 InboxNewsletter = Newsletter: Sie können das Postfach abmelden.
-InboxNewsletterByMail = Newsletter: Der Absender bietet nur eine Abmeldung per Mail an, hier noch nicht unterstützt.
+InboxNewsletterByMail = Newsletter: Die Abmeldung erfolgt per Mail an den Absender, inbox bereitet sie vor.
 InboxCopyUnsubscribeAddress = Abmeldeadresse kopieren
 InboxUnsubscribe = Abmelden
 InboxUnsubscribeTitle = Postfach abmelden?
 InboxUnsubscribeText = Der Absender „%s“ erfährt, dass diese Adresse gelesen wird. inbox sendet die Anfrage selbst, der Link der Mail wird nie geöffnet.
+InboxUnsubscribeByMailText = Der Absender « %s » erfährt, dass diese Adresse gelesen wird. Eine Mail von dieser Adresse an die Abmeldeadresse der Liste wird vorbereitet: prüfen Sie sie und senden Sie sie dann.
+InboxUnsubscribePrepare = Mail vorbereiten
 InboxUnsubscribed = Abmeldeanfrage an „%s“ gesendet
 InboxErrorUnsubscribeNone = Diese Mail bietet keine Abmeldung an
 InboxErrorUnsubscribeNoOneClick = Dieser Absender bietet nur eine Abmeldung per Mail an (kommt mit dem Verfassen von Mails)

@@ -950,11 +950,13 @@ InboxJournal_empty = Vidé
 
 # Newsletters, threads ignored or watched (1.11.0)
 InboxNewsletter = Lettre d'information : vous pouvez désabonner la boîte.
-InboxNewsletterByMail = Lettre d'information : l'expéditeur ne propose qu'un désabonnement par mail, pas encore géré ici.
+InboxNewsletterByMail = Lettre d'information : le désabonnement se fait par un mail à l'expéditeur, inbox le prépare.
 InboxCopyUnsubscribeAddress = Copier l'adresse de désabonnement
 InboxUnsubscribe = Se désabonner
 InboxUnsubscribeTitle = Désabonner la boîte ?
 InboxUnsubscribeText = L'expéditeur « %s » saura que cette adresse est lue. inbox envoie la demande lui-même, le lien du mail n'est jamais ouvert.
+InboxUnsubscribeByMailText = L'expéditeur « %s » saura que cette adresse est lue. Un mail est préparé depuis cette adresse vers l'adresse de désabonnement de la liste : vérifiez-le, puis envoyez-le.
+InboxUnsubscribePrepare = Préparer le mail
 InboxUnsubscribed = Demande de désabonnement envoyée à « %s »
 InboxErrorUnsubscribeNone = Ce mail ne propose pas de désabonnement
 InboxErrorUnsubscribeNoOneClick = Cet expéditeur ne propose qu'un désabonnement par mail (arrivera avec la rédaction des mails)
