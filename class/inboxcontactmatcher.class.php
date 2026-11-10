@@ -80,35 +80,71 @@ class InboxContactMatcher
 		return $out;
 	}
 
-	/** Domains of public mail services: never a thirdparty by its domain (setting INBOX_PUBLIC_DOMAINS adds others) */
-	const PUBLIC_DOMAINS = array('gmail.com', 'googlemail.com', 'outlook.com', 'outlook.fr', 'hotmail.com', 'hotmail.fr', 'live.com', 'live.fr', 'msn.com',
-		'yahoo.com', 'yahoo.fr', 'icloud.com', 'me.com', 'aol.com', 'gmx.com', 'gmx.fr', 'gmx.de', 'web.de', 'orange.fr', 'wanadoo.fr', 'free.fr', 'sfr.fr',
-		'laposte.net', 'bbox.fr', 'neuf.fr', 'numericable.fr', 'proton.me', 'protonmail.com', 'libero.it', 'virgilio.it', 'tiscali.it', 'alice.it', 't-online.de',
-		'telefonica.net', 'mail.com', 'yandex.com', 'zoho.com');
-
 	/**
 	 * Thirdparty of an address by its domain (lot W5): a thirdparty or a contact of it with an address at this domain,
-	 * or a website on it; never for a public mail service; nothing when several thirdparties share the domain
+	 * or a website on it; never for a shared domain (public mail service, disposable address, domain marked shared:
+	 * lot A7, InboxDomains); nothing when several thirdparties share the domain (domainCandidates() offers them)
 	 *
 	 * @param string $email Address
 	 * @return int Thirdparty, 0 when none or not sure
 	 */
 	public function matchDomain($email)
 	{
+		$found = $this->domainSocs($email);
+
+		return count($found['socs']) === 1 && $found['category'] === '' ? $found['socs'][0] : 0;
+	}
+
+	/**
+	 * Thirdparties that may be the one of an address by its domain, to choose (never linked without the user):
+	 * several thirdparties on a domain, or a domain marked shared
+	 *
+	 * @param string $email Address
+	 * @return array{socs:int[],category:string,domain:string} socs empty for a public or disposable domain
+	 */
+	public function domainCandidates($email)
+	{
+		$found = $this->domainSocs($email);
+		if (count($found['socs']) === 1 && $found['category'] === '') {
+			$found['socs'] = array();
+		}
+
+		return $found;
+	}
+
+	/**
+	 * @param string $email Address
+	 * @return array{socs:int[],category:string,domain:string} At most 5 thirdparties
+	 */
+	protected function domainSocs($email)
+	{
 		$email = strtolower(trim((string) $email));
 		$at = strrpos($email, '@');
+		$out = array('socs' => array(), 'category' => '', 'domain' => '');
 		if ($at === false) {
-			return 0;
+			return $out;
 		}
 		$domain = substr($email, $at + 1);
-		$public = array_merge(self::PUBLIC_DOMAINS, array_filter(array_map('trim', explode(',', strtolower(getDolGlobalString('INBOX_PUBLIC_DOMAINS'))))));
-		if ($domain === '' || in_array($domain, $public, true)) {
-			return 0;
+		$out['domain'] = $domain;
+		if ($domain === '') {
+			return $out;
+		}
+		require_once __DIR__.'/inboxdomains.class.php';
+		$out['category'] = (new InboxDomains($this->db))->categoryOf($domain);
+		if (in_array($out['category'], array(InboxDomains::PUBLIC, InboxDomains::DISPOSABLE), true)) {
+			return $out;
+		}
+		// Recognition by the domain turned off (Settings > Public and shared domains, INBOX_DOMAIN_MATCH): the exact address only, no
+		// search of the thirdparties of the domain (the category stays: a search in a text, nothing to save)
+		if (!getDolGlobalInt('INBOX_DOMAIN_MATCH', 1)) {
+			return $out;
 		}
 		$key = '@'.$domain;
 		if (isset($this->cache[$key])) {
-			return $this->cache[$key]['fk_soc'];
+			$out['socs'] = $this->cache[$key]['socs'];
+			return $out;
 		}
+		$start = microtime(true);
 		$p = $this->db->prefix();
 		$like = $this->db->escape($this->db->escapeforlike('@'.$domain));
 		$site = $this->db->escape($this->db->escapeforlike($domain));
@@ -116,11 +152,18 @@ class InboxContactMatcher
 			// The site: this very domain or a subdomain of it (never « myclient.fr » for « client.fr »)
 			." OR LOWER(s.url) IN ('".$site."', 'www.".$site."') OR LOWER(s.url) LIKE '".$site."/%' OR LOWER(s.url) LIKE '%//".$site."' OR LOWER(s.url) LIKE '%//".$site."/%'"
 			." OR LOWER(s.url) LIKE '%.".$site."' OR LOWER(s.url) LIKE '%.".$site."/%'"
-			." OR s.rowid IN (SELECT c.fk_soc FROM ".$p."socpeople as c WHERE c.statut = 1 AND c.fk_soc > 0 AND LOWER(c.email) LIKE '%".$like."' AND c.entity IN (".getEntity('contact')."))) LIMIT 3");
-		$found = is_array($rows) && count($rows) === 1 ? (int) $rows[0]->rowid : 0;
-		$this->cache[$key] = array('fk_soc' => $found, 'fk_socpeople' => 0);
+			." OR s.rowid IN (SELECT c.fk_soc FROM ".$p."socpeople as c WHERE c.statut = 1 AND c.fk_soc > 0 AND LOWER(c.email) LIKE '%".$like."' AND c.entity IN (".getEntity('contact')."))) ORDER BY s.rowid LIMIT 5");
+		$out['socs'] = array_map(function ($r) {
+			return (int) $r->rowid;
+		}, is_array($rows) ? $rows : array());
+		// Measured, not guessed: LIKE '%@domain' reads the whole tables, the slow part on a big database
+		$ms = (int) round((microtime(true) - $start) * 1000);
+		if ($ms > 200) {
+			dol_syslog(__METHOD__.' thirdparties of the domain '.$domain.' found in '.$ms.' ms (Settings > Public and shared domains can turn the recognition by the domain off)', LOG_WARNING);
+		}
+		$this->cache[$key] = array('fk_soc' => count($out['socs']) === 1 ? $out['socs'][0] : 0, 'fk_socpeople' => 0, 'socs' => $out['socs']);
 
-		return $found;
+		return $out;
 	}
 
 	/**

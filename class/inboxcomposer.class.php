@@ -225,7 +225,8 @@ class InboxComposer
 		if (!$identities) {
 			return $this->fail('no_send');
 		}
-		$state = array('user' => (int) $user->id, 'mode' => $mode, 'source' => null, 'draft' => null, 'attachments' => array(), 'quote' => 0);
+		// opened: an answer sent to the same mail after this moment is said before the sending (lot E2, 1.77.0)
+		$state = array('user' => (int) $user->id, 'mode' => $mode, 'source' => null, 'draft' => null, 'attachments' => array(), 'quote' => 0, 'opened' => dol_now());
 		$out = array('to' => array(), 'cc' => array(), 'bcc' => array(), 'subject' => '', 'html' => '', 'quote' => '', 'receipt' => 0);
 		$sourceAccount = (int) $accountId;
 		$raw = null;
@@ -1489,8 +1490,10 @@ class InboxComposer
 	 * @param User                $user  User
 	 * @param string              $token Writing
 	 * @param array<string,mixed> $data  Typed
-	 * @param array<string,mixed> $opts  at (date of a scheduled sending), record (pieces « type:id » to record it on)
-	 * @return array<string,mixed>|null Sent: message_id, sent_copy, account, outbox; queued: queued (id), send_at, delay
+	 * @param array<string,mixed> $opts  at (date of a scheduled sending), record (pieces « type:id » to record it on), force (send
+	 *                                   even when a colleague answered the same mail meanwhile)
+	 * @return array<string,mixed>|null Sent: message_id, sent_copy, account, outbox; queued: queued (id), send_at, delay;
+	 *                                   not sent: conflict (an answer of a colleague, lot E2)
 	 */
 	public function send(User $user, $token, array $data, array $opts = array())
 	{
@@ -1519,6 +1522,16 @@ class InboxComposer
 		$at = (int) ($opts['at'] ?? 0);
 		if ($at && ($at < dol_now() + 60 || $at > dol_now() + 366 * 86400)) {
 			return $this->fail('bad_date');
+		}
+		// An answer already sent to this mail from the mailbox since the writing was opened (lot E2, 1.77.0): said, not
+		// sent; « Send anyway » asks again with force
+		$src = $state['source'] ?? null;
+		if (empty($opts['force']) && is_array($src) && in_array((string) ($src['mode'] ?? ''), array('reply', 'replyall', 'replylist'), true)) {
+			require_once __DIR__.'/inboxactivity.class.php';
+			$conflict = (new InboxActivity($this->db))->answeredSince((int) ($src['account'] ?? 0), (string) ($src['message_id'] ?? ''), (int) ($state['opened'] ?? 0), (string) $token);
+			if ($conflict !== null) {
+				return array('conflict' => $conflict);
+			}
 		}
 		// Other modules may check the mail and stop it (P5): hook inboxBeforeSend, context inbox
 		if (is_object($hookmanager)) {

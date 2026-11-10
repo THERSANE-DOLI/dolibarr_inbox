@@ -21,6 +21,7 @@
  *   #/settings/accounts/<id>/<tab>     card of a mailbox: server, folders, identities, access, tags, sync, journal
  *   #/settings/import                  import from the sources declared by other modules
  *   #/settings/general                 defaults of the webmail (admins of the mailboxes)
+ *   #/settings/domains                 shared domains: public, disposable, shared (managers of the settings)
  *   #/settings/sources                 data sources: mails sent by a site for a requester (admins of Dolibarr)
  *   #/settings/me                      settings of the current user
  * Every change is saved in ajax; a refused action is greyed with its reason, never hidden without a word.
@@ -124,7 +125,7 @@
 					pointSection(main, a.dataset.goto);
 				});
 			}
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, domains: renderDomains, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -183,6 +184,7 @@
 			+ link('accounts', 'inbox', 'InboxNavAccounts')
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
+			+ (isAdmin() ? link('domains', 'shield', 'InboxNavDomains') : '')
 			+ (isDolibarrAdmin() ? link('server', 'server', 'InboxNavServer') : '')
 			+ (isDolibarrAdmin() ? link('sources', 'redirect', 'InboxNavSources') : '')
 			+ (isTrustManager() ? link('trusted', 'trusted', 'InboxNavTrustedDomains') : '')
@@ -3093,6 +3095,204 @@
 		});
 	}
 
+
+	/**
+	 * Settings > Public and shared domains (lot A7, 1.76.0): the shipped list (never downloaded by inbox), the local entries, the ones of
+	 * the other modules; search, filters, thirdparties and mails using each domain; every change at once, with undo
+	 */
+	const DOMAIN_CATS = ['public', 'disposable', 'shared'];
+	async function renderDomains(main, parts, state) {
+		if (!isAdmin()) {
+			I.go('#/settings/accounts');
+			return;
+		}
+		state = state || { search: '', category: '', origin: '', page: 0 };
+		if (!main.querySelector('.ibx-js-domlist')) {
+			main.innerHTML = skeleton();
+		}
+		let r;
+		try {
+			r = await api('domain', 'list', state);
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderDomains(main, parts, state)));
+			return;
+		}
+		const catLabel = c => t('InboxDomainsCat_' + c);
+		const origLabel = d => d.origin === 'shipped' ? (d.status ? t('InboxDomainsOriginShipped') : t('InboxDomainsOriginOff')) : t(d.origin === 'module' ? 'InboxDomainsOriginModule' : 'InboxDomainsOriginLocal');
+		const sh = r.shipped || {};
+		const copied = Object.values(sh).map(x => x.copied).filter(Boolean).sort().pop() || '';
+		const rows = r.rows || [];
+		const pages = Math.max(1, Math.ceil(r.total / 50));
+		let list = '';
+		if (!rows.length) {
+			list = '<div class="ibx-empty" style="height:auto">' + ic('shield', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxDomainsNone') + '</div></div>';
+		} else {
+			list = '<table class="ibx-table ibx-domtable"><thead><tr><th>' + th('InboxDomainsDomain') + '</th><th>' + th('InboxDomainsCategory') + '</th><th>' + th('InboxDomainsOrigin') + '</th>'
+				+ '<th class="ibx-num">' + th('InboxDomainsSocs') + '</th><th class="ibx-num">' + th('InboxDomainsMails') + '</th><th></th></tr></thead><tbody>'
+				+ rows.map(d => '<tr data-id="' + d.id + '" data-domain="' + esc(d.domain) + '"' + (d.status ? '' : ' class="is-off"') + '><td data-label="' + th('InboxDomainsDomain') + '"><b>' + esc(d.domain) + '</b></td>'
+					+ '<td data-label="' + th('InboxDomainsCategory') + '">' + (d.origin === 'local'
+						? '<select class="ibx-field ibx-field--small ibx-js-domcat" aria-label="' + esc(t('InboxDomainsCategoryOf', d.domain)) + '">' + DOMAIN_CATS.map(c => '<option value="' + c + '"' + (c === d.category ? ' selected' : '') + '>' + esc(catLabel(c)) + '</option>').join('') + '</select>'
+						: esc(catLabel(d.category))) + '</td>'
+					+ '<td data-label="' + th('InboxDomainsOrigin') + '"><span class="ibx-badge">' + esc(origLabel(d)) + '</span></td>'
+					+ '<td class="ibx-num" data-label="' + th('InboxDomainsSocs') + '">' + d.socs + '</td><td class="ibx-num" data-label="' + th('InboxDomainsMails') + '">' + d.mails + '</td>'
+					+ '<td class="ibx-table__actions">' + (d.origin === 'local'
+						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon ibx-js-domdel" title="' + th('InboxDelete') + '" aria-label="' + esc(t('InboxDelete') + ' ' + d.domain) + '">' + ic('delete') + '</button>'
+						: (d.origin === 'shipped' ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-domtoggle">' + th(d.status ? 'InboxDomainsDisable' : 'InboxDomainsEnable') + '</button>' : '')) + '</td></tr>').join('')
+				+ '</tbody></table>'
+				+ (pages > 1 ? '<div class="ibx-dompager"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-domprev"' + (state.page ? '' : ' disabled') + '>' + ic('chevron-left') + ' ' + th('InboxDomainsPrev') + '</button>'
+					+ '<span class="ibx-muted">' + th('InboxDomainsPage', state.page + 1, pages) + '</span>'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-domnext"' + (state.page + 1 < pages ? '' : ' disabled') + '>' + th('InboxDomainsNext') + ' ' + ic('chevron-right') + '</button></div>' : '');
+		}
+		if (main.querySelector('.ibx-js-domlist')) {
+			// A search or a filter: the list only, the field keeps the focus
+			$('.ibx-js-domlist', main).innerHTML = list;
+			$('.ibx-js-domcount', main).textContent = t('InboxDomainsCount', r.total);
+			main._dom = { state, rows };
+			return;
+		}
+		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavDomains') + '</h1></div>'
+			+ '<p class="ibx-page__intro">' + th('InboxDomainsHelp') + '</p>'
+			// Recognition by the domain (on by default): off, the exact address only (a big database, slow searches)
+			+ '<div class="ibx-formrow ibx-dommatch"><span class="ibx-formrow__label">' + th('InboxDomainsMatch') + '</span><div><label class="ibx-check"><input type="checkbox" class="ibx-js-dommatch"' + (r.match ? ' checked' : '') + '> ' + th('InboxDomainsMatchLabel') + '</label>'
+			+ '<div class="ibx-formrow__help">' + th('InboxDomainsMatchHelp') + '</div></div></div>'
+			+ '<details class="ibx-domwhy"><summary>' + ic('info') + ' ' + th('InboxDomainsWhy') + '</summary><dl>'
+			+ DOMAIN_CATS.map(c => '<dt>' + esc(catLabel(c)) + '</dt><dd>' + th('InboxDomainsWhy_' + c) + '</dd>').join('') + '</dl></details>'
+			+ '<p class="ibx-muted ibx-domshipped">' + th('InboxDomainsShipped', (sh.public || {}).count || 0, (sh.disposable || {}).count || 0, copied)
+			+ (r.modules ? ' ' + th('InboxDomainsModules', r.modules) : '') + ' <span title="' + esc(Object.values(sh).map(x => x.source + ' (' + x.licence + ')').join(' · ')) + '">' + th('InboxDomainsSources') + '</span></p>'
+			+ '<div class="ibx-domtools"><input class="ibx-field ibx-field--medium ibx-js-domsearch" type="search" placeholder="' + th('InboxDomainsSearch') + '" aria-label="' + th('InboxDomainsSearch') + '" spellcheck="false" value="' + esc(state.search) + '">'
+			+ '<select class="ibx-field ibx-field--small ibx-js-domfcat" aria-label="' + th('InboxDomainsCategory') + '"><option value="">' + th('InboxDomainsAllCats') + '</option>' + DOMAIN_CATS.map(c => '<option value="' + c + '">' + esc(catLabel(c)) + '</option>').join('') + '</select>'
+			+ '<select class="ibx-field ibx-field--small ibx-js-domforig" aria-label="' + th('InboxDomainsOrigin') + '"><option value="">' + th('InboxDomainsAllOrigins') + '</option>'
+			+ ['shipped', 'local', 'off', 'module'].map(o => '<option value="' + o + '">' + th('InboxDomainsOrigin_' + o) + '</option>').join('') + '</select>'
+			+ '<span class="ibx-muted ibx-js-domcount">' + esc(t('InboxDomainsCount', r.total)) + '</span></div>'
+			+ '<div class="ibx-js-domlist">' + list + '</div>'
+			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-domadd">' + ic('plus') + ' ' + th('InboxDomainsAdd') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-js-domrestore">' + ic('undo') + ' ' + th('InboxDomainsRestore') + '</button></div></div>';
+		main._dom = { state, rows };
+		const reload = () => renderDomains(main, parts, main._dom.state);
+		let timer = null;
+		$('.ibx-js-domsearch', main).addEventListener('input', e => {
+			clearTimeout(timer);
+			timer = setTimeout(() => renderDomains(main, parts, Object.assign({}, main._dom.state, { search: e.target.value.trim(), page: 0 })), 250);
+		});
+		$('.ibx-js-domfcat', main).addEventListener('change', e => renderDomains(main, parts, Object.assign({}, main._dom.state, { category: e.target.value, page: 0 })));
+		$('.ibx-js-domforig', main).addEventListener('change', e => renderDomains(main, parts, Object.assign({}, main._dom.state, { origin: e.target.value, page: 0 })));
+		$('.ibx-js-domadd', main).addEventListener('click', () => domainAddDialog(reload));
+		$('.ibx-js-dommatch', main).addEventListener('change', async e => {
+			const on = e.target.checked;
+			try {
+				await post('domain', 'match', { on: on ? 1 : 0 });
+			} catch (err) {
+				e.target.checked = !on;
+				toast(err.message, { error: true });
+				return;
+			}
+			toast(t(on ? 'InboxDomainsMatchOn' : 'InboxDomainsMatchOff'), { action: t('InboxUndo'), onAction: async () => {
+				await post('domain', 'match', { on: on ? 0 : 1 });
+				e.target.checked = !on;
+			} });
+		});
+		$('.ibx-js-domrestore', main).addEventListener('click', async () => {
+			let res;
+			try {
+				res = await post('domain', 'restore', {});
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			reload();
+			toast(t('InboxDomainsRestored', res.domains.length), res.domains.length ? { action: t('InboxUndo'), onAction: async () => {
+				await post('domain', 'toggle', { domains: res.domains, on: 0 });
+				reload();
+			} } : {});
+		});
+		main.onchange = async e => {
+			const sel = e.target.closest('.ibx-js-domcat');
+			if (!sel) {
+				return;
+			}
+			const id = +sel.closest('tr').dataset.id;
+			try {
+				const res = await post('domain', 'update', { domain_id: id, category: sel.value });
+				toast(t('InboxSaved'), { action: t('InboxUndo'), onAction: async () => {
+					await post('domain', 'update', { domain_id: id, category: res.before.category });
+					reload();
+				} });
+			} catch (err) {
+				toast(err.message, { error: true });
+				reload();
+			}
+		};
+		main.onclick = async e => {
+			if (e.target.closest('.ibx-js-domprev, .ibx-js-domnext')) {
+				const st = main._dom.state;
+				renderDomains(main, parts, Object.assign({}, st, { page: Math.max(0, st.page + (e.target.closest('.ibx-js-domnext') ? 1 : -1)) }));
+				return;
+			}
+			const tr = e.target.closest('tr[data-domain]');
+			if (!tr) {
+				return;
+			}
+			const d = main._dom.rows.find(x => x.domain === tr.dataset.domain);
+			if (e.target.closest('.ibx-js-domtoggle')) {
+				try {
+					await post('domain', 'toggle', { domain: d.domain, on: d.status ? 0 : 1 });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return;
+				}
+				reload();
+				toast(t(d.status ? 'InboxDomainsDisabled' : 'InboxDomainsEnabled', d.domain), { action: t('InboxUndo'), onAction: async () => {
+					await post('domain', 'toggle', { domain: d.domain, on: d.status });
+					reload();
+				} });
+				return;
+			}
+			if (e.target.closest('.ibx-js-domdel')) {
+				let res;
+				try {
+					res = await post('domain', 'delete', { domain_id: d.id });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return;
+				}
+				reload();
+				toast(t('InboxDomainsDeleted', d.domain), { action: t('InboxUndo'), onAction: async () => {
+					await post('domain', 'add', { domains: res.removed.domain, category: res.removed.category });
+					reload();
+				} });
+			}
+		};
+	}
+
+	/** Add one or several domains (pasted in a list), in a category */
+	function domainAddDialog(done) {
+		dialog({
+			title: t('InboxDomainsAdd'),
+			body: '<form class="ibx-form" novalidate><div class="ibx-formrow"><label class="ibx-formrow__label" for="f-domlist">' + th('InboxDomainsAddList') + '</label><div>'
+				+ '<textarea class="ibx-field" id="f-domlist" name="domains" rows="5" spellcheck="false" placeholder="groupe-exemple.fr&#10;yopmail.net"></textarea>'
+				+ '<div class="ibx-formrow__help">' + th('InboxDomainsAddHelp') + '</div></div></div>'
+				+ field('category', t('InboxDomainsCategory'), 'shared', { options: DOMAIN_CATS.map(c => [c, t('InboxDomainsCat_' + c)]) })
+				+ '</form>',
+			actions: [{ label: t('InboxDomainsAddButton'), primary: true, run: async dlg => {
+				const v = formValues($('form', dlg));
+				let res;
+				try {
+					res = await post('domain', 'add', v);
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				if (res.bad.length) {
+					toast(t('InboxDomainsBad', res.bad.join(', ')), { error: true });
+				}
+				if (res.added.length) {
+					toast(t('InboxDomainsAdded', res.added.length));
+				}
+				done();
+			} }],
+			onOpen: dlg => $('[name="domains"]', dlg).focus(),
+		});
+	}
 
 	/**
 	 * Settings > Data sources (lot A2 level 1, 1.72.0): mails sent by a site or an application from its own address,

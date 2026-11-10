@@ -544,7 +544,16 @@
 		status(w, t('InboxComposeSending'));
 		w.dlg.setAttribute('aria-busy', 'true');
 		try {
-			const res = await post('compose', 'send', ctx.data);
+			const res = await post('compose', 'send', Object.assign({}, ctx.data, opts.force ? { force: 1 } : {}));
+			if (res.conflict) {
+				// A colleague answered the same mail since this writing was opened (lot E2, 1.77.0): nothing sent
+				w.sending = false;
+				btn.removeAttribute('aria-disabled');
+				w.dlg.removeAttribute('aria-busy');
+				status(w, '');
+				paintConflict(w, res.conflict, opts);
+				return;
+			}
 			w.closed = true;
 			dictateStop(w);
 			finish(w);
@@ -567,6 +576,26 @@
 				$('.ibx-js-send', w.dlg).setAttribute('aria-disabled', 'true');
 			}
 		}
+	}
+
+	/** « Paul answered at 10:42 »: see his answer, or send anyway (never blocking) */
+	function paintConflict(w, c, opts) {
+		const box = $('.ibx-js-conflict', w.dlg);
+		const when = c.date ? new Date(c.date * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+		const who = c.author_name ? t(c.queued ? 'InboxComposeConflictQueued' : 'InboxComposeConflict', c.author_name, when) : t('InboxComposeConflictOther', when);
+		box.innerHTML = ic('warning') + '<span>' + esc(who) + '</span>'
+			+ (c.mail ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-conflictsee">' + th('InboxComposeConflictSee') + '</button>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-conflictsend">' + th('InboxComposeConflictSend') + '</button>';
+		box.hidden = false;
+		const see = $('.ibx-js-conflictsee', box);
+		if (see) {
+			see.addEventListener('click', () => Dolibarr.executeHook('inbox:mail:goto', { folder: c.folder, mail: c.mail }));
+		}
+		$('.ibx-js-conflictsend', box).addEventListener('click', () => {
+			box.hidden = true;
+			send(w, Object.assign({}, opts, { force: true }));
+		});
+		box.focus();
 	}
 
 	// ---------- Before the sending: the usual slips (lot W6 1.17.0, B16, B17, B18) ----------
@@ -1985,6 +2014,7 @@
 			+ '<div class="ibx-window__body ibx-compose__body">'
 			+ '<div class="ibx-cfield ibx-cfield--select" data-filled><span class="ibx-cfield__lead"></span>' + label(w.id + '-from', 'InboxFrom', 'InboxComposeShortFrom') + '<select class="ibx-cfield__input ibx-js-from" id="' + w.id + '-from">' + from + '</select>' + ic('chevron-down', 'ibx-cfield__caret') + '</div>'
 			+ '<div class="ibx-compose__warn ibx-js-boxwarn" role="status" hidden></div>'
+			+ '<div class="ibx-compose__warn ibx-compose__conflict ibx-js-conflict" role="alert" tabindex="-1" hidden></div>'
 			+ rcpt('to', 'InboxTo', 'InboxComposeShortTo', false) + rcpt('cc', 'InboxComposeCcLabel', 'InboxComposeCc', !d.cc.length) + rcpt('bcc', 'InboxComposeBccLabel', 'InboxComposeBcc', !d.bcc.length)
 			+ '<div class="ibx-cfield ibx-cfield--subject"' + (d.subject ? ' data-filled' : '') + '><span class="ibx-cfield__lead"></span>' + label(w.id + '-subject', 'InboxSubject', 'InboxSubject') + '<input class="ibx-cfield__input ibx-js-subject" aria-label="' + th('InboxSubject') + '" id="' + w.id + '-subject" type="text" autocomplete="off" maxlength="998" value="' + esc(d.subject) + '"></div>'
 			+ '<div class="ibx-compose__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '" aria-controls="' + w.id + '-editor">'

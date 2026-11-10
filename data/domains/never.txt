@@ -1,0 +1,2 @@
+# Domains a downloaded list would classify wrongly (the domain of a real company): never shipped as
+# public nor disposable. One domain per line.

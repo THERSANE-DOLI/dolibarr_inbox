@@ -5228,6 +5228,17 @@
 			resocDialog(box);
 			return true;
 		}
+		const fix = e.target.closest('.ibx-js-domfix');
+		if (fix) {
+			domainFix(box, fix.dataset.cat);
+			return true;
+		}
+		const cand = e.target.closest('.ibx-js-domcand');
+		if (cand) {
+			// A thirdparty chosen among the ones of the domain: the mail (and its conversation) attached to it
+			post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: +cand.dataset.soc, remember: 0 }).then(() => loadDolibar(box), err => toast(err.message, { error: true }));
+			return true;
+		}
 		const phoneSet = e.target.closest('.ibx-js-phoneset');
 		if (phoneSet) {
 			phoneDialog(box, phoneSet.dataset.number, phoneSet.dataset.mobile === '1');
@@ -5256,6 +5267,37 @@
 		socCardToggle(box, zone.dataset.card, !!e.target.closest('.ibx-js-socfold'));
 		return true;
 	}
+	/**
+	 * A thirdparty found by the domain only: « this domain is a public mail service » or « several companies use it »;
+	 * a manager of the settings marks it at once (undo), another user asks the managers (bell)
+	 */
+	function domainFixHtml(d) {
+		if (!d.sender.domain || !d.level) {
+			return '';
+		}
+		return '<span class="ibx-domfix">' + ['public', 'shared'].map(c => '<button type="button" class="ibx-linkbtn ibx-js-domfix" data-cat="' + c + '">' + th('InboxDomainsFix_' + c) + '</button>').join(' · ') + '</span>';
+	}
+	async function domainFix(box, category) {
+		const d = box._data;
+		const domain = d.sender.domain;
+		try {
+			if (d.sender.domain_admin) {
+				const res = await post('domain', 'add', { domains: domain, category });
+				toast(t('InboxDomainsMarked', domain, t('InboxDomainsCat_' + category)), { action: t('InboxUndo'), onAction: async () => {
+					for (const id of res.added) {
+						await post('domain', 'delete', { domain_id: id });
+					}
+					loadDolibar(box);
+				} });
+				loadDolibar(box);
+			} else {
+				const res = await post('domain', 'request', { domain, category });
+				toast(res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager'));
+			}
+		} catch (err) {
+			toast(err.message, { error: true });
+		}
+	}
 	function paintDolibar(box) {
 		const d = box._data;
 		const folded = params.dolibar_folded === '1';
@@ -5274,7 +5316,16 @@
 			const sender = [];
 			if (d.sender.soc) {
 				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0))
-					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' : ''));
+					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
+			}
+			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
+			if (d.sender.domain_category === 'disposable') {
+				sender.push('<span class="ibx-badge ibx-domwarn" title="' + th('InboxDomainsDisposableHelp') + '">' + ic('warning') + th('InboxDomainsDisposable') + '</span>');
+			}
+			if (!d.sender.soc && (d.sender.candidates || []).length) {
+				sender.push('<span class="ibx-domcands"><span class="ibx-muted">' + th(d.sender.domain_category === 'shared' ? 'InboxDomainsSharedBy' : 'InboxDomainsSeveral', d.sender.candidates.length, d.sender.domain) + '</span>'
+					+ d.sender.candidates.map(c => '<span class="ibx-domcand">' + pieceHtml(c, 0) + (d.level ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-domcand" data-soc="' + c.id + '">' + ic('link') + ' ' + th('InboxDomainsThisOne') + '</button>' : '') + '</span>').join('')
+					+ '</span>');
 			}
 			if (d.sender.contact) {
 				sender.push(d.sender.contact.readable ? socCardHtml(box, d.sender.contact, 'contact') : pieceHtml(d.sender.contact, 0, '', socId));
@@ -5328,7 +5379,7 @@
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
-				+ (d.notes.length ? d.notes.map((n, i) => noteHtml(n, n.mine, d.notes[i - 1])).join('') : '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>')
+				+ threadHtml(d)
 				+ '</div>'
 				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
 				+ '</div></div>';
@@ -5371,6 +5422,31 @@
 				}
 			});
 		}
+	}
+	/**
+	 * Fil of the mail (lot E2, 1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
+	 * date. Only what is sure: an answer is tied to the mail by its headers or its conversation, never by its subject;
+	 * the forwards are not there.
+	 */
+	function threadHtml(d) {
+		const items = d.notes.map(n => ({ kind: 'note', date: n.date, n })).concat((d.activity || []).map(a => ({ kind: 'sent', date: a.date, a })))
+			.sort((x, y) => x.date - y.date);
+		if (!items.length) {
+			return '<p class="ibx-notes__empty">' + th('InboxNotesEmpty') + '</p>';
+		}
+		return items.map((it, i) => {
+			if (it.kind === 'note') {
+				const prev = items[i - 1] && items[i - 1].kind === 'note' ? items[i - 1].n : null;
+				return noteHtml(it.n, it.n.mine, prev);
+			}
+			const a = it.a;
+			const who = a.mine ? t('InboxMe') : (a.author_name || t('InboxActivityOtherSoftware'));
+			const what = t(a.reply ? (a.author_name ? 'InboxActivityReplied' : 'InboxActivityRepliedElsewhere') : (a.author_name ? 'InboxActivityWrote' : 'InboxActivityWroteElsewhere'), who);
+			return '<div class="ibx-activity" role="note">' + ic(a.reply ? 'reply' : 'sent') + '<span class="ibx-activity__text"><b>' + esc(what) + '</b>'
+				+ (a.subject ? ' <span class="ibx-muted">« ' + esc(a.subject) + ' »</span>' : '') + (a.to ? ' <span class="ibx-muted">' + esc(t('InboxActivityTo', a.to)) + '</span>' : '') + '</span>'
+				+ '<time class="ibx-muted" datetime="' + new Date(a.date * 1000).toISOString() + '" title="' + esc(longDate(a.date)) + '">' + esc(longDate(a.date)) + '</time>'
+				+ '<button type="button" class="ibx-linkbtn ibx-js-activitysee" data-folder="' + a.folder + '" data-mail="' + a.mail + '">' + th('InboxActivitySee') + '</button></div>';
+		}).join('');
 	}
 	/**
 	 * A note as a text message: the picture of its author on the left (its photo of Dolibarr, else its initials), a
@@ -5511,6 +5587,11 @@
 			createDialog(box);
 			return;
 		}
+		const seeSent = e.target.closest('.ibx-js-activitysee');
+		if (seeSent) {
+			Dolibarr.executeHook('inbox:mail:goto', { folder: +seeSent.dataset.folder, mail: +seeSent.dataset.mail });
+			return;
+		}
 		const rqBtn = e.target.closest('.ibx-js-createrequest');
 		if (rqBtn) {
 			createPiece(box, rqBtn.dataset.type, false, null);
@@ -5637,7 +5718,9 @@
 		const dlg = dialog({
 			title: t('InboxCreateTitle'),
 			noCancel: false,
-			body: '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
+			// A disposable address (lot A7, 1.76.0): said before a thirdparty is made from it
+			body: (d.sender.domain_category === 'disposable' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxDomainsDisposableCreate', d.sender.domain) + '</div></div>' : '')
+				+ '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
 				+ '<label class="ibx-inline ibx-createattach"><input type="checkbox" class="ibx-js-createattach"> ' + th('InboxCreateAttachMail') + '</label>'
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],

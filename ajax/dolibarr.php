@@ -28,6 +28,7 @@ dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
 dol_include_once('/inbox/class/inboxdatasource.class.php');
 dol_include_once('/inbox/class/inboxthreadlink.class.php');
+dol_include_once('/inbox/class/inboxactivity.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
@@ -166,6 +167,7 @@ switch ($action) {
 		$email = strtolower($requester ? $requester['email'] : (string) $row->from_email);
 		$socId = (int) $row->fk_soc;
 		$contactId = (int) $row->fk_socpeople;
+		$matcher = null;
 		if (!$socId && $email !== '') {
 			$matcher = new InboxContactMatcher($db);
 			$m = $matcher->match($email);
@@ -177,6 +179,22 @@ switch ($action) {
 			}
 		}
 		$sender['by'] = $sender['by'] ?: ($socId || $contactId ? 'address' : '');
+		// Shared domains (lot A7, 1.76.0): the category of the domain (a disposable address is said), the
+		// thirdparties that share it offered to choose (never linked without the user), and who may correct the list
+		$matcher = $matcher ?? new InboxContactMatcher($db);
+		$byDomain = $email !== '' ? $matcher->domainCandidates($email) : array('socs' => array(), 'category' => '', 'domain' => '');
+		$sender['domain'] = $byDomain['domain'];
+		$sender['domain_category'] = $byDomain['category'];
+		$sender['candidates'] = array();
+		if (!$socId) {
+			foreach ($byDomain['socs'] as $cand) {
+				$dc = $elements->describe($user, 'societe', $cand);
+				if (!empty($dc['readable'])) {
+					$sender['candidates'][] = $dc;
+				}
+			}
+		}
+		$sender['domain_admin'] = (int) $user->hasRight('inbox', 'account', 'admin');
 		// Their ways to reach them (card of the thirdparty, 1.67.0) when the user may read them
 		$situation = new InboxSituation($db);
 		if ($socId) {
@@ -269,7 +287,13 @@ switch ($action) {
 			// The piece the source offers to create, when the user may
 			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
 		}
-		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
+		// Fil of the mail (lot E2, 1.77.0): the answers sent from the mailbox in its conversation, beside the notes
+		$activity = array_map(function ($a) use ($user) {
+			$a['mine'] = $a['author'] > 0 && $a['author'] === (int) $user->id;
+			unset($a['message_id']);
+			return $a;
+		}, (new InboxActivity($db))->sentIn($row));
+		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);

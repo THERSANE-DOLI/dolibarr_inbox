@@ -1,5 +1,34 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: fil of a mail, the answers sent beside the internal notes (lot E2) :   1.77.0
+  - the block of the notes in the panel becomes a fil by date: the notes and the mails sent from the mailbox in the
+    conversation (tied by In-Reply-To, References or the conversation, never by the subject): « Paul answered »
+    when inbox sent it (journal of the mailbox), « Answer sent from the mailbox (other software) » otherwise; « See »
+    opens it. Forwards are left out: nothing ties them to their mail.
+  - before sending an answer: when a colleague answered the same mail since the writing was opened (queue of inbox,
+    even still cancellable, or Sent folder read again), nothing is sent and the writing says « Paul answered this mail
+    at 10:42 » with « See the answer » and « Send anyway ».
+
+- NEW: shared domains, public mail services and disposable addresses (lot A7) :   1.76.0
+  - list shipped in data/domains/ (public.txt: 162 public mail services and access providers kept by hand;
+    disposable.txt: 10 181 domains copied from a CC0 list on 2026-11-10, refreshed before a version by
+    dev/update-domains.php), read in its files (a domain looked for as a line of the text, the text kept for the
+    process), never copied in the database nor downloaded by inbox; the database keeps only the domains added and the
+    shipped ones disabled. The old hidden setting INBOX_PUBLIC_DOMAINS becomes local entries.
+  - a public or disposable domain never designates a thirdparty (subdomains too: mail.acme.com is acme.com, by the
+    public suffixes); a domain shared by several thirdparties, or marked shared, offers them in the panel (« This
+    one », never linked alone); a disposable address is said in the panel and before a thirdparty is made from it.
+  - Settings > Public and shared domains (right « Manage the mailboxes »): search, filters by category and origin (shipped, added,
+    disabled, other module), thirdparties and mails using each domain, add a list, change the category of an added
+    one, disable a shipped one, restore the shipped list, all at once with undo; « Why? » explains each category;
+    cards on the phone.
+  - from a mail whose thirdparty was found by its domain: « Public mail service? » / « Several companies use it? »:
+    marked at once for a manager of the settings (undo), a request in the bell of the managers for the others.
+  - « Recognize the sender by the domain of his address » (Settings > Public and shared domains, on by default): off, the exact address
+    only, for a big database whose searches by domain are slow; the log of Dolibarr says their duration when it
+    passes 200 ms.
+  - hook inboxSharedDomains: the other modules give their domains (origin « other module »). README.
+
 - NEW: bank details in a mail, a lesson rather than a verdict (lot A6) :   1.75.0
   - a mail that talks of bank details (an IBAN with a right key, words of a change in 5 languages, an attachment
     named RIB / IBAN) gets a banner above its body: red when the sender is not authenticated or imitates a known one,
