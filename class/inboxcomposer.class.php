@@ -308,7 +308,7 @@ class InboxComposer
 			}
 			$headers = InboxReader::headers($raw);
 			$info = InboxReader::unsubscribeInfo($headers);
-			if (!$info || $info['mailto'] === '') {
+			if (!$info || $info['mailto'] === '' || InboxReader::unsubscribeMode() === 'off') {
 				dol_delete_dir_recursive($dir);
 				return $this->fail('unsub_none');
 			}
@@ -375,8 +375,10 @@ class InboxComposer
 			if ($mode === 'forward_attach') {
 				$this->keepFile($dir, $state, InboxMimeParser::fileName(($message->subject !== '' ? $message->subject : 'mail').'.eml'), $raw, 'message/rfc822');
 			} else {
-				file_put_contents($dir.'/quote.html', $this->quoteOf($mode, $message));
+				$removed = array('trackers' => 0, 'images' => 0);
+				file_put_contents($dir.'/quote.html', $this->quoteOf($mode, $message, $removed));
 				$state['quote'] = 1;
+				$state['quote_removed'] = $removed;
 				if ($mode === 'forward') {
 					foreach ($message->getFileAttachments() as $a) {
 						$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
@@ -442,6 +444,8 @@ class InboxComposer
 		}
 		$out['identities'] = $identities;
 		$out['quote'] = !empty($state['quote']) ? (string) @file_get_contents($dir.'/quote.html') : '';
+		// Remote pictures taken out of the quote (lot F1 1.78.0), said under it
+		$out['quote_removed'] = $state['quote_removed'] ?? array('trackers' => 0, 'images' => 0);
 		$out['attachments'] = self::attachmentsView($state);
 		$out['source'] = null;
 		if (!empty($state['source'])) {
@@ -1050,18 +1054,21 @@ class InboxComposer
 	/**
 	 * Quote of the mail answered or forwarded, made here from the source (never from the browser)
 	 *
-	 * @param string       $mode    Mode
-	 * @param InboxMessage $message Mail
+	 * @param string                           $mode    Mode
+	 * @param InboxMessage                     $message Mail
+	 * @param array{trackers:int,images:int}   $removed Remote pictures taken out
 	 * @return string Clean HTML, in a div.inbox-quote
 	 */
-	protected function quoteOf($mode, $message)
+	protected function quoteOf($mode, $message, &$removed = null)
 	{
 		global $langs;
 
+		$removed = array('trackers' => 0, 'images' => 0);
 		if ($message->bodyHtml !== '') {
 			$body = $message->bodyHtml;
 			// Pictures of the mail (cid:) are not sent again in an answer: their text stays
 			$body = preg_replace('#<img\b[^>]*src=["\']?cid:[^>]*>#i', '', $body);
+			$body = self::quoteRemote($body, $mode, $removed);
 			$body = InboxMailBuilder::cleanHtml(preg_replace('#^.*<body\b[^>]*>|</body>.*$#is', '', $body));
 		} else {
 			$body = '<div style="white-space:pre-wrap">'.dol_escape_htmltag($message->bodyText).'</div>';
@@ -1094,6 +1101,50 @@ class InboxComposer
 
 		return '<div class="inbox-quote"><p>'.dol_escape_htmltag($langs->transnoentities('InboxQuoteHeader', $date, $who)).'</p>'
 			.'<blockquote type="cite" style="margin:0 0 0 0.8ex;border-left:2px solid #ccc;padding-left:1ex">'.$body.'</blockquote></div>';
+	}
+
+	/**
+	 * Remote pictures of a quote (lot F1 1.78.0). The tracking pictures always go: kept, the reader of the answer
+	 * would tell the sender of the first mail that it was answered, and when; the copy in the Sent folder would tell it
+	 * again to whoever shows its pictures. The other pictures follow the setting of the administrator
+	 * INBOX_QUOTE_REMOTE_IMAGES: keep (default), reply (taken out of the answers), all (answers and forwards); a
+	 * picture taken out leaves its alternative text.
+	 *
+	 * @param string                         $html    HTML of the mail quoted
+	 * @param string                         $mode    Mode of the writing
+	 * @param array{trackers:int,images:int} $removed Counts, added to
+	 * @return string
+	 */
+	public static function quoteRemote($html, $mode, array &$removed)
+	{
+		$setting = getDolGlobalString('INBOX_QUOTE_REMOTE_IMAGES', 'keep');
+		$forward = in_array($mode, array('forward', 'forward_attach'), true);
+		$strip = $setting === 'all' || ($setting === 'reply' && !$forward);
+		$removed += array('trackers' => 0, 'images' => 0);
+		$html = (string) preg_replace_callback('/<img\b[^>]*>/i', function ($m) use ($strip, &$removed) {
+			$tag = $m[0];
+			if (InboxReader::isTracker($tag)) {
+				$removed['trackers']++;
+				return '';
+			}
+			if (!$strip || !preg_match('/\bsrc\s*=\s*["\']?\s*https?:/i', $tag)) {
+				return $tag;
+			}
+			$removed['images']++;
+			$alt = '';
+			if (preg_match('/\balt\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $tag, $a)) {
+				$alt = trim(html_entity_decode(implode('', array_slice($a, 1)), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+			}
+
+			return $alt !== '' ? '['.dol_escape_htmltag(dol_trunc($alt, 80, 'right', 'UTF-8', 1)).']' : '';
+		}, (string) $html);
+		if ($strip) {
+			// Backgrounds of cells and blocks: an address the reader would load as well
+			$html = (string) preg_replace('/url\s*\(\s*[\'"]?\s*https?:[^)]*\)/i', 'none', $html);
+			$html = (string) preg_replace('/\sbackground\s*=\s*("https?:[^"]*"|\'https?:[^\']*\'|https?:[^\s>]+)/i', '', $html);
+		}
+
+		return $html;
 	}
 
 	/**

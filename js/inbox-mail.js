@@ -7253,7 +7253,8 @@
 			banners += '<div class="ibx-banner ibx-banner--info ibx-js-imagesbar">' + ic('remote-blocked') + '<div class="ibx-banner__text">' + th('InboxRemoteBlocked')
 				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '') + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-showimages">' + th('InboxShowImages') + '</button>'
-				+ (m.auth && m.auth.fail ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu">' + th('InboxAlwaysShowImages') + ' ' + ic('chevron-down') + '</button>') + '</div>';
+				// « Always » refused by the administrator (setting 1.78.0): the pictures of each mail on a click only
+				+ (m.auth && m.auth.fail || m.body.always === 'never' ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu">' + th('InboxAlwaysShowImages') + ' ' + ic('chevron-down') + '</button>') + '</div>';
 		}
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
@@ -7441,10 +7442,11 @@
 		const allow = $('.ibx-js-allowimages', pane);
 		if (allow) {
 			const domain = '@' + (m.from.email.split('@')[1] || '');
-			allow.addEventListener('click', () => menu(allow, [
-				{ label: t('InboxAlwaysForSender', m.from.email), run: () => allowImages(m, 'sender') },
-				{ label: t('InboxAlwaysForDomain', domain), run: () => allowImages(m, 'domain') },
-			]));
+			const items = [{ label: t('InboxAlwaysForSender', m.from.email), run: () => allowImages(m, 'sender') }];
+			if (m.body.always !== 'sender') {
+				items.push({ label: t('InboxAlwaysForDomain', domain), run: () => allowImages(m, 'domain') });
+			}
+			allow.addEventListener('click', () => menu(allow, items));
 		}
 		const toggle = $('.ibx-js-atttoggle', pane);
 		if (toggle) {

@@ -21,6 +21,7 @@
  *   #/settings/accounts/<id>/<tab>     card of a mailbox: server, folders, identities, access, tags, sync, journal
  *   #/settings/import                  import from the sources declared by other modules
  *   #/settings/general                 defaults of the webmail (admins of the mailboxes)
+ *   #/settings/security                security: quote, pictures, unsubscribe, bank alert (1.78.0)
  *   #/settings/domains                 shared domains: public, disposable, shared (managers of the settings)
  *   #/settings/sources                 data sources: mails sent by a site for a requester (admins of Dolibarr)
  *   #/settings/me                      settings of the current user
@@ -125,7 +126,7 @@
 					pointSection(main, a.dataset.goto);
 				});
 			}
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, domains: renderDomains, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, security: renderSecurity, domains: renderDomains, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -184,6 +185,7 @@
 			+ link('accounts', 'inbox', 'InboxNavAccounts')
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
+			+ (isAdmin() ? link('security', 'lock', 'InboxNavSecurity') : '')
 			+ (isAdmin() ? link('domains', 'shield', 'InboxNavDomains') : '')
 			+ (isDolibarrAdmin() ? link('server', 'server', 'InboxNavServer') : '')
 			+ (isDolibarrAdmin() ? link('sources', 'redirect', 'InboxNavSources') : '')
@@ -2815,6 +2817,63 @@
 		load();
 	}
 
+	/** Fields of the general settings (General, Security): a value saved when changed, a switch at once */
+	function bindGeneralFields(main) {
+		$$('[data-name]', main).forEach(f => f.addEventListener('change', async () => {
+			try {
+				await post('general', 'set', { name: f.dataset.name, value: f.value });
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+				f.focus();
+			}
+		}));
+		// Switches: saved at once, back if the server refuses
+		$$('.ibx-js-gswitch', main).forEach(sw => sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				await post('general', 'set', { name: sw.dataset.switch, value: on ? '1' : '0' });
+				if (sw.dataset.switch === 'INBOX_BANK_CHECK') {
+					$('.ibx-js-bankoff', main).hidden = on;
+				}
+			} catch (err) {
+				sw.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
+			}
+		}));
+	}
+
+	// ---------- Security (lot F1 1.78.0, admins): what protects the users, each choice with what it protects from ----------
+	async function renderSecurity(main) {
+		if (!isAdmin()) {
+			I.go('#/settings/accounts');
+			return;
+		}
+		main.innerHTML = skeleton();
+		let s;
+		try {
+			s = (await api('general', 'get')).settings;
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderSecurity(main)));
+			return;
+		}
+		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavSecurity') + '</h1></div><p class="ibx-page__intro">' + th('InboxSecurityHelp') + '</p>'
+			+ '<div class="ibx-form ibx-js-general">'
+			+ [['INBOX_QUOTE_REMOTE_IMAGES', 'g-quoteimg', 'InboxQuoteRemoteImages', ['keep', 'reply', 'all']], ['INBOX_IMAGES_ALWAYS', 'g-imgalways', 'InboxImagesAlways', ['domain', 'sender', 'never']],
+				['INBOX_UNSUBSCRIBE', 'g-unsub', 'InboxUnsubscribeSetting', ['oneclick', 'mail', 'off']]].map(([k, id, label, values]) => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="' + id + '">' + th(label) + '</label><div>'
+				+ '<select class="ibx-field ibx-field--medium" id="' + id + '" data-name="' + k + '">' + values.map(v => '<option value="' + v + '"' + (v === s[k] ? ' selected' : '') + '>' + th(label + '_' + v) + '</option>').join('') + '</select>'
+				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxBankCheckSetting') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_BANK_CHECK" aria-checked="' + (s.INBOX_BANK_CHECK === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxBankCheckSetting') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxBankCheckSettingHelp') + '</div>'
+			+ '<div class="ibx-formrow__help ibx-formrow__warn ibx-js-bankoff"' + (s.INBOX_BANK_CHECK === '0' ? '' : ' hidden') + '>' + ic('warning') + ' ' + th('InboxBankCheckOffWarning') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
+			+ '</div></div>';
+		bindGeneralFields(main);
+	}
+
 	// ---------- General (admins) ----------
 	async function renderGeneral(main, parts) {
 		if (!isAdmin()) {
@@ -2860,9 +2919,7 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-read">' + th('InboxReadMode') + '</label><div><select class="ibx-field ibx-field--medium" id="g-read" data-name="INBOX_DEFAULT_READ_MODE">' + ['immediate', 'delay', 'manual'].map(v => '<option value="' + v + '"' + (v === s.INBOX_DEFAULT_READ_MODE ? ' selected' : '') + '>' + th('InboxReadMode_' + v) + '</option>').join('') + '</select><div class="ibx-formrow__help">' + th('InboxReadModeDefaultHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" id="g-delay" data-name="INBOX_DEFAULT_READ_DELAY" value="' + esc(s.INBOX_DEFAULT_READ_DELAY) + '"> ' + th('InboxSeconds') + '</div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-send">' + th('InboxSendDelay') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-send" data-name="INBOX_SEND_DELAY" value="' + esc(s.INBOX_SEND_DELAY) + '"> ' + th('InboxSeconds') + '</div><div class="ibx-formrow__help">' + th('InboxSendDelayHelp') + '</div></div></div>'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-journal">' + th('InboxJournalKeep') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="120" inputmode="numeric" id="g-journal" data-name="INBOX_ACTION_LOG_MONTHS" value="' + esc(s.INBOX_ACTION_LOG_MONTHS) + '"> ' + th('InboxMonths') + '</div><div class="ibx-formrow__help">' + th('InboxJournalKeepHelp') + '</div></div></div>'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-sendmax">' + th('InboxSendMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="100" inputmode="numeric" id="g-sendmax" data-name="INBOX_SEND_MAX_MB" value="' + esc(s.INBOX_SEND_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxSendMaxHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSendAutocopy') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_SEND_AUTOCOPY" aria-checked="' + (s.INBOX_SEND_AUTOCOPY === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxSendAutocopy') + '"></button>'
@@ -2952,26 +3009,7 @@
 		});
 		$$('[name="g-greys"]', look).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_GREYS', greysValue())));
 		// Saved field by field, at once (as the switches), with a toast
-		$$('[data-name]', main).forEach(f => f.addEventListener('change', async () => {
-			try {
-				await post('general', 'set', { name: f.dataset.name, value: f.value });
-				toast(t('InboxSaved'));
-			} catch (err) {
-				toast(err.message, { error: true });
-				f.focus();
-			}
-		}));
-		// Switches: saved at once, back if the server refuses
-		$$('.ibx-js-gswitch', main).forEach(sw => sw.addEventListener('click', async () => {
-			const on = sw.getAttribute('aria-checked') !== 'true';
-			sw.setAttribute('aria-checked', on ? 'true' : 'false');
-			try {
-				await post('general', 'set', { name: sw.dataset.switch, value: on ? '1' : '0' });
-			} catch (err) {
-				sw.setAttribute('aria-checked', on ? 'false' : 'true');
-				toast(err.message, { error: true });
-			}
-		}));
+		bindGeneralFields(main);
 		tabTags($('.ibx-js-tags', main), null);
 		renderWhisperSettings($('.ibx-js-whisper', main));
 		const searchDone = renderSearchSettings($('.ibx-js-searchsettings', main));
