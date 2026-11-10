@@ -281,6 +281,9 @@ class InboxMailBuilder
 			// Written as entities: the tags are removed after, the angle brackets come back with the entities
 			return $text === '' || $text === $url ? htmlspecialchars($url) : $m[2].' &lt;'.htmlspecialchars($url).'&gt;';
 		}, (string) $html);
+		// The signature delimiter of the text mails (RFC 3676 4.3: « -- » and a space alone on its line), written by a
+		// mark that the cleaning of the trailing spaces leaves
+		$html = preg_replace('#<div\b[^>]*class="inbox-signature"[^>]*>(\s*--\s*(<br\s*/?>)?)?#i', "\nINBOXSIGDELIM\n", $html);
 		$html = preg_replace('#<li\b[^>]*>#i', "\n- ", $html);
 		$html = preg_replace('#<(p|div|h\d|tr|blockquote|ul|ol|pre|table)\b[^>]*>#i', "\n", $html);
 		// Quotes: each line of a blockquote starts with « > »
@@ -293,6 +296,7 @@ class InboxMailBuilder
 		$text = InboxMimeParser::htmlToText($html);
 		$text = preg_replace("/[ \t]+\n/", "\n", $text);
 		$text = preg_replace("/\n{3,}/", "\n\n", $text);
+		$text = preg_replace('/^[ \t]*INBOXSIGDELIM[ \t]*\n+/m', "-- \n", $text);
 
 		return trim($text)."\n";
 	}

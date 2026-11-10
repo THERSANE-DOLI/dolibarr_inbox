@@ -36,7 +36,7 @@
 		}
 	};
 	/** Rights of the user, from the flat keys of the context */
-	const rights = () => ({ webmail: !!ctx('INBOX_RIGHT_WEBMAIL', false), account_admin: !!ctx('INBOX_RIGHT_ACCOUNT_ADMIN', false) });
+	const rights = () => ({ webmail: !!ctx('INBOX_RIGHT_WEBMAIL', false), account_admin: !!ctx('INBOX_RIGHT_ACCOUNT_ADMIN', false), dolibarr_admin: !!ctx('INBOX_RIGHT_DOLIBARR_ADMIN', false) });
 	const $ = (sel, root) => (root || document).querySelector(sel);
 	const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 

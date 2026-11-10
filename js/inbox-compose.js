@@ -281,8 +281,46 @@
 		box.hidden = !sig.trim() || !w.signature;
 		$('.ibx-js-sigadd', w.dlg).hidden = !sig.trim() || w.signature;
 		if (!box.hidden) {
-			$('iframe', box).srcdoc = srcdoc('-- <br>' + sig, true);
+			// No « -- » (1.53.5): only the text part of the mail writes it
+			$('iframe', box).srcdoc = srcdoc(sig, true);
 		}
+	}
+	/**
+	 * Frame of the signature or of the quote at the height of its content (1.53.5): no scroll inside it, the writing
+	 * scrolls as a whole. Same origin without scripts (as the reading): nothing of the content runs, the height is read
+	 */
+	function fitFrame(f) {
+		f.addEventListener('load', () => {
+			let doc;
+			try {
+				doc = f.contentDocument;
+			} catch (e) {
+				return;
+			}
+			if (!doc || !doc.documentElement) {
+				return;
+			}
+			const fit = () => {
+				if (!f.hidden) {
+					f.style.height = Math.max(24, Math.ceil(doc.documentElement.getBoundingClientRect().height)) + 'px';
+				}
+			};
+			fit();
+			// Pictures (the logo of a signature) change the height when they arrive
+			Array.from(doc.images).forEach(img => {
+				if (!img.complete) {
+					img.addEventListener('load', fit);
+					img.addEventListener('error', fit);
+				}
+			});
+			if (window.ResizeObserver) {
+				if (f.ibxRo) {
+					f.ibxRo.disconnect();
+				}
+				f.ibxRo = new ResizeObserver(fit);
+				f.ibxRo.observe(doc.documentElement);
+			}
+		});
 	}
 	function paintAttachments(w) {
 		const box = $('.ibx-js-atts', w.dlg);
@@ -1956,11 +1994,11 @@
 			+ '<div class="ibx-compose__dictation ibx-js-dictbar" role="status" hidden></div>'
 			+ '<div class="ibx-compose__ai ibx-js-ai" role="region" aria-label="' + th('InboxAi') + '" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
-			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
+			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="allow-same-origin" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
 			+ (d.quote ? '<div class="ibx-compose__quote ibx-js-quote"><div class="ibx-compose__quotebar"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quotetoggle" aria-expanded="false">··· ' + th(w.mode === 'forward' ? 'InboxComposeShowForward' : 'InboxComposeShowQuote') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteoff">' + th(w.mode === 'forward' ? 'InboxComposeRemoveForward' : 'InboxComposeRemoveQuote') + '</button></div>'
-				+ '<iframe sandbox="" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
+				+ '<iframe sandbox="allow-same-origin" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteon" hidden>' + th('InboxComposePutQuoteBack') + '</button>' : '')
 			+ '<ul class="ibx-compose__atts ibx-js-atts" hidden aria-label="' + th('InboxAttachments') + '"></ul>'
 			+ ((d.pieces || []).length ? '<div class="ibx-compose__record" role="group" aria-label="' + th('InboxRecordOn') + '">' + ic('event-new') + '<span class="ibx-muted">' + th('InboxRecordOn') + '</span>'
@@ -2296,6 +2334,7 @@
 		w.to = recipients(w, 'to', d.to);
 		w.cc = recipients(w, 'cc', d.cc);
 		w.bcc = recipients(w, 'bcc', d.bcc);
+		[$('.ibx-js-sig iframe', dlg), $('.ibx-js-quote iframe', dlg)].filter(Boolean).forEach(fitFrame);
 		bind(w);
 		writings.push(w);
 		dlg.show();
@@ -2350,6 +2389,13 @@
 		['mouseup', 'keyup'].forEach(ev => edBox.addEventListener(ev, () => setTimeout(() => bubble(w), 0)));
 		w.editor.on('blur', () => setTimeout(() => bubble(w), 150));
 		$('.ibx-compose__body', dlg).addEventListener('scroll', () => bubble(w), { passive: true });
+		// A click in the empty space of the writing (under the signature): the cursor at the end of the text
+		$('.ibx-compose__body', dlg).addEventListener('mousedown', e => {
+			if (e.target === e.currentTarget) {
+				e.preventDefault();
+				w.editor.focus('end');
+			}
+		});
 		paintAiButton(w);
 		paintDictateButton(w);
 		// Escape stops the voice typing

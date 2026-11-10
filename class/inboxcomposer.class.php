@@ -1309,7 +1309,8 @@ class InboxComposer
 			// Its variables replaced (1.53.0), as the writing showed it
 			require_once __DIR__.'/inboxtemplates.class.php';
 			$signed = (new InboxTemplates($this->db))->signatures($user, array($identity));
-			$html .= '<div class="inbox-signature">-- <br>'.InboxMailBuilder::cleanHtml($signed[(int) $identity['id']] ?? $identity['signature']).'</div>';
+			// No « -- » in the HTML (1.53.5): the text part writes it (RFC 3676), the HTML marks the signature by its class
+			$html .= '<div class="inbox-signature">'.InboxMailBuilder::cleanHtml($signed[(int) $identity['id']] ?? $identity['signature']).'</div>';
 		}
 		if (!empty($state['quote']) && !empty($data['quote']) && is_file($dir.'/quote.html')) {
 			$html .= '<br>'.(string) file_get_contents($dir.'/quote.html');

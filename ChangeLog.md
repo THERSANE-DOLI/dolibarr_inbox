@@ -1,5 +1,27 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: Settings > Server in the application, with the scheduled jobs of the module :   1.54.0
+  - a page of its own beside General, for the admins of Dolibarr: keeping of the cache and of the journals, timeouts
+    of the mail servers, master user of the mail server (password encrypted, never shown again), each number saved
+    when the field is left.
+  - the scheduled jobs of inbox: on or off at once, frequency, last run (its error when it failed) and next one, a
+    link to their card; said first: the module of the jobs off, a needed job off (synchronisation, sendings), jobs
+    late (the scheduler of Dolibarr probably not started), last run failed.
+  - hook inboxCronJobUrl (context inbox): another interface gives its own address of the card of a job.
+  - the tab Settings of the setup page of Dolibarr points there (the cache and the tests of reading stay).
+  - label of the synchronisation job repaired in the five languages (its end had gone into its comment).
+  - setup page of Dolibarr: while DocStudio is not enabled, a link to its last release on GitHub (viewing and
+    editing of the attachments).
+
+- FIX: signature seen whole in the writing, right under the text, without « -- » in the HTML :   1.53.5
+  - the signature (and the quote when unfolded) took a frame of a fixed height with its own scroll: its frame takes
+    the height of its content (pictures included), the writing scrolls as a whole; same origin without scripts, as
+    the reading, nothing of the content runs.
+  - the text no longer stretches to the bottom of the window: the signature comes right under it, a click in the
+    space below puts the cursor at the end of the text; the cross still removes the signature of this mail.
+  - the delimiter « -- » is no longer written in the HTML part (nor in the writing): the text part keeps it,
+    « -- » and its space alone on a line (RFC 3676), as the mail software read it.
+
 - FIX: « Server error (500) » after a mail sent, though it left :   1.53.4
   - closing the writing after the sending removed its folder with a function of Dolibarr not loaded (files.lib):
     the mail was sent, the closing failed. Loaded by the writing and by the queue of the sendings (its cleaning

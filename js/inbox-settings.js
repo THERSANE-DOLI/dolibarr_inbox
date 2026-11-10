@@ -31,6 +31,8 @@
 	const { esc, t, th, ic, api, post, toast, dialog, confirmDialog, $, $$ } = I;
 	const rights = I.rights;
 	const isAdmin = () => !!rights().account_admin;
+	/** Settings > Server (1.54.0): admins of Dolibarr only (master password of the mail server, scheduled jobs) */
+	const isDolibarrAdmin = () => !!rights().dolibarr_admin;
 
 
 	/** Skeleton while loading (state "loading", interface §9) */
@@ -119,7 +121,7 @@
 					pointSection(main, a.dataset.goto);
 				});
 			}
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, me: renderMe, notifications: renderNotifications };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, server: renderServer, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -146,7 +148,9 @@
 	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true], ['order', 'folders', 'InboxBoxOrderSection', true],
 		['permailbox', 'mark-read', 'InboxReadPerMailbox', true], ['unified', 'multi', 'InboxUnifiedSection', true], ['dictation', 'mic', 'InboxDictationSection', true],
 		['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
-	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, me: ME_SECTIONS };
+	/** Sections of Settings > Server (1.54.0) */
+	const SERVER_SECTIONS = [['keep', 'keep', 'InboxServerKeep'], ['imap', 'plug', 'InboxServerImap'], ['master', 'key', 'InboxMasterUser'], ['cron', 'cron', 'InboxServerCron']];
+	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, server: SERVER_SECTIONS, me: ME_SECTIONS };
 
 	/** Links to the sections of a page: under its link in the menu, or the row of chips of the phone */
 	function sectionLinks(page, sections, cls) {
@@ -176,6 +180,7 @@
 			+ link('accounts', 'inbox', 'InboxNavAccounts')
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
+			+ (isDolibarrAdmin() ? link('server', 'server', 'InboxNavServer') : '')
 			+ '<div class="ibx-settings__navgroup">' + th('InboxNavPersonal') + '</div>'
 			+ link('me', 'account', 'InboxNavMe')
 			+ link('notifications', 'bell', 'InboxNavNotifications');
@@ -2704,6 +2709,142 @@
 		if (parts && parts[0]) {
 			searchDone.then(() => requestAnimationFrame(() => pointSection(main, parts[0])));
 		}
+	}
+
+	// ---------- Server (1.54.0, admins of Dolibarr) ----------
+	/** « every minute », « every 5 minutes », « every day »... */
+	function everyText(sec) {
+		const units = [[86400, 'Day'], [3600, 'Hour'], [60, 'Min']];
+		for (const [n, u] of units) {
+			if (sec >= n && sec % n === 0) {
+				return sec === n ? t('InboxCronEvery1' + u) : t('InboxCronEvery' + u, sec / n);
+			}
+		}
+		return t('InboxCronEverySec', sec);
+	}
+
+	async function renderServer(main, parts) {
+		if (!isDolibarrAdmin()) {
+			I.go('#/settings/accounts');
+			return;
+		}
+		main.innerHTML = skeleton();
+		let s;
+		try {
+			s = await api('server', 'get');
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderServer(main, parts)));
+			return;
+		}
+		const title = id => sectionTitle(SERVER_SECTIONS, id);
+		const number = name => {
+			const d = s.numbers[name];
+			return '<div class="ibx-formrow"><label class="ibx-formrow__label" for="sv-' + name + '">' + th(name) + '</label><div><div class="ibx-inline">'
+				+ '<input class="ibx-field ibx-field--narrow" type="number" inputmode="numeric" id="sv-' + name + '" data-number="' + name + '" min="' + d.min + '" max="' + d.max + '" value="' + esc(d.value) + '"> '
+				+ th(d.unit === 'days' ? 'InboxDays' : 'InboxSeconds') + '</div><div class="ibx-formrow__help">' + th(name + 'Help') + '</div></div></div>';
+		};
+		const m = s.master;
+		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavServer') + '</h1></div><p class="ibx-page__intro">' + th('InboxServerIntro') + '</p>'
+			+ '<nav class="ibx-subchips" aria-label="' + th('InboxNavServer') + '">' + sectionLinks('server', SERVER_SECTIONS, 'ibx-subchip') + '</nav>'
+			+ '<section class="ibx-section" data-section="keep">' + title('keep') + '<div class="ibx-form">' + ['INBOX_CACHE_DAYS', 'INBOX_LOG_DAYS', 'INBOX_ACCOUNT_LOG_DAYS'].map(number).join('') + '</div></section>'
+			+ '<section class="ibx-section" data-section="imap">' + title('imap') + '<div class="ibx-form">' + ['INBOX_IMAP_TIMEOUT', 'INBOX_TEST_TIMEOUT'].map(number).join('') + '</div></section>'
+			// Master user: one form (the four values go together), the password never shown again
+			+ '<section class="ibx-section" data-section="master">' + title('master') + '<p class="ibx-section__help">' + th('InboxMasterUserHelp') + '</p>'
+			+ '<form class="ibx-form ibx-js-master" autocomplete="off">'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="sv-muser">' + th('InboxMasterUserName') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="sv-muser" name="user" autocomplete="off" spellcheck="false" value="' + esc(m.user) + '"></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="sv-mhost">' + th('InboxMasterHost') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="sv-mhost" name="host" autocomplete="off" spellcheck="false" placeholder="mail.example.com" value="' + esc(m.host) + '"><div class="ibx-formrow__help">' + th('InboxMasterHostHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="sv-msep">' + th('InboxMasterSeparator') + '</label><div><input class="ibx-field ibx-field--narrow" type="text" id="sv-msep" name="separator" maxlength="2" autocomplete="off" spellcheck="false" value="' + esc(m.separator) + '"><div class="ibx-formrow__help">' + th('InboxMasterSeparatorHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="sv-mpass">' + th('InboxPassword') + '</label><div><input class="ibx-field ibx-field--medium" type="password" id="sv-mpass" name="password" autocomplete="new-password" placeholder="' + (m.password_kept ? th('InboxPasswordKept') : '') + '">'
+			+ (m.password_kept ? '<div class="ibx-formrow__help">' + th('InboxPasswordKeptHelp') + '</div>' : '') + '</div></div>'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div><button type="submit" class="ibx-btn ibx-btn--primary">' + th('InboxSave') + '</button></div></div>'
+			+ '</form></section>'
+			+ '<section class="ibx-section" data-section="cron">' + title('cron') + '<p class="ibx-section__help">' + th('InboxServerCronHelp') + '</p><div class="ibx-js-cron"></div></section></div>';
+		// Numbers: saved field by field, at once; refused: the value of the server back
+		$$('[data-number]', main).forEach(f => f.addEventListener('change', async () => {
+			try {
+				await post('server', 'set', { name: f.dataset.number, value: f.value });
+				s.numbers[f.dataset.number].value = +f.value;
+				toast(t('InboxSaved'));
+			} catch (err) {
+				f.value = s.numbers[f.dataset.number].value;
+				toast(err.message, { error: true });
+				f.focus();
+			}
+		}));
+		const form = $('.ibx-js-master', main);
+		form.addEventListener('submit', async e => {
+			e.preventDefault();
+			const btn = $('[type="submit"]', form);
+			btn.disabled = true;
+			try {
+				const r = await post('server', 'master', { user: form.elements.user.value, host: form.elements.host.value, separator: form.elements.separator.value, password: form.elements.password.value });
+				form.elements.password.value = '';
+				form.elements.password.placeholder = r.master.password_kept ? t('InboxPasswordKept') : '';
+				form.elements.host.value = r.master.host;
+				toast(t('InboxSaved'));
+			} catch (err) {
+				// What was typed stays
+				toast(err.message, { error: true });
+			}
+			btn.disabled = false;
+		});
+		paintCron($('.ibx-js-cron', main), s.cron);
+		spySections(main, SERVER_SECTIONS.map(x => x[0]));
+		if (parts && parts[0]) {
+			requestAnimationFrame(() => pointSection(main, parts[0]));
+		}
+	}
+
+	/** Scheduled jobs of the module: what is wrong said first, then each job with its switch and its card */
+	function paintCron(box, cron) {
+		const jobs = cron.jobs || [];
+		const off = jobs.filter(j => j.needed && !j.active);
+		const late = jobs.filter(j => j.active && j.late);
+		const failed = jobs.filter(j => j.active && j.last_ok === 0);
+		let html = '';
+		if (!cron.enabled) {
+			html += '<div class="ibx-notice ibx-notice--error">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxServerCronModuleOff') + '</div></div>';
+		}
+		if (off.length) {
+			html += '<div class="ibx-notice ibx-notice--error">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxServerCronNeededOff', off.map(j => j.label).join(', ')) + '</div></div>';
+		}
+		if (cron.enabled && late.length) {
+			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">'
+				+ th(late.length === jobs.filter(j => j.active).length ? 'InboxServerCronNotRunning' : 'InboxServerCronLate', late.map(j => j.label).join(', ')) + '</div></div>';
+		}
+		if (failed.length) {
+			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxServerCronFailed', failed.map(j => j.label).join(', ')) + '</div></div>';
+		}
+		if (!jobs.length) {
+			box.innerHTML = html + '<p class="ibx-muted">' + th('InboxServerCronNone') + '</p>';
+			return;
+		}
+		const when = ts => (ts ? '<span title="' + esc(new Date(ts * 1000).toLocaleString()) + '">' + esc(ago(ts)) + '</span>' : '<span class="ibx-muted">' + th('InboxServerCronNever') + '</span>');
+		html += '<div class="ibx-tablewrap"><table class="ibx-table ibx-crontable"><thead><tr><th>' + th('InboxServerCronJob') + '</th><th>' + th('InboxServerCronActive') + '</th><th>' + th('InboxServerCronEvery')
+			+ '</th><th>' + th('InboxServerCronLast') + '</th><th>' + th('InboxServerCronNext') + '</th></tr></thead><tbody>'
+			+ jobs.map(j => '<tr>'
+				+ '<td><a href="' + esc(j.url) + '" target="_blank" rel="noopener">' + esc(j.label) + ' ' + ic('external', 'ibx-faint') + '</a>'
+				+ (j.needed ? ' <span class="ibx-badge">' + th('InboxServerCronNeeded') + '</span>' : '') + '</td>'
+				+ '<td><button type="button" class="ibx-switch ibx-js-cronswitch" role="switch" data-job="' + j.id + '" aria-checked="' + (j.active ? 'true' : 'false') + '" aria-label="' + th('InboxServerCronActive') + ' ' + esc(j.label) + '"></button></td>'
+				+ '<td class="ibx-nowrap">' + esc(everyText(j.every)) + '</td>'
+				+ '<td>' + (j.running ? '<span class="ibx-status ibx-status--warning">' + th('InboxServerCronRunning') + '</span>'
+					: (j.last ? '<span class="ibx-status ibx-status--' + (j.last_ok ? 'ok' : 'error') + '">' + when(j.last) + '</span>' : when(0)))
+				+ (j.last_output ? '<div class="ibx-formrow__error">' + esc(j.last_output) + '</div>' : '') + '</td>'
+				+ '<td class="ibx-nowrap">' + (j.active ? when(j.next) : '<span class="ibx-muted">' + th('InboxServerCronOff') + '</span>') + '</td></tr>').join('')
+			+ '</tbody></table></div>';
+		box.innerHTML = html;
+		// On or off at once; back if the server refuses
+		$$('.ibx-js-cronswitch', box).forEach(sw => sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				const r = await post('server', 'job', { id: +sw.dataset.job, active: on ? 1 : 0 });
+				paintCron(box, r.cron);
+			} catch (err) {
+				sw.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
+			}
+		}));
 	}
 
 	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------

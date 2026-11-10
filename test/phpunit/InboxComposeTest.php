@@ -140,6 +140,12 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertStringNotContainsString('javascript:', $res['wire']);
 		$this->assertStringContainsString('cid:', $res['wire'], 'a picture of the text becomes a part of the mail');
 		$this->assertStringContainsString('site <https://example.invalid>', InboxMailBuilder::toText(InboxMailBuilder::cleanHtml($b->html)));
+		// Signature delimiter (1.53.5): not in the HTML, « -- » and its space alone on a line in the text part (RFC 3676)
+		$text = InboxMailBuilder::toText(InboxMailBuilder::cleanHtml('<p>Bonjour</p><div class="inbox-signature"><p>John BOTELLA</p></div>'));
+		$this->assertStringContainsString("Bonjour\n\n-- \nJohn BOTELLA", $text);
+		$text = InboxMailBuilder::toText(InboxMailBuilder::cleanHtml('<p>Bonjour</p><div class="inbox-signature">-- <br><p>John</p></div>'));
+		$this->assertSame(1, substr_count($text, '-- '), 'a draft written before 1.53.5: one delimiter');
+		$this->assertStringContainsString("\n-- \n", $text);
 
 		// What the editor writes for the mail software (1.16.1): colours, alignment, tables with their borders in the cells
 		$clean = InboxMailBuilder::cleanHtml('<p style="text-align: center"><span style="color: #b42318; background-color: #fef08a">Urgent</span></p>'
