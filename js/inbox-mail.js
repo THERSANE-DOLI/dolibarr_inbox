@@ -4669,6 +4669,7 @@
 		}
 		box._data = res;
 		box._situation = null;
+		box._phones = [];
 		paintDolibar(box);
 		if (!box._bound) {
 			box._bound = true;
@@ -4752,7 +4753,10 @@
 			return;
 		}
 		box._cited = res.cited || [];
-		if (box._cited.length) {
+		// Phones of the signature not on the cards (1.69.0)
+		box._phones = res.phones || [];
+		box._phoneEdit = !!res.phone_edit;
+		if (box._cited.length || box._phones.length) {
 			paintDolibar(box);
 		}
 	}
@@ -4888,17 +4892,18 @@
 	 * One way to reach: the value is the action (tel: link, new message, map); the copy icon floats after it on hover
 	 * or keyboard focus of the line (always shown without hover)
 	 */
-	function reachHtml(icon, value, kind, extra) {
+	function reachHtml(icon, value, kind, extra, opts) {
 		if (!value) {
 			return '';
 		}
+		opts = opts || {};
 		const href = kind === 'tel' ? 'tel:' + value.replace(/[^\d+]/g, '') : (kind === 'map' ? extra : '#');
 		const title = t(kind === 'tel' ? 'InboxReachCall' : (kind === 'mail' ? 'InboxReachWrite' : 'InboxReachMap'), value);
 		return '<div class="ibx-reach">' + ic(icon)
-			+ '<span class="ibx-reach__wrap"><a class="ibx-reach__val' + (kind === 'mail' ? ' ibx-js-reachwrite' : '') + '" href="' + esc(href) + '"' + (kind === 'map' ? ' target="_blank" rel="noopener noreferrer"' : '')
-			+ ' data-val="' + esc(value) + '" title="' + esc(title) + '">' + esc(value) + '</a>'
+			+ '<span class="ibx-reach__wrap"><a class="ibx-reach__val' + (kind === 'mail' ? ' ibx-js-reachwrite' : '') + (opts.diff ? ' is-diff' : '') + '" href="' + esc(href) + '"'
+			+ (kind === 'map' ? ' target="_blank" rel="noopener noreferrer"' : '') + ' data-val="' + esc(value) + '" title="' + esc(title) + '">' + esc(value + (opts.note ? ' ' + opts.note : '')) + '</a>'
 			+ (kind !== 'map' ? '<button type="button" class="ibx-reach__copy ibx-js-reachcopy" data-val="' + esc(value) + '" aria-label="' + esc(t('InboxCopyValue', value)) + '" title="' + th('InboxCopy') + '">' + ic('copy') + '</button>' : '')
-			+ '</span></div>';
+			+ '</span>' + (opts.action || '') + '</div>';
 	}
 	/** Customer (C), prospect (P), supplier (F) of a thirdparty, as in Dolibarr */
 	function socKinds(r) {
@@ -4924,7 +4929,8 @@
 		const open = box._open === card;
 		const socId = d.sender.soc && d.sender.soc.readable ? d.sender.soc.id : 0;
 		const sub = card === 'contact' ? pieceSub(x, socId) : '';
-		const sig = card === 'soc' ? socSignals(box) : [];
+		const sig = card === 'soc' ? socSignals(box)
+			: (box._phones || []).length ? [{ level: 'attention', short: t((box._phones || []).length > 1 ? 'InboxSigPhonesN' : 'InboxSigPhones1') }] : [];
 		const first = sig[0];
 		const tip = objTipKey(x);
 		const r = x.reach || {};
@@ -4943,7 +4949,11 @@
 				+ '<div class="ibx-soccard__group">' + th('InboxReach') + (card === 'soc' ? ' ' + socKinds(r) : '') + '</div>'
 				+ (r.phone || r.mobile || r.email || r.address
 					? reachHtml('phone', r.phone, 'tel') + reachHtml('phone', r.mobile, 'tel') + reachHtml('mail', r.email, 'mail') + reachHtml('map-pin', r.address, 'map', r.map)
-					: '<div class="ibx-soccard__none">' + th('InboxReachNone') + '</div>');
+					: '<div class="ibx-soccard__none">' + th('InboxReachNone') + '</div>')
+				// Phones of the signature not on the card (1.69.0): call, copy, replace the number of the card
+				+ (card === 'contact' ? (box._phones || []).map(ph => reachHtml('phone', ph.number, 'tel', '', { diff: true, note: t('InboxSignatureNote'),
+					action: box._phoneEdit ? '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-reach__act ibx-js-phoneset" data-number="' + esc(ph.number) + '" data-mobile="' + (ph.mobile ? 1 : 0) + '"'
+						+ ' aria-label="' + esc(t('InboxPhoneReplace', ph.number)) + '" title="' + th('InboxPhoneReplaceShort') + '">' + ic('compose') + '</button>' : '' })).join('') : '');
 			if (card === 'soc' && d.usage !== 'none') {
 				const s = box._situation;
 				const shown = s && s.usage === 'auto' ? t('InboxUsageAutoShown', (s.shown || []).map(u => t('InboxUsage_' + u)).join(' + ') || t('InboxUsage_none'))
@@ -5046,6 +5056,43 @@
 			btn.innerHTML = ic('copy');
 			btn.setAttribute('aria-label', t('InboxCopyValue', btn.dataset.val));
 		}, 1400);
+	}
+	/**
+	 * « Replace the number of the card » (1.69.0): which number of the contact (mobile chosen for a mobile number), the
+	 * number of the card before and after; nothing written before « Replace »; undo in the toast
+	 * @param {HTMLElement} box    Panel
+	 * @param {string}      number Number of the signature
+	 * @param {boolean}     mobile A mobile number
+	 */
+	function phoneDialog(box, number, mobile) {
+		const d = box._data;
+		const c = d.sender.contact;
+		if (!c || !c.readable) {
+			return;
+		}
+		const r = c.reach || {};
+		const cur = field => (field === 'phone_mobile' ? r.mobile : r.phone) || '';
+		const row = (field, label) => '<label class="ibx-radio ibx-radio--block"><input type="radio" name="ibx-phonefield" value="' + field + '"' + ((field === 'phone_mobile') === mobile ? ' checked' : '') + '>'
+			+ '<span>' + th(label) + '<span class="ibx-formrow__help">' + (cur(field) ? esc(t('InboxPhoneNow', cur(field))) : th('InboxPhoneEmpty')) + '</span></span></label>';
+		dialog({
+			title: t('InboxPhoneReplaceTitle'),
+			body: '<p style="margin-top:0">' + th('InboxPhoneFound', number) + '</p><div role="radiogroup" aria-label="' + th('InboxPhoneWhich') + '">'
+				+ row('phone_pro', 'InboxPhonePro') + row('phone_mobile', 'InboxPhoneMobile') + '</div>',
+			actions: [{ label: t('InboxPhoneReplaceDo'), primary: true, run: async dl => {
+				const field = ($('input[name="ibx-phonefield"]:checked', dl) || {}).value || 'phone_pro';
+				const res = await post('dolibarr', 'phone', { id: +box.dataset.mail, contact: c.id, field, number });
+				loadDolibar(box);
+				toast(t('InboxPhoneReplaced'), { action: t('InboxUndo'), onAction: async () => {
+					try {
+						await post('dolibarr', 'phone', { id: +box.dataset.mail, contact: c.id, field, number: res.before || '' });
+						loadDolibar(box);
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+				} });
+				return true;
+			} }],
+		});
 	}
 	/**
 	 * The thirdparty shown on the rows of the list after « Not the right thirdparty? »: the mail and its conversation,
@@ -5169,6 +5216,11 @@
 	function socCardClick(box, e) {
 		if (e.target.closest('.ibx-js-resoc')) {
 			resocDialog(box);
+			return true;
+		}
+		const phoneSet = e.target.closest('.ibx-js-phoneset');
+		if (phoneSet) {
+			phoneDialog(box, phoneSet.dataset.number, phoneSet.dataset.mobile === '1');
 			return true;
 		}
 		const copy = e.target.closest('.ibx-js-reachcopy');

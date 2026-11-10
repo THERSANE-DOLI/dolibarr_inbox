@@ -33,7 +33,7 @@ dol_include_once('/inbox/class/inboxcited.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc'), true));
+inboxAjaxStart(in_array($action, array('link', 'unlink', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
 $langs->loadLangs(array('companies', 'propal', 'orders', 'bills', 'projects', 'ticket', 'interventions', 'sendings', 'supplier_proposal', 'suppliers'));
 $elements = new InboxElements($db);
 $refs = new InboxMailRef($db);
@@ -102,6 +102,22 @@ switch ($action) {
 		$kind = $situation->reach('societe', $socId);
 		$list = InboxSituation::listFor($account, (int) ($kind['client'] ?? 0), (int) ($kind['supplier'] ?? 0));
 		inboxAjaxReply(array('usage' => $list['usage'], 'shown' => $list['shown'], 'indicators' => $situation->compute($user, $socId, $list['ids'])));
+		// no break
+
+	case 'phone':
+		// « Replace the number of the card by this one » (1.69.0): the contact of the sender of the mail only
+		$reader = inboxDolibarrMail();
+		$contactId = (int) $reader->row->fk_socpeople;
+		if ($contactId <= 0 || $contactId !== (int) inboxAjaxParam('contact', 'int') || !InboxElements::canRead($user, 'contact', $contactId)
+			|| !InboxElements::canWriteType($user, 'contact')) {
+			inboxDolibarrFail('InboxErrorPieceNotReadable');
+		}
+		$situation = new InboxSituation($db);
+		$before = $situation->setContactPhone($user, $contactId, (string) inboxAjaxParam('field', 'aZ09'), (string) inboxAjaxParam('number', 'alphanohtml'));
+		if ($before === null) {
+			inboxDolibarrFail($situation->error);
+		}
+		inboxAjaxReply(array('before' => $before));
 		// no break
 
 	case 'resoc':
@@ -315,7 +331,15 @@ switch ($action) {
 		}
 		$cited = new InboxCited($db);
 		$socs = $cited->writerSocs((string) $reader->row->from_email, $body, $others);
-		inboxAjaxReply(array('cited' => $cited->find($user, (string) $reader->row->subject."\n".$body."\n".implode("\n", $names), $socs), 'socs' => $socs));
+		// Phones of the signature that the cards of the contact and of the thirdparty do not have (1.69.0)
+		$contactId = (int) $reader->row->fk_socpeople;
+		$phones = array();
+		if ($contactId > 0 && InboxElements::canRead($user, 'contact', $contactId)) {
+			$situation = new InboxSituation($db);
+			$phones = $situation->newPhones($body, $contactId, (int) $reader->row->fk_soc);
+		}
+		inboxAjaxReply(array('cited' => $cited->find($user, (string) $reader->row->subject."\n".$body."\n".implode("\n", $names), $socs), 'socs' => $socs,
+			'phones' => $phones, 'phone_edit' => $phones && InboxElements::canWriteType($user, 'contact')));
 		// no break
 
 	case 'search':

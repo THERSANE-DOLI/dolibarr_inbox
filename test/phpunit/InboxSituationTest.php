@@ -132,6 +132,38 @@ class InboxSituationTest extends InboxTestCase
 	}
 
 	/**
+	 * Phones of the signature (1.69.0)
+	 *
+	 * @return void
+	 */
+	public function testSignaturePhones()
+	{
+		$this->assertSame('0612345679', InboxSituation::phoneKey('+33 (0)6 12 34 56 79'));
+		$this->assertSame('0612345679', InboxSituation::phoneKey('0033 6.12.34.56.79'));
+		$this->assertSame('0612345679', InboxSituation::phoneKey('06-12-34-56-79'));
+		$this->assertSame('', InboxSituation::phoneKey('1234'), 'too short');
+		$text = "Bonjour,\n\nCommande CF2611-02221 du 09/11/2026, total 1 234,56 EUR.\n\nCordialement,\nClaire Martin\nTél. 04 72 10 20 31\nMob : +33 (0)6 12 34 56 79\n"
+			."Fax: 04.72.10.20.32\n\nLe 3 nov. 2026, Paul a écrit :\n> Tel 01 23 45 67 89\n";
+		$found = InboxSituation::signaturePhones($text);
+		$this->assertSame(array('0472102031', '0612345679'), array_column($found, 'key'), 'no reference, no date, no fax, nothing of the quoted mail');
+		$this->assertTrue($found[1]['mobile']);
+		$this->assertFalse($found[0]['mobile']);
+
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_phones', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$soc = (int) $this->db->last_insert_id($p.'societe');
+		$this->db->query("INSERT INTO ".$p."socpeople (entity, fk_soc, lastname, firstname, phone, phone_mobile, statut, datec, fk_user_creat) VALUES (1, ".$soc.", 'inboxtest_Phones', 'Ann', '04.72.10.20.31', '', 1, '"
+			.$this->db->idate(dol_now())."', ".((int) $this->admin->id).")");
+		$contact = (int) $this->db->last_insert_id($p.'socpeople');
+		$s = new InboxSituation($this->db);
+		$this->assertSame(array('0612345679'), array_column($s->newPhones($text, $contact, $soc), 'key'), 'the number of the card is not offered again');
+
+		$this->assertSame('', $s->setContactPhone($this->admin, $contact, 'phone_mobile', '+33 (0)6 12 34 56 79'), 'empty before');
+		$this->assertSame(array(), $s->newPhones($text, $contact, $soc), 'nothing new any more');
+		$this->assertNull($s->setContactPhone($this->admin, $contact, 'email', 'x'), 'only the phones');
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testCompute()

@@ -2456,3 +2456,19 @@ InboxIndRule_sinv_topay = attenzione da 1, avviso se una scadenza è passata
 InboxIndRule_order_toship = attenzione da 1, avviso se una data prevista è passata
 InboxIndRule_ship_open = attenzione da 1, avviso se una data prevista è passata
 InboxIndRule_reception_wait = attenzione da 1, avviso se una data prevista è passata
+
+# Phones of the signature compared with the card (1.69.0)
+InboxSigPhones1 = Altro telefono nella firma
+InboxSigPhonesN = Altri telefoni nella firma
+InboxSignatureNote = (firma)
+InboxPhoneReplace = Sostituisci il numero della scheda con %s
+InboxPhoneReplaceShort = Sostituisci il numero della scheda con questo
+InboxPhoneReplaceTitle = Aggiorna la scheda del contatto
+InboxPhoneFound = Numero trovato nella firma: %s
+InboxPhoneWhich = Numero della scheda da sostituire
+InboxPhonePro = Telefono professionale
+InboxPhoneMobile = Cellulare
+InboxPhoneNow = Attuale: %s
+InboxPhoneEmpty = Vuoto ora
+InboxPhoneReplaceDo = Sostituisci
+InboxPhoneReplaced = Scheda del contatto aggiornata
