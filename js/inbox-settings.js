@@ -1317,11 +1317,10 @@
 			+ '<div class="ibx-tpledit__tools ibx-js-sigtools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '">'
 			+ [['bold', 'fmt-bold', 'InboxFmtBold'], ['italic', 'fmt-italic', 'InboxFmtItalic'], ['underline', 'fmt-underline', 'InboxFmtUnderline'], ['color', 'fmt-color', 'InboxFmtColor'], null,
 				['link', 'link', 'InboxFmtLink'], ['image', 'file-image', 'InboxSignatureImage'], ['clearFormat', 'fmt-clear', 'InboxFmtClear'], null,
-				['undo', 'undo', 'InboxFmtUndo'], ['redo', 'redo', 'InboxFmtRedo'], null, ['source', 'fmt-source', 'InboxFmtSource']]
-				.map(x => (x ? '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '"' + (x[0] === 'source' ? ' aria-pressed="false"' : '') + '>' + ic(x[1], 'ibx-tbtn__icon') + '</button>' : '<span class="ibx-compose__sep" aria-hidden="true"></span>')).join('')
+				['undo', 'undo', 'InboxFmtUndo'], ['redo', 'redo', 'InboxFmtRedo'], null, ['variable', 'variable', 'InboxVarInsert'], ['source', 'fmt-source', 'InboxFmtSource']]
+				.map(x => (x ? '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '"' + (x[0] === 'source' ? ' aria-pressed="false"' : '') + (x[0] === 'variable' ? ' aria-haspopup="listbox" aria-expanded="false" disabled' : '') + '>' + ic(x[1], 'ibx-tbtn__icon') + '</button>' : '<span class="ibx-compose__sep" aria-hidden="true"></span>')).join('')
 			+ '<input type="color" class="ibx-sigcolor ibx-js-sigcolor" tabindex="-1" aria-hidden="true" value="#d31b11">'
-			// Variables (1.53.0): of the identity, of the user who sends, of the company, of the other modules
-			+ '<label class="ibx-sr-only" for="ibx-sig-var">' + th('InboxVarInsert') + '</label><select class="ibx-field ibx-field--medium ibx-js-sigvar" id="ibx-sig-var" disabled><option value="">' + th('InboxVarInsert') + '</option></select></div>'
+			+ '</div>'
 			+ '<div class="ibx-tpledit__editor ibx-js-sigeditor" aria-labelledby="f-signature-label"></div>'
 			+ '<textarea class="ibx-field ibx-sigsource" id="f-signature" name="signature" rows="12" spellcheck="false" aria-labelledby="f-signature-label" hidden>' + esc(identity.signature) + '</textarea>'
 			+ '<div class="ibx-formrow__help">' + th('InboxSignatureHelp') + '</div><div class="ibx-inline" style="margin-top:.5rem"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-profiles">' + ic('download') + ' ' + th('InboxImportFromDolibarr') + '</button>'
@@ -1393,6 +1392,8 @@
 			return null;
 		}
 		let source = false;
+		let varKeys = [];
+		let varValues = null;
 		const sync = () => {
 			if (!source) {
 				ta.value = editor.isEmpty() ? '' : editor.getHtml();
@@ -1402,8 +1403,8 @@
 			sync();
 			source = on;
 			$('[data-cmd="source"]', tools).setAttribute('aria-pressed', on ? 'true' : 'false');
-			$$('[data-cmd]:not([data-cmd="source"]), .ibx-js-sigvar', tools).forEach(b => {
-				b.disabled = on || (b.tagName === 'SELECT' && b.options.length < 2);
+			$$('[data-cmd]:not([data-cmd="source"])', tools).forEach(b => {
+				b.disabled = on || (b.dataset.cmd === 'variable' && !varKeys.length);
 			});
 			box.hidden = on;
 			ta.hidden = !on;
@@ -1434,7 +1435,8 @@
 						editor.raw().chain().focus().setImage({ src: v, alt: '' }).run();
 					}
 				}, true);
-			} else {
+			} else if (cmd !== 'variable') {
+				// The picker of the variables has its own listener
 				editor.exec(cmd);
 			}
 		});
@@ -1466,24 +1468,153 @@
 				+ '<div class="ibx-tpledit__prevbody"></div>';
 			$('.ibx-tpledit__prevbody', prevBox).innerHTML = r.html || '<p class="ibx-muted">' + th('InboxSignatureNo') + '</p>';
 		});
-		// The keys, from the server (those of the other modules too); the identity first
-		const pick = $('.ibx-js-sigvar', tools);
-		preview().then(r => {
-			const opts = list => list.map(k => '<option value="' + esc(k) + '">' + esc('__' + k + '__') + '</option>').join('');
-			pick.insertAdjacentHTML('beforeend', '<optgroup label="' + th('InboxSignatureVarsIdentity') + '">' + opts(r.keys.filter(k => k.indexOf('INBOX_') === 0)) + '</optgroup>'
-				+ '<optgroup label="' + th('InboxSignatureVarsOther') + '">' + opts(r.keys.filter(k => k.indexOf('INBOX_') !== 0)) + '</optgroup>');
-			pick.disabled = source;
+		// The keys and what they give, from the server (those of the other modules too); read again at each opening
+		// (name or address of the identity typed since)
+		const pickBtn = $('[data-cmd="variable"]', tools);
+		const loadVars = () => preview().then(r => {
+			varKeys = r.keys || [];
+			varValues = r.values || null;
+			pickBtn.disabled = source || !varKeys.length;
 		}).catch(() => {
 			// No list: the variables can still be typed
 		});
-		pick.addEventListener('change', () => {
-			if (pick.value) {
-				// Written as __KEY__, plain text, as Dolibarr and the other modules write their signatures
-				editor.raw().chain().focus().insertContent('__' + pick.value + '__').run();
-				pick.value = '';
+		loadVars();
+		pickBtn.addEventListener('click', async () => {
+			await loadVars();
+			if (!varKeys.length) {
+				return;
 			}
+			// Written as __KEY__, plain text, as Dolibarr and the other modules write their signatures
+			varPicker(pickBtn, varKeys, varValues, k => editor.raw().chain().focus().insertContent('__' + k + '__').run());
 		});
 		return { sync, destroy: () => editor.destroy() };
+	}
+
+	/** Groups of the picker of the variables, by the start of the key (the first that matches) */
+	const VAR_GROUPS = [['INBOX_', 'InboxVarGroupInbox'], ['USER_', 'InboxVarGroupUser'], ['MYCOMPANY_', 'InboxVarGroupCompany'], ['THIRDPARTY_', 'InboxVarGroupThirdparty'],
+		['CONTACT', 'InboxVarGroupThirdparty'], ['', 'InboxVarGroupOther']];
+
+	/**
+	 * Picker of the variables (1.53.3): a search on the key and on its value, grouped, the value each one gives shown
+	 * (values hidden by the server for the keys that look like secrets); arrows, Enter, Escape
+	 * @param {HTMLElement} anchor   Button of the toolbar
+	 * @param {string[]}    keys     Keys without the __
+	 * @param {object|null} values   KEY => value ('' empty, null hidden), null when the values are not known (templates)
+	 * @param {Function}    onPick   Called with the key
+	 */
+	function varPicker(anchor, keys, values, onPick) {
+		const open = document.querySelector('.ibx-varpick');
+		if (open) {
+			const same = open._anchor === anchor;
+			open._close(false);
+			if (same) {
+				return;
+			}
+		}
+		const groupOf = k => VAR_GROUPS.find(g => k.indexOf(g[0]) === 0)[1];
+		const box = document.createElement('div');
+		box.className = 'ibx-menu ibx-varpick';
+		box._anchor = anchor;
+		box.innerHTML = '<div class="ibx-varpick__search">' + ic('search', 'ibx-faint') + '<input type="search" class="ibx-varpick__input" autocomplete="off" spellcheck="false" placeholder="' + th('InboxVarSearch') + '" aria-label="' + th('InboxVarSearch') + '" aria-controls="ibx-varpick-list"></div>'
+			+ '<div class="ibx-varpick__list" id="ibx-varpick-list" role="listbox" aria-label="' + th('InboxVarInsert') + '"></div>';
+		(anchor.closest('dialog[open]') || document.body).appendChild(box);
+		const input = $('.ibx-varpick__input', box);
+		const list = $('.ibx-varpick__list', box);
+		let shown = [];
+		let active = 0;
+		const valueHtml = k => {
+			if (!values) {
+				return '';
+			}
+			const v = values[k];
+			return '<span class="ibx-varpick__value' + (v ? '' : ' is-empty') + '">' + (v === null || v === undefined ? th('InboxVarHidden') : (v === '' ? th('InboxVarEmpty') : esc(v))) + '</span>';
+		};
+		const paint = () => {
+			const q = input.value.trim().toLowerCase().replace(/^_+|_+$/g, '');
+			shown = keys.filter(k => !q || k.toLowerCase().indexOf(q) !== -1 || (values && values[k] && String(values[k]).toLowerCase().indexOf(q) !== -1));
+			active = Math.min(active, Math.max(0, shown.length - 1));
+			let last = '';
+			const order = VAR_GROUPS.map(g => g[1]).filter((g, i, a) => a.indexOf(g) === i);
+			shown.sort((a, b) => order.indexOf(groupOf(a)) - order.indexOf(groupOf(b)) || a.localeCompare(b));
+			list.innerHTML = shown.length ? shown.map((k, i) => {
+				const g = groupOf(k);
+				const head = g !== last ? '<div class="ibx-menu__header" role="presentation">' + th(g) + '</div>' : '';
+				last = g;
+				return head + '<div class="ibx-varpick__item' + (i === active ? ' is-active' : '') + '" role="option" id="ibx-varpick-' + i + '" aria-selected="' + (i === active) + '" data-var="' + i + '">'
+					+ '<span class="ibx-varpick__key">' + esc('__' + k + '__') + '</span>' + valueHtml(k) + '</div>';
+			}).join('') : '<div class="ibx-menu__hint ibx-varpick__none">' + th('InboxVarNone') + '</div>';
+			input.setAttribute('aria-activedescendant', shown.length ? 'ibx-varpick-' + active : '');
+			const cur = $('.ibx-varpick__item.is-active', list);
+			if (cur) {
+				cur.scrollIntoView({ block: 'nearest' });
+			}
+		};
+		const place = () => {
+			const r = anchor.getBoundingClientRect();
+			const w = box.offsetWidth;
+			const h = box.offsetHeight;
+			box.style.position = 'fixed';
+			box.style.zIndex = 90;
+			box.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px';
+			box.style.top = (r.bottom + h + 8 > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
+		};
+		const outside = e => {
+			if (!box.contains(e.target) && !anchor.contains(e.target)) {
+				close(false);
+			}
+		};
+		const close = refocus => {
+			document.removeEventListener('pointerdown', outside, true);
+			box.remove();
+			anchor.setAttribute('aria-expanded', 'false');
+			if (refocus) {
+				anchor.focus();
+			}
+		};
+		box._close = close;
+		const pick = i => {
+			if (shown[i] !== undefined) {
+				close(false);
+				onPick(shown[i]);
+			}
+		};
+		input.addEventListener('input', () => {
+			active = 0;
+			paint();
+		});
+		input.addEventListener('keydown', e => {
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				e.preventDefault();
+				if (shown.length) {
+					active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+					paint();
+				}
+			} else if (e.key === 'Enter') {
+				e.preventDefault();
+				pick(active);
+			} else if (e.key === 'Escape') {
+				// The picker only, never the dialog under it
+				e.preventDefault();
+				e.stopPropagation();
+				close(true);
+			} else if (e.key === 'Tab') {
+				close(false);
+			}
+		});
+		list.addEventListener('pointerdown', e => e.preventDefault());
+		list.addEventListener('click', e => {
+			// data-var, never data-i: the dialog under the picker takes a [data-i] for one of its buttons and closes
+			const it = e.target.closest('[data-var]');
+			if (it) {
+				e.stopPropagation();
+				pick(+it.dataset.var);
+			}
+		});
+		paint();
+		place();
+		anchor.setAttribute('aria-expanded', 'true');
+		document.addEventListener('pointerdown', outside, true);
+		input.focus();
 	}
 
 	/** A web address asked in a small dialog (link, picture of the signature); a picture needs https:// */
@@ -1706,7 +1837,7 @@
 			+ field('subject', t('InboxSubject'), tp.subject, { autocomplete: 'off', help: t('InboxTemplateSubjectHelp') })
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="ibx-tpl-body-label">' + th('InboxTemplateBody') + '</span><div>'
 			+ '<div class="ibx-tpledit__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '">' + tools.map(x => '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '">' + ic(x[1], 'ibx-tbtn__icon') + '</button>').join('')
-			+ '<label class="ibx-sr-only" for="ibx-tpl-var">' + th('InboxVarInsert') + '</label><select class="ibx-field ibx-field--medium ibx-js-var" id="ibx-tpl-var"><option value="">' + th('InboxVarInsert') + '</option>' + keys.map(k => '<option value="' + esc(k) + '">' + esc(k) + '</option>').join('') + '</select></div>'
+			+ '<span class="ibx-compose__sep" aria-hidden="true"></span><button type="button" class="ibx-tbtn ibx-js-var" title="' + th('InboxVarInsert') + '" aria-label="' + th('InboxVarInsert') + '" aria-haspopup="listbox" aria-expanded="false">' + ic('variable', 'ibx-tbtn__icon') + '</button></div>'
 			+ '<div class="ibx-tpledit__editor ibx-js-tpleditor" aria-labelledby="ibx-tpl-body-label"></div>'
 			+ '<div class="ibx-formrow__help">' + th('InboxTemplateBodyHelp') + '</div></div></div>'
 			// Language (1.26.0): the values of the variables (dates, amounts, labels) are written in it
@@ -1763,13 +1894,12 @@
 				editor.exec(b.dataset.cmd);
 			}
 		});
-		$('.ibx-js-var', dlg).addEventListener('change', e => {
-			if (e.target.value) {
-				editor.insertVariable(e.target.value, '');
-				e.target.value = '';
-				editor.focus();
-			}
-		});
+		// Values unknown here (they follow the recipient and the piece): the keys only
+		const varBtn = $('.ibx-js-var', dlg);
+		varBtn.addEventListener('click', () => varPicker(varBtn, keys, null, k => {
+			editor.insertVariable(k, '');
+			editor.focus();
+		}));
 		// Preview: in the mailbox of the tab, for the recipient typed (or none: the variables of the company and the user)
 		const prevBox = $('.ibx-js-tplprevbox', dlg);
 		const runPreview = async () => {

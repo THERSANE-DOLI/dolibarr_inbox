@@ -391,7 +391,7 @@ class InboxTemplates
 	 *
 	 * @param User                $user     User
 	 * @param array<string,mixed> $identity name, email, reply_to, mailbox, mailbox_label, signature
-	 * @return array{html:string,unknown:string[],keys:string[]}
+	 * @return array{html:string,unknown:string[],keys:string[],values:array<string,string|null>}
 	 */
 	public function signaturePreview(User $user, array $identity)
 	{
@@ -402,7 +402,25 @@ class InboxTemplates
 		$keys = array_values(array_unique(array_merge(self::IDENTITY_KEYS, array_keys($base))));
 		sort($keys);
 
-		return array('html' => InboxMailBuilder::cleanHtml($html), 'unknown' => array_values(array_unique($m[1])), 'keys' => $keys);
+		// What each key gives, for the picker of the variables (1.53.3): plain text, short; never the value of a key
+		// that looks like a secret (a module may give a token or a password)
+		$shown = array();
+		foreach ($keys as $k) {
+			$shown[$k] = self::secretKey($k) ? null : dol_trunc(trim((string) preg_replace('/\s+/u', ' ', dol_string_nohtmltag((string) ($values[$k] ?? ''), 1))), 80, 'right', 'UTF-8', 1);
+		}
+
+		return array('html' => InboxMailBuilder::cleanHtml($html), 'unknown' => array_values(array_unique($m[1])), 'keys' => $keys, 'values' => $shown);
+	}
+
+	/**
+	 * A key whose value is never shown in the picker of the variables
+	 *
+	 * @param string $key Key without the __
+	 * @return bool
+	 */
+	public static function secretKey($key)
+	{
+		return (bool) preg_match('/(^|_)(TOKEN|KEY|PASS|PASSWORD|PWD|SECRET|SALT|HASH|APIKEY)(_|$)|PASSWORD|SECRET|TOKEN/', strtoupper((string) $key));
 	}
 
 	/**

@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: variables picked from a button with a search, the value each one gives shown :   1.53.3
+  - the long « Insert a variable » list of the signature and of the templates becomes a button of the toolbar: a
+    search on the name and on the value, the keys grouped (mail and identity, user, company, third party, others).
+  - in a signature, each key shows what it gives for the user and the identity typed, « (empty) » said; the value
+    of a key that looks like a secret (token, key, password, secret) is never sent to the browser.
+
+- FIX: activation stopped on the real cause when the tables cannot be created :   1.53.3
+  - the activation went on after a failed SQL file and stopped on the first missing table (« llx_inbox_tag does
+    not exist »), hiding the SQL error: it now stops at once and shows it.
+  - module installed in a folder not named « inbox » (git clone gives dolibarr_inbox): no table was created, said
+    clearly with the folder to rename.
+
 - FIX: conversation laid out as a mail alone when the column Dolibarr is on the right :   1.53.2
   - the column took the height of its content and the answer bar (Reply, Reply all, Forward) sat under the last
     mail: head on top, the column on the whole height, the answer bar at the bottom, only the mails scroll.

@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.53.2';
+		$this->version = '1.53.3';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -227,8 +227,22 @@ class modInbox extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
+		global $langs;
+		$langs->load('inbox@inbox');
+
+		// _load_tables() looks for /inbox/sql/ only: in a folder with another name (git clone of the repository gives
+		// dolibarr_inbox), it finds nothing, creates no table and still returns 1.
+		$folder = basename(dirname(__DIR__, 2));
+		if ($folder !== 'inbox') {
+			$this->error = $langs->trans('InboxErrorInstallFolder', $folder);
+			return -1;
+		}
+
+		// _load_tables() returns 0 (not -1) when a SQL file fails: test <= 0, else the real SQL error is hidden
+		// behind the first query on a missing table.
 		$result = $this->_load_tables('/inbox/sql/');
-		if ($result < 0) {
+		if ($result <= 0) {
+			$this->error = $langs->trans('InboxErrorInstallTables', $this->db->lasterror());
 			return -1;
 		}
 
