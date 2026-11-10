@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: new logo, bolder and readable at small size :   1.71.0
+  - the messenger bird on the envelope redrawn in solid shapes (the thin line vanished under 32 px), centred on the
+    envelope; on the plum background of the application icons the wing is translucent white.
+  - icon of the tab drawn on a 16 px grid (envelope, wing and head); dev/build-icons.php keeps the wing and also
+    builds the pictos img/inbox.png and img/object_inbox.png from img/inbox.svg.
+
 - NEW: tracking numbers of the shipments, carriers of a mailbox Transport :   1.70.0
   - a tracking number of one of our shipments written in the mail: the shipment offered in « Cited in the mail »
     with its customer and « tracking no. ... », whoever writes (the carrier about a parcel of a customer).
