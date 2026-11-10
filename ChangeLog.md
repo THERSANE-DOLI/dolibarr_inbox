@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: tags of Thunderbird with another keyword than the tag of the same name, seen and aligned :   1.65.0
+  - a keyword set by another software and absent from the list of the tags is shown on the mail as a dashed badge
+    with the raw keyword (it was hidden: a tag created in Thunderbird gets a keyword made from its name, the mail
+    looked untagged). System keywords ($Forwarded, $MDNSent, Junk...) stay hidden.
+  - settings of the tags: column "Keyword", and a part "Same tags in Thunderbird" with the lines user_pref of the
+    active tags (keyword, name, colour, order) to paste in user.js or the Config Editor, copied by a button.
+
 - FIX: assignment, the user saw a grey circle instead of his own photo :   1.64.1
   - his own avatar (marked "me", in the colour of the application) reset the size and the position of the photo:
     only the top left corner of the image was seen. The colour of "me" is now kept for the initials only.
