@@ -2115,6 +2115,7 @@ InboxTwinMergeFailed = Fusión imposible, nada eliminado: %s
 InboxTwinNotRemoved = %s correos movidos, pero la carpeta no pudo eliminarse: %s
 InboxJournal_folder_merge = Carpeta duplicada fusionada
 InboxUnreadBelow = %s no leídos en las subcarpetas
+InboxUnreadElsewhere = %s no leídos en las demás carpetas
 InboxFoldersDisplay = Visualización de las carpetas
 InboxFolderSizesShow = Mostrar el tamaño de las carpetas
 InboxFolderSizeIndexed = Tamaño de los %s correos indexados, de %s
