@@ -139,16 +139,40 @@ class InboxCreate
 		$name = trim((string) $row->from_name);
 		$subject = dol_trunc((string) $row->subject, 200, 'right', 'UTF-8', 1);
 		$soc = (int) ($known['soc'] ?? 0);
+		// Mail sent by a site for a requester (data sources, 1.72.0): the requester and what the site said of him,
+		// nothing to read in the text
+		$data = array();
+		if ((string) ($row->requester_email ?? '') !== '') {
+			$email = strtolower((string) $row->requester_email);
+			$name = trim((string) $row->requester_name);
+			$data = json_decode((string) ($row->source_data ?? ''), true);
+			$data = is_array($data) ? array_map('strval', $data) : array();
+		}
+		$person = trim(($data['firstname'] ?? '').' '.($data['lastname'] ?? ''));
 		switch ($type) {
 			case 'societe':
-				$q['name'] = $name !== '' ? $name : substr($email, (int) strpos($email, '@') + 1);
+				$q['name'] = ($data['company'] ?? '') !== '' ? $data['company'] : ($person !== '' ? $person : ($name !== '' ? $name : substr($email, (int) strpos($email, '@') + 1)));
 				$q['email'] = $email;
+				$map = array('phone' => 'phone', 'siren' => 'idprof1', 'vat' => 'tva_intra', 'address' => 'address', 'zip' => 'zipcode', 'town' => 'town');
+				foreach ($map as $field => $param) {
+					if (($data[$field] ?? '') !== '') {
+						$q[$param] = $data[$field];
+					}
+				}
 				break;
 			case 'contact':
-				$parts = preg_split('/\s+/', $name, 2);
-				$q['firstname'] = count($parts) > 1 ? $parts[0] : '';
-				$q['lastname'] = count($parts) > 1 ? $parts[1] : ($name !== '' ? $name : $email);
+				if (($data['lastname'] ?? '') !== '') {
+					$q['firstname'] = $data['firstname'] ?? '';
+					$q['lastname'] = $data['lastname'];
+				} else {
+					$parts = preg_split('/\s+/', $name, 2);
+					$q['firstname'] = count($parts) > 1 ? $parts[0] : '';
+					$q['lastname'] = count($parts) > 1 ? $parts[1] : ($name !== '' ? $name : $email);
+				}
 				$q['email'] = $email;
+				if (($data['phone'] ?? '') !== '') {
+					$q['phone_pro'] = $data['phone'];
+				}
 				break;
 			case 'action':
 				$q['label'] = $subject;

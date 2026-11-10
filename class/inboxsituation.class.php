@@ -23,6 +23,7 @@
 
 require_once __DIR__.'/inboxelements.class.php';
 require_once __DIR__.'/inboxaccountlog.class.php';
+require_once __DIR__.'/inboxcontactmatcher.class.php';
 
 /**
  * What the card of the thirdparty of a mail shows, by the usage of the mailbox: a list of indicators, each with a level
@@ -796,7 +797,9 @@ class InboxSituation
 		}
 		$this->db->begin();
 		// The contact: the one of the new thirdparty with the address of the sender, if any
-		$contact = $this->db->getRow("SELECT rowid FROM ".$p."socpeople WHERE fk_soc = ".((int) $socId)." AND LOWER(email) = '".$this->db->escape(strtolower(trim((string) $row->from_email)))."' AND statut = 1 ORDER BY rowid");
+		// The address of the requester for a mail sent by a site (data sources, 1.72.0)
+		$email = strtolower(trim((string) (($row->requester_email ?? '') !== '' ? $row->requester_email : $row->from_email)));
+		$contact = $this->db->getRow("SELECT rowid FROM ".$p."socpeople WHERE fk_soc = ".((int) $socId)." AND LOWER(email) = '".$this->db->escape($email)."' AND statut = 1 ORDER BY rowid");
 		$sql = "UPDATE ".$p."inbox_mail SET fk_soc = ".((int) $socId).", fk_socpeople = ".(is_object($contact) ? (int) $contact->rowid : 'NULL').", soc_manual = 1 WHERE ".$where;
 		if (!$this->db->query($sql)) {
 			$this->error = $this->db->lasterror();
@@ -804,7 +807,6 @@ class InboxSituation
 			return -1;
 		}
 		$n = (int) $this->db->affected_rows(true);
-		$email = strtolower(trim((string) $row->from_email));
 		if ($remember && $email !== '') {
 			$this->db->query("DELETE FROM ".$p."inbox_address_soc WHERE entity = ".((int) $conf->entity)." AND email = '".$this->db->escape($email)."'");
 			if (!$this->db->query("INSERT INTO ".$p."inbox_address_soc (entity, email, fk_soc, fk_user_creat, date_creation) VALUES (".((int) $conf->entity).", '".$this->db->escape($email)."', ".((int) $socId).", ".((int) $user->id).", '".$this->db->idate(dol_now())."')")) {
@@ -814,7 +816,7 @@ class InboxSituation
 			}
 			// The other mails of the address follow, but the ones chosen by hand
 			$this->db->query("UPDATE ".$p."inbox_mail SET fk_soc = ".((int) $socId).", fk_socpeople = ".(is_object($contact) ? (int) $contact->rowid : 'NULL')
-				." WHERE from_email = '".$this->db->escape($email)."' AND soc_manual = 0");
+				." WHERE ".InboxContactMatcher::addressWhere($this->db, $email)." AND soc_manual = 0");
 		}
 		$this->db->commit();
 

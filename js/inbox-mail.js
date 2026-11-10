@@ -1681,6 +1681,14 @@
 		}
 		return row.from_name || row.from_email || t('InboxNoSender');
 	}
+	/** Mail sent by a site for a requester (data sources, 1.72.0): the source beside the requester, the site in its tooltip */
+	function viaHtml(row) {
+		if (!row.via) {
+			return '';
+		}
+		const label = row.via.source || row.via.email;
+		return ' <span class="ibx-badge ibx-via" title="' + esc(t('InboxViaTitle', label, row.via.email)) + '">' + ic('redirect') + '<span class="ibx-sr-only">' + th('InboxVia') + ' </span>' + esc(label) + '</span>';
+	}
 
 	/**
 	 * Columns of the table (interface §5): chosen, sized and ordered by the user (setting list_columns), the subject
@@ -1689,7 +1697,7 @@
 	const COLUMNS = {
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
-		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</td>' },
+		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
@@ -1930,7 +1938,7 @@
 				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
-					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span></span>'
+					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
 					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? ic('reply') : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
 					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
@@ -5280,18 +5288,35 @@
 			// A piece linked though cited for another thirdparty keeps its warning
 			const pieces = d.links.map(l => {
 				const c = citedOf(l);
-				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId);
+				// Linked by its conversation (lot A3, 1.73.0): said under the piece
+				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId, l.origin === 'thread' ? { theirs: t('InboxLinkedByThread') } : {});
 			}).concat(d.extra.map(x => pieceHtml(x, 0, '', socId)));
+			const convo = d.conversation || { others: 0, detached: false };
 			const canWrite = !!d.level;
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
+			// Mail sent by a site for a requester (data sources, 1.72.0): who asked, through which source, and the piece
+			// the source offers to create
+			const rq = d.requester;
+			const rqRef = rq && rq.data && rq.data.ref ? rq.data.ref : '';
 			html += '<div class="ibx-dolibar__body">'
+				+ (rq ? '<div class="ibx-dolibar__row ibx-requester"><span class="ibx-dolibar__label">' + th('InboxRequester') + '</span><span class="ibx-dolibar__items">'
+					+ '<span class="ibx-badge ibx-via" title="' + esc(t('InboxRequesterHelp')) + '">' + ic('redirect') + esc(rq.label || t('InboxSourceRemoved')) + '</span>'
+					+ '<span class="ibx-requester__who">' + esc(rq.name || rq.email) + (rq.name ? ' <span class="ibx-muted">' + esc(rq.email) + '</span>' : '') + '</span>'
+					+ (rq.data && rq.data.company && rq.data.company !== rq.name ? '<span class="ibx-muted">' + esc(rq.data.company) + '</span>' : '')
+					+ (rq.data && rq.data.phone ? '<span class="ibx-muted">' + ic('phone') + ' ' + esc(rq.data.phone) + '</span>' : '')
+					+ (rqRef ? '<span class="ibx-muted">' + esc(t('InboxRequesterRef', rqRef)) + '</span>' : '')
+					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
+					+ '</span></div>' : '')
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
 				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>'
 					+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-resoc">' + ic('arrows-exchange') + ' ' + th('InboxResocAttach') + '</button></span>' : '')) + '</span></div>'
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
-					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '') + '</span>' : '') + '</span></div>'
+					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '')
+					+ (convo.detached ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threadattach" title="' + th('InboxThreadDetachedHelp') + '">' + ic('thread') + ' ' + th('InboxThreadAttach') + '</button>'
+						: (convo.others && !+box.dataset.thread ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threaddetach" title="' + th('InboxThreadDetachHelp') + '">' + ic('unlink') + ' ' + th('InboxThreadDetach') + '</button>' : ''))
+					+ '</span>' : '') + '</span></div>'
 				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
 					+ suggest.map(c => pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '', socId, {
 						theirs: c.theirs ? t('InboxCitedTheirRef', c.cited) : (c.tracking ? t('InboxCitedTracking', c.cited) : ''),
@@ -5445,7 +5470,9 @@
 			// A piece cited in the mail, of the thirdparty of the writer: linked in one click
 			citedBtn.disabled = true;
 			try {
-				await post('dolibarr', 'link', { id: mailId, type: citedBtn.dataset.type, element: +citedBtn.dataset.id });
+				const conv = box._data.conversation;
+				const res = await post('dolibarr', 'link', { id: mailId, type: citedBtn.dataset.type, element: +citedBtn.dataset.id, thread: conv && conv.others && !conv.detached ? 1 : 0 });
+				threadLinkedToast(res);
 			} catch (err) {
 				citedBtn.disabled = false;
 				return;
@@ -5453,8 +5480,40 @@
 			loadDolibar(box);
 			return;
 		}
+		if (e.target.closest('.ibx-js-threaddetach')) {
+			// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go, undo
+			let res;
+			try {
+				res = await post('dolibarr', 'detach', { id: mailId });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			await loadDolibar(box);
+			toast(t('InboxThreadDetached', (res.removed || []).length), { action: t('InboxUndo'), onAction: async () => {
+				await post('dolibarr', 'attach_thread', { id: mailId, links: res.removed || [] });
+				loadDolibar(box);
+			} });
+			return;
+		}
+		if (e.target.closest('.ibx-js-threadattach')) {
+			try {
+				await post('dolibarr', 'attach_thread', { id: mailId, links: [] });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			toast(t('InboxThreadAttached'));
+			loadDolibar(box);
+			return;
+		}
 		if (e.target.closest('.ibx-js-createpiece')) {
 			createDialog(box);
+			return;
+		}
+		const rqBtn = e.target.closest('.ibx-js-createrequest');
+		if (rqBtn) {
+			createPiece(box, rqBtn.dataset.type, false, null);
 			return;
 		}
 		const x = e.target.closest('.ibx-js-unlink');
@@ -5583,35 +5642,47 @@
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],
 		});
-		dlg.addEventListener('click', async e => {
+		dlg.addEventListener('click', e => {
 			const b = e.target.closest('.ibx-js-createtype');
-			if (!b) {
-				return;
+			if (b) {
+				createPiece(box, b.dataset.type, $('.ibx-js-createattach', dlg).checked, dlg);
 			}
-			// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
-			const tab = window.open('about:blank', '_blank');
-			let res;
-			try {
-				res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type: b.dataset.type, attach: $('.ibx-js-createattach', dlg).checked ? 1 : 0,
-					soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
-			} catch (err) {
-				if (tab) {
-					tab.close();
-				}
-				toast(err.message, { error: true });
-				return;
-			}
-			if (tab) {
-				tab.opener = null;
-				tab.location.href = res.url;
-			} else {
-				window.open(res.url, '_blank', 'noopener');
-			}
-			dlg.close();
-			toast(t('InboxCreateOpened'));
-			// Back in inbox: the piece created is shown linked
-			window.addEventListener('focus', () => loadDolibar(box), { once: true });
 		});
+	}
+	/** The page of creation of a type, in a new tab; the piece saved there is linked to the mail */
+	async function createPiece(box, type, attach, dlg) {
+		const d = box._data;
+		// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
+		const tab = window.open('about:blank', '_blank');
+		let res;
+		try {
+			res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type, attach: attach ? 1 : 0,
+				soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+		} catch (err) {
+			if (tab) {
+				tab.close();
+			}
+			toast(err.message, { error: true });
+			return;
+		}
+		if (tab) {
+			tab.opener = null;
+			tab.location.href = res.url;
+		} else {
+			window.open(res.url, '_blank', 'noopener');
+		}
+		if (dlg) {
+			dlg.close();
+		}
+		toast(t('InboxCreateOpened'));
+		// Back in inbox: the piece created is shown linked
+		window.addEventListener('focus', () => loadDolibar(box), { once: true });
+	}
+	/** Toast of a link given to the other mails of the conversation too */
+	function threadLinkedToast(res) {
+		if (res && res.others) {
+			toast(t('InboxLinkedThreadToo', res.others));
+		}
 	}
 	/** « + Link »: the pieces of the thirdparty recognized first, then searched as you type */
 	function linkDialog(box, opts) {
@@ -5641,11 +5712,17 @@
 					await attachToPiece(box, opts.attach.m, opts.attach.a, cur.dataset.type, +cur.dataset.id);
 					return true;
 				}
-				await post('dolibarr', 'link', { id: +box.dataset.mail, type: cur.dataset.type, element: +cur.dataset.id });
+				const also = $('.ibx-js-linkthread', dl);
+				threadLinkedToast(await post('dolibarr', 'link', { id: +box.dataset.mail, type: cur.dataset.type, element: +cur.dataset.id, thread: also && also.checked ? 1 : 0 }));
 				loadDolibar(box);
 				return true;
 			} }],
 		});
+		// The link follows the conversation (lot A3, 1.73.0): ticked by default, the other mails of the conversation
+		const conv = d.conversation;
+		if (!opts.attach && !opts.annotate && conv && conv.others && !conv.detached) {
+			$('.ibx-js-piecelist', dlg).insertAdjacentHTML('afterend', '<label class="ibx-inline ibx-linkthread"><input type="checkbox" class="ibx-js-linkthread" checked> ' + th('InboxLinkThreadToo', conv.others) + '</label>');
+		}
 		const input = $('.ibx-js-piecesearch', dlg);
 		const list = $('.ibx-js-piecelist', dlg);
 		// To link: the pieces linked already are greyed; to put a file in a piece: every piece may receive it
@@ -8511,6 +8588,10 @@
 				items.push({ sep: true });
 				items.push({ icon: 'copy', label: t('InboxCopyAddress', row.from_email), run: () => copyText(row.from_email) });
 				items.push({ icon: 'search', label: t('InboxMailsOf', row.from_name || row.from_email), run: () => searchFrom(row.from_email) });
+			}
+			// A mail of a site: a data source made from it (1.74.0), admins of Dolibarr only (checked again by the server)
+			if (I.rights().dolibarr_admin) {
+				items.push({ icon: 'redirect', label: t('InboxSourceFromThisMail'), run: () => I.go('#/settings/sources/new/' + row.id) });
 			}
 		}
 		// Actions of the other modules (same registry as the buttons, hook inbox:mail:actions), the mail being known

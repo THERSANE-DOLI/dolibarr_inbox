@@ -1005,6 +1005,12 @@ class InboxComposer
 				return;
 			}
 		}
+		// Mail sent by a site for a requester (data sources, 1.72.0): the answer goes to the requester, never to the site
+		require_once __DIR__.'/inboxdatasource.class.php';
+		$found = $mine ? null : (new InboxDataSource($this->db))->detect($headers, $from['email']);
+		if (!empty($found['ok'])) {
+			$replyTo = array(array('email' => (string) $found['email'], 'name' => (string) $found['name']));
+		}
 		$first = $mine ? $message->to : ($replyTo ?: array($from));
 		$out['to'] = InboxMailBuilder::parseAddresses($first);
 		if ($mode === 'replyall') {

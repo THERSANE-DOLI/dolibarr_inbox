@@ -187,6 +187,16 @@ class InboxReader
 		$trusted = new InboxTrustedDomain($this->db);
 		$canTrust = $user->hasRight('inbox', 'trusteddomain', 'write');
 		$links = $trusted->linkVerdicts($message->bodyHtml, $message->bodyText, $canTrust);
+		// Data sources (1.72.0): the requester read again from all the headers (a mail indexed before its source was
+		// declared, a source changed since); the index follows, so does its thirdparty unless chosen by hand
+		require_once __DIR__.'/inboxdatasource.class.php';
+		$sources = new InboxDataSource($this->db);
+		$found = $sources->detect($headers, (string) $this->row->from_email);
+		if ($found !== null || (string) ($this->row->requester_email ?? '') !== '') {
+			if ($sources->store($this->row, $found)) {
+				$this->row = $this->db->getRow("SELECT m.*, f.path AS folder_path, f.role AS folder_role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder WHERE m.rowid = ".((int) $this->row->rowid)) ?: $this->row;
+			}
+		}
 
 		return array(
 			'id' => (int) $this->row->rowid,
@@ -199,6 +209,9 @@ class InboxReader
 			'subject' => $message->subject,
 			'from' => array('email' => $message->fromEmail, 'name' => $message->fromName),
 			'reply_to' => $message->replyToEmail,
+			// Requester of a mail sent by a site (data sources, 1.72.0); why a source did not believe the mail
+			'requester' => $sources->ofRow($this->row),
+			'requester_refused' => is_array($found) && empty($found['ok']) ? array('label' => $found['label'], 'why' => $found['why']) : null,
 			'to' => $message->to,
 			'cc' => $message->cc,
 			'date' => (int) $message->date,

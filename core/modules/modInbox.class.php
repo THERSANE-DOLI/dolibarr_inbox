@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.71.1';
+		$this->version = '1.74.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -260,6 +260,10 @@ class modInbox extends DolibarrModules
 			$this->error = $this->db->lasterror();
 			return -1;
 		}
+		if ($result > 0 && $this->installExampleSource() < 0) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
 		if ($result > 0 && $this->migrate() < 0) {
 			$this->error = $this->db->lasterror();
 			return -1;
@@ -318,6 +322,40 @@ class modInbox extends DolibarrModules
 			}
 		}
 		dolibarr_set_const($this->db, 'INBOX_DEFAULT_TAGS_DONE', '1', 'chaine', 0, 'Default tags of Thunderbird installed once', $entity);
+		return 1;
+	}
+
+	/**
+	 *  Data source given as an example (1.72.0): the headers X-Quotation-Mail / X-Quotation-Data of a quote form,
+	 *  disabled and without trusted sender (it does nothing until an admin fills it). Once: the constant
+	 *  INBOX_EXAMPLE_SOURCE_DONE (kept when the module is disabled) stops a reactivation from bringing it back.
+	 *
+	 *  @return int<-1,1>   1 if OK, -1 if KO
+	 */
+	private function installExampleSource()
+	{
+		global $conf, $langs, $user;
+
+		if (getDolGlobalString('INBOX_EXAMPLE_SOURCE_DONE')) {
+			return 1;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+		$entity = (int) $conf->entity;
+		$table = MAIN_DB_PREFIX.'inbox_source';
+		$resql = $this->db->query("SELECT rowid FROM ".$table." WHERE entity = ".$entity." AND code = 'quotation'");
+		if (!$resql) {
+			return -1;
+		}
+		if (!$this->db->num_rows($resql)) {
+			$sql = "INSERT INTO ".$table." (entity, code, label, status, header_email, header_data, request_type, date_creation, fk_user_creat)";
+			$sql .= " VALUES (".$entity.", 'quotation', '".$this->db->escape($langs->transnoentitiesnoconv('InboxSourceExampleLabel'))."', 0, 'X-Quotation-Mail', 'X-Quotation-Data', 'propal',";
+			$sql .= " '".$this->db->idate(dol_now())."', ".(empty($user->id) ? 'NULL' : (int) $user->id).")";
+			if (!$this->db->query($sql)) {
+				return -1;
+			}
+		}
+		dolibarr_set_const($this->db, 'INBOX_EXAMPLE_SOURCE_DONE', '1', 'chaine', 0, 'Example data source installed once', $entity);
+
 		return 1;
 	}
 

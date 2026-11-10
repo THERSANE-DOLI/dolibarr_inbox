@@ -2178,10 +2178,13 @@ class InboxImapConnector extends InboxConnector
 	{
 		$out = array();
 		$preview = in_array('PREVIEW', $this->serverCapabilities, true) ? ' PREVIEW' : '';
+		// Data sources (1.72.0): their headers and the results of the authentication, only when one is active
+		require_once dirname(__DIR__).'/inboxdatasource.class.php';
+		$extra = array_diff((new InboxDataSource($this->db))->syncHeaders(), explode(' ', self::SYNC_HEADERS));
 		foreach (array_chunk($uids, self::FETCH_CHUNK) as $chunk) {
 			$set = implode(',', array_map('intval', $chunk));
 			// Decoded by inbox: Webklex merges the sub parts of a BODYSTRUCTURE written « NIL)( » (attachments not seen)
-			$response = $this->fetchDecoded($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.')])');
+			$response = $this->fetchDecoded($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.($extra ? ' '.implode(' ', $extra) : '').')])');
 			foreach ($this->fetchItems($response) as $item) {
 				if (empty($item['UID'])) {
 					continue;
@@ -2192,6 +2195,10 @@ class InboxImapConnector extends InboxConnector
 				$mail['date_received'] = !empty($item['INTERNALDATE']) ? (int) strtotime((string) $item['INTERNALDATE']) : (int) $mail['date_mail'];
 				$mail['size'] = (int) ($item['RFC822.SIZE'] ?? 0);
 				$mail['snippet'] = isset($item['PREVIEW']) && is_string($item['PREVIEW']) ? InboxHeaderParser::bound($item['PREVIEW'], 200) : '';
+				if ($extra) {
+					// Read by InboxMail with the sources (requester of a mail sent by a site)
+					$mail['source_header'] = substr((string) ($item['HEADER'] ?? ''), 0, InboxHeaderParser::MAX_HEADER);
+				}
 				$out[] = $mail + self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
 			}
 		}

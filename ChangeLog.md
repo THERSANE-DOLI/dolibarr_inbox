@@ -1,5 +1,37 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: form of a data source guided, for an admin who does not know the headers :   1.74.0
+  - « From a mail of the site »: the source of a mail pasted, or « Make a data source from this mail » in the menu
+    of a mail (admins of Dolibarr only): its sender, whether it is authenticated, its own headers (X-...) with a role
+    guessed (address of the requester, data in JSON, one field, ignore) and the keys of its JSON with their value and
+    field guessed; « Use these settings » fills the form, saved only by its button.
+  - « Start from »: advised format X-Data-Form or quote request X-Quotation.
+  - headers per field and keys of the JSON as lines with a list of the fields by their name (a usual key may be
+    ignored on purpose); « ? » beside each setting opens its entry in the glossary: header, trusted sender,
+    authenticated, data (JSON), kind of request, and each field with what it fills in Dolibarr, an example and the key
+    names understood without setting.
+
+- NEW: the link follows the conversation :   1.73.0
+  - linking a mail to a piece offers « Link also the N other mails of the conversation », ticked by default (the
+    cited pieces linked in one click too); the mails of the trash and the junk are left out.
+  - the mails that come in a linked conversation (answers sent included) are linked at the synchronisation; these
+    links say « linked by the conversation » under the piece.
+  - « Detach from the conversation » when it moves to another customer: the mail loses the links of the conversation,
+    gets no new one and gives none, kept by its Message-ID; undo in the toast, « Back in the conversation » later.
+
+- NEW: mails sent by a site or an application for a requester (data sources) :   1.72.0
+  - Settings > Data sources (admins of Dolibarr): trusted senders (addresses or domains), header of the address of
+    the requester, header of the data in JSON, one header per field, keys of the JSON mapped to the fields, kind of
+    request (quote, order, thirdparty, ticket); test on the pasted headers of a mail. An example source
+    X-Quotation-Mail / X-Quotation-Data is installed disabled, without trusted sender.
+  - believed only for a trusted sender that is authenticated (DMARC or DKIM of its domain), each header once, JSON of
+    2000 characters at most, values cleaned; the synchronisation asks these headers only when a source is active,
+    the reading reads them again (mails indexed before the source).
+  - the thirdparty is looked for on the requester (never the site again, even when its contacts change); the list
+    shows the requester with the badge of the source (the site in its tooltip); the panel shows the requester, his
+    data, the number of the request and « Create the quote » (or order, thirdparty, ticket); the creation pages are
+    filled with his data (name, phone, SIREN, VAT, address); « Reply » writes to the requester.
+
 - FIX: panel of the rules, nothing opened any more after a change :   1.71.1
   - after a rule saved from the panel (created, applied, turned on or off, moved), « New rule » and a click on a rule
     opened nothing: the reply of the save had no folders, tags nor addresses of the mailbox. Every reply that gives

@@ -48,5 +48,9 @@ CREATE TABLE llx_inbox_mail(
 	date_index datetime NOT NULL,
 	date_folder datetime DEFAULT NULL,
 	thread_key varchar(32) DEFAULT NULL,
+	requester_email varchar(255) DEFAULT NULL,
+	requester_name varchar(255) DEFAULT NULL,
+	fk_source integer DEFAULT NULL,
+	source_data text DEFAULT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;

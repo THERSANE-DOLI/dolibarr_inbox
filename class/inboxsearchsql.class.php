@@ -33,7 +33,7 @@ class InboxSearchSql implements InboxSearchEngine
 	/** Sorts => SQL expression (never null, the cursor compares values) */
 	const SORTS = array(
 		'date' => "COALESCE(m.date_received, m.date_mail, '1970-01-01 00:00:00')",
-		'from' => "COALESCE(NULLIF(m.from_name, ''), m.from_email, '')",
+		'from' => "COALESCE(NULLIF(m.requester_name, ''), m.requester_email, NULLIF(m.from_name, ''), m.from_email, '')",
 		'subject' => "COALESCE(m.subject, '')",
 		'size' => 'm.size',
 	);
@@ -99,7 +99,7 @@ class InboxSearchSql implements InboxSearchEngine
 			$op = $desc ? '<' : '>';
 			$where[] = "(".$expr." ".$op." ".$value." OR (".$expr." = ".$value." AND m.rowid ".$op." ".((int) $after[1])."))";
 		}
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key,";
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.requester_email, m.requester_name, m.fk_source, m.to_text, m.subject, m.snippet, m.sort_key,";
 		$sql .= " m.date_received, m.date_mail, m.size, m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc,";
 		$words = $this->wordsCondition($query);
 		$sql .= " s.nom AS soc_name, ".$expr." AS sort_value, ".($words !== '' && $this->textIds($query) ? "CASE WHEN ".$words." THEN 0 ELSE 1 END" : "0")." AS in_text";
@@ -183,7 +183,7 @@ class InboxSearchSql implements InboxSearchEngine
 		$keys = array_map(function ($g) {
 			return "'".$this->db->escape((string) $g->tkey)."'";
 		}, $groups);
-		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
+		$sql = "SELECT m.rowid, m.fk_account, m.fk_folder, m.message_id, m.thread_key, m.junk_hint, m.from_email, m.from_name, m.requester_email, m.requester_name, m.fk_source, m.to_text, m.subject, m.snippet, m.sort_key, m.date_received, m.date_mail, m.size,"
 			." m.has_attachments, m.seen, m.answered, m.flagged, m.draft, m.keywords, m.fk_soc, s.nom AS soc_name, ".$key." AS tkey, ".$date." AS sort_value"
 			." FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1 LEFT JOIN ".$p."societe as s ON s.rowid = m.fk_soc"
 			." WHERE ".implode(' AND ', $where)." AND ".$key." IN (".implode(',', $keys).") ORDER BY sort_value DESC, m.rowid DESC";
@@ -245,7 +245,8 @@ class InboxSearchSql implements InboxSearchEngine
 			$where[] = $textIds ? "(".$words." OR m.rowid IN (".implode(',', $textIds)."))" : $words;
 		}
 		foreach ((array) ($query['from'] ?? array()) as $w) {
-			$where[] = "(".$like('m.from_name', $w)." OR ".$like('m.from_email', $w).")";
+			// The requester of a mail sent by a site too (data sources, 1.72.0)
+			$where[] = "(".$like('m.from_name', $w)." OR ".$like('m.from_email', $w)." OR ".$like('m.requester_name', $w)." OR ".$like('m.requester_email', $w).")";
 		}
 		foreach ((array) ($query['to'] ?? array()) as $w) {
 			$where[] = "(".$like('m.to_text', $w)." OR ".$like('m.cc_text', $w).")";
@@ -365,6 +366,27 @@ class InboxSearchSql implements InboxSearchEngine
 		return is_int($data[1]) ? array((string) $data[0], (int) $data[1]) : null;
 	}
 
+	/** @var array<int,string> Labels of the data sources, for the pass */
+	protected static $sourceLabels = null;
+
+	/**
+	 * @param DoliDB $db Database
+	 * @param int    $id Data source
+	 * @return string     Its label, '' when removed
+	 */
+	protected static function sourceLabel($db, $id)
+	{
+		if (self::$sourceLabels === null) {
+			self::$sourceLabels = array();
+			$rows = $db->getRows("SELECT rowid, label FROM ".$db->prefix()."inbox_source WHERE entity = ".((int) $GLOBALS['conf']->entity)." LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				self::$sourceLabels[(int) $r->rowid] = (string) $r->label;
+			}
+		}
+
+		return self::$sourceLabels[(int) $id] ?? '';
+	}
+
 	/**
 	 * Row => JSON for the application (texts escaped by the application, never here)
 	 *
@@ -381,8 +403,11 @@ class InboxSearchSql implements InboxSearchEngine
 			'arrival' => (int) ($o->sort_key ?? 0),
 			'account' => (int) $o->fk_account,
 			'folder' => (int) $o->fk_folder,
-			'from_email' => (string) $o->from_email,
-			'from_name' => (string) $o->from_name,
+			// Mail sent by a site for a requester (data sources, 1.72.0): the requester is the correspondent, the site
+			// and the source are kept for the badge and its tooltip
+			'from_email' => (string) (($o->requester_email ?? '') !== '' ? $o->requester_email : $o->from_email),
+			'from_name' => (string) (($o->requester_email ?? '') !== '' ? ($o->requester_name ?: $o->requester_email) : $o->from_name),
+			'via' => ($o->requester_email ?? '') !== '' ? array('email' => (string) $o->from_email, 'source' => self::sourceLabel($this->db, (int) $o->fk_source)) : null,
 			'to' => dol_trunc((string) $o->to_text, 300, 'right', 'UTF-8', 1),
 			'subject' => (string) $o->subject,
 			'snippet' => (string) $o->snippet,
