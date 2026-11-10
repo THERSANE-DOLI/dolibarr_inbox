@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: content of the cards of the Dolibarr objects drawn like in Dolibarr :   1.64.0
+  - css/inbox-doltip.css: the classes of Dolibarr met in its tooltips (logo, status badges, customer / supplier,
+    categories in their colour, icons aligned), drawn with the variables of the application (light, dark, contrast).
+  - the icons of Dolibarr (Font Awesome of its directory) shown again; this file and Font Awesome loaded at the first
+    card only.
+
 - NEW: the other modules add their styles and scripts to the application :   1.63.0
   - module_parts `inboxcss` and `inboxjs` in their descriptor, loaded after the styles and the scripts of the
     application (like the parts css and js of Dolibarr, own keys: those are written for the pages of Dolibarr).

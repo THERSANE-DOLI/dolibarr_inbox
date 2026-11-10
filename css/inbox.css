@@ -1863,12 +1863,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-objtip { position: fixed; z-index: 70; width: max-content; max-width: min(24rem, calc(100vw - 1rem)); max-height: min(60vh, 28rem); overflow: auto; padding: var(--ibx-s2) var(--ibx-s3);
 	font-family: var(--ibx-font); font-size: var(--ibx-fs-sm); line-height: 1.5; color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border);
 	border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); overflow-wrap: anywhere; box-sizing: border-box; }
-.ibx-objtip__body u:first-child { text-decoration: none; font-weight: 700; }
-.ibx-objtip__body img { max-width: 100%; height: auto; vertical-align: middle; }
-.ibx-objtip__body a { color: var(--ibx-accent); }
-/* Icons of Dolibarr (Font Awesome, not loaded here): empty boxes otherwise */
-.ibx-objtip__body .fa, .ibx-objtip__body .fas, .ibx-objtip__body .far, .ibx-objtip__body .fab, .ibx-objtip__body [class*="fa-"] { display: none; }
-.ibx-objtip__body .badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: 0.25rem; font-size: var(--ibx-fs-xs); font-weight: 600; background: var(--ibx-bg-sunken); }
+/* Its content (classes of Dolibarr): css/inbox-doltip.css, loaded at the first card */
 .ibx-usercard__avatar { flex: none; width: 3rem; height: 3rem; font-size: var(--ibx-fs-lg); }
 .ibx-usercard__main { flex: 1; min-width: 0; display: grid; gap: 0.125rem; }
 .ibx-usercard__name { font-weight: 600; font-size: var(--ibx-fs-lg); }

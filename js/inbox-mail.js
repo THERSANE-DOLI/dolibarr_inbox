@@ -3316,7 +3316,7 @@
 	 * to core/ajax/ajaxtooltip.php here (rights checked there), or its content is given whole when the ajax tooltip is
 	 * off. Asked once per object and page. A phone opens the card of the object, no hover there.
 	 */
-	const OT = { src: new Map(), cache: new Map(), el: null, for: null, show: 0, hide: 0 };
+	const OT = { src: new Map(), cache: new Map(), el: null, for: null, show: 0, hide: 0, styled: false };
 	/** Key of the tooltip of a piece ('' when Dolibarr gives none), its source kept aside */
 	function objTipKey(d) {
 		if (!d.tip_params && !d.tip_html) {
@@ -3325,6 +3325,22 @@
 		const key = d.type + ':' + d.id;
 		OT.src.set(key, { params: d.tip_params || null, html: d.tip_html || '', title: d.kind + ' ' + (d.ref || '') });
 		return key;
+	}
+	/** Styles of the content of the tooltips and icons of Dolibarr, added once at the first card */
+	function objTipStyles() {
+		if (OT.styled) {
+			return;
+		}
+		OT.styled = true;
+		['INBOX_FONTAWESOME_URL', 'INBOX_DOLTIP_CSS_URL'].forEach(k => {
+			const href = I.ctx(k, '');
+			if (href) {
+				const link = document.createElement('link');
+				link.rel = 'stylesheet';
+				link.href = href;
+				document.head.appendChild(link);
+			}
+		});
 	}
 	function objTipLoad(key) {
 		if (!OT.cache.has(key)) {
@@ -3374,6 +3390,7 @@
 			return;
 		}
 		objTipHide();
+		objTipStyles();
 		OT.for = anchor;
 		const el = document.createElement('div');
 		el.className = 'ibx-objtip';
@@ -3396,7 +3413,7 @@
 			objTipHide();
 			return;
 		}
-		// HTML of Dolibarr (same trust as its pages): its icons are not loaded here, hidden by the CSS
+		// HTML of Dolibarr (same trust as its pages), drawn by css/inbox-doltip.css
 		el.innerHTML = '<div class="ibx-objtip__body">' + html + '</div>';
 		I.mount(el);
 		objTipPlace(anchor);
