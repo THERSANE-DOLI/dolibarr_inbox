@@ -41,7 +41,7 @@ require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 class InboxComposer
 {
 	/** @var string[] */
-	const MODES = array('new', 'reply', 'replyall', 'replylist', 'forward', 'forward_attach', 'draft', 'editnew');
+	const MODES = array('new', 'reply', 'replyall', 'replylist', 'forward', 'forward_attach', 'draft', 'editnew', 'unsubscribe');
 
 	/** @var int Documents of a piece listed at most */
 	const MAX_DOCUMENTS = 100;
@@ -295,6 +295,37 @@ class InboxComposer
 			$state['in_reply_to'] = trim($h('In-Reply-To'), " <>");
 			foreach ($message->getFileAttachments() as $a) {
 				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
+			}
+		} elseif ($mode === 'unsubscribe') {
+			// Unsubscribing by mail (RFC 2369 mailto): the address, subject and text the list asks for, written from the
+			// address that got the mail; the same rules as the one-click (level manage, header signed)
+			if ($reader->level !== InboxAccess::LEVEL_MANAGE) {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('no_manage');
+			}
+			$headers = InboxReader::headers($raw);
+			$info = InboxReader::unsubscribeInfo($headers);
+			if (!$info || $info['mailto'] === '') {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('unsub_none');
+			}
+			if (InboxReader::authResults($headers)['dkim'] !== 'pass') {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('unsub_unsigned');
+			}
+			$out['to'] = array(array('email' => $info['mailto'], 'name' => ''));
+			$out['subject'] = $info['mailto_subject'] !== '' ? $info['mailto_subject'] : 'unsubscribe';
+			$out['html'] = '<p>'.nl2br(dol_escape_htmltag($info['mailto_body'] !== '' ? $info['mailto_body'] : 'unsubscribe')).'</p>';
+			$out['signature_off'] = 1;
+			$state['unsubscribe'] = array('mail' => (int) $reader->row->rowid, 'account' => $sourceAccount, 'folder' => (string) $reader->row->folder_path,
+				'message_id' => (string) $reader->row->message_id, 'subject' => (string) $reader->row->subject, 'domain' => (string) substr(strrchr($info['mailto'], '@'), 1));
+			foreach ($identities as $i) {
+				if ($i['account'] === $sourceAccount && in_array(strtolower($i['email']), array_map(function ($a) {
+					return strtolower($a['email']);
+				}, array_merge($message->to, $message->cc)), true)) {
+					$identityId = $i['id'];
+					break;
+				}
 			}
 		} elseif ($mode === 'editnew') {
 			// « Edit as new » (B19): the recipients, subject, text and files of the mail, in a new writing
@@ -1510,7 +1541,7 @@ class InboxComposer
 		$delay = $at ? 0 : self::delayFor($user);
 		$id = $outbox->queue($user, $account, $prepared['identity'], $b, $built, array(
 			'token' => $token, 'source' => $state['source'] ?? null, 'draft' => $state['draft'] ?? null, 'record' => $record, 'pieces' => array_values($allowed),
-			'typed' => $data, 'at' => $at ?: dol_now() + $delay, 'scheduled' => $at ? 1 : 0,
+			'unsubscribe' => $state['unsubscribe'] ?? null, 'typed' => $data, 'at' => $at ?: dol_now() + $delay, 'scheduled' => $at ? 1 : 0,
 		));
 		if ($id <= 0) {
 			return $this->fail('error', $outbox->error);

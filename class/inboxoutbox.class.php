@@ -128,7 +128,7 @@ class InboxOutbox
 			return $v === '' ? 'NULL' : "'".$this->db->escape(dol_trunc($v, $len, 'right', 'UTF-8', 1))."'";
 		};
 		$actions = array('from' => $b->from['email'], 'envelope' => $built['recipients'], 'source' => $o['source'], 'draft' => $o['draft'],
-			'record' => $o['record'], 'pieces' => $o['pieces'], 'identity' => (int) $identity['id']);
+			'record' => $o['record'], 'pieces' => $o['pieces'], 'identity' => (int) $identity['id'], 'unsubscribe' => $o['unsubscribe'] ?? null);
 		$sql = "INSERT INTO ".$p."inbox_outbox (entity, fk_user, fk_account, fk_identity, message_id, subject, recipients, nb_recipients, compose_token, actions, typed,"
 			." scheduled, date_send, status, date_creation) VALUES (".((int) $conf->entity).", ".((int) $user->id).", ".((int) $account->id).", ".((int) $identity['id']).","
 			." '".$this->db->escape($built['message_id'])."', ".$s($b->subject).", ".$s(implode(', ', array_column(array_merge($b->to, $b->cc), 'email')), 65000).","
@@ -268,6 +268,12 @@ class InboxOutbox
 		$subject = (string) $row->subject;
 		InboxActionLog::add($this->db, $author, (int) $account->id, 'send', array((object) array('message_id' => (string) $row->message_id, 'subject' => $subject)),
 			'', $roles['sent'], 0, (string) count((array) $actions['envelope']));
+		if (!empty($actions['unsubscribe'])) {
+			// Unsubscribed by mail: in the journal of the mailbox that got the newsletter, as the one-click
+			$u = $actions['unsubscribe'];
+			InboxActionLog::add($this->db, $author, (int) $u['account'], 'unsubscribe', array((object) array('message_id' => (string) $u['message_id'], 'subject' => (string) $u['subject'])),
+				(string) $u['folder'], '', 0, (string) $u['domain']);
+		}
 		$account->context['inbox'] = array('message_id' => (string) $row->message_id, 'identity' => (int) $row->fk_identity, 'recipients' => (array) $actions['envelope'],
 			'subject' => $subject, 'source' => $source ? (string) ($source['message_id'] ?? '') : '', 'mode' => $source ? (string) $source['mode'] : 'new', 'outbox' => (int) $id);
 		$account->call_trigger('INBOX_MAIL_SENT', $author);

@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: unsubscribing by mail, when the newsletter offers no one-click :   1.53.0
+  - « Unsubscribe » prepares a writing to the address of List-Unsubscribe (mailto), with the subject and text the
+    list asks for, from the address that got the newsletter, without signature: the user checks it and sends it.
+  - same rules as the one-click: level « manage » on the mailbox, header signed by the sender (DKIM), said before
+    that the sender will know the address is read; never a cc/bcc of the mailto, subject on one line.
+  - logged as « Unsubscribed » in the journal of the mailbox once sent; the newsletter is not marked answered.
+  - the address is copied only when inbox cannot write the mail (no right to send, unsigned header).
+
 - NEW: variables in the signatures (identity, user who sends, company, other modules) :   1.52.0
   - the signature of an identity is filled in the writing and at the sending: __INBOX_IDENTITY_NAME__,
     __INBOX_IDENTITY_EMAIL__, __INBOX_IDENTITY_REPLYTO__, __INBOX_MAILBOX_EMAIL__, __INBOX_MAILBOX_LABEL__ (the old

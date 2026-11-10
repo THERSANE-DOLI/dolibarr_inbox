@@ -2425,7 +2425,7 @@
 	};
 	/** Mail answered in the writing in front (presence « is writing an answer », lot W3 call of state) */
 	I.composeWriting = () => {
-		const w = writings.find(x => x.dlg.classList.contains('is-front') && x.source && x.mode !== 'draft' && !x.closed);
+		const w = writings.find(x => x.dlg.classList.contains('is-front') && x.source && x.mode !== 'draft' && x.mode !== 'unsubscribe' && !x.closed);
 		return w ? w.source : 0;
 	};
 })();

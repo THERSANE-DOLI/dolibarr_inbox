@@ -950,11 +950,13 @@ InboxJournal_empty = Svuotata
 
 # Newsletters, threads ignored or watched (1.11.0)
 InboxNewsletter = Newsletter: puoi disiscrivere la casella.
-InboxNewsletterByMail = Newsletter: il mittente offre solo la disiscrizione via mail, non ancora gestita qui.
+InboxNewsletterByMail = Newsletter: la disiscrizione avviene con una mail al mittente, inbox la prepara.
 InboxCopyUnsubscribeAddress = Copia l'indirizzo di disiscrizione
 InboxUnsubscribe = Disiscriviti
 InboxUnsubscribeTitle = Disiscrivere la casella?
 InboxUnsubscribeText = Il mittente « %s » saprà che questo indirizzo è letto. inbox invia la richiesta da sé, il link della mail non viene mai aperto.
+InboxUnsubscribeByMailText = Il mittente « %s » saprà che questo indirizzo è letto. Viene preparata una mail da questo indirizzo verso l'indirizzo di disiscrizione della lista: controllala, poi inviala.
+InboxUnsubscribePrepare = Prepara la mail
 InboxUnsubscribed = Richiesta di disiscrizione inviata a « %s »
 InboxErrorUnsubscribeNone = Questa mail non propone la disiscrizione
 InboxErrorUnsubscribeNoOneClick = Questo mittente propone solo una disiscrizione via mail (arriverà con la scrittura delle mail)

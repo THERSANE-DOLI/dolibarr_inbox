@@ -4360,6 +4360,14 @@
 			toast(btn.title, { error: true });
 			return;
 		}
+		if (!m.unsubscribe.oneclick) {
+			// By mail: the mail is prepared, read and sent by the user (the writing is the step before, nothing sent here)
+			const okMail = await confirmBox(t('InboxUnsubscribeTitle'), th('InboxUnsubscribeByMailText', m.from.name || m.from.email), t('InboxUnsubscribePrepare'));
+			if (okMail && I.compose) {
+				I.compose({ mode: 'unsubscribe', mail: m.id });
+			}
+			return;
+		}
 		const ok = await confirmBox(t('InboxUnsubscribeTitle'), th('InboxUnsubscribeText', m.from.name || m.from.email), t('InboxUnsubscribe'));
 		if (!ok) {
 			return;
@@ -6328,19 +6336,15 @@
 		if (m.unsubscribe && !opts.inline) {
 			// Newsletter (B4): one-click by the server, never the link opened; by mail when the composer comes (W6)
 			const u = m.unsubscribe;
-			banners += '<div class="ibx-banner ibx-banner--info ibx-js-unsubbar">' + ic('unsubscribe');
-			if (!u.oneclick) {
-				// By mail only: no dead button, the address copied (shown in full on its own line, never squeezing the text)
-				banners += '<div class="ibx-banner__text">' + th('InboxNewsletterByMail')
-					+ (u.mailto ? '<div class="ibx-muted ibx-banner__detail">' + esc(u.mailto) + '</div>' : '') + '</div>'
-					+ (u.mailto ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyUnsubscribeAddress') + '</button>' : '');
-			} else {
-				const why = !u.signed ? t('InboxErrorUnsubscribeNotSigned') : (m.level !== 'manage' ? t('InboxReadOnlyOn', m.mailbox) : '');
-				banners += '<div class="ibx-banner__text">' + th('InboxNewsletter')
-					+ (why ? '<div class="ibx-muted">' + esc(why) + '</div>' : '') + '</div>'
-					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-unsubscribe"' + (why ? ' aria-disabled="true" title="' + esc(why) + '"' : '') + '>' + th('InboxUnsubscribe') + '</button>';
-			}
-			banners += '</div>';
+			// By mail (1.53.0): a writing prepared from the address that got the mail, sent by the user
+			const byMail = !u.oneclick && !!u.mailto;
+			const why = !u.signed ? t('InboxErrorUnsubscribeNotSigned') : (m.level !== 'manage' ? t('InboxReadOnlyOn', m.mailbox)
+				: (byMail && !I.ctx('INBOX_CAN_SEND', false) ? t('InboxComposeNoIdentity') : ''));
+			banners += '<div class="ibx-banner ibx-banner--info ibx-js-unsubbar">' + ic('unsubscribe') + '<div class="ibx-banner__text">' + th(byMail ? 'InboxNewsletterByMail' : 'InboxNewsletter')
+				+ (why ? '<div class="ibx-muted">' + esc(why) + '</div>' : '') + (byMail && why ? '<div class="ibx-muted ibx-banner__detail">' + esc(u.mailto) + '</div>' : '') + '</div>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-unsubscribe"' + (why ? ' aria-disabled="true" title="' + esc(why) + '"' : '') + '>' + th('InboxUnsubscribe') + '</button>'
+				// The address copied only when inbox cannot write the mail itself
+				+ (byMail && why ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyUnsubscribeAddress') + '</button>' : '') + '</div>';
 		}
 		// Invitation and read receipt (lot W8 1.22.0, js/inbox-invite.js)
 		if (I.mailExtrasHtml) {
