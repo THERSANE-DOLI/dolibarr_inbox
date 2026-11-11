@@ -199,6 +199,10 @@ class InboxOutbox
 		if ($account->fetch((int) $row->fk_account) <= 0 || !$account->isActive()) {
 			return $this->failed($row, 'no_send', 'Mailbox not active', $direct);
 		}
+		// Protected mailbox (1.89.0): never in this queue, sent from the session (lot S3)
+		if ($account->isProtected()) {
+			return $this->failed($row, 'no_send', 'Protected mailbox', $direct);
+		}
 		// The rights may have changed during the delay
 		$access = new InboxAccess($this->db);
 		InboxAccess::clearCache();

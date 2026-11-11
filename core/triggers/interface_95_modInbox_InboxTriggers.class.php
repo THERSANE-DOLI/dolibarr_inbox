@@ -56,6 +56,17 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 		if (!isModEnabled('inbox')) {
 			return 0;
 		}
+		// Protected mailboxes (1.89.0): a user disabled loses his devices, so the encrypted copies of the passwords
+		// setstatus() calls the trigger before it changes the object: the database tells
+		$disabled = false;
+		if ($action === 'USER_ENABLEDISABLE' && !empty($object->id)) {
+			$row = $this->db->getRow("SELECT statut FROM ".$this->db->prefix()."user WHERE rowid = ".((int) $object->id));
+			$disabled = is_object($row) && (int) $row->statut === 0;
+		}
+		if (($disabled || $action === 'USER_DELETE') && !empty($object->id)) {
+			dol_include_once('/inbox/class/inboxprotect.class.php');
+			(new InboxProtect($this->db))->revokeUser($user, (int) $object->id);
+		}
 		if ($action === 'USER_DELETE' || $action === 'USERGROUP_DELETE') {
 			return $this->forget($action === 'USER_DELETE' ? 'fk_user' : 'fk_usergroup', (int) $object->id, $user);
 		}

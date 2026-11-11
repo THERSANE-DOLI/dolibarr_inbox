@@ -209,7 +209,17 @@ class InboxImapConnector extends InboxConnector
 	 */
 	protected function getSecret()
 	{
+		global $langs;
+
 		$account = $this->account;
+		// Protected mailbox (1.89.0): login and password only, the copy of the session that unlocked it
+		if ($account->isProtected()) {
+			$secret = $account->getImapPassword();
+			if ($secret === '') {
+				$this->error = $langs->transnoentities('InboxProtectLocked');
+			}
+			return $secret;
+		}
 		if ($account->imap_auth_mode === InboxAccount::AUTH_OAUTH) {
 			$error = '';
 			$token = InboxOAuth::getAccessToken((string) $account->oauth_service, $error);
@@ -564,6 +574,122 @@ class InboxImapConnector extends InboxConnector
 		} catch (Exception $e) {
 			$this->error = $this->explainException($e);
 			// A timeout leaves the connection in an unknown state: the next call connects again
+			$this->disconnect();
+			return null;
+		}
+	}
+
+	/**
+	 * Live reading of a protected mailbox (1.89.0): UIDs of a folder matching IMAP criteria, read only (EXAMINE).
+	 * Criteria are built by InboxLive from known keywords; the words typed go as literals.
+	 *
+	 * @param string             $folder   Folder path
+	 * @param array<int,mixed>   $criteria UID SEARCH criteria (CHARSET first when words are given)
+	 * @return array{uids:int[],uidvalidity:int}|null UIDs, the highest first
+	 */
+	public function liveSearch($folder, array $criteria)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			return null;
+		}
+		try {
+			$this->examined = '';
+			if (!$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$uids = $this->searchUids($criteria ?: array('ALL'));
+			rsort($uids);
+
+			return array('uids' => $uids, 'uidvalidity' => (int) $this->examinedValidity);
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			$this->disconnect();
+			return null;
+		}
+	}
+
+	/**
+	 * Live reading (1.89.0): some headers of some mails of a folder (the marks of a sending waiting in Drafts)
+	 *
+	 * @param string   $folder Folder path
+	 * @param int[]    $uids   UIDs
+	 * @param string[] $names  Header names (letters, digits and dashes)
+	 * @return array<int,array<string,string>>|null UID => lower case name => value
+	 */
+	public function liveHeaders($folder, array $uids, array $names)
+	{
+		$this->error = '';
+		$names = array_values(array_filter($names, function ($n) {
+			return (bool) preg_match('/^[A-Za-z0-9-]{1,64}$/', (string) $n);
+		}));
+		$uids = array_values(array_filter(array_map('intval', $uids)));
+		if (!$names || !$uids || !self::isSafeFolderPath($folder) || !$this->connect()) {
+			return $uids ? null : array();
+		}
+		try {
+			if ($this->examined !== $folder && !$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$out = array();
+			$response = $this->fetchDecoded(implode(',', $uids), '(UID BODY.PEEK[HEADER.FIELDS ('.implode(' ', $names).')])');
+			foreach ($this->fetchItems($response) as $item) {
+				if (empty($item['UID'])) {
+					continue;
+				}
+				$h = array();
+				foreach (InboxReader::headers((string) ($item['HEADER'] ?? '')."\r\n\r\n") as $pair) {
+					$h[strtolower($pair[0])] = $pair[1];
+				}
+				$out[(int) $item['UID']] = $h;
+			}
+
+			return $out;
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
+			$this->disconnect();
+			return null;
+		}
+	}
+
+	/**
+	 * Live reading (1.89.0): headers, flags, size, structure of some mails of a folder, in the common format
+	 *
+	 * @param string $folder Folder path
+	 * @param int[]  $uids   UIDs
+	 * @return array<int,array<string,mixed>>|null Rows in the order of the UIDs asked
+	 */
+	public function liveFetch($folder, array $uids)
+	{
+		$this->error = '';
+		if (!self::isSafeFolderPath($folder) || !$this->connect()) {
+			return null;
+		}
+		$uids = array_values(array_filter(array_map('intval', $uids)));
+		if (!$uids) {
+			return array();
+		}
+		try {
+			if ($this->examined !== $folder && !$this->examine($folder)) {
+				$this->error = 'Folder not found';
+				return null;
+			}
+			$byUid = array();
+			foreach ($this->fetchMails($uids, (int) $this->examinedValidity) as $m) {
+				$byUid[(int) $m['sort_key']] = $m;
+			}
+			$out = array();
+			foreach ($uids as $u) {
+				if (isset($byUid[$u])) {
+					$out[] = $byUid[$u];
+				}
+			}
+
+			return $out;
+		} catch (Exception $e) {
+			$this->error = $this->explainException($e);
 			$this->disconnect();
 			return null;
 		}

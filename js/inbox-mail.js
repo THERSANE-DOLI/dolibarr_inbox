@@ -437,7 +437,8 @@
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
 				+ '</div>'
 				+ (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '')
-				+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '');
+				+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '')
+				+ lockedNote(a);
 			if (open) {
 				html += '<ul role="group">' + branch(a, 0, 1, needle) + '</ul>';
 			} else if (here && !inboxOn) {
@@ -446,6 +447,18 @@
 			html += '</li>';
 		});
 		body.innerHTML = awayNotes() + '<ul class="ibx-tree" role="tree" aria-label="' + th('InboxFolders') + '">' + viewsHtml() + html + '</ul>';
+	}
+
+	/**
+	 * Protected mailbox locked in this session (1.89.0): no folder shown, a button to unlock it (password of the
+	 * mailbox or approval from another device of the user)
+	 */
+	function lockedNote(a) {
+		if (!a.locked) {
+			return '';
+		}
+		return '<div class="ibx-tree__note ibx-tree__note--locked">' + ic('lock') + ' ' + th('InboxProtectLockedShort')
+			+ ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-unlockbox" data-account="' + a.id + '">' + th('InboxProtectUnlock') + '</button></div>';
 	}
 
 	// ---------- One mailbox at a time (1.30.0, analyse-navigation-vues.md §2) ----------
@@ -485,7 +498,8 @@
 			+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
 			+ '</div>';
 		const notes = (progress >= 0 ? '<div class="ibx-tree__note">' + th('InboxIndexingPct', progress) + '</div>' : '')
-			+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '');
+			+ (quotaPct >= 90 ? '<div class="ibx-tree__note ibx-tree__note--warning" role="status">' + ic('warning') + ' ' + th('InboxQuotaAlmostFull', quotaPct) + '</div>' : '')
+			+ lockedNote(a);
 		if (S.pickOpen) {
 			html += '<ul class="ibx-boxpick__list" aria-label="' + th('InboxBoxChange') + '">' + S.accounts.map(x => {
 				const c = boxUnread(x);
@@ -1177,6 +1191,14 @@
 				const key = toggle.dataset.toggle;
 				setOpen(key, !isOpen(key));
 				renderTree();
+				return;
+			}
+			const unlock = e.target.closest('.ibx-js-unlockbox');
+			if (unlock) {
+				e.stopPropagation();
+				if (I.protect) {
+					I.protect.openLock(+unlock.dataset.account).then(ok => (ok ? refreshTree() : null));
+				}
 				return;
 			}
 			const err = e.target.closest('.ibx-js-accounterror');
@@ -3630,7 +3652,8 @@
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
-			+ (partial || inThread ? '' : assignLine([m.id], m.assignees || [], m.has_message_id !== false))
+			// Protected mailbox (1.89.0): never assigned (nothing kept in Dolibarr)
+			+ (partial || inThread || m.live ? '' : assignLine([m.id], m.assignees || [], m.has_message_id !== false))
 			+ (partial ? '' : blockedLine(m))
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
@@ -4422,8 +4445,8 @@
 			{ id: 'assign', icon: 'user-plus', label: t(rows.length && rows.every(r => (r.assignees || []).includes(S.me)) ? 'InboxUnassignMe' : 'InboxAssignMe'), key: t('InboxKeySpace'),
 				disabled: !!assignRefusal(ids), reason: assignRefusal(ids), run: () => doAssignMe(ids) },
 			{ id: 'assignto', icon: 'user-circle', label: t('InboxAssignPerson'), disabled: !!assignRefusal(ids), reason: assignRefusal(ids), run: () => assignDialog(ids) },
-			{ id: 'watch', icon: 'watch', label: t(rows.length && rows.every(r => r.watched) ? 'InboxUnwatchThread' : 'InboxWatchThread'), key: 'W', run: () => doThreadMark(ids, 'watch') },
-			{ id: 'ignore', icon: 'ignore', label: t(rows.length && rows.every(r => r.ignored) ? 'InboxUnignoreThread' : 'InboxIgnoreThread'), key: 'K', disabled: !!manage, reason: manage, run: () => doThreadMark(ids, 'ignore') },
+			{ id: 'watch', icon: 'watch', label: t(rows.length && rows.every(r => r.watched) ? 'InboxUnwatchThread' : 'InboxWatchThread'), key: 'W', disabled: rows.some(r => r.live), reason: rows.some(r => r.live) ? t('InboxProtectNoDolibarr') : '', run: () => doThreadMark(ids, 'watch') },
+			{ id: 'ignore', icon: 'ignore', label: t(rows.length && rows.every(r => r.ignored) ? 'InboxUnignoreThread' : 'InboxIgnoreThread'), key: 'K', disabled: !!manage || rows.some(r => r.live), reason: manage || (rows.some(r => r.live) ? t('InboxProtectNoDolibarr') : ''), run: () => doThreadMark(ids, 'ignore') },
 			{ id: 'tag', icon: 'tag', label: t('InboxTagMenu'), key: '1…9', disabled: !!manage, reason: manage, run: () => tagMenu(anchor || S.el, ids) },
 			{ sep: true },
 			{ id: 'archive', icon: 'archive', label: t('InboxArchive'), key: 'A', disabled: !!manage || role === 'archive', reason: manage, run: () => doArchive(ids) },
@@ -4483,6 +4506,10 @@
 	/** Why these mails cannot be assigned ('' = they can): no Message-ID, the key of an assignment */
 	function assignRefusal(ids) {
 		const rows = ids.map(rowOf).filter(Boolean);
+		// Protected mailbox (1.89.0): never assigned, nothing of it kept in Dolibarr
+		if (rows.some(r => r.live)) {
+			return t('InboxProtectNoDolibarr');
+		}
 		return rows.length && rows.every(r => r.has_mid === 0 || r.has_message_id === false) ? t('InboxErrorNoMessageId') : '';
 	}
 	/** The rows, the open mail and the line « Assigned to » painted again after a change */
@@ -4508,6 +4535,10 @@
 	function doAssignMe(ids) {
 		const rows = ids.map(rowOf).filter(Boolean);
 		if (!rows.length || !S.me) {
+			return null;
+		}
+		if (rows.some(r => r.live)) {
+			toast(t('InboxProtectNoDolibarr'), { error: true });
 			return null;
 		}
 		const all = rows.every(r => (r.assignees || []).includes(S.me));
@@ -4810,6 +4841,11 @@
 	}
 	async function loadDolibar(box) {
 		if (!box) {
+			return;
+		}
+		// Mail of a protected mailbox (1.89.0): nothing linked to Dolibarr, said once in place of the panel
+		if (+box.dataset.mail < 0) {
+			box.innerHTML = '<div class="ibx-dolibar__head ibx-muted">' + ic('lock') + ' ' + th('InboxProtectReadingNote') + '</div>';
 			return;
 		}
 		box.innerHTML = '<div class="ibx-dolibar__head"><span class="ibx-skeleton" style="width:40%"></span></div>';
@@ -9013,12 +9049,18 @@
 		];
 		// Folders managed from inbox (1.10.0): greyed with the reason, never hidden
 		const f = e.folder;
-		const manage = e.account.level === 'manage' ? '' : t('InboxReadOnlyOn', e.account.email);
+		// Protected mailbox (1.89.0): read live, its folders are managed on the mail server (the actions below work on the
+		// index of inbox): greyed with the reason
+		const prot = e.account.protected && e.account.protect_level === 'content' ? t('InboxProtectFolderReason') : '';
+		const manage = prot || (e.account.level === 'manage' ? '' : t('InboxReadOnlyOn', e.account.email));
 		const special = f.role || isInboxPath(f) ? t('InboxFolderSpecialReason') : '';
+		if (prot) {
+			items[1] = { icon: 'mark-read', label: t('InboxSyncNow'), disabled: true, reason: prot, run: () => null };
+		}
 		items.push({ sep: true });
-		items.push({ icon: 'mark-read', label: t('InboxFolderMarkRead'), disabled: !f.unread || !f.selectable, reason: f.unread ? '' : t('InboxFolderNothingUnread'), run: () => folderMarkRead(f) });
+		items.push({ icon: 'mark-read', label: t('InboxFolderMarkRead'), disabled: !!prot || !f.unread || !f.selectable, reason: prot || (f.unread ? '' : t('InboxFolderNothingUnread')), run: () => folderMarkRead(f) });
 		items.push({ icon: 'download', label: t('InboxImportMails'), disabled: !!manage || !f.selectable, reason: manage, run: () => pickImport(e.account, f) });
-		items.push({ icon: 'download-all', label: t('InboxExportFolder'), disabled: !f.selectable || !f.total, reason: f.total ? '' : t('InboxFolderEmptyReason'), run: () => exportDialog(f) });
+		items.push({ icon: 'download-all', label: t('InboxExportFolder'), disabled: !!prot || !f.selectable || !f.total, reason: prot || (f.total ? '' : t('InboxFolderEmptyReason')), run: () => exportDialog(f) });
 		if (f.role === 'trash' || f.role === 'junk') {
 			items.push({ icon: 'delete', label: t(f.role === 'trash' ? 'InboxEmptyTrash' : 'InboxEmptyJunk'), danger: true, disabled: !!manage, reason: manage, run: () => folderEmpty(e.account, f) });
 		}
@@ -10406,6 +10448,17 @@
 			refreshTree().then(() => runGoto());
 		} else {
 			runGoto();
+		}
+	});
+
+	// Protected mailboxes (1.89.0): unlocked in silence after the tree was read, or locked from the settings: the
+	// tree follows (its folders are read live on the mail server while unlocked)
+	Dolibarr.on('inbox:protect:state', () => {
+		if (!S.el || !(S.accounts || []).length || !I.protect) {
+			return;
+		}
+		if (S.accounts.some(a => a.protected && !!a.locked !== I.protect.isLocked(a.id))) {
+			refreshTree();
 		}
 	});
 

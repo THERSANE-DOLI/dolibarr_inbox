@@ -260,7 +260,7 @@ class InboxFulltext
 		$start = microtime(true);
 		$deadline = $start + max(10, getDolGlobalInt('INBOX_MEILI_BUDGET', 40));
 		$rows = $this->db->getRows("SELECT ft.fk_account FROM ".$this->db->prefix()."inbox_fulltext as ft INNER JOIN ".$this->db->prefix()."inbox_account as a ON a.rowid = ft.fk_account"
-			." WHERE ft.entity = ".((int) $conf->entity)." AND a.status = ".InboxAccount::STATUS_ACTIVE." ORDER BY ft.tms LIMIT 500");
+			." WHERE ft.entity = ".((int) $conf->entity)." AND a.status = ".InboxAccount::STATUS_ACTIVE." AND a.protected = 0 ORDER BY ft.tms LIMIT 500");
 		$sent = 0;
 		$errors = 0;
 		foreach (is_array($rows) ? $rows : array() as $r) {
@@ -295,7 +295,7 @@ class InboxFulltext
 			return 0;
 		}
 		$account = new InboxAccount($this->db);
-		if ($account->fetch((int) $accountId) <= 0) {
+		if ($account->fetch((int) $accountId) <= 0 || !$account->canWorkNow()) {
 			return 0;
 		}
 		$uid = self::indexUid((int) $accountId);

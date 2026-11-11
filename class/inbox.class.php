@@ -174,7 +174,12 @@ class Inbox
 
 		$account = new InboxAccount($this->db);
 		if ($account->fetchByEmail($mailbox) > 0 && $account->isActive()) {
-			return $account;
+			// Protected mailbox (1.89.0): not given to the other modules (no copy of its mails out of the webmail), nor
+			// to the hook (another module could open the same address with its own password)
+			return $account->canWorkNow() ? $account : null;
+		}
+		if ($account->id > 0 && !$account->canWorkNow()) {
+			return null;
 		}
 		if (!is_object($hookmanager)) {
 			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';

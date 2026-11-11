@@ -2576,3 +2576,34 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-pieceins__opts { display: flex; flex-direction: column; gap: var(--ibx-s2); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
 .ibx-pieceins__opts > legend { padding: 0 var(--ibx-s1); font-weight: 600; }
 
+
+/* Protected mailboxes (1.89.0): fingerprint of a device, to compare by eye */
+.ibx-protect__fp { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0.06em; font-size: var(--ibx-fs-sm); white-space: nowrap; }
+p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius, 6px); background: var(--ibx-bg-soft, transparent); }
+.ibx-protect__list { margin: 0 0 var(--ibx-s3) 1.25rem; padding: 0; }
+.ibx-protect__list li { margin-bottom: var(--ibx-s1); }
+
+/* Card of a mailbox (1.89.0): the sections of a tab as chips under it */
+.ibx-sectabs { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); margin: calc(-1 * var(--ibx-s2)) 0 var(--ibx-s4); }
+.ibx-sectab { display: inline-flex; align-items: center; min-height: 2.25rem; padding: 0 var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: 999px; color: var(--ibx-text); text-decoration: none; font-size: var(--ibx-fs-sm); }
+.ibx-sectab:hover { border-color: var(--ibx-border-strong); }
+.ibx-sectab.is-on { color: var(--ibx-accent); border-color: var(--ibx-accent); background: var(--ibx-accent-soft); font-weight: 600; }
+.ibx-sectab[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+@media (pointer: coarse) { .ibx-sectab { min-height: 2.75rem; } }
+/* Overview of a mailbox: only what asks for an action */
+.ibx-overview { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ibx-s2); max-width: 52rem; }
+.ibx-overview__item { display: flex; align-items: center; gap: var(--ibx-s3); padding: var(--ibx-s3); border: 1px solid var(--ibx-border); border-left-width: 3px; border-radius: var(--ibx-radius); }
+.ibx-overview__item--error { border-left-color: var(--ibx-danger); }
+.ibx-overview__item--warning { border-left-color: var(--ibx-warning); }
+.ibx-overview__item--info { border-left-color: var(--ibx-border-strong); }
+.ibx-overview__text { flex: 1; }
+.ibx-overview__state { margin-top: var(--ibx-s3); }
+.ibx-empty--inline { height: auto; padding: var(--ibx-s5) 0; align-items: flex-start; text-align: left; }
+/* Step of the connection test waiting for its result (1.89.0) */
+.ibx-checklist__item--pending { color: var(--ibx-text-muted); }
+.ibx-checklist__item--pending .ibx-spinner { margin-top: 0.25rem; }
+/* Choice with its explanation under the label (level of the protection, 1.89.0) */
+.ibx-check.ibx-check--block { display: flex; align-items: flex-start; gap: var(--ibx-s2); margin: var(--ibx-s2) 0; }
+.ibx-check--block > input { margin-top: 0.2rem; flex: none; }
+.ibx-check--block > span { display: flex; flex-direction: column; gap: 0.125rem; }
+.ibx-check--block .ibx-formrow__help { margin: 0; }

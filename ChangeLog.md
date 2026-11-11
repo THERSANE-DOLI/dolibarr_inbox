@@ -1,5 +1,36 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: protected mailboxes, opened only by the browsers of their users, nothing kept in Dolibarr :   1.89.0
+  - Card of the mailbox > Server, row Protection under the password (admin of the mailboxes; the owner of a personal
+    mailbox in the tab Encrypted accesses), login and password only, the password tried on the mail server. Two
+    levels: « The password » (default: it leaves the database, the mailbox works as the others while a session
+    unlocked it, synchronised by the pages of its users, never by a scheduled job) or « The password and the
+    content » (the local data of the mailbox emptied, read live); the level can be changed afterwards.
+  - Each browser keeps its own key (not extractable); the password is encrypted for each device allowed. Unlocked
+    in silence at the opening on an allowed device, else by the password of the mailbox or the approval from
+    another device of the user (fingerprint compared); unlocked for the session only.
+  - Encrypted accesses: a manager who has the mailbox unlocked gives the access to the devices of his colleagues,
+    fingerprints shown, never automatic; devices revoked in My account > My devices or by the admin, copies of who
+    loses the access deleted; back to the normal mode, reset when every device is lost; journal without content.
+  - Level content, read live on the mail server: folders, list, search by the server, reading, attachments,
+    flags, moves, archives, trash; no index, cache, link, assignment nor journal of the mails.
+  - Sending: the delay of the undo kept in the session (encrypted), closing the page sends at once; a copy marked
+    in Drafts offered at the next opening if the browser died; scheduled sendings wait in Drafts, sent while a page
+    is open (catch-up asked by default); a failure while no page was open is told once.
+  - Card of a mailbox in 6 tabs instead of 12: Overview (only what asks for an action: not active, test failed,
+    synchronisation in error, nobody with an access, special folders not found, devices waiting), Connection, Access,
+    Writing (identities, templates, out of office), Reception (rules, tags, card of the thirdparty), Journal; their
+    sections as chips, the addresses of the sections kept; « Incoming / Outgoing server » in the tab Server.
+  - A mailbox not tested yet: « Test the connection » beside the switch of its status, the switch usable as soon as
+    the test passed; the result of the test in a window (its steps shown at once), also kept under the form.
+  - Writing: a table written elsewhere (signature with border="0") keeps its own borders, no grid added in its cells.
+
+- FIX: known senders of the company no longer flagged « Probable imitation » when Plesk repeats its results :   1.88.11
+  - Plesk writes its dmarc and dkim results twice in its Authentication-Results header (mails between colleagues,
+    forwarded or written on the server): a result repeated as is now counts once.
+  - Two spf or dmarc results that differ (value or domain) in the header of the server stay refused, the detail
+    tells « conflicting results ».
+
 - FIX: mails answered easier to see in the list :   1.88.10
   - The reply mark takes the accent color, a little bigger and thicker, in the cards and in the table.
   - Its label « Answered » on hover and for the screen readers (5 languages).

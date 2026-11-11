@@ -31,6 +31,12 @@ dol_include_once('/inbox/class/inboxavatar.class.php');
 
 inboxAjaxStart(false);
 session_write_close();
+// Protected mailbox (1.89.0): no picture looked for (one connection to the mail server per row of the list), the
+// page shows the initials
+if (InboxLive::isMail(GETPOSTINT('id'))) {
+	http_response_code(404);
+	exit;
+}
 $reader = new InboxReader($db);
 if (!$reader->load($user, GETPOSTINT('id'))) {
 	http_response_code(404);

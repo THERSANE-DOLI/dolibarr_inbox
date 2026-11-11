@@ -126,6 +126,15 @@ class InboxComposer
 		if (!empty($chosen[$role])) {
 			return (string) $chosen[$role];
 		}
+		// Protected with its content (1.89.0): its folders read on the server (no index)
+		if ($account->isLive()) {
+			require_once __DIR__.'/inboxlive.class.php';
+			$live = new InboxLive($this->db);
+			$f = $live->folder($account, 0, $role);
+			$live->close();
+
+			return $f ? (string) $f->path : '';
+		}
 		$rows = $this->db->getRows("SELECT path, flags FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $account->id)." AND role = '".$this->db->escape($role)."'"
 			." AND status = ".InboxFolder::STATUS_PRESENT." AND selectable = 1 ORDER BY LENGTH(path) LIMIT 10");
 		foreach (is_array($rows) ? $rows : array() as $r) {
@@ -1777,6 +1786,10 @@ class InboxComposer
 				$record[] = array('type' => $allowed[$key]['type'], 'id' => (int) $allowed[$key]['id']);
 			}
 		}
+		// Protected mailbox (1.89.0): never in the queue of the server, kept for the session (lot S3)
+		if ($account->isProtected()) {
+			return $this->sendProtected($user, $account, $prepared, $b, $built, $state, $token, $data, $at, (string) ($opts['catchup'] ?? 'ask'));
+		}
 		require_once __DIR__.'/inboxoutbox.class.php';
 		$outbox = new InboxOutbox($this->db);
 		$delay = $at ? 0 : self::delayFor($user);
@@ -1799,6 +1812,65 @@ class InboxComposer
 
 		return array('queued' => $id, 'send_at' => $at ?: dol_now() + $delay, 'delay' => $delay, 'scheduled' => $at ? 1 : 0, 'subject' => $b->subject,
 			'pieces' => array_values($allowed), 'record' => $record);
+	}
+
+	/**
+	 * Sending of a protected mailbox (1.89.0, analyse-boites-protegees §7): the delay of the undo kept in the session
+	 * (the page sends it at its end, or at once when it closes); a date: the mail waits in Drafts with its date
+	 *
+	 * @param User                $user     User
+	 * @param InboxAccount        $account  Mailbox
+	 * @param array<string,mixed> $prepared Result of prepare()
+	 * @param InboxMailBuilder    $b        Builder
+	 * @param array<string,mixed> $built    Result of build()
+	 * @param array<string,mixed> $state    State of the writing
+	 * @param string              $token    Writing
+	 * @param array<string,mixed> $data     Values typed
+	 * @param int                 $at       Date of a sending scheduled, 0 = now
+	 * @param string              $catchup  Scheduled: ask or send when no page was open at the date
+	 * @return array<string,mixed>|null
+	 */
+	protected function sendProtected(User $user, InboxAccount $account, array $prepared, InboxMailBuilder $b, array $built, array $state, $token, array $data, $at, $catchup)
+	{
+		require_once __DIR__.'/inboxlivesend.class.php';
+		$live = new InboxLiveSend($this->db);
+		if ($at) {
+			$rid = $live->schedule($user, $account, $built, $at, $catchup);
+			if ($rid === null) {
+				return $this->fail($live->errorCode ?: 'error', $live->error);
+			}
+			// The writing is over: its draft and its folder go (the mail waits in Drafts on the server)
+			if (!empty($state['draft'])) {
+				$this->removeDraft($state['draft'], null, (int) $account->id, $user);
+			}
+			$dir = self::dirOf($user, $token);
+			if ($dir !== null) {
+				dol_delete_dir_recursive($dir);
+			}
+			unset($_SESSION['inbox_compose'][$token]);
+
+			return array('queued' => 0, 'send_at' => (int) $at, 'delay' => 0, 'scheduled' => 1, 'subject' => $b->subject, 'pieces' => array(), 'record' => array(), 'live' => 1);
+		}
+		$delay = self::delayFor($user);
+		$id = $live->queue($user, $account, $prepared['identity'], $b, $built, array('token' => $token, 'source' => $state['source'] ?? null, 'draft' => $state['draft'] ?? null,
+			'typed' => $data, 'at' => dol_now() + $delay));
+		if ($id === 0) {
+			if ($live->error !== 'too_big') {
+				return $this->fail('error', $live->error);
+			}
+			$delay = 0;
+		}
+		if ($delay === 0 || $id === 0) {
+			$res = $id ? $live->deliver($user, $id) : null;
+			if ($res === null) {
+				$this->errorCode = $live->errorCode ?: 'error';
+				$this->error = $live->error;
+				return null;
+			}
+			return $res;
+		}
+
+		return array('queued' => $id, 'send_at' => dol_now() + $delay, 'delay' => $delay, 'scheduled' => 0, 'subject' => $b->subject, 'pieces' => array(), 'record' => array(), 'live' => 1);
 	}
 
 	/**

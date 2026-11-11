@@ -213,10 +213,25 @@ class InboxAccount extends CommonObject
 	public $import_key;
 	/** @var string Level of the current user on this mailbox, set by InboxAccess::getAccounts() */
 	public $access_level = '';
+	/** @var int 1 = protected mailbox (1.89.0): no password on the server, opened only in a session that unlocked it */
+	public $protected = 0;
+	/** @var int Generation of the password of a protected mailbox: an encrypted copy of an older one is obsolete */
+	public $protect_gen = 0;
+	/** @var string password or content (see PROTECT_ constants) */
+	public $protect_level = self::PROTECT_PASSWORD;
 
 	/** @var string[] State of the synchronisation: written only by InboxSync (never by create / update, so that saving
 	 * the card during a pass does not write old values over it), loaded by fetch() */
 	const SYNC_FIELDS = array('sync_state', 'sync_error', 'date_sync_error', 'date_sync', 'date_folders', 'sync_lock', 'sync_retry_at', 'sync_fail_count', 'quota_used', 'quota_limit');
+
+	/** @var string[] Protection (1.89.0): written only by InboxProtect, never by create / update (a card saved meanwhile
+	 * must not turn a protected mailbox back to the normal mode), loaded by fetch() */
+	const PROTECT_FIELDS = array('protected', 'protect_gen', 'protect_level');
+
+	/** Protection of the password only: the mailbox works as the others while a session unlocked it */
+	const PROTECT_PASSWORD = 'password';
+	/** Protection of the password and of the content: nothing of the mailbox kept, read live */
+	const PROTECT_CONTENT = 'content';
 
 	/** @var string[] Columns of the server: a change is written in the journal (values, never a password) */
 	const SERVER_FIELDS = array('imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert',
@@ -261,6 +276,14 @@ class InboxAccount extends CommonObject
 		};
 		// Checking the certificate turned off: a man in the middle could read the password
 		$certOff = $old && !empty($old->imap_validate_cert) && empty($this->imap_validate_cert);
+		// Protected mailbox (1.89.0): no password typed here (it would be kept in the database), the server and the
+		// login stay those of the encrypted copies; back to the normal mode first
+		if ($old && $old->isProtected()) {
+			if ($typedImap || $typedSmtp || $certOff || $moved(self::IMAP_SECRET_FIELDS) || $moved(self::SMTP_SECRET_FIELDS)) {
+				return 'InboxProtectErrorServerLocked';
+			}
+			return '';
+		}
 		$special = in_array((string) $this->imap_auth_mode, array(self::AUTH_MASTER, self::AUTH_OAUTH), true);
 		if ($special && !$dolibarrAdmin) {
 			if (!$old || (string) $old->imap_auth_mode !== (string) $this->imap_auth_mode || $certOff
@@ -352,10 +375,35 @@ class InboxAccount extends CommonObject
 	 */
 	public function loadSyncState()
 	{
-		$row = $this->db->getRow("SELECT ".implode(', ', self::SYNC_FIELDS)." FROM ".$this->db->prefix().$this->table_element." WHERE rowid = ".((int) $this->id));
+		$row = $this->db->getRow("SELECT ".implode(', ', array_merge(self::SYNC_FIELDS, self::PROTECT_FIELDS))." FROM ".$this->db->prefix().$this->table_element." WHERE rowid = ".((int) $this->id));
 		if (!is_object($row)) {
-			return;
+			// A column missing (files of inbox newer than its tables, module not activated again): a protected mailbox
+			// must never look like a normal one (it would be synchronised without its password, 1.89.0). Read again
+			// with the columns there are; the protection known, nothing worked on until the update is done.
+			$this->protected = 0;
+			$cols = array();
+			$res = $this->db->DDLDescTable($this->db->prefix().$this->table_element);
+			while ($res && ($c = $this->db->fetch_object($res))) {
+				$cols[] = strtolower((string) ($c->Field ?? $c->field ?? ''));
+			}
+			$have = array_values(array_intersect(array_merge(self::SYNC_FIELDS, self::PROTECT_FIELDS), $cols));
+			$row = $have ? $this->db->getRow("SELECT ".implode(', ', $have)." FROM ".$this->db->prefix().$this->table_element." WHERE rowid = ".((int) $this->id)) : null;
+			if (!is_object($row)) {
+				return;
+			}
+			foreach (array_merge(self::SYNC_FIELDS, self::PROTECT_FIELDS) as $field) {
+				if (!property_exists($row, $field)) {
+					$row->$field = null;
+				}
+			}
+			// Protected, the level not known: the strictest one (no work, nothing written)
+			if (!empty($row->protected) && $row->protect_level === null) {
+				$row->protect_level = self::PROTECT_CONTENT;
+			}
 		}
+		$this->protected = (int) $row->protected;
+		$this->protect_gen = (int) $row->protect_gen;
+		$this->protect_level = (string) ($row->protect_level ?? '') === self::PROTECT_CONTENT ? self::PROTECT_CONTENT : self::PROTECT_PASSWORD;
 		foreach (self::SYNC_FIELDS as $field) {
 			$value = $row->$field;
 			$this->$field = (strpos($field, 'date_') === 0 || in_array($field, array('sync_lock', 'sync_retry_at'), true)) ? ($value ? (int) $this->db->jdate($value) : null) : $value;
@@ -638,6 +686,14 @@ class InboxAccount extends CommonObject
 	 */
 	public function getImapPassword()
 	{
+		// Protected mailbox: only the copy of the session that unlocked it (none in a scheduled job)
+		if ($this->isProtected()) {
+			require_once __DIR__.'/inboxprotect.class.php';
+			$secrets = InboxProtect::secrets((int) $this->id);
+
+			return is_array($secrets) ? (string) $secrets['imap'] : '';
+		}
+
 		return empty($this->imap_password) ? '' : (string) dolDecrypt((string) $this->imap_password);
 	}
 
@@ -659,6 +715,12 @@ class InboxAccount extends CommonObject
 	{
 		if (!empty($this->smtp_same_credentials)) {
 			return $this->getImapPassword();
+		}
+		if ($this->isProtected()) {
+			require_once __DIR__.'/inboxprotect.class.php';
+			$secrets = InboxProtect::secrets((int) $this->id);
+
+			return is_array($secrets) ? (string) ($secrets['smtp'] ?? '') : '';
 		}
 
 		return empty($this->smtp_password) ? '' : (string) dolDecrypt((string) $this->smtp_password);
@@ -703,6 +765,42 @@ class InboxAccount extends CommonObject
 	public function isActive()
 	{
 		return (int) $this->status === self::STATUS_ACTIVE;
+	}
+
+	/**
+	 * @return bool Protected mailbox (1.89.0): nothing of it is kept, no scheduled job, no work out of a session
+	 */
+	public function isProtected()
+	{
+		return !empty($this->protected);
+	}
+
+	/**
+	 * @return bool Protected with its content (1.89.0): nothing of it kept, read live on the mail server
+	 */
+	public function isLive()
+	{
+		return $this->isProtected() && $this->protect_level === self::PROTECT_CONTENT;
+	}
+
+	/**
+	 * Work of the server on the mailbox now (synchronisation, anti-spam, other modules): always for a normal mailbox;
+	 * a mailbox protected for its password only, while this request has it unlocked (a session of a user, never a
+	 * scheduled job); never one protected with its content
+	 *
+	 * @return bool
+	 */
+	public function canWorkNow()
+	{
+		if (!$this->isProtected()) {
+			return true;
+		}
+		if ($this->isLive()) {
+			return false;
+		}
+		require_once __DIR__.'/inboxprotect.class.php';
+
+		return InboxProtect::isUnlocked((int) $this->id);
 	}
 
 	/**
@@ -882,6 +980,8 @@ class InboxAccount extends CommonObject
 			'date_sync_error' => $this->date_sync_error ? (int) $this->date_sync_error : null,
 			'date_sync' => $this->date_sync ? (int) $this->date_sync : null,
 			'sync_retry_at' => $this->sync_retry_at ? (int) $this->sync_retry_at : null,
+			'protected' => $this->isProtected() ? 1 : 0,
+			'protect_level' => $this->isProtected() ? (string) $this->protect_level : '',
 		);
 		$config = array();
 		foreach ($this->getConnectorConfig() as $key => $value) {

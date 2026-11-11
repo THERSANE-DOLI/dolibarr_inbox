@@ -661,6 +661,8 @@
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,
+		/** Current CSRF token (renewed by a reconnection): for a sendBeacon, that cannot go through post() */
+		token: () => token,
 		$, $$,
 	};
 	Dolibarr.defineTool('inbox', inbox);

@@ -39,8 +39,12 @@ $lead = new InboxLead($db);
  */
 function inboxLeadMail()
 {
-	global $db, $user;
+	global $db, $user, $langs;
 
+	// Protected mailbox (1.89.0): no link, note, piece nor thirdparty from its mails (D1)
+	if (InboxLive::isMail((int) inboxAjaxParam('id', 'int'))) {
+		inboxAjaxReply(array('error' => $langs->transnoentities('InboxProtectNoDolibarr'), 'code' => 'protected'), 403);
+	}
 	$reader = new InboxReader($db);
 	if (!$reader->load($user, (int) inboxAjaxParam('id', 'int'))) {
 		inboxAjaxNotFound();

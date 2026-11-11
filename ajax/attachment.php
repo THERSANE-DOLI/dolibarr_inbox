@@ -41,6 +41,8 @@ if ($raw === null) {
 }
 $message = InboxMimeParser::parse($raw);
 $scan = new InboxAttachmentScan($db);
+// Protected mailbox (1.89.0): no verdict read from or kept in the cache (the print of the file would stay)
+$scan->keep = !$reader->isLive();
 $mode = GETPOST('mode', 'aZ09') ?: 'download';
 $part = GETPOSTINT('part');
 

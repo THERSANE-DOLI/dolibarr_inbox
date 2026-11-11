@@ -260,11 +260,30 @@ class InboxMailBuilder
 			// Tables of the editor have no border: written in the cells, as the mail software read no stylesheet
 			if ($tag === 'table' && stripos($child->getAttribute('style'), 'border-collapse') === false) {
 				$child->setAttribute('style', trim($child->getAttribute('style').';border-collapse:collapse', '; '));
-			} elseif (($tag === 'td' || $tag === 'th') && stripos($child->getAttribute('style'), 'border') === false) {
+			} elseif (($tag === 'td' || $tag === 'th') && stripos($child->getAttribute('style'), 'border') === false
+				&& !self::closestTableHasBorderAttr($child)) {
 				$child->setAttribute('style', trim($child->getAttribute('style').';border:1px solid #d0d5dd;padding:4px 8px;vertical-align:top', '; '));
 			}
 			self::cleanNode($child, $keepVars, $noRemote);
 		}
+	}
+
+	/**
+	 * The table of a cell carries a border="" attribute: written by hand or by another software (a signature, a
+	 * template), never by the editor; its borders are kept as written, no grid added
+	 *
+	 * @param DOMElement $cell td or th
+	 * @return bool
+	 */
+	protected static function closestTableHasBorderAttr(DOMElement $cell)
+	{
+		for ($node = $cell->parentNode; $node instanceof DOMElement; $node = $node->parentNode) {
+			if (strtolower($node->nodeName) === 'table') {
+				return $node->hasAttribute('border');
+			}
+		}
+
+		return false;
 	}
 
 	/**

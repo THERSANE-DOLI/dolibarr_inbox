@@ -197,6 +197,22 @@ switch ($action) {
 		$situationOfBox = new InboxSituation($db);
 		$data['carrier_category'] = (int) $account->carrier_category;
 		$data['carrier_categories'] = $situationOfBox->supplierCategories();
+		// Overview (1.89.0): special folders not found, by the same rule as the sending (chosen, else the folders of the
+		// index); a protected mailbox has no index, not checked
+		$data['missing_roles'] = array();
+		// Protection (1.89.0): the user who protects must be able to open the mailbox himself (his browser gets the first
+		// copy); an admin of Dolibarr has no implicit access, said before the click with the names
+		$data['own_level'] = (new InboxAccess($db))->getLevel($user, (int) $account->id);
+		$data['me'] = $user->getFullName($langs) ?: $user->login;
+		if (!$account->isLive() && $account->isActive()) {
+			dol_include_once('/inbox/class/inboxcomposer.class.php');
+			$composerOfBox = new InboxComposer($db);
+			foreach (array('sent', 'drafts', 'trash') as $role) {
+				if ($composerOfBox->roleFolder($account, $role) === '') {
+					$data['missing_roles'][] = $role;
+				}
+			}
+		}
 		inboxAjaxReply(array('account' => $data));
 		// no break
 

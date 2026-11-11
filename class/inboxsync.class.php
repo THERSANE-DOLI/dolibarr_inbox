@@ -138,7 +138,9 @@ class InboxSync
 		$this->stats = array('folders' => 0, 'new' => 0, 'changed' => 0, 'deleted' => 0);
 		$force = !empty($options['force']);
 		$phase = (int) ($options['phase'] ?? 0);
-		if (!$account->isActive()) {
+		// A protected mailbox (1.89.0): its password only, synchronised by the session that unlocked it (never a scheduled
+		// job); with its content, never (nothing of it is kept, it is read live on the server)
+		if (!$account->isActive() || !$account->canWorkNow()) {
 			return 0;
 		}
 		$account->loadSyncState();
@@ -472,7 +474,7 @@ class InboxSync
 
 		$start = microtime(true);
 		$deadline = $start + max(10, getDolGlobalInt('INBOX_SYNC_BUDGET', 45));
-		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." AND status = ".InboxAccount::STATUS_ACTIVE." ORDER BY date_sync, rowid LIMIT 500");
+		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." AND status = ".InboxAccount::STATUS_ACTIVE." AND protected = 0 ORDER BY date_sync, rowid LIMIT 500");
 		$accounts = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$a = new InboxAccount($this->db);

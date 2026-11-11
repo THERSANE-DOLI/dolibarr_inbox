@@ -26,11 +26,44 @@ dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxtextsearch.class.php');
 dol_include_once('/inbox/class/inboxfulltext.class.php');
 dol_include_once('/inbox/class/inboxuserparam.class.php');
+dol_include_once('/inbox/class/inboxlive.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 // The calls that write (presence, synchronisation, results of a search in the text) need POST and the token (audit INBX-017)
 inboxAjaxStart(in_array($action, array('state', 'pump', 'refresh', 'content'), true));
 $access = new InboxAccess($db);
+/**
+ * Live page of a protected mailbox (1.89.0): same answer as a page of the index, nothing of the index around it
+ *
+ * @param stdClass            $folder Folder (inboxListFolder)
+ * @param array<string,mixed> $query  Parsed query
+ * @return never
+ */
+function inboxListLivePage($folder, array $query)
+{
+	global $db, $inboxTypedQuery;
+
+	$account = new InboxAccount($db);
+	if ($account->fetch((int) $folder->fk_account) <= 0) {
+		inboxAjaxNotFound();
+	}
+	$live = new InboxLive($db);
+	$start = microtime(true);
+	$page = $live->page($account, (int) $folder->rowid, $query, (string) inboxAjaxParam('cursor', 'alphanohtml'), (int) (inboxAjaxParam('limit', 'int') ?: 50));
+	$live->close();
+	if ($page === null) {
+		inboxAjaxReply(array('error' => $live->error, 'code' => InboxProtect::isUnlocked((int) $account->id) ? 'live' : 'locked'), 502);
+	}
+	$page['threads'] = false;
+	$page['people'] = new stdClass();
+	$page['ms'] = (int) round((microtime(true) - $start) * 1000);
+	$page['fulltext'] = array('ready' => array(), 'error' => false, 'relevance' => false);
+	$page['crops'] = new stdClass();
+	$page['live'] = 1;
+	$page['query'] = array_intersect_key((array) $inboxTypedQuery, array_flip(array('words', 'from', 'to', 'subject', 'tag', 'before', 'after', 'attachment', 'unread')));
+	inboxAjaxReply($page);
+}
+
 $readable = array_keys(array_filter($access->getLevels($user), function ($level) {
 	return InboxAccess::rank($level) >= InboxAccess::rank(InboxAccess::LEVEL_READ);
 }));
@@ -53,6 +86,21 @@ function inboxListFolder($folderId, array $readable)
 {
 	global $db;
 
+	// Folder of a protected mailbox (1.89.0): a number of the live reading, known in this session only
+	if (InboxLive::isLive($folderId) && !InboxLive::isMail($folderId)) {
+		$accountId = InboxLive::accountOf($folderId);
+		if (!in_array($accountId, $readable, true) || InboxLive::folderPath($folderId) === null) {
+			inboxAjaxNotFound();
+		}
+		$live = new stdClass();
+		$live->rowid = (int) $folderId;
+		$live->fk_account = $accountId;
+		$live->total = 0;
+		$live->unread = 0;
+		$live->live = 1;
+
+		return $live;
+	}
 	$row = $folderId > 0 ? $db->getRow("SELECT rowid, fk_account, total, unread FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1") : null;
 	if (!is_object($row) || !in_array((int) $row->fk_account, $readable, true)) {
 		inboxAjaxNotFound();
@@ -196,6 +244,25 @@ switch ($action) {
 		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
 		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
 		$query = inboxListQuery();
+		if (!empty($folder->live)) {
+			// Protected mailbox: every UID matching, numbered for the session
+			$account = new InboxAccount($db);
+			$account->fetch((int) $folder->fk_account);
+			$live = new InboxLive($db);
+			$c = $live->connector($account);
+			$path = (string) InboxLive::folderPath((int) $folder->rowid);
+			$empty = false;
+			$found = $c ? $c->liveSearch($path, InboxLive::criteria($query, $empty)) : null;
+			if ($found === null || $empty) {
+				inboxAjaxReply(array('ids' => array(), 'more' => false));
+			}
+			$uids = array_slice($found['uids'], 0, 20000);
+			$ids = InboxLive::mailIds((int) $account->id, $path, array_map(function ($u) use ($found) {
+				return $found['uidvalidity'].':'.$u;
+			}, $uids));
+			$live->close();
+			inboxAjaxReply(array('ids' => array_values($ids), 'more' => count($found['uids']) > 20000));
+		}
 		inboxListTextIds($query, 'folder', (int) $folder->rowid, $readable);
 		inboxListFulltext($query, array((int) $folder->fk_account));
 		$engine = new InboxSearchSql($db);
@@ -243,6 +310,10 @@ switch ($action) {
 			$folderId = 0;
 		} elseif ($scope !== 'all') {
 			$folder = inboxListFolder($folderId, $readable);
+			if (!empty($folder->live)) {
+				// A protected mailbox is read one folder at a time on its server (no search over the whole mailbox)
+				inboxListLivePage($folder, inboxListQuery());
+			}
 			$accounts = array((int) $folder->fk_account);
 			if ($scope === 'account') {
 				$folderId = 0;
@@ -458,6 +529,19 @@ switch ($action) {
 		if ($folderId > 0) {
 			inboxListFolder($folderId, $readable);
 			$out['open'] = array('folder' => $folderId, 'stamp' => inboxListStamp($folderId));
+		} elseif (InboxLive::isLive($folderId)) {
+			// Protected mailbox (1.89.0): STATUS of the open folder at the rhythm of this call, its counters given to the tree
+			$folder = inboxListFolder($folderId, $readable);
+			$account = new InboxAccount($db);
+			$account->fetch((int) $folder->fk_account);
+			$live = new InboxLive($db);
+			$c = $live->connector($account);
+			$st = $c ? $c->folderStatus((string) InboxLive::folderPath($folderId)) : null;
+			$live->close();
+			if ($st) {
+				$out['folders'][] = array($folderId, (int) $st['total'], (int) $st['unread'], 0);
+				$out['open'] = array('folder' => $folderId, 'stamp' => (string) $st['token']);
+			}
 		}
 		inboxAjaxReply($out);
 		// no break
@@ -496,6 +580,25 @@ switch ($action) {
 			}
 		}
 		$more = false;
+		// Protected for their password (1.89.0): the scheduled job cannot open them, the page of a user who unlocked them
+		// synchronises them, whatever the job does (one pass per minute at most, the least recent first)
+		if ($readable) {
+			$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', $readable).") AND status = ".InboxAccount::STATUS_ACTIVE
+				." AND protected = 1 AND protect_level = 'password' AND (date_sync IS NULL OR date_sync < '".$db->idate(dol_now() - 60)."') ORDER BY date_sync ASC LIMIT 20");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if (microtime(true) > $deadline - 2) {
+					$more = true;
+					break;
+				}
+				$account = new InboxAccount($db);
+				if ($account->fetch((int) $r->rowid) > 0 && $account->canWorkNow() && $sync->run($account, $deadline, array()) === 1) {
+					$add();
+					$done[] = (int) $r->rowid;
+					$account->loadSyncState();
+					$more = $more || $account->sync_state === 'first_sync';
+				}
+			}
+		}
 		if (!$cronAlive && $readable) {
 			// A first indexing is left: state « first_sync », or a folder not indexed yet (index rebuilt, folder followed
 			// again, mailbox just enabled)

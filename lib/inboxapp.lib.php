@@ -144,6 +144,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_TOKEN' => currentToken(),
 		// The JS context only takes strings, numbers and booleans: flat keys, JSON text for the settings
 		'INBOX_USER_ID' => (int) $user->id,
+		// Associated data of the encrypted copies of the protected mailboxes (1.89.0): entity | mailbox | user | device
+		'INBOX_ENTITY' => (int) $conf->entity,
 		'INBOX_USER_NAME' => $user->getFullName($GLOBALS['langs']),
 		'INBOX_RIGHT_WEBMAIL' => (bool) $user->hasRight('inbox', 'webmail', 'use'),
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),
