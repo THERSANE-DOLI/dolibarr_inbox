@@ -65,6 +65,7 @@ function inboxLeadInput()
 		$opts[$k] = (int) ($o[$k] ?? 0);
 	}
 	$opts['categories'] = array_values(array_filter(array_map('intval', (array) ($o['categories'] ?? array()))));
+	$opts['categories_supplier'] = array_values(array_filter(array_map('intval', (array) ($o['categories_supplier'] ?? array()))));
 
 	return array($soc, $contact, $opts);
 }

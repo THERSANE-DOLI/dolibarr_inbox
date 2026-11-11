@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: categories as Dolibarr shows them, in the tool combo and the panel « New customer » :   1.81.0
+  - combo: choices as chips in the field (data-combo-chips, « × » on each, Backspace removes the last one), colour of
+    an option (data-color: a dot in the list, the colour of its chip, text black or white by contrast), tree
+    (data-depth, data-path: indented, searched on the whole path, the path in the title of the chip).
+  - panel: customer categories in the order of their tree with their colours; supplier categories in their own
+    field when « Supplier » is ticked; each set only on the nature it belongs to.
+
 - NEW: searchable lists, tool « combo » of the JavaScript context, written for the core :   1.80.0
   - js/dolibarr-combo.js and css/dolibarr-combo.css, no dependency (no jQuery, nothing of inbox): Dolibarr.tools.combo
     is defined only when the core has none. Opt-in: the selects marked data-combo, or attach(). Search with case

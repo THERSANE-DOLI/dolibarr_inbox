@@ -50,6 +50,9 @@ class InboxLeadTest extends InboxTestCase
 			$this->db->query("DELETE FROM ".$p."societe WHERE rowid = ".((int) $r->rowid));
 		}
 		$this->db->query("DELETE FROM ".$p."socpeople WHERE lastname LIKE 'ZZLEAD%'");
+		$this->db->query("DELETE FROM ".$p."categorie_societe WHERE fk_categorie IN (SELECT rowid FROM ".$p."categorie WHERE label LIKE 'Zzlead%')");
+		$this->db->query("DELETE FROM ".$p."categorie_fournisseur WHERE fk_categorie IN (SELECT rowid FROM ".$p."categorie WHERE label LIKE 'Zzlead%')");
+		$this->db->query("DELETE FROM ".$p."categorie WHERE label LIKE 'Zzlead%'");
 		$this->db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE message_id LIKE '%@lead.inbox-test.invalid')");
 		$this->db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@lead.inbox-test.invalid'");
 		foreach ($this->saved as $k => $v) {
@@ -201,6 +204,48 @@ class InboxLeadTest extends InboxTestCase
 		$this->assertSame('+ 33 199 00 12 34', $sig['soc']['phone'][0][0]);
 
 		$this->assertSame("Merci\n--\nPaul", InboxLead::ownText("Merci\n-- \nPaul\n\nOn Mon, 10 Nov 2026, Bob <b@x.invalid> wrote:\n> old"));
+	}
+
+	/**
+	 * Categories as Dolibarr shows them (1.80.1): order of the tree, depth, path, colour; supplier ones apart, set on
+	 * the creation by the nature of the thirdparty
+	 *
+	 * @return void
+	 */
+	public function testCategories()
+	{
+		$p = $this->db->prefix();
+		$cat = function ($label, $type, $parent, $color) use ($p) {
+			$this->db->query("INSERT INTO ".$p."categorie (entity, fk_parent, label, type, color, visible, date_creation) VALUES (1, ".((int) $parent).", '".$label."', ".$type.", '".$color."', 0, '".$this->db->idate(dol_now())."')");
+			return (int) $this->db->last_insert_id($p.'categorie');
+		};
+		$sales = $cat('Zzlead Sales', 2, 0, 'ff0000');
+		$whole = $cat('Zzlead Wholesale', 2, $sales, '00aa00');
+		$sup = $cat('Zzlead Steel', 1, 0, '');
+		$form = (new InboxLead($this->db))->form($this->admin);
+		$mine = array_values(array_filter($form['categories'], function ($c) {
+			return strpos($c['label'], 'Zzlead') === 0;
+		}));
+		$this->assertSame(array($sales, $whole), array_column($mine, 'id'), 'the parent, then its child');
+		$this->assertSame(array(0, 1), array_column($mine, 'depth'));
+		$this->assertSame('Zzlead Sales > Zzlead Wholesale', $mine[1]['path']);
+		$this->assertSame('#ff0000', $mine[0]['color']);
+		$this->assertContains($sup, array_column($form['categories_supplier'], 'id'));
+		$this->assertNotContains($sup, array_column($form['categories'], 'id'));
+
+		$this->set('SOCIETE_CODECLIENT_ADDON', 'mod_codeclient_monkey');
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		(new InboxAccess($this->db))->grant($this->admin, $box->id, $this->admin->id, 0, 'manage');
+		$this->db->query("INSERT INTO ".$p."inbox_folder (fk_account, path, name, delimiter, role, status) VALUES (".((int) $box->id).", 'INBOX', 'INBOX', '.', 'inbox', 1)");
+		$folder = (int) $this->db->last_insert_id($p.'inbox_folder');
+		$this->db->query("INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, date_mail, from_email, subject, size, date_index) VALUES ("
+			.((int) $box->id).", ".$folder.", '1:2', 2, 'a1c@lead.inbox-test.invalid', '".$this->db->idate(dol_now())."', 'x@zzlead.invalid', 'Cat', 10, '".$this->db->idate(dol_now())."')");
+		$row = $this->db->getRow("SELECT * FROM ".$p."inbox_mail WHERE rowid = ".((int) $this->db->last_insert_id($p.'inbox_mail')));
+		$lead = new InboxLead($this->db);
+		$res = $lead->create($this->admin, $row, array('name' => 'Zzlead Cats'), null, array('prospect' => 1, 'supplier' => 1, 'categories' => array($whole), 'categories_supplier' => array($sup)));
+		$this->assertIsArray($res, $lead->error);
+		$this->assertSame(1, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$p."categorie_societe WHERE fk_soc = ".((int) $res['soc'])." AND fk_categorie = ".$whole)->n);
+		$this->assertSame(1, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$p."categorie_fournisseur WHERE fk_soc = ".((int) $res['soc'])." AND fk_categorie = ".$sup)->n);
 	}
 
 	/**

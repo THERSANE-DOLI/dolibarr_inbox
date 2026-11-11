@@ -127,7 +127,7 @@
 				prospect: fromDef ? fromDef.prospect : (last.prospect !== undefined ? !!last.prospect : true),
 				customer: fromDef ? fromDef.customer : !!last.customer,
 				supplier: !!last.supplier, private: !!st.found.private, commercial: last.commercial !== undefined ? !!last.commercial : true,
-				vat_subject: last.vat_subject !== undefined ? !!last.vat_subject : true, categories: last.categories || [], contact: true, use_soc: 0,
+				vat_subject: last.vat_subject !== undefined ? !!last.vat_subject : true, categories: last.categories || [], categories_supplier: last.categories_supplier || [], contact: true, use_soc: 0,
 			};
 			if (!st.values.soc.typent_id && last.typent_id) {
 				st.values.soc.typent_id = String(last.typent_id);
@@ -170,8 +170,9 @@
 				+ f.countries.map(x => '<option value="' + x.id + '"' + (String(x.id) === String(st.values.soc.country_id || '') ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></div>'
 				+ '<span class="ibx-lead__label">' + th('InboxLeadSalesRep') + '</span><label class="ibx-inline"><input type="checkbox" class="ibx-js-leadopt" data-opt="commercial"' + (o.commercial ? ' checked' : '') + '> ' + esc(f.me.name) + '</label>'
 				+ '<span class="ibx-lead__label">' + th('InboxLeadVat') + '</span><label class="ibx-inline"><input type="checkbox" class="ibx-js-leadopt" data-opt="vat_subject"' + (o.vat_subject ? ' checked' : '') + '> ' + th('InboxLeadVatSubject') + '</label>'
-				+ (f.categories.length ? '<label class="ibx-lead__label" for="ibx-lead-cats">' + th('InboxLeadCategories') + '</label><div class="ibx-lead__field"><select class="ibx-field" id="ibx-lead-cats" multiple data-combo>'
-					+ f.categories.map(c => '<option value="' + c.id + '"' + (o.categories.includes(c.id) ? ' selected' : '') + '>' + esc(c.label) + '</option>').join('') + '</select></div>' : '')
+				// Categories as Dolibarr shows them: colour, tree, chips; the supplier ones when « Supplier » is ticked
+				+ catsField('ibx-lead-cats', 'InboxLeadCategories', f.categories, o.categories, o.prospect || o.customer)
+				+ catsField('ibx-lead-catssup', 'InboxLeadCategoriesSupplier', f.categories_supplier || [], o.categories_supplier, o.supplier)
 				+ '</div></details>';
 		const contactPart = o.private && !useSoc ? '<p class="ibx-muted">' + th('InboxLeadPrivateHelp') + '</p>'
 			: '<h3 class="ibx-lead__title"><label class="ibx-inline"><input type="checkbox" class="ibx-js-leadopt" data-opt="contact"' + (o.contact || useSoc ? ' checked' : '') + (useSoc ? ' disabled' : '') + '> ' + th('InboxLeadContactToo') + '</label></h3>'
@@ -204,6 +205,16 @@
 		checkReady(st);
 	}
 
+	/** A field of categories: chips of their colour, the tree kept, searched on the whole path */
+	function catsField(id, key, list, chosen, shown) {
+		if (!list.length || !shown) {
+			return '';
+		}
+		return '<label class="ibx-lead__label" for="' + id + '">' + th(key) + '</label><div class="ibx-lead__field"><select class="ibx-field" id="' + id + '" multiple data-combo data-combo-chips>'
+			+ list.map(c => '<option value="' + c.id + '"' + (chosen.includes(c.id) ? ' selected' : '') + (c.color ? ' data-color="' + esc(c.color) + '"' : '')
+				+ ' data-depth="' + (+c.depth || 0) + '" data-path="' + esc(c.path || c.label) + '">' + esc(c.label) + '</option>').join('') + '</select></div>';
+	}
+
 	/** « Create » greyed while a mandatory field is empty */
 	function checkReady(st) {
 		const btn = $('.ibx-js-leadcreate', st.panel);
@@ -222,7 +233,8 @@
 		// A private person: its names go with the thirdparty (Dolibarr makes its contact)
 		const contact = o.use_soc || o.private || o.contact ? Object.assign({}, st.values.contact) : null;
 		return { id: st.mail, soc, contact, opts: { prospect: o.prospect ? 1 : 0, customer: o.customer ? 1 : 0, supplier: o.supplier ? 1 : 0, private: o.private ? 1 : 0,
-			vat_subject: o.vat_subject ? 1 : 0, commercial: o.commercial ? 1 : 0, categories: o.categories, use_soc: o.use_soc || 0 } };
+			vat_subject: o.vat_subject ? 1 : 0, commercial: o.commercial ? 1 : 0, categories: o.prospect || o.customer ? o.categories : [], categories_supplier: o.supplier ? o.categories_supplier : [],
+			use_soc: o.use_soc || 0 } };
 	}
 
 	async function create(st) {
@@ -312,8 +324,8 @@
 			} else if (el.matches('.ibx-js-leadkind')) {
 				st.opts.private = el.value === '1';
 				render(st);
-			} else if (el.id === 'ibx-lead-cats') {
-				st.opts.categories = Array.from(el.selectedOptions).map(x => +x.value);
+			} else if (el.id === 'ibx-lead-cats' || el.id === 'ibx-lead-catssup') {
+				st.opts[el.id === 'ibx-lead-cats' ? 'categories' : 'categories_supplier'] = Array.from(el.selectedOptions).map(x => +x.value);
 			}
 		});
 		p.addEventListener('toggle', e => {
