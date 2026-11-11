@@ -1,0 +1,40 @@
+# Rspamd beside Dolibarr for the anti-spam engine of inbox (1.88.0): the check and the controller on 127.0.0.1 only,
+# Redis (its learning) reachable by Rspamd only. Start with ./run.sh (it writes the hashed password of the controller
+# first), or « docker compose up -d » once override.d/worker-controller.inc exists. Restarted with the server.
+name: inbox-rspamd
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: inbox-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+    restart: unless-stopped
+
+  rspamd:
+    image: rspamd/rspamd:3.11.1
+    container_name: inbox-rspamd
+    depends_on:
+      - redis
+    ports:
+      - "127.0.0.1:11333:11333"
+      - "127.0.0.1:11334:11334"
+    volumes:
+      - ./local.d:/etc/rspamd/local.d:ro
+      - ./override.d:/etc/rspamd/override.d:ro
+    networks:
+      - internal
+      - default
+    restart: unless-stopped
+
+networks:
+  # Redis has no way out and is reached by Rspamd only
+  internal:
+    internal: true
+
+volumes:
+  redis-data:
+    name: inbox-rspamd-redis

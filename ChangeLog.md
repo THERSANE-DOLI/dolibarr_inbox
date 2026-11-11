@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Rspamd started with dev/rspamd/docker-compose.yml (Rspamd and Redis, Redis on an internal network without way
+  out, restarted with the server); run.sh writes the hashed password of the controller (RSPAMD_PASSWORD) :   1.88.2
+
 - FIX: anti-spam engine checked on a real Rspamd 3.11.1 :   1.88.1
   - Spam decided by the threshold « add header » that Rspamd sends back (its action depends on modules made for a
     mail server), shown as the threshold of the mail; a check ended by such a module (greylist) is an error said
