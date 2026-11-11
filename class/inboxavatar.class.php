@@ -25,12 +25,13 @@
  * Picture of a correspondent, looked for by the server, never by the browser (neither the address of the workstation
  * nor the moment of the reading leave Dolibarr). Order:
  * 1. Dolibarr: photo of the user of the address, else of the contact, else logo of the thirdparty recognised;
- * 2. BIMI (verified logo published in the DNS of the domain), only for a mail that passed DMARC: a forged mail
- *    would otherwise show the real logo of the company imitated;
+ * 2. BIMI (logo published in the DNS of the domain), only for a mail that passed DMARC from a known sender (domain
+ *    recognized or thirdparty of the address, 1.88.6): a lookalike domain may publish the logo of another company;
  * 3. Gravatar, off by default (a hash of the address of each correspondent would be sent to a third party);
  * 4. nothing: the application shows the initials.
  * Kept 30 days when found, 7 days when not (llx_inbox_avatar); images only, size and time limited; SVG of BIMI
- * served as an image, with a CSP that forbids any script when opened alone.
+ * rebuilt from an allow list (InboxSvg, 1.88.6) and served as an image, with a CSP that forbids any script when
+ * opened alone.
  */
 class InboxAvatar
 {
@@ -62,7 +63,7 @@ class InboxAvatar
 	 *
 	 * @param string $email Address, lower case
 	 * @param int    $socid Thirdparty recognised by the index (0 if none)
-	 * @param bool   $bimi  The mail passed DMARC: BIMI may be used
+	 * @param bool   $bimi  The mail passed DMARC and its sender is known: BIMI may be used
 	 * @return array{type:string,data:string}|null Picture, null for the initials
 	 */
 	public function get($email, $socid = 0, $bimi = false)
@@ -220,8 +221,23 @@ class InboxAvatar
 		if (!is_array($res) || (int) ($res['http_code'] ?? 0) !== 200 || !isset($res['content']) || strlen((string) $res['content']) > self::MAX_BYTES) {
 			return null;
 		}
-		$data = (string) $res['content'];
+		return self::picture((string) $res['content']);
+	}
+
+	/**
+	 * Picture from a content out of Dolibarr: its type, an SVG cleaned (InboxSvg)
+	 *
+	 * @param string $data Content
+	 * @return array{type:string,data:string}|null
+	 */
+	public static function picture($data)
+	{
 		$type = self::imageType($data);
+		if ($type === 'image/svg+xml') {
+			require_once __DIR__.'/inboxsvg.class.php';
+			$data = InboxSvg::clean($data);
+			$type = $data !== '' ? $type : '';
+		}
 
 		return $type ? array('type' => $type, 'data' => $data) : null;
 	}
@@ -273,10 +289,10 @@ class InboxAvatar
 		if ($age >= self::FOUND_DAYS * 86400 || !is_readable($path)) {
 			return false;
 		}
-		$data = (string) file_get_contents($path);
-		$type = self::imageType($data);
+		// A file kept before 1.88.6 is cleaned as well
+		$pic = self::picture((string) file_get_contents($path));
 
-		return $type ? array('type' => $type, 'data' => $data) : false;
+		return $pic ?: false;
 	}
 
 	/**

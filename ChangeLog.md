@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: BIMI logos safer :   1.88.6
+  - Shown only for a known sender (domain recognized or address linked to a thirdparty), besides DMARC: a
+    lookalike domain may publish the logo of another company.
+  - SVG rebuilt from an allow list (InboxSvg, pure PHP): no script, event, style sheet, foreignObject, outer
+    reference nor entity; the logos already kept are cleaned when read.
+
 - FIX: risks said in Settings > General > Pictures of the correspondents :   1.88.5
   - Gravatar not recommended: anyone can attach any picture to their address, it proves nothing about the sender.
   - BIMI renamed « Brand logos »: the logo confirms the sending domain, not the company (a lookalike domain may
