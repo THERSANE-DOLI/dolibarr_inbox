@@ -31,6 +31,7 @@ dol_include_once('/inbox/class/inboxservertester.class.php');
 dol_include_once('/inbox/class/inboxmeili.class.php');
 dol_include_once('/inbox/class/inboxlead.class.php');
 dol_include_once('/inbox/class/inboxuserparam.class.php');
+dol_include_once('/inbox/class/inboxsvg.class.php');
 
 /**
  * Database only, no mail server
@@ -147,5 +148,26 @@ class InboxSecurityFixes3Test extends InboxTestCase
 		(new InboxUserParam($this->db))->set($this->admin, 'lead_pending', (string) json_encode($list));
 		$this->assertSame('inboxtest_secret_soc', $lead->pendingFor($this->admin, 424242)[0]['soc_name'] ?? '', 'with the right: named');
 		$this->db->query("DELETE FROM ".$p."societe WHERE rowid = ".$soc);
+	}
+
+	/**
+	 * INBX-074 (DOCTYPE hidden by the encoding of an SVG) and INBX-072 (tag coded in entities)
+	 *
+	 * @return void
+	 */
+	public function testSvgAndLeadValues()
+	{
+		$svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#c00"/></svg>';
+		$this->assertNotSame('', InboxSvg::clean($svg), 'a plain SVG is kept');
+		$utf7 = '<?xml version="1.0" encoding="UTF-7"?>+ADw-!DOCTYPE svg +AFs-+ADw-!ENTITY a +ACI-AAAA+ACI-+AD4-+AF0-+AD4-'
+			.'<svg xmlns="http://www.w3.org/2000/svg"><rect id="+ACY-a+ADs-" width="1" height="1"/></svg>';
+		$this->assertSame('', InboxSvg::clean($utf7), 'a DOCTYPE hidden by the encoding');
+		$this->assertSame('', InboxSvg::clean('<?xml version="1.0" encoding="ISO-8859-1"?>'.$svg), 'UTF-8 only');
+		foreach (array('&lt;img src=x onerror=alert(1)&gt;Durand', '&#60;script&#62;x&#60;/script&#62;Durand', '<b>Durand</b>') as $v) {
+			$clean = InboxLead::cleanValue('name', $v);
+			$this->assertStringNotContainsString('<', $clean, $v);
+			$this->assertStringNotContainsString('&lt', $clean, $v);
+			$this->assertStringContainsString('Durand', $clean, $v);
+		}
 	}
 }

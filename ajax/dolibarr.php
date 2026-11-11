@@ -438,7 +438,9 @@ switch ($action) {
 	case 'detach':
 		// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go
 		$reader = inboxDolibarrMail();
-		if (!$reader->level) {
+		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
+		// mailbox (as INBX-006), never by a reader (audit INBX-068)
+		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
 			inboxAjaxNotFound();
 		}
 		$threads = new InboxThreadLink($db);
@@ -452,7 +454,9 @@ switch ($action) {
 	case 'attach_thread':
 		// Undo of the detachment: back in its conversation, the links given back
 		$reader = inboxDolibarrMail();
-		if (!$reader->level) {
+		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
+		// mailbox (as INBX-006), never by a reader (audit INBX-068)
+		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
 			inboxAjaxNotFound();
 		}
 		$links = inboxAjaxParam('links', 'none');

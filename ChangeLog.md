@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, hardenings :   1.89.6
+  - « Detach from the conversation » and its undo: by who may send from the mailbox, the links being shared by every
+    copy of the mail.
+  - undo of « New customer »: only what the panel made in the session; values of the panel: a tag written in
+    entities removed as well.
+  - undo of an action outside the journal: the mails named by the lines undone only, never more mails than they did.
+  - brand logos (SVG): refused when a DOCTYPE comes out once read (encoding UTF-7) or when not in UTF-8.
+  - Settings > Server: the password of the master user typed again when its server changes.
+  - dev/rspamd/run.sh: a random password of the controller when none is given, never a password known in advance;
+    the DNS asked by Rspamd for the senders said in the README.
+
 - FIX: security audit of 2026-11-11, thirdparties of the mails and private network :   1.89.5
   - contacts left to create after « New customer »: the thirdparty named only with the rights of the user; this
     memory written by the panel only, never from My account.

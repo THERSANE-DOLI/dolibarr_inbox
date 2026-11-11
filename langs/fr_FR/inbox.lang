@@ -3169,6 +3169,7 @@ InboxProtectFingerprintMismatch = La clé de cet appareil ne correspond pas à s
 InboxProtectErrorMasterServer = Un utilisateur maître de ce serveur de mail est réglé dans Réglages > Serveur : il ouvre toutes les boîtes du serveur, protégées ou non. Retirez-le avant de protéger une boîte de ce serveur.
 InboxErrorAccountProtectedElsewhere = Cette adresse est une boîte protégée : elle ne peut pas être ouverte par l'utilisateur maître du serveur.
 InboxErrorMasterProtected = Des boîtes protégées sont sur ce serveur : un utilisateur maître les ouvrirait. Retirez d'abord leur protection.
+InboxErrorMasterPasswordAgain = Le serveur de l'utilisateur maître a changé : retapez son mot de passe, celui enregistré n'est jamais envoyé à un autre serveur.
 InboxProtectErrorConfirm = L'adresse saisie n'est pas celle de la boîte.
 InboxProtectErrorServerLocked = Boîte protégée : son serveur, son identifiant et son mot de passe ne se changent pas ici. Repassez-la d'abord en mode normal.
 InboxLog_protect = Boîte protégée

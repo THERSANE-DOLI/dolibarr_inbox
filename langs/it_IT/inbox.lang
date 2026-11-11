@@ -3169,6 +3169,7 @@ InboxProtectFingerprintMismatch = La chiave di questo dispositivo non corrispond
 InboxProtectErrorMasterServer = Un utente master di questo server di posta è impostato in Impostazioni > Server: apre tutte le caselle del server, protette o no. Rimuovetelo prima di proteggere una casella di questo server.
 InboxErrorAccountProtectedElsewhere = Questo indirizzo è una casella protetta: non può essere aperta dall'utente master del server.
 InboxErrorMasterProtected = Su questo server ci sono caselle protette: un utente master le aprirebbe. Togliete prima la loro protezione.
+InboxErrorMasterPasswordAgain = Il server dell'utente master è cambiato: digitate di nuovo la sua password, quella salvata non viene mai inviata a un altro server.
 InboxProtectErrorConfirm = L'indirizzo digitato non è quello della casella.
 InboxProtectErrorServerLocked = Casella protetta: il suo server, il suo login e la sua password non si cambiano qui. Riportatela prima alla modalità normale.
 InboxLog_protect = Casella protetta

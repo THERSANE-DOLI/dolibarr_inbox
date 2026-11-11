@@ -1,9 +1,11 @@
 #!/bin/sh
 # Rspamd and Redis for the anti-spam engine of inbox (1.88.0), with docker-compose.yml:
 # - check 127.0.0.1:11333, controller 127.0.0.1:11334;
-# - the password of the controller: RSPAMD_PASSWORD (production), else the password of the tests below;
-#   written hashed in override.d/worker-controller.inc, to type the same in Settings > Anti-spam of inbox.
-# The configuration of local.d/ and override.d/ never asks outside (see the README of inbox).
+# - the password of the controller: RSPAMD_PASSWORD, else a random one shown once (never a password known in
+#   advance, audit INBX-078); written hashed in override.d/worker-controller.inc, to type the same in Settings >
+#   Anti-spam of inbox.
+# The configuration of local.d/ and override.d/ asks no list of reputation nor update outside; Rspamd still asks
+# the DNS for SPF, DKIM and DMARC of the senders of the mails it judges (see the README of inbox).
 # Usage: [RSPAMD_PASSWORD=...] dev/rspamd/run.sh [stop]
 cd "$(dirname "$0")" || exit 1
 if [ "$1" = "stop" ]; then
@@ -11,8 +13,11 @@ if [ "$1" = "stop" ]; then
 	exit 0
 fi
 RSPAMD_IMAGE=rspamd/rspamd:3.11.1
-PASSWORD=${RSPAMD_PASSWORD:-inbox-rspamd-test-password}
-[ -z "$RSPAMD_PASSWORD" ] && echo "Test password of the controller (set RSPAMD_PASSWORD for a production)"
+PASSWORD=$RSPAMD_PASSWORD
+if [ -z "$PASSWORD" ]; then
+	PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | cut -c1-24)
+	echo "Password of the controller (shown once, type it in Settings > Anti-spam): $PASSWORD"
+fi
 # Containers of a former version of this script (docker run): replaced by the ones of compose
 docker rm -f inbox-rspamd inbox-redis >/dev/null 2>&1
 HASH=$(docker run --rm "$RSPAMD_IMAGE" rspamadm pw -p "$PASSWORD" 2>/dev/null | tail -n 1)

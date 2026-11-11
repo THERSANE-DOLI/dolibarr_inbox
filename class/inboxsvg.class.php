@@ -77,6 +77,10 @@ class InboxSvg
 		$ok = $in->loadXML($data, LIBXML_NONET | LIBXML_COMPACT);
 		libxml_clear_errors();
 		libxml_use_internal_errors($prev);
+		// A DOCTYPE hidden from the test on the bytes (encoding UTF-7, UTF-16) is still one once read (audit INBX-074)
+		if ($ok && ($in->doctype !== null || ($in->xmlEncoding !== null && strtoupper((string) $in->xmlEncoding) !== 'UTF-8'))) {
+			return '';
+		}
 		$root = $ok ? $in->documentElement : null;
 		if (!$root || $root->namespaceURI !== self::NS || $root->localName !== 'svg') {
 			return '';

@@ -3169,6 +3169,7 @@ InboxProtectFingerprintMismatch = The key of this device does not match its fing
 InboxProtectErrorMasterServer = A master user of this mail server is set in Settings > Server: it opens every mailbox of the server, protected or not. Remove it before protecting a mailbox of this server.
 InboxErrorAccountProtectedElsewhere = This address is a protected mailbox: it cannot be opened by the master user of the server.
 InboxErrorMasterProtected = Protected mailboxes are on this server: a master user would open them. Take their protection off first.
+InboxErrorMasterPasswordAgain = The server of the master user changed: type its password again, the saved one is never sent to another server.
 InboxProtectErrorConfirm = The address typed is not the one of the mailbox.
 InboxProtectErrorServerLocked = Protected mailbox: its server, its login and its password cannot be changed here. Turn it back to the normal mode first.
 InboxLog_protect = Mailbox protected

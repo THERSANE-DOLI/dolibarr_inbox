@@ -3169,6 +3169,7 @@ InboxProtectFingerprintMismatch = La clave de este dispositivo no corresponde a 
 InboxProtectErrorMasterServer = Un usuario maestro de este servidor de correo está configurado en Ajustes > Servidor: abre todos los buzones del servidor, protegidos o no. Elimínelo antes de proteger un buzón de este servidor.
 InboxErrorAccountProtectedElsewhere = Esta dirección es un buzón protegido: no puede abrirla el usuario maestro del servidor.
 InboxErrorMasterProtected = Hay buzones protegidos en este servidor: un usuario maestro los abriría. Retire primero su protección.
+InboxErrorMasterPasswordAgain = El servidor del usuario maestro ha cambiado: vuelva a escribir su contraseña, la guardada nunca se envía a otro servidor.
 InboxProtectErrorConfirm = La dirección escrita no es la del buzón.
 InboxProtectErrorServerLocked = Buzón protegido: su servidor, su usuario y su contraseña no se cambian aquí. Vuelva primero al modo normal.
 InboxLog_protect = Buzón protegido

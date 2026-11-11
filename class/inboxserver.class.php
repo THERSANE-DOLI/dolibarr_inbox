@@ -143,6 +143,12 @@ class InboxServer
 			$this->error = 'InboxErrorMasterProtected';
 			return false;
 		}
+		// The saved password never goes to another server: typed again when the server changes (audit INBX-082)
+		$oldHost = strtolower(trim(getDolGlobalString('INBOX_MASTER_HOST')));
+		if ($masterUser !== '' && (string) $password === '' && getDolGlobalString('INBOX_MASTER_PASSWORD') !== '' && $host !== $oldHost) {
+			$this->error = 'InboxErrorMasterPasswordAgain';
+			return false;
+		}
 		dolibarr_set_const($this->db, 'INBOX_MASTER_USER', $masterUser, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($this->db, 'INBOX_MASTER_HOST', $host, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($this->db, 'INBOX_MASTER_SEPARATOR', $separator, 'chaine', 0, '', $conf->entity);

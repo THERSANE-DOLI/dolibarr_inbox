@@ -208,6 +208,19 @@ class InboxSecurityFixes2Test extends InboxTestCase
 		$this->assertTrue(InboxActionLog::undoes($this->db, 'tag', array($mail), array(), array($tagged)));
 		$this->assertFalse(InboxActionLog::undoes($this->db, 'tag', array($mail), array(), array($other)), 'a line that no undo gives back');
 		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail, 999999999), array('folder' => $folders['INBOX']), array($deleted)), 'a mail that is not there');
+
+		// Audit INBX-080: a line of one mail gives back that mail only, never more mails than the lines did
+		$decoy = (object) (array('nb' => 1, 'message_id' => 'zzdecoy@inbox-test.invalid') + (array) $deleted);
+		$own = (object) (array('nb' => 1, 'message_id' => 'zzundo@inbox-test.invalid') + (array) $deleted);
+		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX']), array($decoy)), 'the line of another mail');
+		$this->assertFalse(InboxActionLog::undoes($this->db, 'tag', array($mail), array(), array((object) (array('action' => 'tag') + (array) $decoy))), 'tags behind the line of another mail');
+		$this->assertTrue(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX']), array($own)));
+		$this->db->query("INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, date_mail, from_email, subject, date_index) VALUES (".((int) $a->id).", ".$folders['INBOX.Trash'].", '1:2', 2,"
+			." 'zzundo2@inbox-test.invalid', '2026-11-02 10:00:00', 'client@inbox-test.invalid', 'y', '".$this->db->idate(dol_now())."')");
+		$mail2 = (int) $this->db->last_insert_id($p.'inbox_mail');
+		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail, $mail2), array('folder' => $folders['INBOX']), array($deleted)), 'more mails than the line did');
+		$two = (object) (array('nb' => 2, 'message_id' => null) + (array) $deleted);
+		$this->assertTrue(InboxActionLog::undoes($this->db, 'move', array($mail, $mail2), array('folder' => $folders['INBOX']), array($two)));
 	}
 
 	/**

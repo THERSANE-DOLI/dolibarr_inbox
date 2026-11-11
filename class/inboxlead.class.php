@@ -332,7 +332,9 @@ class InboxLead
 	 */
 	public static function cleanValue($field, $value)
 	{
-		$v = self::plainLines(strip_tags((string) $value));
+		// A tag coded in entities is a tag too: decoded, then removed (audit INBX-072); no < > left
+		$v = self::plainLines(strip_tags(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+		$v = str_replace(array('<', '>'), '', $v);
 		$v = trim(preg_replace('/\s+/u', ' ', $v), " \t,;:|*_-");
 		if ($v === '') {
 			return '';
@@ -1397,6 +1399,13 @@ class InboxLead
 			$matcher->refreshAddress($e);
 		}
 		$this->remember($user, $soc, $opts);
+		// What this panel made, the only things its undo may remove (audit INBX-069)
+		if ($useSoc <= 0) {
+			$_SESSION['inbox_lead_made']['societe'][(int) $socId] = dol_now();
+		}
+		if ($contactId > 0) {
+			$_SESSION['inbox_lead_made']['contact'][(int) $contactId] = dol_now();
+		}
 
 		return array('soc' => (int) $socId, 'contact' => (int) $contactId, 'contact_error' => $contactError);
 	}
@@ -1447,6 +1456,13 @@ class InboxLead
 		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 		$recent = dol_now() - 600;
 		$linker = new InboxLink($this->db);
+		// Only what this panel made in this session, a few minutes ago (audit INBX-069)
+		$made = function ($type, $id) use ($recent) {
+			return (int) ($_SESSION['inbox_lead_made'][$type][(int) $id] ?? 0) >= $recent;
+		};
+		if (($contactId > 0 && !$made('contact', $contactId)) || ($socId > 0 && !$made('societe', $socId))) {
+			return (bool) $this->fail('undo', 'InboxErrorCannotCreate');
+		}
 		if ($contactId > 0) {
 			$c = new Contact($this->db);
 			if ($c->fetch($contactId) <= 0 || (int) $c->user_creation_id !== (int) $user->id || $c->date_creation < $recent) {
@@ -1456,6 +1472,7 @@ class InboxLead
 				return (bool) $this->fail('undo', $c->error);
 			}
 			$linker->forgetElement('contact', $contactId);
+			unset($_SESSION['inbox_lead_made']['contact'][(int) $contactId]);
 		}
 		if ($socId > 0) {
 			$s = new Societe($this->db);
@@ -1467,6 +1484,7 @@ class InboxLead
 				return (bool) $this->fail('undo', $s->error);
 			}
 			$linker->forgetElement('societe', $socId);
+			unset($_SESSION['inbox_lead_made']['societe'][(int) $socId]);
 		}
 
 		return true;

@@ -3169,6 +3169,7 @@ InboxProtectFingerprintMismatch = Der Schlüssel dieses Geräts passt nicht zu s
 InboxProtectErrorMasterServer = Für diesen Mailserver ist unter Einstellungen > Server ein Master-Benutzer eingetragen: er öffnet jedes Postfach des Servers, geschützt oder nicht. Entfernen Sie ihn, bevor Sie ein Postfach dieses Servers schützen.
 InboxErrorAccountProtectedElsewhere = Diese Adresse ist ein geschütztes Postfach: sie kann nicht vom Master-Benutzer des Servers geöffnet werden.
 InboxErrorMasterProtected = Auf diesem Server liegen geschützte Postfächer: ein Master-Benutzer würde sie öffnen. Heben Sie zuerst ihren Schutz auf.
+InboxErrorMasterPasswordAgain = Der Server des Master-Benutzers hat sich geändert: geben Sie sein Passwort erneut ein, das gespeicherte wird nie an einen anderen Server gesendet.
 InboxProtectErrorConfirm = Die eingegebene Adresse ist nicht die des Postfachs.
 InboxProtectErrorServerLocked = Geschütztes Postfach: Server, Login und Passwort lassen sich hier nicht ändern. Setzen Sie es zuerst in den normalen Modus zurück.
 InboxLog_protect = Postfach geschützt
