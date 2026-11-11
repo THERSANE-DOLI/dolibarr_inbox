@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Settings > Security opens on the « Outside services »: every function of inbox that asks a service out of
+  our servers (Gravatar, BIMI logos, AI of the writing, voice typing, lists of reputation by DNS of Rspamd), what
+  leaves and to whom, its state and the way to its setting :   1.88.3
+
 - FIX: Rspamd started with dev/rspamd/docker-compose.yml (Rspamd and Redis, Redis on an internal network without way
   out, restarted with the server); run.sh writes the hashed password of the controller (RSPAMD_PASSWORD) :   1.88.2
 

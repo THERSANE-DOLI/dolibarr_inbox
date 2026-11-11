@@ -2846,6 +2846,31 @@
 		}));
 	}
 
+	/**
+	 * Outside services (1.88.3): every function of inbox that asks a service out of our servers, what leaves and to
+	 * whom, its state, the way to its setting. All off by default, turned on by the administrator.
+	 */
+	const OUTSIDE_SERVICES = [
+		['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar', 'gravatar', '#/settings/general/avatars'],
+		['INBOX_AVATAR_BIMI', 'InboxAvatarBimi', 'bimi', '#/settings/general/avatars'],
+		['INBOX_AI_ENABLED', 'InboxAiEnabled', 'ai', '#/settings/general/ai'],
+		['INBOX_DICTATION_ENABLED', 'InboxDictationEnabled', 'dictation', '#/settings/general/dictation'],
+		['INBOX_RSPAMD_DNSLISTS', 'InboxRspamdDnsLists', 'dnslists', '#/settings/antispam/settings'],
+	];
+	function outsideServices(s) {
+		return '<section class="ibx-section ibx-outside" data-section="outside"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxOutsideTitle') + '</h2>'
+			+ '<p class="ibx-muted">' + th('InboxOutsideHelp') + '</p>'
+			+ '<table class="ibx-table"><thead><tr><th>' + th('InboxOutsideService') + '</th><th>' + th('InboxOutsideWhat') + '</th><th>' + th('InboxOutsideState') + '</th><th></th></tr></thead><tbody>'
+			+ OUTSIDE_SERVICES.map(([k, label, id, href]) => {
+				const on = s[k] === '1';
+				return '<tr><td data-label="' + th('InboxOutsideService') + '"><b>' + th(label) + '</b></td>'
+					+ '<td data-label="' + th('InboxOutsideWhat') + '">' + th('InboxOutsideWhat_' + id) + '</td>'
+					+ '<td data-label="' + th('InboxOutsideState') + '"><span class="ibx-status' + (on ? ' ibx-status--warning' : '') + '">' + th(on ? 'InboxOutsideOn' : 'InboxOutsideOff') + '</span></td>'
+					+ '<td class="ibx-table__actions"><a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="' + href + '">' + th('InboxOutsideSet') + '</a></td></tr>';
+			}).join('')
+			+ '</tbody></table></section>';
+	}
+
 	// ---------- Security (lot F1 1.78.0, admins): what protects the users, each choice with what it protects from ----------
 	async function renderSecurity(main) {
 		if (!isAdmin()) {
@@ -2861,6 +2886,7 @@
 			return;
 		}
 		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavSecurity') + '</h1></div><p class="ibx-page__intro">' + th('InboxSecurityHelp') + '</p>'
+			+ outsideServices(s)
 			+ '<div class="ibx-form ibx-js-general">'
 			+ [['INBOX_QUOTE_REMOTE_IMAGES', 'g-quoteimg', 'InboxQuoteRemoteImages', ['keep', 'reply', 'all']], ['INBOX_IMAGES_ALWAYS', 'g-imgalways', 'InboxImagesAlways', ['domain', 'sender', 'never']],
 				['INBOX_UNSUBSCRIBE', 'g-unsub', 'InboxUnsubscribeSetting', ['oneclick', 'mail', 'off']]].map(([k, id, label, values]) => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="' + id + '">' + th(label) + '</label><div>'
