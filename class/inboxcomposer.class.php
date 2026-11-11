@@ -1238,6 +1238,30 @@ class InboxComposer
 	}
 
 	/**
+	 * A file of a writing, to check it before sending (lot A5, 1.82.0): the very file that leaves with the mail
+	 *
+	 * @param User   $user  User
+	 * @param string $token Writing (of this user, in this session)
+	 * @param string $id    Attachment
+	 * @return array{name:string,content:string,mime:string}|null
+	 */
+	public function attachmentFile(User $user, $token, $id)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		foreach ((array) ($state['attachments'] ?? array()) as $a) {
+			if ((string) $a['id'] === (string) $id && preg_match('/^[0-9a-f]{16}$/', (string) $id) && is_file($dir.'/att-'.$id)) {
+				return array('name' => (string) $a['name'], 'content' => (string) file_get_contents($dir.'/att-'.$id), 'mime' => (string) $a['mime']);
+			}
+		}
+
+		return $this->fail('not_found');
+	}
+
+	/**
 	 * @param array<string,mixed> $state State
 	 * @return array<int,array{id:string,name:string,size:int,mime:string,scan:string}>
 	 */

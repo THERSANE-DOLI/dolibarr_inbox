@@ -1159,6 +1159,7 @@ InboxComposeBadAddress = Address not valid: %s
 InboxComposeBadAddressOne = address not valid
 InboxComposeRemoveRecipient = Remove %s
 InboxComposeRemoveFile = Remove %s
+InboxComposeViewFile = Check %s before sending
 InboxComposeNoSubjectTitle = Send without a subject?
 InboxComposeNoSubjectText = The mail has no subject: the recipient will not know what it is about before opening it.
 InboxComposeSendAnyway = Send without subject

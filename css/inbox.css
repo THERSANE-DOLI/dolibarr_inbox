@@ -2518,3 +2518,6 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-lead__nature--customer:has(input:checked) { background: #55955d; color: #fff; }
 .ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
 .ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }
+/* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
+.ibx-compose__attname { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname:hover { color: var(--ibx-accent); }

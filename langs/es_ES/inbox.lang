@@ -1159,6 +1159,7 @@ InboxComposeBadAddress = Dirección no válida: %s
 InboxComposeBadAddressOne = dirección no válida
 InboxComposeRemoveRecipient = Quitar %s
 InboxComposeRemoveFile = Quitar %s
+InboxComposeViewFile = Comprobar %s antes de enviar
 InboxComposeNoSubjectTitle = ¿Enviar sin asunto?
 InboxComposeNoSubjectText = El correo no tiene asunto: el destinatario no sabrá de qué trata antes de abrirlo.
 InboxComposeSendAnyway = Enviar sin asunto

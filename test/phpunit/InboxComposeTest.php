@@ -301,6 +301,16 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertSame(self::BOX, $open['identities'][0]['email']);
 		$this->assertNotNull($c->saveDraft($this->admin, $open['token'], array('identity' => $open['identity'], 'to' => 'jean@client.invalid', 'subject' => 'ZzCompose noid', 'html' => '<p>x</p>')), $c->error);
 		$this->assertCount(1, $this->onServerSubject('INBOX.Drafts', 'ZzCompose noid'));
+		// A file of the writing, checked in the viewer before sending (lot A5, 1.82.0): the very file, its author only
+		$tmp = tempnam(sys_get_temp_dir(), 'ibxt');
+		file_put_contents($tmp, '%PDF-1.4 devis');
+		$att = $c->upload($this->admin, $open['token'], 'devis.pdf', $tmp, 'application/pdf');
+		@unlink($tmp);
+		$this->assertNotNull($att, $c->error);
+		$file = $c->attachmentFile($this->admin, $open['token'], $att['id']);
+		$this->assertSame(array('devis.pdf', '%PDF-1.4 devis'), array($file['name'], $file['content']));
+		$this->assertNull($c->attachmentFile($this->admin, $open['token'], 'deadbeefdeadbeef'), 'not one of the writing');
+		$this->assertNull($c->attachmentFile($this->user('composefile'), $open['token'], $att['id']), 'another user');
 		$this->assertTrue($c->close($this->admin, $open['token'], true));
 	}
 

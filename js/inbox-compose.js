@@ -338,7 +338,10 @@
 		const box = $('.ibx-js-atts', w.dlg);
 		box.hidden = !w.attachments.length;
 		box.innerHTML = w.attachments.map(a => '<li class="ibx-compose__att' + (a.scan === 'infected' ? ' is-bad' : '') + (a.pending ? ' is-pending' : '') + '">' + ic(a.pending ? 'send-later' : 'attachment')
-			+ '<span class="ibx-ellipsis" title="' + esc(a.name) + '">' + esc(a.name) + '</span><span class="ibx-muted">' + esc(a.pending ? t('InboxComposeUploading') : size(a.size)) + '</span>'
+			// The name opens the file in the viewer (lot A5, 1.82.0): the very file that leaves with the mail, checked
+			+ (a.pending || a.scan === 'infected' || !I.viewComposeFiles ? '<span class="ibx-ellipsis" title="' + esc(a.name) + '">' + esc(a.name) + '</span>'
+				: '<button type="button" class="ibx-compose__attname ibx-ellipsis ibx-js-attview" data-id="' + esc(a.id) + '" title="' + esc(t('InboxComposeViewFile', a.name)) + '">' + esc(a.name) + '</button>')
+			+ '<span class="ibx-muted">' + esc(a.pending ? t('InboxComposeUploading') : size(a.size)) + '</span>'
 			+ (a.pending ? '' : '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-unattach" data-id="' + esc(a.id) + '" aria-label="' + esc(t('InboxComposeRemoveFile', a.name)) + '">' + ic('close') + '</button>') + '</li>').join('');
 	}
 	function status(w, text, error) {
@@ -2185,6 +2188,12 @@
 			e.target.value = '';
 		});
 		$('.ibx-js-atts', dlg).addEventListener('click', async e => {
+			const view = e.target.closest('.ibx-js-attview');
+			if (view) {
+				const files = w.attachments.filter(a => !a.pending && a.scan !== 'infected');
+				I.viewComposeFiles(w.token, $('.ibx-js-subject', w.dlg).value, files, Math.max(0, files.findIndex(a => a.id === view.dataset.id)));
+				return;
+			}
 			const b = e.target.closest('.ibx-js-unattach');
 			if (!b) {
 				return;

@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the files of a writing open in the viewer, to check them before sending (lot A5) :   1.82.0
+  - a click on the name of an attachment of a writing (file sent, document of a piece, attachment of a forward)
+    opens it in the viewer of inbox, the writing seen behind: the very file that leaves with the mail, read in the
+    folder of the writing (not a copy of the draft). Same answers and protections as the attachments of a mail
+    (antivirus, CSP, an infected file never opened), shared code (ajax/inbox_attserve.inc.php); only the author of
+    the writing, in its session.
+
 - FIX: panel « New customer », nothing filled in silence :   1.81.1
   - « More fields » folded shows every value it holds on its line; the categories, the country, the sales
     representatives and the VAT are never taken again from a former creation (only the nature and the type are).

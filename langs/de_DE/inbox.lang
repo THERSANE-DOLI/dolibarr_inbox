@@ -1159,6 +1159,7 @@ InboxComposeBadAddress = Ungültige Adresse: %s
 InboxComposeBadAddressOne = ungültige Adresse
 InboxComposeRemoveRecipient = %s entfernen
 InboxComposeRemoveFile = %s entfernen
+InboxComposeViewFile = %s vor dem Senden prüfen
 InboxComposeNoSubjectTitle = Ohne Betreff senden?
 InboxComposeNoSubjectText = Die E-Mail hat keinen Betreff: der Empfänger weiß vor dem Öffnen nicht, worum es geht.
 InboxComposeSendAnyway = Ohne Betreff senden
