@@ -32,6 +32,7 @@ require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
 require_once __DIR__.'/inboxfolder.class.php';
+require_once __DIR__.'/inboxprotect.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
 /**
@@ -167,9 +168,117 @@ class InboxComposer
 	 */
 	public static function readState($dir)
 	{
-		$state = json_decode((string) @file_get_contents($dir.'/state.json'), true);
+		$state = json_decode((string) self::getFile($dir, 'state.json'), true);
 
 		return is_array($state) ? $state : array();
+	}
+
+	/** Marker of a writing of a protected mailbox: its files are sealed by the key of the session (audit INBX-062) */
+	const SEALED = '.sealed';
+
+	/**
+	 * @param string $dir Folder of the writing
+	 * @return bool       Its files are sealed
+	 */
+	public static function isSealed($dir)
+	{
+		return is_file($dir.'/'.self::SEALED);
+	}
+
+	/**
+	 * Associated data of a sealed file: it does not open in another writing nor under another name
+	 *
+	 * @param string $dir  Folder of the writing
+	 * @param string $name File
+	 * @return string
+	 */
+	protected static function sealAad($dir, $name)
+	{
+		return 'compose|'.basename((string) $dir).'|'.$name;
+	}
+
+	/**
+	 * Write a file of the writing: sealed for a protected mailbox (never in clear on the disk, readable by a request
+	 * of this browser in this session only), as is else
+	 *
+	 * @param string $dir     Folder of the writing
+	 * @param string $name    File
+	 * @param string $content Content
+	 * @return bool
+	 */
+	public static function putFile($dir, $name, $content)
+	{
+		$content = (string) $content;
+		if (self::isSealed($dir)) {
+			$content = InboxProtect::seal($content, self::sealAad($dir, $name));
+			if ($content === null) {
+				dol_syslog(__METHOD__.' no key of the session: '.$name.' not written', LOG_WARNING);
+				return false;
+			}
+		}
+
+		return file_put_contents($dir.'/'.$name, $content, LOCK_EX) !== false;
+	}
+
+	/**
+	 * @param string $dir  Folder of the writing
+	 * @param string $name File
+	 * @return string|null Content, null when missing or not readable in this session
+	 */
+	public static function getFile($dir, $name)
+	{
+		$content = @file_get_contents($dir.'/'.$name);
+		if ($content === false) {
+			return null;
+		}
+
+		return self::isSealed($dir) ? InboxProtect::unseal($content, self::sealAad($dir, $name)) : $content;
+	}
+
+	/**
+	 * Seal the files of a writing written in clear: its mailbox became a protected one (identity changed)
+	 *
+	 * @param string $dir Folder of the writing
+	 * @return bool       Sealed (or already)
+	 */
+	protected static function sealDir($dir)
+	{
+		if (self::isSealed($dir)) {
+			return true;
+		}
+		if (InboxProtect::seal('', 'probe') === null) {
+			return false;
+		}
+		$plain = array();
+		foreach ((array) glob($dir.'/*') as $path) {
+			if (is_file($path)) {
+				$plain[basename($path)] = (string) file_get_contents($path);
+			}
+		}
+		touch($dir.'/'.self::SEALED);
+		foreach ($plain as $name => $content) {
+			if (!self::putFile($dir, $name, $content)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * A writing of this mailbox is sealed: a protected mailbox
+	 *
+	 * @param int $accountId Mailbox
+	 * @return bool
+	 */
+	protected function protectedAccount($accountId)
+	{
+		if ((int) $accountId <= 0) {
+			return false;
+		}
+		$account = new InboxAccount($this->db);
+
+		return $account->fetch((int) $accountId) > 0 && $account->isProtected();
 	}
 
 	/**
@@ -180,7 +289,7 @@ class InboxComposer
 	protected static function writeState($dir, array $state)
 	{
 		$state['tms'] = dol_now();
-		file_put_contents($dir.'/state.json', json_encode($state), LOCK_EX);
+		self::putFile($dir, 'state.json', (string) json_encode($state));
 	}
 
 	/**
@@ -259,6 +368,22 @@ class InboxComposer
 			return $this->fail('error', 'Cannot create '.$dir);
 		}
 		$identityId = 0;
+		$sealAccount = $sourceAccount;
+		if ($sealAccount <= 0) {
+			foreach ($identities as $i) {
+				if (!empty($i['default'])) {
+					$sealAccount = (int) $i['account'];
+				}
+			}
+		}
+		if ($this->protectedAccount($sealAccount)) {
+			// The key of the session is there while the mailbox is unlocked: never a file in clear without it
+			if (InboxProtect::seal('', 'probe') === null) {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('error', 'Protected mailbox not unlocked in this session');
+			}
+			touch($dir.'/'.self::SEALED);
+		}
 		if ($mode === 'draft') {
 			if ((string) $reader->row->folder_role !== 'drafts') {
 				dol_delete_dir_recursive($dir);
@@ -289,7 +414,7 @@ class InboxComposer
 			$out['html'] = $parts['body'];
 			$out['signature_off'] = $parts['signature'] === '' ? 1 : 0;
 			if ($parts['quote'] !== '') {
-				file_put_contents($dir.'/quote.html', $parts['quote']);
+				self::putFile($dir, 'quote.html', $parts['quote']);
 				$state['quote'] = 1;
 			}
 			// The mail answered, found again by its Message-ID in the mailboxes of the user
@@ -399,7 +524,7 @@ class InboxComposer
 				$this->keepFile($dir, $state, InboxMimeParser::fileName(($message->subject !== '' ? $message->subject : 'mail').'.eml'), $raw, 'message/rfc822');
 			} else {
 				$removed = array('trackers' => 0, 'images' => 0);
-				file_put_contents($dir.'/quote.html', $this->quoteOf($mode, $message, $removed));
+				self::putFile($dir, 'quote.html', $this->quoteOf($mode, $message, $removed));
 				$state['quote'] = 1;
 				$state['quote_removed'] = $removed;
 				if ($mode === 'forward') {
@@ -466,7 +591,7 @@ class InboxComposer
 			$identities[$n]['signature'] = InboxMailBuilder::cleanHtml($signed[(int) $i['id']] ?? (string) $i['signature']);
 		}
 		$out['identities'] = $identities;
-		$out['quote'] = !empty($state['quote']) ? (string) @file_get_contents($dir.'/quote.html') : '';
+		$out['quote'] = !empty($state['quote']) ? (string) self::getFile($dir, 'quote.html') : '';
 		// Remote pictures taken out of the quote (lot F1 1.78.0), said under it
 		$out['quote_removed'] = $state['quote_removed'] ?? array('trackers' => 0, 'images' => 0);
 		$out['attachments'] = self::attachmentsView($state);
@@ -1263,7 +1388,7 @@ class InboxComposer
 	protected function keepFile($dir, array &$state, $name, $content, $mime)
 	{
 		$id = bin2hex(random_bytes(8));
-		file_put_contents($dir.'/att-'.$id, (string) $content);
+		self::putFile($dir, 'att-'.$id, (string) $content);
 		$scan = new InboxAttachmentScan($this->db);
 		$res = $scan->check((string) $content, (string) $name);
 		$att = array('id' => $id, 'name' => InboxMimeParser::fileName((string) $name) ?: 'file', 'size' => strlen((string) $content),
@@ -1421,7 +1546,7 @@ class InboxComposer
 		$state = self::readState($dir);
 		foreach ((array) ($state['attachments'] ?? array()) as $a) {
 			if ((string) $a['id'] === (string) $id && preg_match('/^[0-9a-f]{16}$/', (string) $id) && is_file($dir.'/att-'.$id)) {
-				return array('name' => (string) $a['name'], 'content' => (string) file_get_contents($dir.'/att-'.$id), 'mime' => (string) $a['mime']);
+				return array('name' => (string) $a['name'], 'content' => (string) self::getFile($dir, 'att-'.$id), 'mime' => (string) $a['mime']);
 			}
 		}
 
@@ -1520,6 +1645,9 @@ class InboxComposer
 		if ($account->fetch($identity['account']) <= 0) {
 			return $this->fail('no_send');
 		}
+		if ($account->isProtected() && !self::sealDir($dir)) {
+			return $this->fail('error', 'Protected mailbox not unlocked in this session');
+		}
 		$b = new InboxMailBuilder();
 		$bad = array();
 		$b->from = array('email' => $identity['email'], 'name' => $identity['name']);
@@ -1562,7 +1690,7 @@ class InboxComposer
 			$html .= '<div class="inbox-signature">'.InboxMailBuilder::cleanHtml($signed[(int) $identity['id']] ?? $identity['signature']).'</div>';
 		}
 		if (!empty($state['quote']) && !empty($data['quote']) && is_file($dir.'/quote.html')) {
-			$html .= '<br>'.(string) file_get_contents($dir.'/quote.html');
+			$html .= '<br>'.(string) self::getFile($dir, 'quote.html');
 		}
 		$b->html = $html;
 		$b->keepVars = (bool) $draft;
@@ -1588,7 +1716,9 @@ class InboxComposer
 				return $this->fail('infected', $a['name']);
 			}
 			$total += (int) $a['size'];
-			$b->attachments[] = array('path' => $path, 'name' => $a['name'], 'mime' => $a['mime']);
+			// Sealed: given by its content, never written again in clear
+			$b->attachments[] = self::isSealed($dir) ? array('content' => (string) self::getFile($dir, 'att-'.$a['id']), 'name' => $a['name'], 'mime' => $a['mime'])
+				: array('path' => $path, 'name' => $a['name'], 'mime' => $a['mime']);
 		}
 		if ($total > self::maxBytes()) {
 			return $this->fail('too_big');

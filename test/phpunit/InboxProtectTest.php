@@ -155,6 +155,85 @@ class InboxProtectTest extends InboxTestCase
 	}
 
 	/**
+	 * Files of a writing of a protected mailbox sealed by the key of the session (audit INBX-062)
+	 *
+	 * @return void
+	 */
+	public function testSealedWriting()
+	{
+		require_once __DIR__.'/../../class/inboxcomposer.class.php';
+		$p = $this->db->prefix();
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		(new InboxAccess($this->db))->grant($this->admin, $box->id, $this->admin->id, 0, 'manage');
+		InboxAccess::clearCache();
+		$i = new InboxIdentity($this->db);
+		$i->fk_account = (int) $box->id;
+		$i->email = self::BOX;
+		$i->name = 'Sealed';
+		$i->is_default = 1;
+		$this->assertGreaterThan(0, $i->create($this->admin), implode(',', $i->errors));
+		$c = new InboxComposer($this->db);
+
+		// A normal mailbox: as before
+		$open = $c->open($this->admin, 'new', 0, (int) $box->id);
+		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
+		$dir = $c->held($this->admin, $open['token']);
+		$this->assertFalse(InboxComposer::isSealed($dir));
+		$c->close($this->admin, $open['token'], false);
+
+		// Protected and unlocked: sealed, nothing in clear on the disk, read back in this session only
+		$this->db->query("UPDATE ".$p."inbox_account SET protected = 1, protect_level = 'content', imap_password = NULL WHERE rowid = ".((int) $box->id));
+		InboxProtect::unlock($box->id, array('imap' => self::BOX_PASSWORD));
+		$open = $c->open($this->admin, 'new', 0, (int) $box->id);
+		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
+		$dir = $c->held($this->admin, $open['token']);
+		$this->assertTrue(InboxComposer::isSealed($dir));
+		$secret = 'ZzSecretContent '.uniqid();
+		$tmp = tempnam(sys_get_temp_dir(), 'ibx');
+		file_put_contents($tmp, $secret);
+		$this->assertNotNull($c->upload($this->admin, $open['token'], 'secret.txt', $tmp, 'text/plain'), $c->errorCode.' '.$c->error);
+		@unlink($tmp);
+		foreach ((array) glob($dir.'/*') as $f) {
+			$this->assertStringNotContainsString($secret, (string) file_get_contents($f), basename($f).' in clear');
+			$this->assertStringNotContainsString('"user"', (string) file_get_contents($f), basename($f).' state in clear');
+		}
+		$state = InboxComposer::readState($dir);
+		$this->assertSame((int) $this->admin->id, (int) $state['user'], 'read back in the session');
+		$file = $c->attachmentFile($this->admin, $open['token'], (string) $state['attachments'][0]['id']);
+		$this->assertSame($secret, $file['content'] ?? '');
+		// Another key (another session): nothing readable
+		$cookie = $_COOKIE[InboxProtect::cookieName()];
+		$_COOKIE[InboxProtect::cookieName()] = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+		$this->assertSame(array(), InboxComposer::readState($dir));
+		$_COOKIE[InboxProtect::cookieName()] = $cookie;
+		$c->close($this->admin, $open['token'], false);
+
+		// Begun from a normal mailbox, the identity of the protected one chosen: sealed from then
+		$other = new InboxAccount($this->db);
+		$other->email = 'zzother@inbox-test.invalid';
+		$other->imap_host = self::IMAP_HOST;
+		$other->status = InboxAccount::STATUS_ACTIVE;
+		$this->assertGreaterThan(0, $other->create($this->admin), implode(',', $other->errors));
+		(new InboxAccess($this->db))->grant($this->admin, $other->id, $this->admin->id, 0, 'manage');
+		InboxAccess::clearCache();
+		$open = $c->open($this->admin, 'new', 0, (int) $other->id);
+		$dir = $c->held($this->admin, $open['token']);
+		$this->assertFalse(InboxComposer::isSealed($dir));
+		$c->prepare($this->admin, $dir, InboxComposer::readState($dir), array('identity' => (int) $i->id, 'to' => array('dest@inbox-test.invalid'), 'subject' => 'x', 'html' => '<p>x</p>'), true);
+		$this->assertTrue(InboxComposer::isSealed($dir));
+		$this->assertStringNotContainsString('"user"', (string) file_get_contents($dir.'/state.json'));
+		$this->assertSame((int) $this->admin->id, (int) InboxComposer::readState($dir)['user']);
+		$c->close($this->admin, $open['token'], false);
+		$this->db->query("DELETE FROM ".$p."inbox_account_access WHERE fk_account = ".((int) $other->id));
+		$this->db->query("DELETE FROM ".$p."inbox_account WHERE rowid = ".((int) $other->id));
+
+		// Locked (no key in the session): never opened in clear
+		InboxProtect::lockAll();
+		unset($_COOKIE[InboxProtect::cookieName()]);
+		$this->assertNull($c->open($this->admin, 'new', 0, (int) $box->id));
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testSessionCopy()
