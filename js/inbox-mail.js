@@ -4282,7 +4282,7 @@
 			{ id: 'move', icon: 'folder-move', label: t('InboxMoveToMenu'), key: 'Maj+M', disabled: !!manage, reason: manage, run: () => moveDialog(ids) },
 			inJunk ? { id: 'notjunk', icon: 'inbox', label: t('InboxNotJunk'), key: 'Maj+J', disabled: !!manage, reason: manage, run: () => doJunk(ids, false) }
 				: { id: 'junk', icon: 'junk', label: t('InboxJunk'), key: 'J', disabled: !!manage, reason: manage, run: () => doJunk(ids, true) },
-			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, run: () => doDelete(ids) },
+			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, irreversible: inTrash, run: () => doDelete(ids) },
 		];
 		return items;
 	}
@@ -5702,7 +5702,7 @@
 	async function annotateStart(box, m, a, editor) {
 		let v;
 		try {
-			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+			v = await attApi(m, a.part, 'check');
 		} catch (err) {
 			toast(err.message, { error: true });
 			return;
@@ -6892,7 +6892,8 @@
 		return list;
 	}
 	function actionButtons(m) {
-		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '') + '" data-action="' + esc(a.id) + '"'
+		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '')
+			+ (a.danger ? ' ibx-btn--danger-hover' + (a.irreversible ? ' is-irreversible' : '') : '') + '" data-action="' + esc(a.id) + '"'
 			+ (a.disabled ? ' aria-disabled="true" title="' + esc(a.reason || a.label) + '"' : ' title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '"') + ' aria-label="' + esc(a.label) + '">' + ic(a.icon) + '</button>').join('')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-more" aria-haspopup="menu" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>';
 	}
@@ -6900,6 +6901,15 @@
 	/** Small menu under a button; closes on Escape, outside click; arrows move */
 	// The menus of inbox for the other spaces too (Settings: menu of a rule)
 	I.menu = (anchor, items, at) => menu(anchor, items, at);
+	/**
+	 * The files of a writing in the viewer of inbox (lot A5, 1.82.0), to check them before sending
+	 * @param {string} token Writing
+	 * @param {string} subject Subject of the writing
+	 * @param {Array<{id:string,name:string,size:number,mime:string}>} files Attachments
+	 * @param {number} index File opened
+	 */
+	I.viewComposeFiles = (token, subject, files, index) => openViewer({ mail: { id: 'c-' + token, compose: token, subject,
+		attachments: files.map(f => ({ part: f.id, name: f.name, size: f.size, kind: fileKind(f.name, f.mime) })) }, index });
 	// What the panel of the rules (js/inbox-rules.js) needs to know: the mailboxes, the mail read
 	I.mailState = () => ({ accounts: S.accounts, mail: S.mail });
 	function menu(anchor, items, at) {
@@ -7873,7 +7883,37 @@
 	}
 
 	function attUrl(m, a, mode, force) {
+		// A file of a writing (lot A5, 1.82.0): the very file that leaves with the mail, same answers and protections
+		if (m.compose) {
+			return I.ctx('INBOX_AJAX_URL', '') + 'composefile.php?compose=' + encodeURIComponent(m.compose) + '&att=' + encodeURIComponent(a.part) + '&mode=' + mode + (force ? '&force=1' : '');
+		}
 		return I.ctx('INBOX_AJAX_URL', '') + 'attachment.php?id=' + m.id + '&part=' + a.part + '&mode=' + mode + (force ? '&force=1' : '');
+	}
+	/** Kind of a file by its name and type, as the server gives it for the attachments of a mail */
+	function fileKind(name, mime) {
+		const n = String(name || '').toLowerCase();
+		const t = String(mime || '').toLowerCase();
+		if (t === 'application/pdf' || /\.pdf$/.test(n)) {
+			return 'pdf';
+		}
+		if (/^image\/(png|jpe?g|gif|webp)$/.test(t) || /\.(png|jpe?g|gif|webp)$/.test(n)) {
+			return 'image';
+		}
+		if (/\.csv$/.test(n) || t === 'text/csv') {
+			return 'csv';
+		}
+		if (/^text\//.test(t) || /\.(txt|log|md|json|xml)$/.test(n)) {
+			return 'text';
+		}
+		if (/\.zip$/.test(n) || t === 'application/zip') {
+			return 'zip';
+		}
+		return /\.eml$/.test(n) || t === 'message/rfc822' ? 'mail' : 'other';
+	}
+	/** Verdict, text or files of one attachment, of a mail or of a writing */
+	function attApi(m, part, mode, force) {
+		return m.compose ? api('composefile', mode, { compose: m.compose, att: part, mode, force: force ? 1 : 0 })
+			: api('attachment', mode, { id: m.id, part, mode, force: force ? 1 : 0 });
 	}
 
 	/**
@@ -7890,6 +7930,10 @@
 		return openersOf(m).then(r => r.editors);
 	}
 	function openersOf(m) {
+		if (!m._openers && m.compose) {
+			// A file of a writing: the viewers of inbox only
+			m._openers = Promise.resolve({ viewers: {}, editors: {} });
+		}
 		if (!m._openers) {
 			m._openers = api('attachment', 'viewers', { id: m.id, part: -1, mode: 'viewers' })
 				.then(r => ({ viewers: (r && r.viewers) || {}, editors: (r && r.editors) || {} }))
@@ -8034,7 +8078,7 @@
 	async function guardedDownload(m, a) {
 		let v;
 		try {
-			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+			v = await attApi(m, a.part, 'check');
 		} catch (err) {
 			toast(err.message, { error: true });
 			return;
@@ -8141,7 +8185,7 @@
 		tab.opener = null;
 		let v;
 		try {
-			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+			v = await attApi(m, a.part, 'check');
 		} catch (err) {
 			tab.close();
 			toast(err.message, { error: true });
@@ -8375,7 +8419,7 @@
 		const a = list[w.index];
 		let v;
 		try {
-			v = await api('attachment', 'check', { id: m.id, part: a.part, mode: 'check' });
+			v = await attApi(m, a.part, 'check');
 		} catch (err) {
 			body.innerHTML = '<div class="ibx-empty">' + ic('warning', 'ibx-empty__icon') + '<div>' + th('InboxCannotOpen') + '</div><div class="ibx-muted">' + esc(err.message) + '</div></div>';
 			body.removeAttribute('aria-busy');
@@ -8437,19 +8481,19 @@
 				img.classList.add('is-actual');
 				img.style.transform = 'scale(' + scale + ')';
 			}, { passive: false });
-		} else if (a.kind === 'mail') {
+		} else if (a.kind === 'mail' && !m.compose) {
 			body.innerHTML = top + '<iframe class="ibx-viewer__frame ibx-viewer__frame--mail" title="' + esc(a.name) + '" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" src="'
 				+ I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=' + a.part + '"></iframe>';
 		} else if (a.kind === 'text' || a.kind === 'csv') {
 			try {
-				const res = await api('attachment', 'text', { id: m.id, part: a.part, mode: 'text', force: force ? 1 : 0 });
+				const res = await attApi(m, a.part, 'text', force);
 				body.innerHTML = top + (a.kind === 'csv' ? csvTable(res.text) : '<pre class="ibx-viewer__text">' + esc(res.text) + '</pre>') + (res.truncated ? '<p class="ibx-muted ibx-viewer__pad">' + th('InboxTruncated') + '</p>' : '');
 			} catch (err) {
 				body.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
 			}
 		} else if (a.kind === 'zip') {
 			try {
-				const res = await api('attachment', 'list', { id: m.id, part: a.part, mode: 'list', force: force ? 1 : 0 });
+				const res = await attApi(m, a.part, 'list', force);
 				body.innerHTML = top + '<div class="ibx-viewer__pad"><p class="ibx-muted">' + th('InboxZipContent', res.files.length) + '</p><table class="ibx-table"><tbody>'
 					+ res.files.map(f => '<tr><td class="ibx-breakall">' + esc(f.name) + '</td><td class="ibx-muted">' + esc(size(f.size)) + '</td></tr>').join('') + '</tbody></table></div>';
 			} catch (err) {

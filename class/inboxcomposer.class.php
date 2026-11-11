@@ -518,6 +518,11 @@ class InboxComposer
 		return $out;
 	}
 
+	/** Automatic event of the agenda of Dolibarr « sent by mail » per type of piece */
+	const SENT_BY_MAIL = array('propal' => 'PROPAL_SENTBYMAIL', 'commande' => 'ORDER_SENTBYMAIL', 'facture' => 'BILL_SENTBYMAIL', 'supplier_proposal' => 'PROPOSAL_SUPPLIER_SENTBYMAIL',
+		'order_supplier' => 'ORDER_SUPPLIER_SENTBYMAIL', 'invoice_supplier' => 'BILL_SUPPLIER_SENTBYMAIL', 'fichinter' => 'FICHINTER_SENTBYMAIL', 'shipping' => 'SHIPPING_SENTBYMAIL',
+		'project' => 'PROJECT_SENTBYMAIL', 'ticket' => 'TICKET_SENTBYMAIL', 'societe' => 'COMPANY_SENTBYMAIL', 'contact' => 'CONTACT_SENTBYMAIL');
+
 	/**
 	 * Linked pieces the user may also write, and record a sending on (an event of the agenda)
 	 *
@@ -531,9 +536,17 @@ class InboxComposer
 			return array();
 		}
 
-		return array_values(array_filter($linked, function ($pc) use ($user) {
+		$out = array_values(array_filter($linked, function ($pc) use ($user) {
 			return InboxElements::canWriteType($user, (string) $pc['type']);
 		}));
+		// Ticked at first as Dolibarr does when a piece is sent from its card: the automatic event « sent by mail » of
+		// its type in Agenda > Automatic events (1.83.2)
+		foreach ($out as $i => $pc) {
+			$code = self::SENT_BY_MAIL[(string) $pc['type']] ?? '';
+			$out[$i]['auto'] = $code !== '' && getDolGlobalString('MAIN_AGENDA_ACTIONAUTO_'.$code) ? 1 : 0;
+		}
+
+		return $out;
 	}
 
 	/**
@@ -1235,6 +1248,161 @@ class InboxComposer
 		$state['attachments'][] = $att;
 
 		return $att;
+	}
+
+	/**
+	 * Pieces to insert in a writing (lot A5, 1.83.0): of the thirdparties of the recipients and of the pieces linked to
+	 * the mail answered, or of all the thirdparties
+	 *
+	 * @param User     $user   User
+	 * @param string   $token  Writing
+	 * @param string   $term   Reference or thirdparty searched
+	 * @param bool     $all    All the thirdparties
+	 * @param string[] $emails Recipients typed
+	 * @return array{pieces:array<int,array<string,mixed>>,scoped:bool}|null
+	 */
+	public function pieceSearch(User $user, $token, $term, $all, array $emails)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		require_once __DIR__.'/inboxpieceinsert.class.php';
+		$state = self::readState($dir);
+		$ins = new InboxPieceInsert($this->db);
+		$socs = $ins->socsOf($emails);
+		$elements = new InboxElements($this->db);
+		foreach ((array) ($state['linked'] ?? array()) as $pc) {
+			$soc = (int) $elements->socOf((string) $pc['type'], (int) $pc['id']);
+			if ($soc > 0) {
+				$socs[] = $soc;
+			}
+		}
+		$socs = array_values(array_unique($socs));
+
+		return array('pieces' => $ins->search($user, $socs, $term, (bool) $all || !$socs), 'scoped' => !$all && (bool) $socs);
+	}
+
+	/**
+	 * What a piece may give to the writing: its PDF, its online links
+	 *
+	 * @param User   $user  User
+	 * @param string $token Writing
+	 * @param string $type  Type
+	 * @param int    $id    Piece
+	 * @return array<string,mixed>|null
+	 */
+	public function pieceOffer(User $user, $token, $type, $id)
+	{
+		if ($this->held($user, $token) === null) {
+			return $this->fail('not_found');
+		}
+		require_once __DIR__.'/inboxpieceinsert.class.php';
+		$ins = new InboxPieceInsert($this->db);
+		$o = $ins->load($user, (string) $type, (int) $id);
+		if (!$o) {
+			return $this->fail('not_found');
+		}
+		$pdf = $this->mainDocument($user, (string) $type, (int) $id);
+		$out = $ins->options($o, (string) $type, $pdf);
+		if ($pdf !== '') {
+			// Seen in Dolibarr before it is attached: its own page of documents checks the rights
+			$part = array('propal' => 'propal', 'commande' => 'commande', 'facture' => 'facture')[$type];
+			$out['pdf_url'] = DOL_URL_ROOT.'/document.php?modulepart='.$part.'&file='.urlencode(dol_sanitizeFileName((string) $o->ref).'/'.$pdf);
+			$found = $this->documentsDirOf($user, (string) $type, (int) $id);
+			$out['pdf_size'] = $found ? (int) @filesize($found[0].'/'.$pdf) : 0;
+		}
+		$out['ref'] = (string) $o->ref;
+
+		return $out;
+	}
+
+	/**
+	 * A piece inserted: the HTML for the text, its PDF attached when asked, the piece offered for « record the
+	 * sending on » (linked to the mail sent)
+	 *
+	 * @param User                $user  User
+	 * @param string              $token Writing
+	 * @param string              $type  Type
+	 * @param int                 $id    Piece
+	 * @param array<string,bool>  $ask   summary, lines, pdf, sign, pay
+	 * @return array{html:string,attachment:array<string,mixed>|null,piece:array<string,mixed>|null}|null
+	 */
+	public function pieceInsert(User $user, $token, $type, $id, array $ask)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		require_once __DIR__.'/inboxpieceinsert.class.php';
+		$ins = new InboxPieceInsert($this->db);
+		$o = $ins->load($user, (string) $type, (int) $id);
+		if (!$o) {
+			return $this->fail('not_found');
+		}
+		$pdf = $this->mainDocument($user, (string) $type, (int) $id);
+		$can = $ins->options($o, (string) $type, $pdf);
+		$wantPdf = !empty($ask['pdf']);
+		$ask = array('summary' => !empty($ask['summary']), 'lines' => !empty($ask['lines']), 'sign' => !empty($ask['sign']) && $can['sign'], 'pay' => !empty($ask['pay']) && $can['pay']);
+		$html = $ins->html($o, (string) $type, $ask);
+		$state = self::readState($dir);
+		$att = null;
+		if ($wantPdf && $pdf !== '') {
+			$found = $this->documentsDirOf($user, (string) $type, (int) $id);
+			$size = (int) @filesize($found[0].'/'.$pdf);
+			if (array_sum(array_column((array) $state['attachments'], 'size')) + $size > self::maxBytes()) {
+				return $this->fail('too_big');
+			}
+			$att = $this->keepFile($dir, $state, $pdf, (string) file_get_contents($found[0].'/'.$pdf), 'application/pdf');
+			if ($att['scan'] === InboxAttachmentScan::INFECTED) {
+				@unlink($dir.'/att-'.$att['id']);
+				return $this->fail('infected', $pdf);
+			}
+		}
+		// The piece joins the pieces of the writing: offered to record the sending on it (and to link the mail sent)
+		$piece = null;
+		$key = (string) $type.':'.(int) $id;
+		$known = array_map(function ($pc) {
+			return $pc['type'].':'.$pc['id'];
+		}, (array) ($state['linked'] ?? array()));
+		$entry = array('type' => (string) $type, 'id' => (int) $id, 'ref' => (string) $o->ref, 'kind' => (string) (new InboxElements($this->db))->describe($user, (string) $type, (int) $id)['kind'],
+			'icon' => (string) (InboxElements::TYPES[$type]['icon'] ?? 'document'));
+		if (!in_array($key, $known, true)) {
+			$state['linked'][] = $entry;
+		}
+		$state['pieces'] = $this->piecesOf($user, (array) $state['linked']);
+		foreach ($state['pieces'] as $pc) {
+			if ($pc['type'].':'.$pc['id'] === $key) {
+				$piece = $pc;
+			}
+		}
+		self::writeState($dir, $state);
+
+		return array('html' => $html, 'attachment' => $att, 'piece' => $piece);
+	}
+
+	/**
+	 * A file of a writing, to check it before sending (lot A5, 1.82.0): the very file that leaves with the mail
+	 *
+	 * @param User   $user  User
+	 * @param string $token Writing (of this user, in this session)
+	 * @param string $id    Attachment
+	 * @return array{name:string,content:string,mime:string}|null
+	 */
+	public function attachmentFile(User $user, $token, $id)
+	{
+		$dir = $this->held($user, $token);
+		if ($dir === null) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		foreach ((array) ($state['attachments'] ?? array()) as $a) {
+			if ((string) $a['id'] === (string) $id && preg_match('/^[0-9a-f]{16}$/', (string) $id) && is_file($dir.'/att-'.$id)) {
+				return array('name' => (string) $a['name'], 'content' => (string) file_get_contents($dir.'/att-'.$id), 'mime' => (string) $a['mime']);
+			}
+		}
+
+		return $this->fail('not_found');
 	}
 
 	/**

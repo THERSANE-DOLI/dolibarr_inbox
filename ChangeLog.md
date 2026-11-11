@@ -1,5 +1,33 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the delete button of the reading header turns red on hover and keyboard focus, as a destructive action;
+  in the trash (destroy for good) its icon is red at rest too :   1.83.3
+
+- FIX: « Record the sending on » a piece ticked at first only when Dolibarr records this sending in the agenda by
+  itself (Agenda > Automatic events, « sent by mail » of the type of the piece), for the linked and the inserted
+  pieces; the event is made only when the box is ticked :   1.83.2
+
+- FIX: sending recorded on a piece, the agenda keeps what was written only and no copy of the mail goes in the
+  documents of the piece: no signature, no quoted or forwarded mail, the attachments listed by name and size; the
+  mail stays in the mailbox, linked to the piece :   1.83.1
+
+- NEW: insert a piece of Dolibarr in a writing (lot A5) :   1.83.0
+  - « Insert a piece » in the bar of the writing: proposals, orders and invoices of the thirdparties of the
+    recipients and of the pieces linked to the mail answered (« All thirdparties » to widen), searched by reference
+    or thirdparty, the readable ones only.
+  - for the piece chosen: a line that recalls it (reference, date, amounts), the table of its lines (a table of
+    the editor, styles in the cells for the mail software, totals under it), its PDF attached (seen in Dolibarr
+    before; a piece without PDF is said), the link to sign a proposal online and to pay an order or an invoice
+    online, only when Dolibarr offers them. Written in the language of the thirdparty, as its PDF.
+  - the piece joins « Record the sending on », ticked: the sending noted on it and the mail sent linked to it.
+
+- NEW: the files of a writing open in the viewer, to check them before sending (lot A5) :   1.82.0
+  - a click on the name of an attachment of a writing (file sent, document of a piece, attachment of a forward)
+    opens it in the viewer of inbox, the writing seen behind: the very file that leaves with the mail, read in the
+    folder of the writing (not a copy of the draft). Same answers and protections as the attachments of a mail
+    (antivirus, CSP, an infected file never opened), shared code (ajax/inbox_attserve.inc.php); only the author of
+    the writing, in its session.
+
 - FIX: panel « New customer », nothing filled in silence :   1.81.1
   - « More fields » folded shows every value it holds on its line; the categories, the country, the sales
     representatives and the VAT are never taken again from a former creation (only the nature and the type are).

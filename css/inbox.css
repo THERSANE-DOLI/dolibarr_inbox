@@ -1077,6 +1077,12 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-multi__actions .ibx-bulkbar__label { position: static; width: auto; height: auto; clip: auto; overflow: visible; }
 .ibx-btn--danger-quiet { color: var(--ibx-danger); }
 .ibx-btn--danger-quiet:hover { background: var(--ibx-danger-soft); }
+/* Destructive icon button of the reading header: neutral at rest, red on hover and keyboard focus */
+.ibx-btn--danger-hover { --_fg-h: #ffffff; --_bg-h: var(--ibx-danger); --_bd-h: var(--ibx-danger); }
+.ibx-btn--danger-hover:focus-visible:not([aria-disabled="true"]) { color: #ffffff; background: var(--ibx-danger); border-color: var(--ibx-danger); }
+.ibx-btn--danger-hover .ibx-icon { color: inherit; }
+/* Irreversible (destroy from the trash): red icon at rest too */
+.ibx-btn--danger-hover.is-irreversible { --_fg: var(--ibx-danger); }
 .ibx-readhead__actions .ibx-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .ibx-menu__item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 
@@ -2518,3 +2524,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-lead__nature--customer:has(input:checked) { background: #55955d; color: #fff; }
 .ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
 .ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }
+/* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
+.ibx-compose__attname { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname:hover { color: var(--ibx-accent); }
+/* Insert a piece of Dolibarr (lot A5, 1.83.0) */
+.ibx-pieceins { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: min(40rem, 80vw); }
+.ibx-pieceins__item { display: grid; grid-template-columns: auto minmax(8rem, auto) minmax(0, 1fr) auto auto; gap: var(--ibx-s3); }
+.ibx-pieceins__soc { min-width: 0; }
+.ibx-pieceins__amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ibx-pieceins__opts { display: flex; flex-direction: column; gap: var(--ibx-s2); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-pieceins__opts > legend { padding: 0 var(--ibx-s1); font-weight: 600; }

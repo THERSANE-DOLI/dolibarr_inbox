@@ -434,6 +434,79 @@ class InboxOutbox
 	}
 
 	/**
+	 * Text of a mail sent kept in the agenda (1.83.1): what the user wrote, without the signature nor the quoted or
+	 * forwarded mail behind it (marked inbox-signature and inbox-quote by the writing, else found in the text), then
+	 * the attachments listed by name and size, never their content
+	 *
+	 * @param InboxMessage $message Mail sent
+	 * @return string
+	 */
+	public static function writtenText($message)
+	{
+		global $langs;
+
+		$text = '';
+		if ((string) $message->bodyHtml !== '') {
+			$html = (string) $message->bodyHtml;
+			$doc = new DOMDocument();
+			$previous = libxml_use_internal_errors(true);
+			$doc->loadHTML('<?xml encoding="UTF-8"><html><body>'.$html.'</body></html>', LIBXML_NONET | LIBXML_HTML_NODEFDTD);
+			libxml_clear_errors();
+			libxml_use_internal_errors($previous);
+			$xp = new DOMXPath($doc);
+			$marked = $xp->query('//*[contains(concat(" ", normalize-space(@class), " "), " inbox-quote ") or contains(concat(" ", normalize-space(@class), " "), " inbox-signature ")]');
+			foreach (iterator_to_array($marked) as $n) {
+				if ($n->parentNode) {
+					$n->parentNode->removeChild($n);
+				}
+			}
+			$body = $doc->getElementsByTagName('body')->item(0);
+			$inner = '';
+			foreach ($body ? $body->childNodes : array() as $c) {
+				$inner .= $doc->saveHTML($c);
+			}
+			$text = InboxMimeParser::htmlToText($inner);
+			if ($marked->length === 0) {
+				$text = self::cutQuote($text);
+			}
+		} else {
+			$text = self::cutQuote((string) $message->bodyText);
+		}
+		$text = trim(preg_replace("/\n{3,}/", "\n\n", InboxMimeParser::clean($text, true)));
+		$files = array();
+		foreach ((array) $message->attachments as $a) {
+			if (empty($a['inline']) && empty($a['embedded'])) {
+				$files[] = (string) $a['name'].' ('.dol_print_size((int) $a['size'], 1, 1).')';
+			}
+		}
+		if ($files) {
+			$text .= "\n\n".$langs->transnoentities('InboxEventAttachments', implode(', ', $files));
+		}
+
+		return $text;
+	}
+
+	/**
+	 * A text without what follows « -- » (signature) nor the quoted mail (« On ... wrote: », « > » lines)
+	 *
+	 * @param string $text Text
+	 * @return string
+	 */
+	protected static function cutQuote($text)
+	{
+		require_once __DIR__.'/inboxlead.class.php';
+		$own = InboxLead::ownText((string) $text);
+		$lines = preg_split('/\n/', $own);
+		foreach ($lines as $i => $l) {
+			if (preg_match('/^--\s*$/', $l)) {
+				return implode("\n", array_slice($lines, 0, $i));
+			}
+		}
+
+		return $own;
+	}
+
+	/**
 	 * The sending recorded on pieces: an event of the agenda on the piece (and its thirdparty), the mail (.eml) in the
 	 * documents of the piece, the mail sent linked to the piece
 	 *
@@ -449,13 +522,11 @@ class InboxOutbox
 
 		require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
 		require_once __DIR__.'/inboxelements.class.php';
-		require_once __DIR__.'/inboxcreate.class.php';
 		require_once __DIR__.'/inboxlink.class.php';
 		require_once __DIR__.'/inboxmailref.class.php';
 		require_once __DIR__.'/inboxmimeparser.class.php';
 		$message = InboxMimeParser::parse($raw);
 		$elements = new InboxElements($this->db);
-		$create = new InboxCreate($this->db);
 		$links = new InboxLink($this->db);
 		$refs = new InboxMailRef($this->db);
 		$mailref = $refs->fetchOrCreateByMessageId((string) $row->message_id, array('subject' => (string) $row->subject, 'from_email' => $message->fromEmail,
@@ -471,7 +542,8 @@ class InboxOutbox
 			$event->type_code = 'AC_EMAIL';
 			$event->code = 'AC_EMAIL';
 			$event->label = dol_trunc($langs->transnoentities('InboxEventMailSent', (string) $row->subject), 250, 'right', 'UTF-8', 1);
-			$event->note_private = dol_trunc(InboxMimeParser::clean($message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml), true), 60000, 'right', 'UTF-8', 1);
+			// What was written only (1.83.1): no signature, no quoted or forwarded mail, the attachments listed
+			$event->note_private = dol_trunc(self::writtenText($message), 60000, 'right', 'UTF-8', 1);
 			$event->datep = dol_now();
 			$event->datef = dol_now();
 			$event->percentage = -1;
@@ -491,7 +563,7 @@ class InboxOutbox
 				dol_syslog(__METHOD__.' event: '.$event->error, LOG_WARNING);
 				continue;
 			}
-			$create->attach($user, $type, $elementId, dol_sanitizeFileName(dol_trunc((string) $row->subject ?: 'mail', 80, 'right', 'UTF-8', 1)).'.eml', $raw);
+			// No copy of the mail in the documents of the piece (1.83.1): it stays in the mailbox, linked below
 			// The author may write in the mailbox and read the piece (checked above): linked even before the copy in
 			// Sent is in the index
 			if ($mailref > 0 && $links->link($mailref, $type, $elementId, $user, 'inbox') < 0 && $links->error === 'InboxMailNotFound') {
