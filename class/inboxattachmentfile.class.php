@@ -119,6 +119,7 @@ class InboxAttachmentFile
 		}
 		$a = $list[(int) $part];
 		$scan = new InboxAttachmentScan($this->db);
+		$scan->keep = !$reader->isLive();
 		$verdict = $scan->check($a['content'], $a['name']);
 		$langs->load('inbox@inbox');
 		if ($verdict['state'] === InboxAttachmentScan::INFECTED) {

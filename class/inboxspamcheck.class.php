@@ -127,7 +127,8 @@ class InboxSpamCheck
 			return $this->connectors[$accountId];
 		}
 		$account = new InboxAccount($this->db);
-		if ($account->fetch((int) $accountId) <= 0) {
+		// Protected mailbox (1.89.0): no work out of the session that unlocked it
+		if ($account->fetch((int) $accountId) <= 0 || !$account->canWorkNow()) {
 			return null;
 		}
 		$error = '';

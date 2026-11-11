@@ -114,7 +114,7 @@ class InboxRetention
 			return 0;
 		}
 		$removed = 0;
-		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." AND status = ".InboxAccount::STATUS_ACTIVE." LIMIT 10000");
+		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." AND status = ".InboxAccount::STATUS_ACTIVE." AND protected = 0 LIMIT 10000");
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$account = new InboxAccount($this->db);
 			if ($account->fetch((int) $r->rowid) <= 0) {

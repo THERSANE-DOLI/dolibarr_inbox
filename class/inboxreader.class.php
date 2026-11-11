@@ -32,6 +32,7 @@ require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 require_once __DIR__.'/inboxreceipt.class.php';
+require_once __DIR__.'/inboxlive.class.php';
 
 /**
  * A mail of the index read for a user: the row must be in a mailbox the user may read (else « not found », never
@@ -77,6 +78,10 @@ class InboxReader
 	{
 		$this->error = '';
 		$this->errorCode = '';
+		// Mail of a protected mailbox (1.89.0): a number of the live reading, read on the server
+		if (InboxLive::isMail($mailId)) {
+			return $this->loadLive($user, (int) $mailId);
+		}
 		$p = $this->db->prefix();
 		$row = $this->db->getRow("SELECT m.*, f.path AS folder_path, f.role AS folder_role FROM ".$p."inbox_mail as m"
 			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder WHERE m.rowid = ".((int) $mailId));
@@ -103,6 +108,46 @@ class InboxReader
 	}
 
 	/**
+	 * Mail of a protected mailbox read live (1.89.0): the row is built from the server, nothing is read from or kept
+	 * in the index
+	 *
+	 * @param User $user   User
+	 * @param int  $mailId Number of the live reading
+	 * @return bool
+	 */
+	protected function loadLive(User $user, $mailId)
+	{
+		$accountId = InboxLive::accountOf($mailId);
+		$level = (new InboxAccess($this->db))->getLevel($user, $accountId);
+		$account = new InboxAccount($this->db);
+		if ($level === InboxAccess::LEVEL_NONE || $account->fetch($accountId) <= 0 || !$account->isActive() || !$account->isProtected()) {
+			$this->errorCode = 'not_found';
+			return false;
+		}
+		$live = new InboxLive($this->db);
+		$row = $live->row($account, $mailId);
+		$live->close();
+		if (!$row) {
+			$this->errorCode = in_array($live->error, array('gone', 'not_found'), true) ? $live->error : 'error';
+			$this->error = $live->error;
+			return false;
+		}
+		$this->row = $row;
+		$this->account = $account;
+		$this->level = $level;
+
+		return true;
+	}
+
+	/**
+	 * @return bool The mail loaded is one of a protected mailbox, read live (nothing to keep of it)
+	 */
+	public function isLive()
+	{
+		return !empty($this->row->live);
+	}
+
+	/**
 	 * Raw mail: from the cache, else from the server (and kept)
 	 *
 	 * @param User $user User
@@ -110,6 +155,21 @@ class InboxReader
 	 */
 	public function raw(User $user)
 	{
+		if ($this->isLive()) {
+			// Protected mailbox: from the server, never kept (D1)
+			$error = '';
+			$connector = InboxConnectorFactory::forAccount($this->db, $this->account, $error);
+			$raw = $connector ? $connector->fetchRaw((string) $this->row->folder_path, (string) $this->row->remote_id) : null;
+			if ($connector) {
+				$connector->disconnect();
+			}
+			if ($raw === null || $raw === '') {
+				$this->error = $connector ? $connector->getError() : $error;
+				$this->errorCode = ($connector && $connector->notFound()) || $raw === '' ? 'gone' : 'error';
+				return null;
+			}
+			return $raw;
+		}
 		$inbox = new Inbox($this->db);
 		$messageId = (string) $this->row->message_id;
 		$raw = $messageId !== '' ? $inbox->cachedRaw($this->account->email, $messageId) : null;
@@ -156,7 +216,7 @@ class InboxReader
 		$headers = self::headers($raw);
 		$p = $this->db->prefix();
 		// Snippet of the cards, when the server did not give it
-		if (trim((string) $this->row->snippet) === '' && $message->bodyText !== '') {
+		if (!$this->isLive() && trim((string) $this->row->snippet) === '' && $message->bodyText !== '') {
 			$snippet = dol_trunc(InboxHeaderParser::forDb($this->db, InboxMimeParser::clean(mb_substr($message->bodyText, 0, 600, 'UTF-8'))), 200, 'right', 'UTF-8', 1);
 			$this->db->query("UPDATE ".$p."inbox_mail SET snippet = '".$this->db->escape($snippet)."' WHERE rowid = ".((int) $this->row->rowid));
 		}
@@ -194,7 +254,7 @@ class InboxReader
 		// declared, a source changed since); the index follows, so does its thirdparty unless chosen by hand
 		require_once __DIR__.'/inboxdatasource.class.php';
 		$sources = new InboxDataSource($this->db);
-		$found = $sources->detect($headers, (string) $this->row->from_email);
+		$found = $this->isLive() ? null : $sources->detect($headers, (string) $this->row->from_email);
 		if ($found !== null || (string) ($this->row->requester_email ?? '') !== '') {
 			if ($sources->store($this->row, $found)) {
 				$this->row = $this->db->getRow("SELECT m.*, f.path AS folder_path, f.role AS folder_role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder WHERE m.rowid = ".((int) $this->row->rowid)) ?: $this->row;

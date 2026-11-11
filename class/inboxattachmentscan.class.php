@@ -42,6 +42,9 @@ class InboxAttachmentScan
 	/** @var DoliDB */
 	protected $db;
 
+	/** @var bool Verdicts read from and kept in the cache (false for a protected mailbox, 1.89.0: nothing kept) */
+	public $keep = true;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -86,7 +89,7 @@ class InboxAttachmentScan
 		}
 		$sha1 = sha1($content);
 		$p = $this->db->prefix();
-		$row = $this->db->getRow("SELECT result, message, date_scan FROM ".$p."inbox_attachment_scan WHERE sha1 = '".$this->db->escape($sha1)."'");
+		$row = $this->keep ? $this->db->getRow("SELECT result, message, date_scan FROM ".$p."inbox_attachment_scan WHERE sha1 = '".$this->db->escape($sha1)."'") : null;
 		if (is_object($row)) {
 			$fresh = (int) $this->db->jdate($row->date_scan) > dol_now() - self::CLEAN_DAYS * 86400;
 			if ($row->result === self::INFECTED || $fresh) {
@@ -101,7 +104,7 @@ class InboxAttachmentScan
 			return array('state' => self::UNSCANNED, 'message' => 'No antivirus command in the setup of Dolibarr');
 		}
 		$verdict = $this->scan($content);
-		if ($verdict['state'] === self::CLEAN || $verdict['state'] === self::INFECTED) {
+		if ($this->keep && ($verdict['state'] === self::CLEAN || $verdict['state'] === self::INFECTED)) {
 			$this->db->query("DELETE FROM ".$p."inbox_attachment_scan WHERE sha1 = '".$this->db->escape($sha1)."'");
 			$this->db->query("INSERT INTO ".$p."inbox_attachment_scan (sha1, result, message, date_scan) VALUES ('".$this->db->escape($sha1)."',"
 				." '".$this->db->escape($verdict['state'])."', '".$this->db->escape(dol_trunc($verdict['message'], 250, 'right', 'UTF-8', 1))."', '".$this->db->idate(dol_now())."')");

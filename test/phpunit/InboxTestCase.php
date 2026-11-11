@@ -84,6 +84,15 @@ abstract class InboxTestCase extends TestCase
 	{
 		$p = $db->prefix();
 		$rows = $db->getRows("SELECT rowid FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid' LIMIT 10000");
+		// Protected mailboxes (1.89.0): copies of the test mailboxes, devices of the test users and of the tests
+		if ($db->DDLDescTable($p.'inbox_account_key')) {
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$db->query("DELETE FROM ".$p."inbox_account_key WHERE fk_account = ".((int) $r->rowid));
+				$db->query("DELETE FROM ".$p."inbox_pending_notice WHERE fk_account = ".((int) $r->rowid));
+			}
+			$db->query("DELETE FROM ".$p."inbox_account_key WHERE fk_device IN (SELECT rowid FROM ".$p."inbox_device WHERE label LIKE 'ZzDevice%' OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%'))");
+			$db->query("DELETE FROM ".$p."inbox_device WHERE label LIKE 'ZzDevice%' OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
+		}
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $r->rowid).")");
 			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification', 'inbox_template_account') as $t) {

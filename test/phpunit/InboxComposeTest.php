@@ -163,6 +163,11 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertStringNotContainsString('border:1px solid #d0d5dd;padding:4px', $lines, 'no grid added over a style chosen');
 		$this->assertStringContainsString('width="120"', $lines);
 		$this->assertStringContainsString('align="center"', $lines);
+		// A table written elsewhere (signature with border="0"): no grid added in its cells
+		$sig = InboxMailBuilder::cleanHtml('<table border="0" cellpadding="0" cellspacing="0" style="width:600px"><tbody><tr>'
+			.'<td style="width:280px">Logo</td><td style="border-left:2px solid #d31b11">&nbsp;</td><td>Name</td></tr></tbody></table>');
+		$this->assertStringNotContainsString('#d0d5dd', $sig, 'no grid in a table with a border attribute');
+		$this->assertStringContainsString('border-left:2px solid #d31b11', $sig);
 
 		$this->assertSame('Re: Commande', InboxComposer::subjectFor('reply', 'RE: Re: Commande'));
 		$this->assertSame('Fwd: Commande', InboxComposer::subjectFor('forward', 'TR: Commande'));

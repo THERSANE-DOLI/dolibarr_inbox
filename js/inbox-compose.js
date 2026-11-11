@@ -536,6 +536,8 @@
 			return;
 		}
 		d.at = opts.at || 0;
+		// Protected mailbox, scheduled (1.89.0): what to do when no page is open at the date
+		d.catchup = opts.catchup || '';
 		d.record = $$('.ibx-js-record:checked', w.dlg).map(c => c.value);
 		const ctx = { writing: { mode: w.mode, source: w.source }, data: d, cancel: false, reason: '' };
 		try {
@@ -572,7 +574,10 @@
 			w.closed = true;
 			dictateStop(w);
 			finish(w);
-			if (res.queued) {
+			if (res.live && res.scheduled) {
+				// Protected mailbox (1.89.0): the mail waits in Drafts on the mail server with its date
+				toast(t('InboxProtectScheduledDone', new Date(res.send_at * 1000).toLocaleString()));
+			} else if (res.queued) {
 				sendBar(res);
 			} else {
 				sentDone(res);
@@ -702,8 +707,8 @@
 		const fmt = dt => dt.toLocaleString(I.ctx('MAIN_LANG_DEFAULT', 'en_US').replace('_', '-'), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 		popMenu(anchor, [
 			{ header: t('InboxSendLater') },
-			{ label: t('InboxSendTomorrow', fmt(tomorrow)), icon: 'send-later', run: () => send(w, { at: Math.floor(tomorrow.getTime() / 1000) }) },
-			{ label: t('InboxSendMonday', fmt(monday)), icon: 'send-later', run: () => send(w, { at: Math.floor(monday.getTime() / 1000) }) },
+			{ label: t('InboxSendTomorrow', fmt(tomorrow)), icon: 'send-later', run: () => sendAt(w, Math.floor(tomorrow.getTime() / 1000)) },
+			{ label: t('InboxSendMonday', fmt(monday)), icon: 'send-later', run: () => sendAt(w, Math.floor(monday.getTime() / 1000)) },
 			{ label: t('InboxSendChoose'), icon: 'agenda', run: () => chooseDate(w) },
 		]);
 	}
@@ -723,9 +728,32 @@
 					$('#ibx-send-at', d).focus();
 					return false;
 				}
-				send(w, { at: Math.floor(dt.getTime() / 1000) });
+				sendAt(w, Math.floor(dt.getTime() / 1000));
 			} }],
 			onOpen: d => $('#ibx-send-at', d).focus(),
+		});
+	}
+	/**
+	 * Send at a date. A protected mailbox (1.89.0, analyse-boites-protegees §7.2): the server alone cannot send, the
+	 * mail leaves only if a page of Dolibarr is open at the date; told first, with what to do otherwise (ask by
+	 * default: a mail sent days later may do more harm than good)
+	 */
+	function sendAt(w, at) {
+		const acc = identityOf(w).account;
+		if (!I.protect || !I.protect.byId(acc)) {
+			send(w, { at });
+			return;
+		}
+		dialog({
+			title: t('InboxSendLater'),
+			body: '<div class="ibx-notice ibx-notice--info">' + ic('lock') + '<div class="ibx-notice__text">' + th('InboxProtectScheduleWarning') + '</div></div>'
+				+ '<fieldset class="ibx-fieldset"><legend>' + th('InboxProtectCatchupLegend') + '</legend>'
+				+ '<label class="ibx-check"><input type="radio" name="ibx-catchup" value="ask" checked> ' + th('InboxProtectCatchupAsk') + '</label>'
+				+ '<label class="ibx-check"><input type="radio" name="ibx-catchup" value="send"> ' + th('InboxProtectCatchupSend') + '</label></fieldset>',
+			actions: [{ label: t('InboxSendSchedule'), primary: true, run: d => {
+				const v = ($('input[name="ibx-catchup"]:checked', d) || {}).value || 'ask';
+				send(w, { at, catchup: v });
+			} }],
 		});
 	}
 
@@ -787,7 +815,9 @@
 		} else {
 			const left = Math.max(0, Math.ceil((b.at - Date.now()) / 1000));
 			b.el.innerHTML = ic('sent') + '<span class="ibx-sendbar__text">' + esc(b.sending ? t('InboxComposeSending') : t('InboxSendIn', left)) + '</span>' + subject
-				+ (b.sending ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxUndo') + '</button><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-barnow">' + th('InboxSendNow') + '</button>') + recordButton(b);
+				+ (b.sending ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxUndo') + '</button><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-barnow">' + th('InboxSendNow') + '</button>') + recordButton(b)
+				// Protected mailbox (1.89.0): the delay lives in this page, closing it sends at once
+				+ (b.id < 0 && !b.sending ? '<span class="ibx-sendbar__hint ibx-muted">' + th('InboxProtectCloseSends') + '</span>' : '');
 		}
 		// Closable once nothing is pending (the countdown drives the sending: no cross there)
 		if (b.state === 'sent' || b.state === 'error' || b.scheduled) {
@@ -806,6 +836,33 @@
 			}
 		};
 	}
+	/**
+	 * The page closes (1.89.0): the mails of the protected mailboxes still in their delay leave at once, the server
+	 * alone could not send them later (navigator.sendBeacon carries the cookie of the session). « hidden » counts only
+	 * on a phone, where it is the last sure event; on a computer it is a mere change of tab.
+	 */
+	function flushLive() {
+		bars.forEach(b => {
+			if (b.id >= 0 || b.scheduled || b.sending || b.state === 'sent' || b.state === 'error' || !navigator.sendBeacon) {
+				return;
+			}
+			const form = new FormData();
+			form.append('action', 'dispatch');
+			form.append('id', String(b.id));
+			form.append('beacon', '1');
+			form.append('token', I.token());
+			if (navigator.sendBeacon(I.ctx('INBOX_AJAX_URL', '') + 'compose.php', form)) {
+				clearInterval(b.timer);
+				b.sending = true;
+			}
+		});
+	}
+	window.addEventListener('pagehide', flushLive);
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'hidden' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+			flushLive();
+		}
+	});
 	function removeBar(b) {
 		clearInterval(b.timer);
 		b.el.remove();

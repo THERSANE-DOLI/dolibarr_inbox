@@ -18,7 +18,8 @@
  * Settings space of the inbox application (lot W1, analyse-lot-w1 §5):
  *   #/settings/accounts                list of the mailboxes
  *   #/settings/accounts/new            new mailbox (tab Server)
- *   #/settings/accounts/<id>/<tab>     card of a mailbox: server, folders, identities, access, tags, sync, journal
+ *   #/settings/accounts/<id>/<section> card of a mailbox (1.89.0): 6 tabs (overview, connection, access, writing,
+ *                                      reception, journal), their sections as chips (server, folders, sync...)
  *   #/settings/import                  import from the sources declared by other modules
  *   #/settings/general                 defaults of the webmail (admins of the mailboxes)
  *   #/settings/security                security: quote, pictures, unsubscribe, bank alert (1.78.0)
@@ -153,7 +154,7 @@
 	/** Sections of Settings > My account (1.32.0); the 4th value: shown only for some users, hidden until there */
 	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true], ['order', 'folders', 'InboxBoxOrderSection', true],
 		['permailbox', 'mark-read', 'InboxReadPerMailbox', true], ['unified', 'multi', 'InboxUnifiedSection', true], ['dictation', 'mic', 'InboxDictationSection', true],
-		['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
+		['devices', 'lock', 'InboxProtectMyDevices', true], ['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
 	/** Sections of Settings > Server (1.54.0) */
 	const SERVER_SECTIONS = [['keep', 'keep', 'InboxServerKeep'], ['imap', 'plug', 'InboxServerImap'], ['master', 'key', 'InboxMasterUser'], ['cron', 'cron', 'InboxServerCron']];
 	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, server: SERVER_SECTIONS, me: ME_SECTIONS };
@@ -198,6 +199,59 @@
 	}
 
 	/** My settings: the receivers of my voice I agreed to, withdrawn one by one (1.28.0) */
+	/**
+	 * My devices (1.89.0): the browsers that hold a key for the protected mailboxes, shown only when there is one; this
+	 * one is marked, each one renamed or revoked (a lost computer then opens nothing)
+	 */
+	async function myDevices(box) {
+		if (!box) {
+			return;
+		}
+		const mine = I.protect.device();
+		let r;
+		try {
+			r = await api('protect', 'devices', { device: mine ? mine.deviceId : 0 });
+		} catch (err) {
+			return;
+		}
+		if (!r.devices.length) {
+			box.hidden = true;
+			return;
+		}
+		const date = ts => ts ? new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-')) : '-';
+		box.hidden = false;
+		box.innerHTML = sectionTitle(ME_SECTIONS, 'devices') + '<p class="ibx-section__help">' + th('InboxProtectMyDevicesHelp') + '</p>'
+			+ '<table class="ibx-table"><thead><tr><th>' + th('InboxProtectDevice') + '</th><th>' + th('InboxProtectFingerprint') + '</th><th>' + th('InboxProtectLastUse') + '</th><th></th></tr></thead><tbody>'
+			+ r.devices.map(d => '<tr><td><input class="ibx-field ibx-field--medium" data-rename="' + d.id + '" value="' + esc(d.label) + '" aria-label="' + th('InboxProtectDevice') + '">'
+				+ (mine && mine.deviceId === d.id ? ' <span class="ibx-status ibx-status--ok">' + th('InboxProtectThisDevice') + '</span>' : '') + '</td>'
+				+ '<td><code class="ibx-protect__fp">' + esc(d.fingerprint) + '</code></td><td class="ibx-muted">' + esc(date(d.date_last_use)) + '</td>'
+				+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-revoke="' + d.id + '" data-fp="' + esc(d.fingerprint) + '">' + th('InboxProtectRevokeDevice') + '</button></td></tr>').join('')
+			+ '</tbody></table>';
+		I.mount(box);
+		$$('[data-rename]', box).forEach(f => f.addEventListener('change', async () => {
+			try {
+				await post('protect', 'rename', { device: f.dataset.rename, label: f.value });
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		}));
+		$$('[data-revoke]', box).forEach(b => b.addEventListener('click', async () => {
+			const ok = await confirmDialog({ title: t('InboxProtectRevokeDevice'), text: t('InboxProtectRevokeDeviceConfirm', b.dataset.fp), confirm: t('InboxProtectRevokeDevice'), danger: true });
+			if (!ok) {
+				return;
+			}
+			try {
+				await post('protect', 'revoke', { device: b.dataset.revoke });
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			toast(t('InboxProtectDeviceRevoked'));
+			myDevices(box);
+		}));
+	}
+
 	async function myDictation(box) {
 		if (!box) {
 			return;
@@ -237,7 +291,7 @@
 	// ---------- Mailboxes: list ----------
 	async function renderAccounts(main, parts) {
 		if (parts[0]) {
-			return renderAccountCard(main, parts[0], parts[1] || 'server');
+			return renderAccountCard(main, parts[0], parts[1] || 'overview');
 		}
 		main.innerHTML = skeleton();
 		let data;
@@ -612,6 +666,7 @@
 
 	// ---------- Mailbox: card ----------
 	const TABS = [
+		{ id: 'overview', key: 'InboxTabOverview', admin: false },
 		{ id: 'server', key: 'InboxTabServer', admin: true },
 		{ id: 'folders', key: 'InboxTabFolders', admin: true },
 		{ id: 'identities', key: 'InboxTabIdentities', admin: false },
@@ -622,12 +677,59 @@
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
 		{ id: 'rules', key: 'InboxTabRules', admin: false },
 		{ id: 'away', key: 'InboxTabAway', admin: false },
+		{ id: 'protection', key: 'InboxTabProtection', admin: false },
 		{ id: 'journal', key: 'InboxTabJournal', admin: false },
 	];
 
+	/**
+	 * Tabs of the card (1.89.0): the sections grouped by intention, in the order of use (overview, then what is set
+	 * once, then what moves often); a tab with one section has no chips. The address keeps the section
+	 * (#/settings/accounts/<id>/rules): the links of the other screens stay good.
+	 */
+	const GROUPS = [
+		{ id: 'overview', key: 'InboxTabOverview', sections: ['overview'] },
+		{ id: 'connection', key: 'InboxTabConnection', sections: ['server', 'folders', 'sync'] },
+		{ id: 'access', key: 'InboxTabAccess', sections: ['access', 'protection'] },
+		// Outgoing: what is written (the out of office is a mail written in advance)
+		{ id: 'writing', key: 'InboxTabWriting', sections: ['identities', 'templates', 'away'] },
+		// Incoming: sorted at the arrival, classed, shown beside the mail
+		{ id: 'reception', key: 'InboxTabReception', sections: ['rules', 'tags', 'usage'] },
+		{ id: 'journal', key: 'InboxTabJournal', sections: ['journal'] },
+	];
+	/** Name of a section in its chip (the section « access » under the tab Access: the people) */
+	const SECTION_KEYS = { access: 'InboxTabAccessPeople', usage: 'InboxTabUsageCard' };
+	/** Tabs and chips of the card, the current section shown */
+	function cardNav(id, tabs, tab, isNew) {
+		const visible = GROUPS.map(g => Object.assign({}, g, { list: g.sections.map(sid => tabs.find(x => x.id === sid)).filter(Boolean) })).filter(g => g.list.length);
+		const cur = visible.find(g => g.list.some(x => x.id === tab)) || visible[0];
+		let html = '<div class="ibx-tabs" role="tablist">' + visible.map(g => {
+			const first = g.list[0].id;
+			const disabled = isNew && !g.list.some(x => x.id === 'server');
+			return '<a class="ibx-tab" role="tab" href="' + (disabled ? '#' : '#/settings/accounts/' + id + '/' + (g === cur ? tab : first)) + '" aria-selected="' + (g === cur) + '"'
+				+ (disabled ? ' aria-disabled="true" title="' + th('InboxSaveFirst') + '"' : '') + '>' + th(g.key) + '</a>';
+		}).join('') + '</div>';
+		if (cur && cur.list.length > 1) {
+			html += '<nav class="ibx-sectabs" aria-label="' + th(cur.key) + '">' + cur.list.map(x => {
+				const disabled = isNew && x.id !== 'server';
+				return '<a class="ibx-sectab' + (x.id === tab ? ' is-on' : '') + '" href="' + (disabled ? '#' : '#/settings/accounts/' + id + '/' + x.id) + '"' + (x.id === tab ? ' aria-current="page"' : '')
+					+ (disabled ? ' aria-disabled="true" title="' + th('InboxSaveFirst') + '"' : '') + '>' + th(SECTION_KEYS[x.id] || x.key) + '</a>';
+			}).join('') + '</nav>';
+		}
+		return html;
+	}
+	/** Navigation of the card painted again for another section (the content is changed by showTab) */
+	function paintCardNav(main, c, tab) {
+		const nav = $('.ibx-js-cardnav', main);
+		if (nav) {
+			nav.innerHTML = cardNav(c.id, c.tabs, tab, false);
+		}
+	}
+
 	/** Card on screen: the same mailbox in another tab keeps its head and tabs, only the content of the tab changes */
 	let card = null;
-	const TAB_FNS = () => ({ server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), journal: tabJournal });
+	/** Mailbox whose test was asked from the head of the card (button beside the switch): run once its form is there */
+	let testAsked = 0;
+	const TAB_FNS = () => ({ overview: tabOverview, server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), protection: tabProtection, journal: tabJournal });
 
 	/**
 	 * Content of a tab, without flash: made aside and put in place once loaded (or after 300 ms, then with its
@@ -676,6 +778,7 @@
 		}
 		if (!isNew && card && card.id === String(id) && card.main === main && $('.ibx-js-tab', main) && card.tabs.some(x => x.id === tab)) {
 			showTab(main, card.account, tab);
+			paintCardNav(main, card, tab);
 			return;
 		}
 		card = null;
@@ -689,7 +792,8 @@
 				return;
 			}
 		}
-		const tabs = TABS.filter(x => isAdmin() || !x.admin);
+		const owner = account && account.type === 'personal' && +account.fk_user_owner === +I.ctx('INBOX_USER_ID', 0);
+		const tabs = TABS.filter(x => (isAdmin() || !x.admin) && (x.id !== 'protection' || (account && (account.protected || (owner && !isAdmin())))));
 		if (!tabs.find(x => x.id === tab)) {
 			tab = tabs[0].id;
 		}
@@ -699,14 +803,15 @@
 		const title = isNew ? t('InboxNewAccount') : (account.label || account.email);
 		let html = '<div class="ibx-page"><a class="ibx-page__back" href="#/settings/accounts">' + ic('chevron-left') + ' ' + th('InboxNavAccounts') + '</a>'
 			+ '<div class="ibx-page__head"><h1 class="ibx-page__title">' + esc(title) + '</h1>' + (account ? statusSwitch(account) : '') + '</div>';
-		html += '<div class="ibx-tabs" role="tablist">' + tabs.map(x => {
-			const disabled = isNew && x.id !== 'server';
-			return '<a class="ibx-tab" role="tab" href="' + (disabled ? '#' : '#/settings/accounts/' + id + '/' + x.id) + '" aria-selected="' + (x.id === tab) + '"'
-				+ (disabled ? ' aria-disabled="true" title="' + th('InboxSaveFirst') + '"' : '') + '>' + th(x.key) + '</a>';
-		}).join('') + '</div><div class="ibx-js-tab"></div></div>';
+		html += '<div class="ibx-js-cardnav">' + cardNav(id, isNew ? tabs.filter(x => x.id === 'server') : tabs.filter(x => x.id !== 'overview' || !isNew), tab, isNew) + '</div><div class="ibx-js-tab"></div></div>';
 		main.innerHTML = html;
 		I.mount(main);
-		$$('.ibx-tab[aria-disabled="true"]', main).forEach(a => a.addEventListener('click', e => e.preventDefault()));
+		main.addEventListener('click', e => {
+			const off = e.target.closest('.ibx-js-cardnav [aria-disabled="true"]');
+			if (off) {
+				e.preventDefault();
+			}
+		});
 		if (account) {
 			bindStatusSwitch(main, account, tab);
 		}
@@ -715,6 +820,263 @@
 			card = { id: String(id), main, account, tabs };
 		}
 		TAB_FNS()[tab](box, account, main);
+	}
+
+	// ----- Tab Overview (1.89.0): only what asks for an action, each point with its link -----
+	async function tabOverview(box, account) {
+		const a = account;
+		const go = section => '#/settings/accounts/' + a.id + '/' + section;
+		const points = [];
+		const add = (level, text, section, link) => points.push({ level, text, section, link });
+		if (a.status === 0) {
+			add('warning', t('InboxOverviewDraft'), 'server', t('InboxTabServer'));
+		} else if (a.status === 9) {
+			add('info', t('InboxOverviewDisabled'), 'server', t('InboxTabServer'));
+		}
+		if (a.last_test_result === 'error') {
+			add('error', t('InboxOverviewTestFailed'), 'server', t('InboxTestConnection'));
+		}
+		if (a.status === 1 && a.protect_level !== 'content' && ['auth_failed', 'unreachable', 'error'].includes(a.sync_state)) {
+			add('error', t('InboxOverviewSyncError', t('InboxSyncState_' + a.sync_state)) + (a.sync_error ? ' : ' + a.sync_error : ''), 'sync', t('InboxTabSync'));
+		}
+		if (isAdmin() && a.type === 'shared' && a.summary && !a.summary.accesses) {
+			add('warning', t('InboxOverviewNoAccess'), 'access', t('InboxTabAccessPeople'));
+		}
+		const missing = (a.missing_roles || []).map(r => t('InboxFolderRole' + r[0].toUpperCase() + r.slice(1)));
+		if (isAdmin() && missing.length) {
+			add('warning', t('InboxOverviewRolesMissing', missing.join(', ')), 'folders', t('InboxTabFolders'));
+		}
+		box.innerHTML = skeleton(3);
+		if (a.protected) {
+			try {
+				const d = await api('protect', 'accesses', { id: a.id });
+				if (!d.unlocked) {
+					add('info', t('InboxOverviewLocked'), 'protection', t('InboxTabProtection'));
+				}
+				const waiting = d.users.reduce((n, u) => n + u.devices.filter(x => x.state !== 'ok').length, 0);
+				if (waiting) {
+					add('warning', t('InboxOverviewDevicesWaiting', waiting), 'protection', t('InboxTabProtection'));
+				}
+			} catch (e) {
+				// the other points stay
+			}
+		}
+		const order = { error: 0, warning: 1, info: 2 };
+		points.sort((x, y) => order[x.level] - order[y.level]);
+		const when = a.date_sync ? new Date(a.date_sync * 1000).toLocaleString() : '';
+		const state = a.status !== 1 ? '' : (a.protect_level === 'content' ? t('InboxOverviewProtectedState') : (when ? t('InboxOverviewSyncedAt', when) : ''));
+		box.innerHTML = (points.length
+			? '<ul class="ibx-overview">' + points.map(x => '<li class="ibx-overview__item ibx-overview__item--' + x.level + '">' + ic(x.level === 'info' ? 'info' : 'warning')
+				+ '<span class="ibx-overview__text">' + esc(x.text) + '</span><a class="ibx-btn ibx-btn--sm" href="' + go(x.section) + '">' + esc(x.link) + '</a></li>').join('') + '</ul>'
+			: '<div class="ibx-empty ibx-empty--inline">' + ic('done', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxOverviewNothing') + '</div></div>')
+			+ (state ? '<p class="ibx-muted ibx-overview__state">' + esc(state) + '</p>' : '');
+	}
+
+	// ----- Tab Protection (1.89.0, analyse-boites-protegees §5): mode of the mailbox, encrypted accesses per device -----
+	const PROTECT_STATE = { ok: ['ok', 'InboxProtectStateOk'], obsolete: ['warning', 'InboxProtectStateObsolete'], missing: ['', 'InboxProtectStateMissing'] };
+	async function tabProtection(box, account) {
+		box.innerHTML = skeleton(4);
+		let data;
+		try {
+			data = await api('protect', 'accesses', { id: account.id });
+		} catch (err) {
+			box.replaceChildren(errorBox(err, () => tabProtection(box, account)));
+			return;
+		}
+		const P = I.protect;
+		const again = () => {
+			I.changed('account', account.id);
+			tabProtection(box, account);
+		};
+		let html = '';
+		if (!data.protected) {
+			html += '<p class="ibx-section__help">' + th('InboxProtectIntro') + '</p>'
+				+ '<ul class="ibx-protect__list"><li>' + th('InboxProtectWhatYes') + '</li><li>' + th('InboxProtectWhatNo') + '</li></ul>';
+			if (!data.can_decide) {
+				html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxProtectWhoDecides') + '</div></div>';
+			} else if (data.refusal) {
+				html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + esc(data.refusal) + '</div></div>';
+			} else if (!data.own_access) {
+				html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxProtectErrorOwnAccess') + '</div></div>';
+			} else if (!P.supported()) {
+				html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxProtectUnsupported') + '</div></div>';
+			} else {
+				html += '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-protect">' + ic('lock') + ' ' + th('InboxProtectAction') + '</button>';
+			}
+			box.innerHTML = html;
+			const btn = $('.ibx-js-protect', box);
+			if (btn) {
+				btn.addEventListener('click', () => protectDialog(account, data, again));
+			}
+			return;
+		}
+
+		// Protected: state of this session, then the devices of each user who has an access
+		const mine = P.byId(account.id);
+		const unlocked = data.unlocked;
+		html += '<div class="ibx-notice ibx-notice--info">' + ic('lock') + '<div class="ibx-notice__text">' + th('InboxProtectIsOn') + '</div>'
+			+ (unlocked ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-lock">' + th('InboxProtectLockNow') + '</button>'
+				: (mine ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-unlock">' + th('InboxProtectUnlock') + '</button>' : '')) + '</div>';
+		// Level of the protection (password / content): said, changed by who decides the mode
+		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxProtectLevelLegend') + '</h2>'
+			+ '<p><b>' + th('InboxProtectLevel_' + (data.level || 'password')) + '</b> : ' + th('InboxProtectLevelHelp_' + (data.level || 'password')) + '</p>'
+			+ (data.can_decide ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-level" data-level="' + (data.level === 'content' ? 'password' : 'content') + '">'
+				+ th(data.level === 'content' ? 'InboxProtectLevelToPassword' : 'InboxProtectLevelToContent') + '</button>' : '') + '</section>';
+		html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxProtectAccesses') + '</h2><p class="ibx-section__help">' + th('InboxProtectAccessesHelp') + '</p>';
+		const waiting = [];
+		html += '<table class="ibx-table"><thead><tr><th>' + th('InboxAccessWho') + '</th><th>' + th('InboxProtectDevice') + '</th><th>' + th('InboxProtectFingerprint') + '</th><th>' + th('InboxProtectState') + '</th><th></th></tr></thead><tbody>';
+		data.users.forEach(u => {
+			if (!u.devices.length) {
+				html += '<tr><td>' + esc(u.name) + '</td><td colspan="4" class="ibx-muted">' + th('InboxProtectNoDevice') + '</td></tr>';
+				return;
+			}
+			u.devices.forEach((d, i) => {
+				const st = PROTECT_STATE[d.state] || PROTECT_STATE.missing;
+				const can = unlocked && d.state !== 'ok';
+				if (can) {
+					waiting.push({ fk_user: u.id, device: d.id, public_key: d.public_key });
+				}
+				html += '<tr><td>' + (i === 0 ? esc(u.name) : '') + '</td><td>' + esc(d.label || '-') + '</td><td><code class="ibx-protect__fp">' + esc(d.fingerprint) + '</code></td>'
+					+ '<td><span class="ibx-status' + (st[0] ? ' ibx-status--' + st[0] : '') + '">' + th(st[1]) + '</span></td>'
+					+ '<td class="ibx-table__actions">' + (can ? '<label class="ibx-check"><input type="checkbox" data-give="' + u.id + ':' + d.id + '"> ' + th('InboxProtectGiveThis') + '</label>' : '')
+					+ (isAdmin() ? ' <button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-revoke-device="' + d.id + '" data-fp="' + esc(d.fingerprint) + '" title="' + th('InboxProtectRevokeDevice') + '" aria-label="' + th('InboxProtectRevokeDevice') + '">' + ic('close') + '</button>' : '')
+					+ '</td></tr>';
+			});
+		});
+		html += '</tbody></table>';
+		if (waiting.length) {
+			html += '<p class="ibx-section__help">' + th('InboxProtectGiveHelp') + '</p><button type="button" class="ibx-btn ibx-btn--primary ibx-js-give">' + ic('key') + ' ' + th('InboxProtectGive') + '</button>';
+		} else if (!unlocked) {
+			html += '<p class="ibx-muted">' + th('InboxProtectGiveNeedsUnlock') + '</p>';
+		}
+		html += '</section>';
+		if (data.can_decide) {
+			html += '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxProtectMode') + '</h2>'
+				+ '<div class="ibx-inline"><button type="button" class="ibx-btn ibx-js-unprotect"' + (unlocked ? '' : ' aria-disabled="true" title="' + th('InboxProtectGiveNeedsUnlock') + '"') + '>' + th('InboxProtectBackNormal') + '</button>'
+				+ '<button type="button" class="ibx-btn ibx-btn--danger ibx-js-reset">' + th('InboxProtectReset') + '</button></div>'
+				+ '<p class="ibx-section__help">' + th('InboxProtectResetHelp') + '</p></section>';
+		}
+		box.innerHTML = html;
+
+		const on = (sel, fn) => {
+			const el = $(sel, box);
+			if (el) {
+				el.addEventListener('click', async e => {
+					if (el.getAttribute('aria-disabled') === 'true') {
+						e.preventDefault();
+						return;
+					}
+					try {
+						await fn();
+					} catch (err) {
+						toast(err.message, { error: true });
+					}
+				});
+			}
+		};
+		on('.ibx-js-level', async () => {
+			const to = $('.ibx-js-level', box).dataset.level;
+			const ok = await confirmDialog({ title: t(to === 'content' ? 'InboxProtectLevelToContent' : 'InboxProtectLevelToPassword'),
+				text: t(to === 'content' ? 'InboxProtectLevelToContentConfirm' : 'InboxProtectLevelToPasswordConfirm'), confirm: t(to === 'content' ? 'InboxProtectLevelToContent' : 'InboxProtectLevelToPassword'),
+				danger: to === 'content', typeToConfirm: to === 'content' ? account.email : '' });
+			if (!ok) {
+				return;
+			}
+			await post('protect', 'level', { id: account.id, level: to });
+			await P.refresh();
+			again();
+		});
+		on('.ibx-js-lock', async () => {
+			await P.lock(account.id);
+			again();
+		});
+		on('.ibx-js-unlock', async () => {
+			if (await P.openLock(account.id)) {
+				again();
+			}
+		});
+		on('.ibx-js-give', async () => {
+			const chosen = new Set($$('[data-give]:checked', box).map(c => c.dataset.give));
+			const targets = waiting.filter(w => chosen.has(w.fk_user + ':' + w.device));
+			if (!targets.length) {
+				toast(t('InboxProtectChooseDevices'), { error: true });
+				return;
+			}
+			const n = await P.grant(account.id, targets);
+			toast(t('InboxProtectGiven', n));
+			again();
+		});
+		$$('[data-revoke-device]', box).forEach(b => b.addEventListener('click', async () => {
+			const ok = await confirmDialog({ title: t('InboxProtectRevokeDevice'), text: t('InboxProtectRevokeDeviceConfirm', b.dataset.fp), confirm: t('InboxProtectRevokeDevice'), danger: true });
+			if (!ok) {
+				return;
+			}
+			try {
+				await post('protect', 'revoke', { device: b.dataset.revokeDevice });
+				again();
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		}));
+		on('.ibx-js-unprotect', async () => {
+			const ok = await confirmDialog({ title: t('InboxProtectBackNormal'), text: t('InboxProtectBackNormalConfirm'), confirm: t('InboxProtectBackNormal') });
+			if (!ok) {
+				return;
+			}
+			await post('protect', 'unprotect', { id: account.id });
+			await P.refresh();
+			toast(t('InboxProtectBackNormalDone'));
+			again();
+		});
+		on('.ibx-js-reset', async () => {
+			const ok = await confirmDialog({ title: t('InboxProtectReset'), text: t('InboxProtectResetConfirm'), confirm: t('InboxProtectReset'), danger: true, typeToConfirm: account.email });
+			if (!ok) {
+				return;
+			}
+			await post('protect', 'reset', { id: account.id, confirm_email: account.email });
+			await P.refresh();
+			again();
+		});
+	}
+
+	/** Dialog « Protect this mailbox » (§5.1 and §8): what changes, the passwords, the address typed again */
+	function protectDialog(account, data, done) {
+		const P = I.protect;
+		dialog({
+			title: t('InboxProtectAction'),
+			wide: true,
+			body: '<fieldset class="ibx-fieldset"><legend>' + th('InboxProtectLevelLegend') + '</legend>'
+				+ '<label class="ibx-check ibx-check--block"><input type="radio" name="ibx-prot-level" value="password" checked> <span><b>' + th('InboxProtectLevel_password') + '</b><span class="ibx-formrow__help">' + th('InboxProtectLevelHelp_password') + '</span></span></label>'
+				+ '<label class="ibx-check ibx-check--block"><input type="radio" name="ibx-prot-level" value="content"> <span><b>' + th('InboxProtectLevel_content') + '</b><span class="ibx-formrow__help">' + th('InboxProtectLevelHelp_content') + '</span></span></label></fieldset>'
+				+ '<p>' + th('InboxProtectDialogIntro') + '</p><ul class="ibx-protect__list">'
+				+ ['InboxProtectSay1', 'InboxProtectSay3', 'InboxProtectSay4', 'InboxProtectSay5'].map(k => '<li>' + th(k) + '</li>').join('') + '</ul>'
+				// Level content only: what is emptied now
+				+ '<div class="ibx-notice ibx-notice--warning ibx-js-purgewarn" hidden>' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxProtectPurgeWarning') + '</div></div>'
+				+ '<div class="ibx-form">' + P.passwordFields(!!data.smtp_own, 'ibx-prot')
+				+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-prot-confirm">' + th('InboxTypeToConfirm', account.email) + '</label><div><input id="ibx-prot-confirm" class="ibx-field" autocomplete="off" spellcheck="false"></div></div></div>',
+			actions: [{ label: t('InboxProtectAction'), primary: true, run: async d => {
+				const secrets = P.readPasswords(d, 'ibx-prot');
+				if (!secrets.imap) {
+					$('#ibx-prot-imap', d).focus();
+					return false;
+				}
+				const confirm = $('#ibx-prot-confirm', d).value.trim();
+				if (confirm.toLowerCase() !== String(account.email).toLowerCase()) {
+					$('#ibx-prot-confirm', d).focus();
+					return false;
+				}
+				const level = ($('input[name="ibx-prot-level"]:checked', d) || {}).value || 'password';
+				await P.protect(account, secrets, confirm, level);
+				toast(t('InboxProtectDone'));
+				done();
+			} }],
+			onOpen: d => {
+				$('#ibx-prot-imap', d).focus();
+				$$('input[name="ibx-prot-level"]', d).forEach(r => r.addEventListener('change', () => {
+					$('.ibx-js-purgewarn', d).hidden = ($('input[name="ibx-prot-level"]:checked', d) || {}).value !== 'content';
+				}));
+			},
+		});
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
@@ -862,6 +1224,13 @@
 	function tabServer(box, account, main) {
 		const a = account || { type: 'shared', imap_port: 993, imap_encryption: 'ssl', imap_auth_mode: 'login', imap_validate_cert: 1, smtp_port: 465, smtp_encryption: 'ssl', smtp_same_credentials: 1, sieve_port: 4190, sync_max_days: 0, sync_max_mails: 0 };
 		const enc = [['ssl', t('InboxEncSsl')], ['tls', t('InboxEncTls')], ['none', t('InboxEncNone')]];
+		// Protected mailbox (1.89.0): no password here, the server and the login stay those of the encrypted copies
+		const prot = !!(account && account.protected);
+		// Why it cannot be protected now: login and password only, an active mailbox (its accesses count only then)
+		// and who protects must open it himself: the names said (an admin of Dolibarr has no access of his own)
+		const owner = a.summary && a.summary.owner ? a.summary.owner : '';
+		const noAccess = account && !a.own_level ? (a.type === 'personal' && owner ? t('InboxProtectNotYoursPersonal', a.me || '', owner) : t('InboxProtectNotYoursShared', a.me || '')) : '';
+		const protWhy = !account ? '' : (a.imap_auth_mode !== 'login' ? t('InboxProtectErrorAuthMode') : (a.status !== 1 ? t('InboxProtectNeedActive') : noAccess));
 		let html = '<form class="ibx-form" novalidate autocomplete="off">'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMailbox') + '</h2><div class="ibx-form">'
 			+ field('email', t('InboxAccountEmail'), a.email, { type: 'email', required: true, autocomplete: 'off', placeholder: 'devis@example.com', cls: 'ibx-field--medium' })
@@ -879,10 +1248,18 @@
 			+ field('imap_auth_mode', t('InboxImapAuthMode'), a.imap_auth_mode, { options: [['login', t('InboxAuthLogin')], ['master', t('InboxAuthMaster')], ['oauth', t('InboxAuthOAuth')]], cls: 'ibx-field--medium' })
 			+ field('oauth_service', t('InboxOAuthService'), a.oauth_service, { hidden: a.imap_auth_mode !== 'oauth', help: t('InboxOAuthServiceHelp'), cls: 'ibx-field--medium' })
 			+ field('imap_login', t('InboxImapLogin'), a.imap_login, { placeholder: t('InboxLoginDefault'), autocomplete: 'off', cls: 'ibx-field--medium', hidden: a.imap_auth_mode === 'master' })
-			+ '<div class="ibx-formrow" data-field="imap_password"' + (a.imap_auth_mode === 'login' ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-imap_password">' + th('InboxPassword') + '</label><div>'
+			+ (prot ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxPassword') + '</span><div><div>' + ic('lock') + ' ' + th('InboxProtectPasswordOn') + '</div>'
+				+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + a.id + '/protection">' + ic('key') + ' ' + th('InboxProtectManage') + '</a></div></div>'
+				: '<div class="ibx-formrow" data-field="imap_password"' + (a.imap_auth_mode === 'login' ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-imap_password">' + th('InboxPassword') + '</label><div>'
 			+ '<div class="ibx-password"><input class="ibx-field ibx-field--medium" id="f-imap_password" name="imap_password" type="password" autocomplete="new-password" placeholder="' + (a.has_imap_password ? th('InboxPasswordKept') : '') + '"></div>'
-			+ '<div class="ibx-formrow__help">' + th(a.has_imap_password ? 'InboxPasswordKeptHelp' : 'InboxPasswordHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>'
+			+ '<div class="ibx-formrow__help">' + th(a.has_imap_password ? 'InboxPasswordKeptHelp' : 'InboxPasswordHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>')
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxCertificate') + '</span><div><label class="ibx-check"><input type="checkbox" name="imap_validate_cert"' + (a.imap_validate_cert ? ' checked' : '') + '> ' + th('InboxValidateCert') + '</label></div></div>'
+			// Protection (1.89.0): what becomes of the password, beside it; the encrypted accesses in their own tab
+			+ (account && !prot ? '<div class="ibx-formrow" data-field="protection"><span class="ibx-formrow__label">' + th('InboxProtectRow') + '</span><div>'
+				+ '<div class="ibx-formrow__help">' + th('InboxProtectNotOn') + '</div>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-protect"' + (protWhy ? ' aria-disabled="true" title="' + esc(protWhy) + '"' : '') + '>' + ic('lock') + ' ' + th('InboxProtectAction') + '</button>'
+				+ (protWhy ? '<div class="ibx-formrow__help">' + esc(protWhy) + '</div>' : '') + '</div></div>' : '')
+			+ (prot ? '<p class="ibx-section__help">' + ic('lock') + ' ' + th('InboxProtectServerReadonly') + '</p>' : '')
 			+ '</div></section>'
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionSmtp') + '</h2><div class="ibx-form">'
 			+ field('smtp_host', t('InboxSmtpHost'), a.smtp_host, { placeholder: t('InboxSameAsImap'), cls: 'ibx-field--medium', inputmode: 'url' })
@@ -914,6 +1291,40 @@
 		box.innerHTML = html;
 		I.mount(box);
 		const form = $('form', box);
+		if (prot) {
+			['imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'imap_validate_cert', 'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_same_credentials', 'smtp_login', 'smtp_password'].forEach(n => {
+				const el = form.elements[n];
+				if (el) {
+					el.disabled = true;
+					el.title = t('InboxProtectServerReadonly');
+				}
+			});
+		}
+		const protBtn = $('.ibx-js-protect', form);
+		if (protBtn) {
+			protBtn.addEventListener('click', async () => {
+				if (protBtn.getAttribute('aria-disabled') === 'true') {
+					return;
+				}
+				let data;
+				try {
+					data = await api('protect', 'accesses', { id: account.id });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return;
+				}
+				const why = !I.protect.supported() ? t('InboxProtectUnsupported') : (data.refusal || (!data.own_access ? t('InboxProtectErrorOwnAccess') : ''));
+				if (why) {
+					toast(why, { error: true });
+					return;
+				}
+				protectDialog(account, data, () => {
+					card = null;
+					I.changed('account', account.id);
+					I.go('#/settings/accounts/' + account.id + '/protection');
+				});
+			});
+		}
 		// Fields that depend on others
 		const sync = () => {
 			const v = formValues(form);
@@ -1011,6 +1422,21 @@
 			const out = $('.ibx-js-testresult', form);
 			btn.setAttribute('aria-disabled', 'true');
 			out.innerHTML = '<div class="ibx-notice ibx-notice--info" role="status">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxTesting') + '</div></div>';
+			// The result in a window at once (1.89.0), wherever the button is: the steps to come, then their result; it
+			// can be closed during the test (the result stays under the form)
+			const steps = ['imap', 'capabilities', 'folders', 'smtp', 'sieve'];
+			const win = dialog({
+				title: t('InboxTestConnection'),
+				wide: true,
+				body: '<div class="ibx-js-testwin" aria-live="polite"><ul class="ibx-checklist">' + steps.map(st => '<li class="ibx-checklist__item ibx-checklist__item--pending">'
+					+ '<span class="ibx-spinner" aria-hidden="true"></span><div><div class="ibx-checklist__step">' + th('InboxTestStep_' + st) + '</div><div class="ibx-muted">' + th('InboxTesting') + '</div></div></li>').join('') + '</ul></div>',
+			});
+			const paintWin = html => {
+				const zone = win.isConnected && $('.ibx-js-testwin', win);
+				if (zone) {
+					zone.innerHTML = html;
+				}
+			};
 			const values = formValues(form);
 			if (account) {
 				values.id = account.id;
@@ -1020,11 +1446,33 @@
 			try {
 				const r = await post('account', 'test', values);
 				out.innerHTML = checklist(r.test);
+				paintWin(checklist(r.test));
 				if (account && values.save) {
 					I.changed('account', account.id);
+					// Tested (1.89.0): the switch of the head can be used at once, its hint goes
+					if (['ok', 'warning'].includes(r.test.status)) {
+						account.last_test_result = r.test.status;
+						const sw = $('.ibx-js-statusswitch', main);
+						if (sw) {
+							sw.removeAttribute('aria-disabled');
+							sw.removeAttribute('title');
+						}
+						const hint = $('.ibx-js-statustest', main);
+						if (hint) {
+							hint.remove();
+						}
+					}
 				}
 			} catch (err) {
 				out.innerHTML = '';
+				// A field to fix: the window goes, the form says which one; any other error is said in the window
+				if (err.fields && Object.keys(err.fields).length) {
+					if (win.isConnected) {
+						win.close();
+					}
+				} else {
+					paintWin('<div class="ibx-notice ibx-notice--error" role="alert">' + ic('warning') + '<div class="ibx-notice__text">' + esc(err.message) + '</div></div>');
+				}
 				showErrors(err);
 			}
 			btn.removeAttribute('aria-disabled');
@@ -1033,6 +1481,12 @@
 			form.dataset.dirty = '1';
 		});
 		bindStatusActions(form, account, main);
+		if (account && testAsked === account.id) {
+			testAsked = 0;
+			const run = $('.ibx-js-test', form);
+			run.scrollIntoView({ block: 'center' });
+			run.click();
+		}
 	}
 
 	function ownerPicker(form) {
@@ -1088,7 +1542,9 @@
 		const active = account.status === 1;
 		const canEnable = active || ['ok', 'warning'].includes(account.last_test_result);
 		const label = th(active ? 'InboxAccountStatusActive' : (account.status === 9 ? 'InboxAccountStatusDisabled' : 'InboxAccountStatusDraft'));
+		// Not testable yet (1.89.0): why, and the way out, beside the switch (not only after a click on it)
 		return '<span class="ibx-inline"><span class="ibx-js-statuslabel">' + label + '</span>'
+			+ (canEnable ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-statustest" title="' + th('InboxErrorEnableNeedsTest') + '">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>')
 			+ '<button type="button" class="ibx-switch ibx-js-statusswitch" role="switch" aria-checked="' + (active ? 'true' : 'false') + '" aria-label="' + th('InboxAccountStatusActive') + '"'
 			+ (canEnable ? '' : ' aria-disabled="true" title="' + th('InboxErrorEnableNeedsTest') + '"') + '></button></span>';
 	}
@@ -1114,7 +1570,39 @@
 				actions.innerHTML = statusActions(account);
 				bindStatusActions(actions, account);
 			}
+			// Row Protection of the Server tab (1.89.0): possible once the mailbox is active
+			const protRow = $('[data-field="protection"]', main);
+			const protBtn = protRow && $('.ibx-js-protect', protRow);
+			if (protBtn && account.imap_auth_mode === 'login') {
+				const why = status === 1 ? '' : t('InboxProtectNeedActive');
+				if (why) {
+					protBtn.setAttribute('aria-disabled', 'true');
+				} else {
+					protBtn.removeAttribute('aria-disabled');
+				}
+				protBtn.title = why;
+				const helps = $$('.ibx-formrow__help', protRow);
+				if (helps[1]) {
+					helps[1].hidden = !why;
+				} else if (why) {
+					protBtn.insertAdjacentHTML('afterend', '<div class="ibx-formrow__help">' + esc(why) + '</div>');
+				}
+			}
 		};
+		// « Test the connection » beside the switch: the test of the form Server, on its section
+		const asked = $('.ibx-js-statustest', main);
+		if (asked) {
+			asked.addEventListener('click', () => {
+				const run = $('.ibx-js-test', main);
+				if (run) {
+					run.scrollIntoView({ block: 'center' });
+					run.click();
+				} else {
+					testAsked = account.id;
+					I.go('#/settings/accounts/' + account.id + '/server');
+				}
+			});
+		}
 		let busy = false;
 		sw.addEventListener('click', async () => {
 			if (sw.getAttribute('aria-disabled') === 'true') {
@@ -2085,6 +2573,17 @@
 					return t(l.after && l.after.ids ? 'InboxLogIndicatorsOwn' : 'InboxLogIndicatorsReset');
 				case 'carriers':
 					return t('InboxLogCarriers');
+				case 'protect':
+				case 'protect_level':
+				case 'unprotect':
+				case 'protect_reset':
+				case 'key_enrol':
+				case 'key_grant':
+				case 'key_approve':
+				case 'key_revoke':
+				case 'unlock':
+				case 'unlock_failed':
+					return t('InboxLog_' + l.action, (l.after && l.after.device) || '');
 				default:
 					return l.action;
 			}
@@ -4572,6 +5071,7 @@
 					+ esc(m.label && m.label !== m.email ? m.label + ' <' + m.email + '>' : m.email) + '</label>').join('') + '</div></section>';
 		}
 		html += '<section class="ibx-section ibx-js-mydictation" data-section="dictation" hidden></section>';
+		html += '<section class="ibx-section ibx-js-mydevices" data-section="devices" hidden></section>';
 		html += '<section class="ibx-section" data-section="display">' + title('display') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-view">' + th('InboxView') + '</label><div>' + opt('view', ['cards', 'table'], p.view) + '<div class="ibx-formrow__help">' + th('InboxViewHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-conversation">' + th('InboxConversationsSetting') + '</label><div>' + opt('conversation', ['1', '0'], p.conversation) + '<div class="ibx-formrow__help">' + th('InboxConversationsHelp') + '</div></div></div>'
@@ -4600,7 +5100,7 @@
 		spySections(main, ME_SECTIONS.map(x => x[0]));
 		// My dictation comes later (shown only when used): its link then, and a section asked by the route
 		// (#/settings/me/unified, from a menu) brought into view once the page is complete
-		myDictation($('.ibx-js-mydictation', main)).then(() => {
+		Promise.all([myDictation($('.ibx-js-mydictation', main)), myDevices($('.ibx-js-mydevices', main))]).then(() => {
 			syncSectionLinks(main);
 			if (parts && parts[0]) {
 				requestAnimationFrame(() => pointSection(main, parts[0]));

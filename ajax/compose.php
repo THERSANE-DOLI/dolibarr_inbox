@@ -152,7 +152,7 @@ switch ($action) {
 		$record = inboxAjaxParam('record', 'none');
 		// force: « Send anyway » after an answer of a colleague was said (lot E2, 1.77.0)
 		$res = $composer->send($user, $token, inboxComposeTyped(), array('at' => (int) inboxAjaxParam('at', 'int'), 'record' => is_array($record) ? array_map('strval', $record) : array(),
-			'force' => (int) inboxAjaxParam('force', 'int') === 1));
+			'force' => (int) inboxAjaxParam('force', 'int') === 1, 'catchup' => (string) inboxAjaxParam('catchup', 'aZ09')));
 		if ($res === null) {
 			inboxComposeFail($composer);
 		}
@@ -164,10 +164,31 @@ switch ($action) {
 	case 'outbox':
 		// Queue of the sending (1.17.0): send now, undo (the writing comes back), record on pieces, my mails waiting
 		dol_include_once('/inbox/class/inboxoutbox.class.php');
+		dol_include_once('/inbox/class/inboxlivesend.class.php');
 		$outbox = new InboxOutbox($db);
 		$id = (int) inboxAjaxParam('id', 'int');
+		$liveSend = new InboxLiveSend($db);
 		if ($action === 'outbox') {
-			inboxAjaxReply(array('items' => $outbox->listMine($user)));
+			// With the mails of the protected mailboxes in their delay (kept in this session, 1.89.0)
+			inboxAjaxReply(array('items' => array_merge($outbox->listMine($user), $liveSend->listMine($user))));
+		}
+		if (InboxLiveSend::isLive($id)) {
+			// Protected mailbox (1.89.0): « beacon » is the page closing (navigator.sendBeacon): sent to the end, even
+			// when nobody waits for the answer
+			if ($action === 'dispatch' && (int) inboxAjaxParam('beacon', 'int') === 1) {
+				ignore_user_abort(true);
+				set_time_limit(120);
+			}
+			if ($action === 'record') {
+				inboxAjaxReply(array('recorded' => array()));
+			}
+			$res = $action === 'dispatch' ? $liveSend->deliver($user, $id, (int) inboxAjaxParam('beacon', 'int') === 1) : $liveSend->cancel($user, $id);
+			if ($res === null) {
+				$composer->errorCode = $liveSend->errorCode;
+				$composer->error = $liveSend->error;
+				inboxComposeFail($composer);
+			}
+			inboxAjaxReply($res);
 		}
 		if ($action === 'record') {
 			$pieces = inboxAjaxParam('pieces', 'none');

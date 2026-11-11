@@ -389,6 +389,9 @@ class InboxAccess
 		$log = new InboxAccountLog($this->db);
 		$log->add($accountId, $author, InboxAccountLog::ACTION_ACCESS_REMOVE, array('fk_user' => (int) $fkUser, 'fk_usergroup' => (int) $fkGroup, 'level' => (string) $current->level), null);
 		self::clearCache();
+		// Protected mailbox (1.89.0): the encrypted copies of who lost the access go with it
+		require_once __DIR__.'/inboxprotect.class.php';
+		(new InboxProtect($this->db))->pruneBlobs((int) $accountId);
 
 		return 1;
 	}

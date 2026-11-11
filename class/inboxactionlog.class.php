@@ -58,6 +58,11 @@ class InboxActionLog
 		if (self::$paused || !$mails) {
 			return 0;
 		}
+		// Protected with its content (1.89.0): the journal of the actions names the mails (subject, Message-ID), nothing kept
+		$protected = $db->getRow("SELECT protected, protect_level FROM ".$db->prefix()."inbox_account WHERE rowid = ".((int) $accountId));
+		if (is_object($protected) && (int) $protected->protected === 1 && (string) $protected->protect_level === 'content') {
+			return 0;
+		}
 		$n = count($mails);
 		$first = reset($mails);
 		// An action on a folder: one line carrying its number of mails

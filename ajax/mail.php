@@ -56,6 +56,14 @@ switch ($action) {
 			inboxMailFail($reader);
 		}
 		$out = $reader->describe($user, $raw);
+		// Protected mailbox (1.89.0): no assignment, no link, nothing of the index
+		if ($reader->isLive()) {
+			$out['assignees'] = array();
+			$out['assignee_people'] = new stdClass();
+			$out['has_message_id'] = false;
+			$out['live'] = 1;
+			inboxAjaxReply($out);
+		}
 		// « Assigned to » of the reading (lot W4 1.9.0)
 		dol_include_once('/inbox/class/inboxassign.class.php');
 		$assign = new InboxAssign($db);
@@ -70,6 +78,9 @@ switch ($action) {
 	case 'thread':
 		// Mails of the conversation in the whole mailbox (sent mails included), the oldest first; a mail in two folders
 		// once (the copy outside the trash and the junk first)
+		if ($reader->isLive()) {
+			inboxAjaxReply(array('key' => '', 'mails' => array(array('id' => (int) $reader->row->rowid)), 'people' => new stdClass()));
+		}
 		$key = (string) $reader->row->thread_key;
 		$list = array();
 		if ($key !== '') {

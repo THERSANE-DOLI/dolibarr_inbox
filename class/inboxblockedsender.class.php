@@ -938,7 +938,7 @@ class InboxBlockedSender
 		$hash = $this->hash();
 		$p = $this->db->prefix();
 		$rows = $this->db->getRows("SELECT rowid, blocked_hash, blocked_state, blocked_date FROM ".$p."inbox_account WHERE entity = ".((int) $conf->entity)
-			." AND status = ".InboxAccount::STATUS_ACTIVE." AND (blocked_hash IS NULL OR blocked_hash <> '".$this->db->escape($hash)."'"
+			." AND status = ".InboxAccount::STATUS_ACTIVE." AND protected = 0 AND (blocked_hash IS NULL OR blocked_hash <> '".$this->db->escape($hash)."'"
 			." OR (blocked_state <> '".self::STATE_OK."' AND (blocked_date IS NULL OR blocked_date < '".$this->db->idate(dol_now() - self::RETRY_SECONDS)."'))) ORDER BY rowid LIMIT 200");
 		$empty = !$this->forScript()['addresses'] && !$this->forScript()['domains'];
 		$done = 0;

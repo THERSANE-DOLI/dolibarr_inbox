@@ -30,6 +30,7 @@ dol_include_once('/inbox/class/inboxnewmarks.class.php');
 dol_include_once('/inbox/class/inboxlook.class.php');
 dol_include_once('/inbox/class/inboxuserparam.class.php');
 dol_include_once('/inbox/class/inboxretention.class.php');
+dol_include_once('/inbox/class/inboxlive.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('look', 'lookreset'), true));
@@ -134,8 +135,41 @@ switch ($action) {
 				$aways[(int) $r->rowid] = array('from' => substr((string) $r->away_from, 0, 10), 'to' => substr((string) $r->away_to, 0, 10));
 			}
 		}
+		$live = new InboxLive($db);
 		foreach ($accounts as $account) {
 			$account->loadSyncState();
+			// Protected with its content (1.89.0): its folders read live on the server while unlocked, nothing when locked
+			if ($account->isLive()) {
+				$unlocked = InboxProtect::isUnlocked((int) $account->id);
+				$liveTree = $unlocked ? $live->tree($account) : array();
+				$list[] = array(
+					'id' => (int) $account->id,
+					'email' => (string) $account->email,
+					'label' => (string) $account->label,
+					'personal' => $account->type === InboxAccount::TYPE_PERSONAL && (int) $account->fk_user_owner === (int) $user->id,
+					'level' => (string) $account->access_level,
+					'color' => (string) InboxLook::cleanColor((string) $account->color),
+					'icon' => (string) InboxLook::cleanIcon((string) $account->icon),
+					'state' => $liveTree === null ? 'unreachable' : 'ok',
+					'error' => $liveTree === null ? $live->error : '',
+					'retry_at' => null,
+					'progress' => null,
+					'quota' => null,
+					'folders' => is_array($liveTree) ? $liveTree : array(),
+					'fulltext' => '',
+					'away' => $aways[(int) $account->id] ?? null,
+					'marks' => (object) array(),
+					'tags' => array_values(array_map(function ($t) {
+						return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border']);
+					}, array_filter($tagHelper->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), function ($t) {
+						return (int) $t['status'] === 1;
+					}))),
+					'protected' => 1,
+					'protect_level' => 'content',
+					'locked' => $unlocked ? 0 : 1,
+				);
+				continue;
+			}
 			// New mails of this user (arrived since he last left the folder, still unread)
 			$marks = $newMarks->marks($user, (int) $account->id);
 			$news = $newMarks->counts($marks);
@@ -170,6 +204,10 @@ switch ($action) {
 				}, array_filter($tagHelper->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), function ($t) {
 					return (int) $t['status'] === 1;
 				}))),
+				// Protected for its password (1.89.0): the index as the others, synchronised while a session unlocked it
+				'protected' => $account->isProtected() ? 1 : 0,
+				'protect_level' => $account->isProtected() ? 'password' : '',
+				'locked' => $account->isProtected() && !InboxProtect::isUnlocked((int) $account->id) ? 1 : 0,
 			);
 		}
 		// Size of the folders (1.40.0), asked by the user: the mails indexed, summed by the database (no IMAP call)
@@ -182,6 +220,10 @@ switch ($action) {
 			}
 			foreach ($list as $i => $a) {
 				foreach ($a['folders'] as $k => $f) {
+					// A protected mailbox has no index to sum (the size is not known)
+					if (!empty($a['protected'])) {
+						continue;
+					}
 					$list[$i]['folders'][$k]['bytes'] = $bytes[(int) $f['id']] ?? 0;
 				}
 			}
@@ -194,6 +236,7 @@ switch ($action) {
 				return (int) $b['personal'] <=> (int) $a['personal'] ?: strcasecmp($a['label'] ?: $a['email'], $b['label'] ?: $b['email']);
 			});
 		}
+		$live->close();
 		inboxAjaxReply(array('accounts' => $list, 'admin' => (bool) $user->hasRight('inbox', 'account', 'admin'), 'icons' => InboxLook::choices()));
 		// no break
 

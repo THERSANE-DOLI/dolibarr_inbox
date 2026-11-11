@@ -29,6 +29,7 @@ require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxsync.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
+require_once __DIR__.'/inboxlive.class.php';
 
 /**
  * Every write follows the same order (P8): write on the mail server, check, then the index. Never the index first.
@@ -201,6 +202,26 @@ class InboxActions
 	 */
 	protected function rows(User $user, array $mailIds, $level)
 	{
+		// Mails of a protected mailbox (1.89.0): numbers of the live reading, all of one mailbox, nothing in the index
+		$live = array_filter($mailIds, array('InboxLive', 'isMail'));
+		if ($live) {
+			$accountId = InboxLive::accountOf(reset($live));
+			$access = new InboxAccess($this->db);
+			$account = $this->account($accountId);
+			if (count($live) !== count($mailIds) || !$account || !$account->isLive() || count(array_unique(array_map(array('InboxLive', 'accountOf'), $live))) !== 1) {
+				$this->error = 'InboxMailNotFound';
+				return null;
+			}
+			if (!$this->system && !$access->check($user, $accountId, $level)) {
+				$this->error = $access->check($user, $accountId, InboxAccess::LEVEL_READ) ? 'InboxErrorNeedManage' : 'InboxMailNotFound';
+				return null;
+			}
+			$rows = $this->live()->actionRows($account, $live);
+			if ($rows === null) {
+				$this->error = 'InboxMailNotFound';
+			}
+			return $rows;
+		}
 		$p = $this->db->prefix();
 		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.fk_folder, m.remote_id, m.sort_key, m.message_id, m.subject, m.date_mail, m.date_received, m.seen, m.answered,"
 			." m.flagged, m.keywords, f.path, f.role, f.delimiter FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
@@ -222,6 +243,21 @@ class InboxActions
 		}
 
 		return $rows;
+	}
+
+	/** @var InboxLive|null */
+	protected $liveReader;
+
+	/**
+	 * @return InboxLive Live reading of the protected mailboxes (1.89.0)
+	 */
+	protected function live()
+	{
+		if ($this->liveReader === null) {
+			$this->liveReader = new InboxLive($this->db);
+		}
+
+		return $this->liveReader;
 	}
 
 	/**
@@ -387,6 +423,9 @@ class InboxActions
 	{
 		$first = $list[0];
 		$p = $this->db->prefix();
+		if (!empty($first->live) || InboxLive::isLive($folderId)) {
+			return $this->moveLive($user, $list, (int) $folderId, $kind);
+		}
 		$target = $this->db->getRow("SELECT rowid, fk_account, path, role FROM ".$p."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1 AND selectable = 1");
 		if (!is_object($target)) {
 			$this->error = 'InboxErrorFolderNotFound';
@@ -461,6 +500,59 @@ class InboxActions
 	}
 
 	/**
+	 * Move inside a protected mailbox (1.89.0): on the server only, the mails get their new numbers; never from or to
+	 * another mailbox (it would put the mail in an index), never journaled with its subject
+	 *
+	 * @param User     $user     User
+	 * @param object[] $list     Rows of one folder (live)
+	 * @param int      $folderId Target folder (live number)
+	 * @param string   $kind     Action
+	 * @return array<string,mixed>|null
+	 */
+	protected function moveLive(User $user, array $list, $folderId, $kind)
+	{
+		$first = $list[0];
+		if (empty($first->live) || !InboxLive::isLive($folderId) || InboxLive::accountOf($folderId) !== (int) $first->fk_account) {
+			$this->error = 'InboxProtectErrorMoveOut';
+			return null;
+		}
+		$account = $this->account((int) $first->fk_account);
+		$target = $account ? $this->live()->folder($account, $folderId) : null;
+		if (!$target) {
+			$this->error = 'InboxErrorFolderNotFound';
+			return null;
+		}
+		if ((int) $target->rowid === (int) $first->fk_folder) {
+			return array('count' => 0, 'undo' => array());
+		}
+		$c = $this->connector((int) $first->fk_account);
+		if (!$c) {
+			return null;
+		}
+		$map = $c->move((string) $first->path, array_map(function ($r) {
+			return (string) $r->remote_id;
+		}, $list), (string) $target->path);
+		if ($map === null) {
+			$this->error = $c->getError();
+			return null;
+		}
+		$known = array_values(array_filter(array_map('strval', $map), function ($v) {
+			return (bool) preg_match('/^\d+:\d+$/', $v);
+		}));
+		$numbers = InboxLive::mailIds((int) $first->fk_account, (string) $target->path, $known);
+		$newIds = array();
+		foreach ($list as $r) {
+			$new = (string) ($map[(string) $r->remote_id] ?? '');
+			if (isset($numbers[$new])) {
+				$newIds[(int) $r->rowid] = $numbers[$new];
+			}
+		}
+
+		return array('count' => count($list), 'ids' => $newIds,
+			'undo' => $newIds ? array(array('action' => 'move', 'ids' => array_values($newIds), 'folder' => (int) $first->fk_folder)) : array());
+	}
+
+	/**
 	 * Counters of the folders follow at once (the next pass of the synchronisation reads the real ones)
 	 *
 	 * @param int      $from Source folder
@@ -490,6 +582,10 @@ class InboxActions
 	 */
 	protected function roleFolder($accountId, $role)
 	{
+		$account = $this->account((int) $accountId);
+		if ($account && $account->isLive()) {
+			return $this->live()->folder($account, 0, $role);
+		}
 		$f = $this->db->getRow("SELECT rowid, path, delimiter, role FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $accountId)." AND role = '".$this->db->escape($role)."'"
 			." AND status = 1 AND selectable = 1 ORDER BY CASE WHEN flags LIKE '%\\\\\\\\".$this->db->escape($role)."%' THEN 0 ELSE 1 END, LENGTH(path)");
 
@@ -526,7 +622,25 @@ class InboxActions
 		$out = array('count' => 0, 'undo' => array(), 'ids' => array());
 		foreach ($byYear as $year => $rows) {
 			$path = $basePath.$delim.$year;
-			$folder = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".$accountId." AND path = '".$this->db->escape($path)."' AND status = 1");
+			if (!empty($first->live)) {
+				// Protected mailbox: the folder of the year on the server, created when missing
+				$account = $this->account($accountId);
+				$folder = $this->live()->folder($account, InboxLive::folderId($accountId, $path));
+				if (!$folder) {
+					if ((!$base && !$c->createFolder($basePath)) || !$c->createFolder($path)) {
+						$this->error = $c->getError();
+						return null;
+					}
+					InboxLive::forgetFolders($accountId);
+					$folder = $this->live()->folder($account, InboxLive::folderId($accountId, $path));
+					if (!$folder) {
+						$this->error = 'InboxErrorFolderNotFound';
+						return null;
+					}
+				}
+			} else {
+				$folder = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".$accountId." AND path = '".$this->db->escape($path)."' AND status = 1");
+			}
 			if (!is_object($folder)) {
 				if (!$base && !$c->createFolder($basePath)) {
 					$this->error = $c->getError();
@@ -639,7 +753,7 @@ class InboxActions
 			return null;
 		}
 		// « Junk » or « Not junk » of a user: learned by the engine of inbox (1.88.0), the mails at their new place
-		if ($kind === '' && !empty($moved['ids'])) {
+		if ($kind === '' && !empty($moved['ids']) && empty($first->live)) {
 			require_once __DIR__.'/inboxspamcheck.class.php';
 			(new InboxSpamCheck($this->db))->queue($user, array_values($moved['ids']), $junk);
 		}
@@ -667,7 +781,8 @@ class InboxActions
 	protected function trigger(User $user, $code, $accountId, array $data)
 	{
 		$account = $this->account($accountId);
-		if ($account) {
+		// Protected with its content (1.89.0): nothing of its mails given to the other modules
+		if ($account && !$account->isLive()) {
 			$account->context['inbox'] = $data;
 			$account->call_trigger($code, $user);
 		}
