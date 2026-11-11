@@ -1115,7 +1115,7 @@ InboxJunkLegitText = Questa mail è nella posta indesiderata, ma Dolibarr conosc
 InboxJunkLegitShort = Mittente noto e autenticato: probabilmente non indesiderata
 InboxJunkLegitCount = %s mail probabilmente non indesiderate
 InboxAuthServers = Server di autenticazione attendibili
-InboxAuthServersHelp = Nome dei server di ricezione dell'azienda, come lo scrivono in « Authentication-Results » (più di uno: separati da virgole). Senza, inbox non dice nulla dell'autenticazione dei mittenti.
+InboxAuthServersHelp = Nome dei server di ricezione dell'azienda, come lo scrivono in « Authentication-Results » (più di uno: separati da virgole). Senza, inbox non dice nulla dell'autenticazione dei mittenti. Nessun mittente è allora provato: niente immagini mostrate da sole, nessun badge di dominio riconosciuto, nessun richiedente di una fonte di dati, nessun logo di marchio.
 
 # Writing and sending (1.16.0)
 InboxNewMail = Nuova mail

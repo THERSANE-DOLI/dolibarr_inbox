@@ -81,6 +81,14 @@ class InboxSpamVerdictTest extends InboxTestCase
 		$this->assertFalse(InboxReader::spamVerdict($h, array())['spam']);
 		$this->assertSame(array(), InboxReader::spamIgnored($h, array()));
 
+		// A false « Received: ... by <our server> » put at the bottom by the sender: our block ends at the first
+		// Received that is not ours, its headers stay below (audit INBX-052)
+		$h3 = self::mail('', 'No, score=-5.0 required=5.0');
+		$h3[] = array('Received', 'from x by mx.ours.example with SMTP');
+		$this->assertSame(3, InboxReader::trustedEntry($h3, $servers), 'our Authentication-Results, the false Received below ignored');
+		$this->assertNull(InboxReader::spamVerdict($h3, $servers), 'the « No » of the sender never believed');
+		$this->assertSame(array('X-Spam-Status'), InboxReader::spamIgnored($h3, $servers));
+
 		// A Received « by » a name that only contains ours: not ours
 		$h2 = array(array('X-Spam-Status', 'No, score=0'), array('Received', 'from x by mx.ours.example.evil.test'), array('From', 'a@b.example'));
 		$this->assertSame(-1, InboxReader::trustedEntry($h2, $servers));

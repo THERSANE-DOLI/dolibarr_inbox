@@ -217,19 +217,41 @@ class InboxSecurityFixes2Test extends InboxTestCase
 	 */
 	public function testAuthPass()
 	{
+		$ar = function ($value) {
+			return InboxReader::authResults(array(array('Authentication-Results', $value)));
+		};
+		// No receiving server declared: the topmost header may be the sender's, never proven (INBX-071, 2026-11-11)
 		$this->setting('INBOX_AUTH_SERVERS', '');
 		$this->assertFalse(InboxReader::authPass(InboxReader::authResults(array()), 'boss@client.invalid'), 'no result: not proven');
-		$dkim = InboxReader::authResults(array(array('Authentication-Results', 'mx.example.invalid; spf=pass smtp.mailfrom=client.invalid; dkim=pass header.d=client.invalid header.s=s1; dmarc=none')));
+		$this->assertFalse(InboxReader::authPass($ar('mx.example.com; dmarc=pass header.from=client.invalid'), 'boss@client.invalid'), 'no server declared');
+
+		$this->setting('INBOX_AUTH_SERVERS', 'mx.example.com');
+		$dkim = $ar('mx.example.com; spf=pass smtp.mailfrom=client.invalid; dkim=pass header.d=client.invalid header.s=s1; dmarc=none');
 		$this->assertSame(array('client.invalid'), $dkim['dkim_domains']);
 		$this->assertTrue(InboxReader::authPass($dkim, 'boss@client.invalid'));
 		$this->assertTrue(InboxReader::authPass($dkim, 'boss@mail.client.invalid'), 'a subdomain of the signature');
 		$this->assertFalse(InboxReader::authPass($dkim, 'boss@other.invalid'), 'a signature of another domain');
-		$this->assertTrue(InboxReader::authPass(InboxReader::authResults(array(array('Authentication-Results', 'mx.example.invalid; dmarc=pass'))), 'x@any.invalid'));
-		$this->assertFalse(InboxReader::authPass(InboxReader::authResults(array(array('Authentication-Results', 'mx.example.invalid; dkim=pass header.d=client.invalid; dmarc=fail'))), 'boss@client.invalid'));
-		// A receiving server declared: its result only
-		$this->setting('INBOX_AUTH_SERVERS', 'mx.example.com');
-		$this->assertFalse(InboxReader::authPass(InboxReader::authResults(array(array('Authentication-Results', 'forged.example; dmarc=pass'))), 'boss@client.invalid'));
-		$this->assertTrue(InboxReader::authPass(InboxReader::authResults(array(array('Authentication-Results', 'mx.example.com 1; dmarc=pass'))), 'boss@client.invalid'));
+		$this->assertTrue(InboxReader::authPass($ar('mx.example.com; dmarc=pass header.from=client.invalid'), 'x@client.invalid'));
+		$this->assertFalse(InboxReader::authPass($ar('mx.example.com; dmarc=pass'), 'x@client.invalid'), 'DMARC without the domain it was evaluated on');
+		$this->assertFalse(InboxReader::authPass($ar('mx.example.com; dmarc=pass header.from=other.invalid'), 'x@client.invalid'), 'DMARC of another domain (INBX-050)');
+		$this->assertFalse(InboxReader::authPass($ar('mx.example.com; dkim=pass header.d=client.invalid; dmarc=fail header.from=client.invalid'), 'boss@client.invalid'));
+		$this->assertFalse(InboxReader::authPass($ar('forged.example; dmarc=pass header.from=client.invalid'), 'boss@client.invalid'), 'the result of the server declared only');
+		$this->assertTrue(InboxReader::authPass($ar('mx.example.com 1; dmarc=pass header.from=client.invalid'), 'boss@client.invalid'));
+
+		// INBX-050: values chosen by the sender inside a result are not results
+		$forged = $ar('mx.example.com; spf=pass (mx.example.com: domain of dmarc=pass@evil.invalid designates 192.0.2.1 as permitted sender)'
+			.' smtp.mailfrom=dmarc=pass@evil.invalid; dkim=none; dmarc=fail (p=none) header.from=recognized.invalid');
+		$this->assertSame('fail', $forged['dmarc'], 'the address of the envelope is not the verdict');
+		$this->assertTrue($forged['fail']);
+		$this->assertFalse(InboxReader::authPass($forged, 'compta@recognized.invalid'));
+		$this->assertSame('none', $ar('mx.example.com; spf=pass smtp.mailfrom=dkim=pass@evil.invalid; dkim=none')['dkim'], 'nor for DKIM (one-click unsubscribe)');
+		$i = $ar('mx.example.com; dkim=pass header.i=recognized.invalid@evil.invalid header.d=evil.invalid');
+		$this->assertSame(array('evil.invalid'), $i['dkim_domains']);
+		$i = $ar('mx.example.com; dkim=pass header.i=recognized.invalid@evil.invalid');
+		$this->assertSame(array('evil.invalid'), $i['dkim_domains'], 'header.i: the part after its @');
+		$twice = $ar('mx.example.com; dmarc=pass header.from=client.invalid; dmarc=pass header.from=client.invalid');
+		$this->assertTrue(InboxReader::authPass($twice, 'a@client.invalid'), 'a result repeated as is (Plesk) counts once');
+		$this->assertTrue($ar('mx.example.com; dmarc=fail header.from=client.invalid; dmarc=pass header.from=client.invalid')['fail'], 'two that differ: failure');
 	}
 
 	/**

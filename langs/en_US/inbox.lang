@@ -1115,7 +1115,7 @@ InboxJunkLegitText = This mail is in the junk, but %s is known to Dolibarr and t
 InboxJunkLegitShort = Known sender, authenticated: probably not a junk
 InboxJunkLegitCount = %s mail(s) probably not junk
 InboxAuthServers = Trusted authentication servers
-InboxAuthServersHelp = Name of the receiving servers of the company, as they write it in « Authentication-Results » (several: separated by commas). Without it, inbox says nothing of the authentication of the senders.
+InboxAuthServersHelp = Name of the receiving servers of the company, as they write it in « Authentication-Results » (several: separated by commas). Without it, inbox says nothing of the authentication of the senders. Nor is any sender proven: no pictures shown alone, no badge of a recognized domain, no requester of a data source, no brand logo.
 
 # Writing and sending (1.16.0)
 InboxNewMail = New mail

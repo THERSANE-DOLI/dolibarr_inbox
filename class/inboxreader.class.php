@@ -301,7 +301,7 @@ class InboxReader
 			'sender_check' => $senderCheck,
 			// Bank details in the mail (lot A6, 1.75.0): a lesson with its signals, never « all is fine »
 			// Setting of the administrator (1.78.0): on by default
-			'bank' => !getDolGlobalInt('INBOX_BANK_CHECK', 1) ? null : (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".($message->bodyText !== '' ? $message->bodyText : InboxMimeParser::htmlToText($message->bodyHtml)),
+			'bank' => !getDolGlobalInt('INBOX_BANK_CHECK', 1) ? null : (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".$message->bodyText."\n".InboxMimeParser::htmlToText($message->bodyHtml),
 				array_column($attachments, 'name'), $passed, $senderCheck, (string) $message->replyToEmail),
 			'trusted' => $trusted->senderVerdict($message->fromEmail, (string) $message->replyToEmail, $auth, $passed),
 			'link_hosts' => (object) $links['hosts'],
@@ -787,16 +787,41 @@ class InboxReader
 				break;
 			}
 		}
-		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false, 'trusted' => $trusted, 'dkim_domains' => array());
-		foreach (array('spf', 'dkim', 'dmarc') as $k) {
-			if (preg_match('/\b'.$k.'=([a-z]+)/i', $value, $m)) {
-				$out[$k] = strtolower($m[1]);
+		$out = array('spf' => '', 'dkim' => '', 'dmarc' => '', 'fail' => false, 'trusted' => $trusted, 'dkim_domains' => array(), 'dmarc_from' => '');
+		// Read result by result (RFC 8601): a « dmarc=pass » in the address of the envelope, in a comment or in the
+		// value of a property is not a result (audit INBX-050). One spf and one dmarc: two that differ are a failure.
+		require_once __DIR__.'/inboxsenderauth.class.php';
+		$parts = $value !== '' ? InboxSenderAuth::splitStructured($value) : array();
+		$seen = array();
+		foreach (array_slice(is_array($parts) ? $parts : array(), 1) as $part) {
+			if (!preg_match('/^\s*(spf|dkim|dmarc)\s*=\s*([a-z]+)(.*)$/is', $part, $m)) {
+				continue;
 			}
-		}
-		// Domains of the valid DKIM signatures (header.d, else header.i), each result being separated by a ;
-		foreach (explode(';', $value) as $part) {
-			if (preg_match('/^\s*dkim=pass\b/i', $part) && preg_match('/\bheader\.(?:d|i)=@?([a-z0-9.-]{1,253})/i', $part, $m)) {
-				$out['dkim_domains'][] = strtolower(trim($m[1], '.'));
+			$method = strtolower($m[1]);
+			$result = strtolower($m[2]);
+			$props = InboxSenderAuth::properties($m[3]);
+			if ($method === 'dkim') {
+				// The domain of a valid signature: header.d, else the part of header.i after its @ (its local part is free)
+				$domain = isset($props['header.d']) ? $props['header.d'] : (isset($props['header.i']) ? (string) substr((string) strrchr('@'.$props['header.i'], '@'), 1) : '');
+				$domain = strtolower(trim($domain, '. '));
+				if ($result === 'pass' && preg_match('/^[a-z0-9.-]{1,253}$/', $domain)) {
+					$out['dkim_domains'][] = $domain;
+				}
+				$out['dkim'] = $out['dkim'] === 'pass' ? 'pass' : ($out['dkim'] === '' || $result === 'pass' ? $result : $out['dkim']);
+				continue;
+			}
+			$key = $result.'|'.strtolower(trim((string) ($props['header.from'] ?? ''))).'|'.strtolower(trim((string) ($props['smtp.mailfrom'] ?? '')));
+			if (isset($seen[$method])) {
+				// Plesk repeats its results as they are (1.88.11): once; another value is a forged or contradictory one
+				if ($seen[$method] !== $key) {
+					$out['fail'] = true;
+				}
+				continue;
+			}
+			$seen[$method] = $key;
+			$out[$method] = $result;
+			if ($method === 'dmarc') {
+				$out['dmarc_from'] = strtolower(trim((string) ($props['header.from'] ?? '')));
 			}
 		}
 		if ($out['spf'] === '') {
@@ -805,7 +830,7 @@ class InboxReader
 				$out['spf'] = strtolower($m[1]);
 			}
 		}
-		$out['fail'] = $out['dmarc'] === 'fail' || ($out['dkim'] === 'fail' && in_array($out['spf'], array('fail', 'softfail'), true));
+		$out['fail'] = $out['fail'] || $out['dmarc'] === 'fail' || ($out['dkim'] === 'fail' && in_array($out['spf'], array('fail', 'softfail'), true));
 
 		return $out;
 	}
@@ -841,9 +866,14 @@ class InboxReader
 		if (!$servers) {
 			return $found;
 		}
+		// The block written by our servers from the top: it ends at the first Received that is not theirs, a lower
+		// « Received: ... by <our server> » was written by the sender (audit INBX-052)
 		foreach (array_values($headers) as $i => $h) {
 			$name = strtolower((string) $h[0]);
-			if ($name === 'received' && preg_match('/\bby\s+\[?([a-z0-9.-]+)/i', (string) $h[1], $m) && in_array(strtolower(rtrim($m[1], '.')), $servers, true)) {
+			if ($name === 'received') {
+				if (!preg_match('/\bby\s+\[?([a-z0-9.-]+)/i', (string) $h[1], $m) || !in_array(strtolower(rtrim($m[1], '.')), $servers, true)) {
+					break;
+				}
 				$found = $i;
 			} elseif ($name === 'authentication-results' && in_array(strtolower(trim((string) preg_replace('/\s+\d+\s*$/', '', (string) strtok((string) $h[1], ';')))), $servers, true)) {
 				$found = $i;
@@ -953,13 +983,16 @@ class InboxReader
 	public static function authPass(array $auth, $fromEmail)
 	{
 		require_once __DIR__.'/inboxknownsenders.class.php';
-		if (!empty($auth['fail']) || (InboxKnownSenders::trustedServers() && empty($auth['trusted']))) {
+		// Without a receiving server declared, the topmost header may be the one of the sender: never proven (audit
+		// INBX-071; Settings > Security says so)
+		if (!empty($auth['fail']) || !InboxKnownSenders::trustedServers() || empty($auth['trusted'])) {
 			return false;
 		}
-		if (($auth['dmarc'] ?? '') === 'pass') {
-			return true;
-		}
 		$domain = strtolower((string) substr((string) strrchr((string) $fromEmail, '@'), 1));
+		// DMARC proves the domain it was evaluated on only: the one of the sender shown (audit INBX-050)
+		if (($auth['dmarc'] ?? '') === 'pass') {
+			return $domain !== '' && ($auth['dmarc_from'] ?? '') === $domain;
+		}
 		foreach ((array) ($auth['dkim_domains'] ?? array()) as $d) {
 			if ($domain !== '' && ($domain === $d || substr($domain, -strlen('.'.$d)) === '.'.$d)) {
 				return true;

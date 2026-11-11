@@ -24,6 +24,7 @@
 require_once __DIR__.'/inboxspamrspamd.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxsenderauth.class.php';
+require_once __DIR__.'/inboxknownsenders.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
@@ -188,7 +189,9 @@ class InboxSpamCheck
 			}
 			$headEnd = strpos($raw, "\r\n\r\n");
 			$headers = InboxSenderAuth::parseHeaders($headEnd === false ? $raw : substr($raw, 0, $headEnd));
-			if (!$all && InboxReader::spamVerdict($headers) !== null) {
+			// Judged by our server only when its servers are declared: else the verdict may be written by the sender
+			// (« X-Spam-Flag: NO », audit INBX-052)
+			if (!$all && InboxKnownSenders::trustedServers() && InboxReader::spamVerdict($headers) !== null) {
 				// Judged by the filter of the server already
 				$this->done((int) $r->rowid, null);
 				continue;

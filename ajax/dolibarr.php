@@ -31,6 +31,7 @@ dol_include_once('/inbox/class/inboxthreadlink.class.php');
 dol_include_once('/inbox/class/inboxactivity.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
+dol_include_once('/inbox/class/inboxsenderauth.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
 dol_include_once('/inbox/class/inboxcited.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
@@ -56,6 +57,29 @@ function inboxDolibarrFail($key)
 		'InboxErrorNoteEmpty' => 422, 'InboxErrorLinkNotYours' => 403, 'InboxErrorNoMessageId' => 422, 'Bad parameters' => 400, 'InboxErrorCannotCreate' => 403, 'InboxErrorCannotAttach' => 403,
 		'InboxErrorAttachmentInfected' => 422);
 	inboxAjaxReply(array('error' => preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key) : $key, 'code' => $key), $codes[$key] ?? 500);
+}
+
+/**
+ * The sender of the mail is proven (audit INBX-059): authenticated by our receiving server for its own domain, no
+ * Reply-To elsewhere, not the requester of a data source (typed by anyone in a form). Only then are the numbers of
+ * its signature offered to replace the ones of the card, the numbers the alerts tell to call.
+ *
+ * @param InboxReader                         $reader  Mail loaded
+ * @param array<int,array{0:string,1:string}> $headers Its headers
+ * @return bool
+ */
+function inboxDolibarrSenderProven(InboxReader $reader, array $headers)
+{
+	if ((string) ($reader->row->requester_email ?? '') !== '') {
+		return false;
+	}
+	$from = strtolower(trim((string) $reader->row->from_email));
+	$replyTo = strtolower(trim((string) InboxSenderAuth::extractAddress(InboxReader::headerValue($headers, 'reply-to'))));
+	if ($from === '' || ($replyTo !== '' && $replyTo !== $from)) {
+		return false;
+	}
+
+	return InboxReader::authPass(InboxReader::authResults($headers), $from);
 }
 
 /**
@@ -122,6 +146,10 @@ switch ($action) {
 		$contactId = (int) $reader->row->fk_socpeople;
 		if ($contactId <= 0 || $contactId !== (int) inboxAjaxParam('contact', 'int') || !InboxElements::canRead($user, 'contact', $contactId)
 			|| !InboxElements::canWriteType($user, 'contact')) {
+			inboxDolibarrFail('InboxErrorPieceNotReadable');
+		}
+		$raw = $reader->raw($user);
+		if ($raw === null || !inboxDolibarrSenderProven($reader, InboxReader::headers($raw))) {
 			inboxDolibarrFail('InboxErrorPieceNotReadable');
 		}
 		$situation = new InboxSituation($db);
@@ -358,7 +386,7 @@ switch ($action) {
 		// Phones of the signature that the cards of the contact and of the thirdparty do not have (1.69.0)
 		$contactId = (int) $reader->row->fk_socpeople;
 		$phones = array();
-		if ($contactId > 0 && InboxElements::canRead($user, 'contact', $contactId)) {
+		if ($contactId > 0 && InboxElements::canRead($user, 'contact', $contactId) && inboxDolibarrSenderProven($reader, $headers)) {
 			$situation = new InboxSituation($db);
 			$phones = $situation->newPhones($body, $contactId, (int) $reader->row->fk_soc);
 		}

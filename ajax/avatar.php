@@ -50,7 +50,8 @@ if (GETPOSTINT('reading') === 1 && (string) $reader->row->message_id !== '') {
 	if ($raw !== null && ((int) $reader->row->size <= 0 || strlen($raw) === (int) $reader->row->size)) {
 		$auth = InboxReader::authResults(InboxReader::headers($raw));
 		// The logo of a brand only when our own server checked the mail (audit INBX-022)
-		$bimi = $auth['trusted'] && $auth['dmarc'] === 'pass' && !$auth['fail'];
+		// DMARC of the domain of the sender shown, never another one (audit INBX-050)
+		$bimi = $auth['dmarc'] === 'pass' && InboxReader::authPass($auth, (string) $reader->row->from_email);
 	}
 	if ($bimi && (int) $reader->row->fk_soc <= 0) {
 		dol_include_once('/inbox/class/inboxtrusteddomain.class.php');

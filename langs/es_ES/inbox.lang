@@ -1115,7 +1115,7 @@ InboxJunkLegitText = Este correo está en no deseado, pero Dolibarr conoce a %s 
 InboxJunkLegitShort = Remitente conocido y autenticado: probablemente no es no deseado
 InboxJunkLegitCount = %s correo(s) probablemente legítimo(s)
 InboxAuthServers = Servidores de autenticación de confianza
-InboxAuthServersHelp = Nombre de los servidores de recepción de la empresa, tal como lo escriben en « Authentication-Results » (varios: separados por comas). Sin él, inbox no dice nada de la autenticación de los remitentes.
+InboxAuthServersHelp = Nombre de los servidores de recepción de la empresa, tal como lo escriben en « Authentication-Results » (varios: separados por comas). Sin él, inbox no dice nada de la autenticación de los remitentes. Ningún remitente queda entonces probado: ni imágenes mostradas solas, ni insignia de dominio reconocido, ni solicitante de una fuente de datos, ni logotipo de marca.
 
 # Writing and sending (1.16.0)
 InboxNewMail = Nuevo correo

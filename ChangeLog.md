@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, authentication of the senders and alerts against frauds :   1.89.4
+  - Authentication-Results read result by result: a « dmarc=pass » or « dkim=pass » put by the sender in its
+    address of the envelope or in a comment is no longer taken for the verdict; DMARC proves the domain it was
+    evaluated on only (header.from = the sender shown); the domain of a DKIM signature read after the @ of header.i.
+  - without a receiving server declared in Settings > Anti-spam, no sender is proven (pictures shown alone, badge
+    of a recognized domain, requester of a data source, brand logo): the header may be written by the sender.
+  - entry of the mail into our servers: the block of the top only, a false « Received ... by <our server> » put
+    lower by the sender no longer makes its anti-spam headers believed; without servers declared, the anti-spam
+    engine of inbox no longer leaves aside a mail that brings its own verdict.
+  - bank details: the text and the HTML of the mail read (a mail could show its IBAN in HTML only); groups of an IBAN
+    separated by dots, dashes or narrow spaces, invisible characters inside the words or the numbers, still found.
+  - « Replace the number of the card »: offered and accepted for a proven sender only (no Reply-To elsewhere, never
+    the requester of a data source).
+
 - FIX: security audit of 2026-11-11, protected mailboxes keep their promise :   1.89.3
   - level « The password and the content »: the index of Meilisearch removed before the local data (it was left
     there), refused while Meilisearch does not answer or while mails wait in the queue; the files of the cache and

@@ -43,6 +43,12 @@ class InboxBankCheckTest extends InboxTestCase
 		$this->assertFalse(InboxBankCheck::validIban('FR7630006000011234567890188'), 'wrong key');
 		$this->assertSame(array(self::IBAN, self::OTHER), InboxBankCheck::ibans("Notre IBAN : FR76 3000 6000 0112 3456 7890 189\nNew: de89 3704 0044 0532 0130 00"));
 		$this->assertSame(array(), InboxBankCheck::ibans('Commande FR12 3456 7890 1234 5678'), 'a reference that looks like it');
+		// Other separators and invisible characters never hide it (audit INBX-053)
+		$this->assertSame(array(self::IBAN), InboxBankCheck::ibans('IBAN FR76.3000.6000.0112.3456.7890.189'));
+		$this->assertSame(array(self::IBAN), InboxBankCheck::ibans('IBAN FR76-3000-6000-0112-3456-7890-189'));
+		$this->assertSame(array(self::IBAN), InboxBankCheck::ibans("IBAN FR76\u{202F}3000\u{202F}6000\u{202F}0112\u{202F}3456\u{202F}7890\u{202F}189"));
+		$this->assertSame(array(self::IBAN), InboxBankCheck::ibans("IBAN FR76 30\u{200B}00 6000 0112 3456 7890 189"));
+		$this->assertTrue(InboxBankCheck::topic("Merci de noter nos nouvelles coordon\u{200B}nées ban\u{00AD}caires", array())['words']);
 		$this->assertSame('FR76 •••• 0189', InboxBankCheck::mask(self::IBAN));
 		$this->assertNull(InboxBankCheck::topic('Bonjour, voici le devis.', array('devis.pdf')));
 		$this->assertTrue(InboxBankCheck::topic('Merci de noter nos nouvelles coordonnées bancaires', array())['words']);

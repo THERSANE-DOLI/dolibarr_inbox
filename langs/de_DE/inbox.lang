@@ -1115,7 +1115,7 @@ InboxJunkLegitText = Diese Mail liegt im Spam, aber %s ist Dolibarr bekannt und 
 InboxJunkLegitShort = Bekannter, authentifizierter Absender: wahrscheinlich kein Spam
 InboxJunkLegitCount = %s Mail(s) wahrscheinlich kein Spam
 InboxAuthServers = Vertrauenswürdige Authentifizierungsserver
-InboxAuthServersHelp = Name der Empfangsserver des Unternehmens, wie sie ihn in « Authentication-Results » schreiben (mehrere: durch Kommas getrennt). Ohne ihn sagt inbox nichts über die Authentifizierung der Absender.
+InboxAuthServersHelp = Name der Empfangsserver des Unternehmens, wie sie ihn in « Authentication-Results » schreiben (mehrere: durch Kommas getrennt). Ohne ihn sagt inbox nichts über die Authentifizierung der Absender. Dann ist auch kein Absender bewiesen: keine allein angezeigten Bilder, kein Abzeichen einer erkannten Domain, kein Anfragender einer Datenquelle, kein Markenlogo.
 
 # Writing and sending (1.16.0)
 InboxNewMail = Neue E-Mail
