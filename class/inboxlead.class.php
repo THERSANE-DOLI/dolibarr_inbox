@@ -1625,6 +1625,10 @@ class InboxLead
 			if ((int) ($x['mail'] ?? 0) !== (int) $mailId || (int) ($x['at'] ?? 0) < dol_now() - 7 * 86400) {
 				continue;
 			}
+			// The thirdparty read with the rights of the user, in his entity (audit INBX-058)
+			if ((int) ($x['soc'] ?? 0) <= 0 || !InboxElements::canRead($user, 'societe', (int) $x['soc'])) {
+				continue;
+			}
 			$c = (array) ($x['contact'] ?? array());
 			$p = $this->db->prefix();
 			$soc = $this->db->getRow("SELECT nom FROM ".$p."societe WHERE rowid = ".((int) $x['soc']));

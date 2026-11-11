@@ -3414,6 +3414,42 @@
 			}
 		});
 	}
+	/**
+	 * HTML of a card of Dolibarr kept to what a card shows (audit INBX-061): the core does not escape every value of
+	 * its tooltips (subject of a ticket made from a mail, name of a contact), a tag or an event handler written there
+	 * would run in the page of inbox. Read in an inert document, only simple tags, no event, links and pictures of
+	 * Dolibarr only.
+	 * @param {string} html HTML of core/ajax/ajaxtooltip.php
+	 * @returns {string}
+	 */
+	const TIP_TAGS = new Set(['A', 'B', 'BR', 'DIV', 'EM', 'HR', 'I', 'IMG', 'LI', 'P', 'SMALL', 'SPAN', 'STRONG', 'TABLE', 'TBODY', 'TD', 'TH', 'THEAD', 'TR', 'U', 'UL']);
+	const TIP_ATTRS = new Set(['class', 'title', 'alt', 'colspan', 'rowspan', 'width', 'height', 'style', 'href', 'src']);
+	function tipHtml(html) {
+		const doc = new DOMParser().parseFromString('<body>' + String(html || '') + '</body>', 'text/html');
+		const walk = node => {
+			for (const el of Array.from(node.children)) {
+				if (!TIP_TAGS.has(el.tagName)) {
+					el.replaceWith(doc.createTextNode(el.textContent || ''));
+					continue;
+				}
+				for (const at of Array.from(el.attributes)) {
+					const name = at.name.toLowerCase();
+					const ok = TIP_ATTRS.has(name)
+						&& (name !== 'style' || !/url\s*\(|expression|@import|position\s*:/i.test(at.value))
+						&& ((name !== 'href' && name !== 'src') || sameOriginUrl(at.value) !== '');
+					if (!ok) {
+						el.removeAttribute(at.name);
+					}
+				}
+				if (el.tagName === 'A') {
+					el.setAttribute('rel', 'noopener noreferrer');
+				}
+				walk(el);
+			}
+		};
+		walk(doc.body);
+		return doc.body.innerHTML;
+	}
 	function objTipLoad(key) {
 		if (!OT.cache.has(key)) {
 			const src = OT.src.get(key) || {};
@@ -3486,7 +3522,7 @@
 			return;
 		}
 		// HTML of Dolibarr (same trust as its pages), drawn by css/inbox-doltip.css
-		el.innerHTML = '<div class="ibx-objtip__body">' + html + '</div>';
+		el.innerHTML = '<div class="ibx-objtip__body">' + tipHtml(html) + '</div>';
 		I.mount(el);
 		objTipPlace(anchor);
 	}
@@ -4910,7 +4946,8 @@
 	}
 	/** An address inside Dolibarr only (the module gives it) */
 	function insideUrl(url) {
-		return typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/' && !/[\s<>"]/.test(url);
+		// « /\host » is read as another host by the browsers (audit INBX-084)
+		return typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/' && !/[\s<>"\\]/.test(url);
 	}
 	/** Summary of a block: badges, lines, one action (window), links; every text escaped */
 	function panelBody(d) {

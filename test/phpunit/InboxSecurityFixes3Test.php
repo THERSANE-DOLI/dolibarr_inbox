@@ -27,6 +27,10 @@ dol_include_once('/inbox/class/inboxagenda.class.php');
 dol_include_once('/inbox/class/inboxbounce.class.php');
 dol_include_once('/inbox/class/inboxoutbox.class.php');
 dol_include_once('/inbox/class/inboxmessage.class.php');
+dol_include_once('/inbox/class/inboxservertester.class.php');
+dol_include_once('/inbox/class/inboxmeili.class.php');
+dol_include_once('/inbox/class/inboxlead.class.php');
+dol_include_once('/inbox/class/inboxuserparam.class.php');
 
 /**
  * Database only, no mail server
@@ -103,5 +107,45 @@ class InboxSecurityFixes3Test extends InboxTestCase
 		$shown = self::shown(InboxAgenda::note($text));
 		$this->assertStringNotContainsString('<img', $shown, 'never a tag in the card of the event');
 		$this->assertStringContainsString('Bonjour', $shown);
+	}
+
+	/**
+	 * INBX-051: an IPv4 written in an IPv6 is the IPv4
+	 *
+	 * @return void
+	 */
+	public function testPrivateAddresses()
+	{
+		foreach (array('127.0.0.1', '::1', '::', '::ffff:127.0.0.1', '::ffff:10.0.0.1', '::ffff:169.254.169.254', '::127.0.0.1', '64:ff9b::7f00:1',
+			'2002:7f00:1::', '100.64.0.1', '198.18.0.1', 'fd00::1', 'fe80::1', 'not an ip') as $ip) {
+			$this->assertTrue(InboxServerTester::ipPrivate($ip), $ip);
+			$this->assertTrue(InboxServerTester::isPrivate($ip), $ip.' (isPrivate)');
+		}
+		foreach (array('8.8.8.8', '2001:4860:4860::8888', '::ffff:8.8.8.8', '100.128.0.1', '198.20.0.1') as $ip) {
+			$this->assertFalse(InboxServerTester::ipPrivate($ip), $ip);
+		}
+		$this->assertTrue(InboxMeili::isLocal('http://[::ffff:127.0.0.1]:7700'));
+		$this->assertTrue(InboxMeili::isLocal('http://[::ffff:10.0.0.5]:7700'));
+		$this->assertFalse(InboxMeili::isLocal('https://[2001:4860:4860::8888]'));
+	}
+
+	/**
+	 * INBX-058: the contacts left to create name only the thirdparties the user may read
+	 *
+	 * @return void
+	 */
+	public function testLeadPendingRights()
+	{
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_secret_soc', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$soc = (int) $this->db->last_insert_id($p.'societe');
+		$u = $this->user('leadnoright');
+		$list = array(array('mail' => 424242, 'soc' => $soc, 'contact' => array('lastname' => 'zzz'), 'at' => dol_now()));
+		(new InboxUserParam($this->db))->set($u, 'lead_pending', (string) json_encode($list));
+		$lead = new InboxLead($this->db);
+		$this->assertSame(array(), $lead->pendingFor($u, 424242), 'no right on the thirdparties: nothing named');
+		(new InboxUserParam($this->db))->set($this->admin, 'lead_pending', (string) json_encode($list));
+		$this->assertSame('inboxtest_secret_soc', $lead->pendingFor($this->admin, 424242)[0]['soc_name'] ?? '', 'with the right: named');
+		$this->db->query("DELETE FROM ".$p."societe WHERE rowid = ".$soc);
 	}
 }

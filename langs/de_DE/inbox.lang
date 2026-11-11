@@ -1048,6 +1048,7 @@ InboxAlreadyLinked = Bereits verknüpft
 InboxNoPieceFound = Kein Beleg gefunden
 InboxTypeToSearch = Ref., Geschäftspartner oder Kontakt eingeben
 InboxErrorPieceNotReadable = Sie dürfen diesen Dolibarr-Beleg nicht lesen
+InboxErrorResocRemember = Diesen Geschäftspartner für alle nächsten Mails der Adresse zu merken, steht dem zu, der aus diesem Postfach senden darf: die Wahl gilt nur für diese Unterhaltung.
 InboxErrorNoteNotFound = Notiz nicht gefunden
 InboxErrorNoteNotYours = Nur der Verfasser oder eine Person, die das Postfach verwaltet, darf diese Notiz ändern
 InboxErrorNoteEmpty = Die Notiz ist leer

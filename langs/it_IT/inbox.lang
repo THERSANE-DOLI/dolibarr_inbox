@@ -1048,6 +1048,7 @@ InboxAlreadyLinked = Già collegato
 InboxNoPieceFound = Nessun documento trovato
 InboxTypeToSearch = Digita un rif., una terza parte o un contatto
 InboxErrorPieceNotReadable = Non puoi leggere questo documento di Dolibarr
+InboxErrorResocRemember = Ricordare questo soggetto terzo per tutte le prossime mail dell'indirizzo spetta a chi può inviare da questa casella: la scelta vale solo per questa conversazione.
 InboxErrorNoteNotFound = Nota non trovata
 InboxErrorNoteNotYours = Solo l'autore o una persona che gestisce la casella può modificare questa nota
 InboxErrorNoteEmpty = La nota è vuota

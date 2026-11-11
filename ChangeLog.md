@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, thirdparties of the mails and private network :   1.89.5
+  - contacts left to create after « New customer »: the thirdparty named only with the rights of the user; this
+    memory written by the panel only, never from My account.
+  - « Not the right thirdparty? » remembered for the address: by who may send from the mailbox, the mails of the
+    mailboxes of the entity only.
+  - card of a piece of Dolibarr on hover: its HTML kept to simple tags, no event, links and pictures of Dolibarr
+    only (the core does not escape every value of its cards, the subject of a ticket made from a mail for one).
+  - test of a server by a manager who is not an administrator of Dolibarr: an IPv4 written in an IPv6 (::ffff:..,
+    NAT64, 6to4) and the shared ranges of the operators counted as private; address of a window of a module
+    without a backslash.
+
 - FIX: security audit of 2026-11-11, authentication of the senders and alerts against frauds :   1.89.4
   - Authentication-Results read result by result: a « dmarc=pass » or « dkim=pass » put by the sender in its
     address of the envelope or in a comment is no longer taken for the verdict; DMARC proves the domain it was

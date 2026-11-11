@@ -81,8 +81,10 @@ class InboxMeili
 		if (!filter_var($ip, FILTER_VALIDATE_IP)) {
 			return false;
 		}
+		require_once __DIR__.'/inboxservertester.class.php';
 
-		return !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+		// An IPv4 written in an IPv6 is the IPv4 (audit INBX-051)
+		return InboxServerTester::ipPrivate($ip);
 	}
 
 	/**

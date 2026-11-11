@@ -1048,6 +1048,7 @@ InboxAlreadyLinked = Already linked
 InboxNoPieceFound = No piece found
 InboxTypeToSearch = Type a ref., a thirdparty or a contact
 InboxErrorPieceNotReadable = You cannot read this piece of Dolibarr
+InboxErrorResocRemember = Remembering this thirdparty for every next mail of the address is done by who may send from this mailbox: the choice is kept for this conversation only.
 InboxErrorNoteNotFound = Note not found
 InboxErrorNoteNotYours = Only its author or a person who manages the mailbox may change this note
 InboxErrorNoteEmpty = The note is empty
