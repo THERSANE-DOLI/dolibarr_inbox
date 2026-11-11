@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the delete button of the reading header turns red on hover and keyboard focus, as a destructive action;
+  in the trash (destroy for good) its icon is red at rest too :   1.83.3
+
 - FIX: « Record the sending on » a piece ticked at first only when Dolibarr records this sending in the agenda by
   itself (Agenda > Automatic events, « sent by mail » of the type of the piece), for the linked and the inserted
   pieces; the event is made only when the box is ticked :   1.83.2

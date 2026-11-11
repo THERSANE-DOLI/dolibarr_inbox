@@ -4282,7 +4282,7 @@
 			{ id: 'move', icon: 'folder-move', label: t('InboxMoveToMenu'), key: 'Maj+M', disabled: !!manage, reason: manage, run: () => moveDialog(ids) },
 			inJunk ? { id: 'notjunk', icon: 'inbox', label: t('InboxNotJunk'), key: 'Maj+J', disabled: !!manage, reason: manage, run: () => doJunk(ids, false) }
 				: { id: 'junk', icon: 'junk', label: t('InboxJunk'), key: 'J', disabled: !!manage, reason: manage, run: () => doJunk(ids, true) },
-			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, run: () => doDelete(ids) },
+			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, irreversible: inTrash, run: () => doDelete(ids) },
 		];
 		return items;
 	}
@@ -6892,7 +6892,8 @@
 		return list;
 	}
 	function actionButtons(m) {
-		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '') + '" data-action="' + esc(a.id) + '"'
+		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '')
+			+ (a.danger ? ' ibx-btn--danger-hover' + (a.irreversible ? ' is-irreversible' : '') : '') + '" data-action="' + esc(a.id) + '"'
 			+ (a.disabled ? ' aria-disabled="true" title="' + esc(a.reason || a.label) + '"' : ' title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '"') + ' aria-label="' + esc(a.label) + '">' + ic(a.icon) + '</button>').join('')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-more" aria-haspopup="menu" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>';
 	}
