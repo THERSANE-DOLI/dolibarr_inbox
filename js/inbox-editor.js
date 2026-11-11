@@ -257,6 +257,12 @@
 		/** Written by a mark of the editor (bold, italic, underline, strike): the button can take it off */
 		const MARKED = d => (d[0] === 'font-weight' && /^(bold(er)?|[5-9]\d{2,})$/i.test(d[1])) || (d[0] === 'font-style' && /^italic$/i.test(d[1]))
 			|| (d[0] === 'text-decoration' && /^(underline|line-through)$/i.test(d[1]));
+		/**
+		 * Never kept from a mail taken back in the editor (audit INBX-079): a block laid over the page (position,
+		 * z-index...) or an address loaded by the page of inbox (url(), image-set)
+		 */
+		const UNSAFE_STYLE = d => /^(position|z-index|inset|top|right|bottom|left|transform|filter|cursor|pointer-events|behavior|-moz-binding|content)$/i.test(d[0])
+			|| /url\s*\(|image-set|expression\s*\(|@import|javascript:/i.test(d[1]);
 		const keptStyle = (type, el) => {
 			let decl = declarations(el.getAttribute('style'));
 			// Spans one inside the other make one mark: the styles of the spans around are taken in, the inner one wins
@@ -268,7 +274,7 @@
 			const owned = OWNED[type];
 			const byName = new Map();
 			decl.forEach(d => {
-				if ((owned && owned.test(d[0])) || ((type === 'textStyle' || type === 'link') && MARKED(d))) {
+				if (UNSAFE_STYLE(d) || (owned && owned.test(d[0])) || ((type === 'textStyle' || type === 'link') && MARKED(d))) {
 					return;
 				}
 				// The table: its full width and centring are attributes of the editor

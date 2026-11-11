@@ -1,5 +1,105 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: settings of the application, who may change each one written in its definition :   1.89.10
+  - each setting declares who may change it: manager (managers of the mailboxes) or dolibarr_admin; a right missing
+    or mistyped is read as dolibarr_admin: a setting added later is never opened to more people than meant.
+  - the constants that go with a change (password of the controller of Rspamd when its server changes, last error)
+    declared with the setting, no longer written apart.
+  - the screens read the settings this user sees without changing them from the server: fields and switches
+    frozen, nothing written by hand in the script.
+
+- FIX: security audit of 2026-11-11, remarks :   1.89.9
+  - protected mailbox: its port of Sieve kept as its servers (the password goes there); its encrypted copies and its
+    notices removed with the mailbox.
+  - an attachment filed in the documents of a piece: an executable file gets « .noexe », as an upload of Dolibarr.
+
+- FIX: security audit of 2026-11-11, anti-spam and unsubscribing :   1.89.8
+  - blocked senders: from a mail whose sender is not proven, the block for every mailbox by the managers of the
+    list; a blocked address become the one of a user of Dolibarr told to the managers, no longer unblocked alone
+    (our own domains still are).
+  - learning of the anti-spam engine: 200 mails per user and per day (INBOX_RSPAMD_LEARN_MAX_PER_DAY), the base
+    being common to every mailbox.
+  - unsubscribing by mail: the address asked must belong to who signed the mail or to its sender, never a text of
+    the sender to a third party from the address of the company.
+
+- FIX: security audit of 2026-11-11, links, imitations and pieces :   1.89.7
+  - the link follows the conversation for a correspondent of it only (sender or recipient of its mails): a
+    Message-ID or a subject copied by someone else never gives him its pieces.
+  - links of a mail: the host of a link read before the address in its query (an imitation was missed); a
+    recognized domain written to the left of another one (thersane.fr.secure-pay.io) said as an imitation.
+  - blocked senders: the names of the thirdparties and contacts for who may read the thirdparties, the subject of
+    the mail of a block for the managers of the list and its author; « sender of a mail linked to a piece » found
+    again (its query never answered).
+  - « Edit as new » and a draft taken back: no style that lays a block over the page or loads an address, tracking
+    pictures removed and remote pictures as for a quote (Settings > Security).
+  - « New customer »: the extrafields that the page of creation lets the user fill only.
+
+- FIX: security audit of 2026-11-11, hardenings :   1.89.6
+  - « Detach from the conversation » and its undo: by who may send from the mailbox, the links being shared by every
+    copy of the mail.
+  - undo of « New customer »: only what the panel made in the session; values of the panel: a tag written in
+    entities removed as well.
+  - undo of an action outside the journal: the mails named by the lines undone only, never more mails than they did.
+  - brand logos (SVG): refused when a DOCTYPE comes out once read (encoding UTF-7) or when not in UTF-8.
+  - Settings > Server: the password of the master user typed again when its server changes.
+  - dev/rspamd/run.sh: a random password of the controller when none is given, never a password known in advance;
+    the DNS asked by Rspamd for the senders said in the README.
+
+- FIX: security audit of 2026-11-11, thirdparties of the mails and private network :   1.89.5
+  - contacts left to create after « New customer »: the thirdparty named only with the rights of the user; this
+    memory written by the panel only, never from My account.
+  - « Not the right thirdparty? » remembered for the address: by who may send from the mailbox, the mails of the
+    mailboxes of the entity only.
+  - card of a piece of Dolibarr on hover: its HTML kept to simple tags, no event, links and pictures of Dolibarr
+    only (the core does not escape every value of its cards, the subject of a ticket made from a mail for one).
+  - test of a server by a manager who is not an administrator of Dolibarr: an IPv4 written in an IPv6 (::ffff:..,
+    NAT64, 6to4) and the shared ranges of the operators counted as private; address of a window of a module
+    without a backslash.
+
+- FIX: security audit of 2026-11-11, authentication of the senders and alerts against frauds :   1.89.4
+  - Authentication-Results read result by result: a « dmarc=pass » or « dkim=pass » put by the sender in its
+    address of the envelope or in a comment is no longer taken for the verdict; DMARC proves the domain it was
+    evaluated on only (header.from = the sender shown); the domain of a DKIM signature read after the @ of header.i.
+  - without a receiving server declared in Settings > Anti-spam, no sender is proven (pictures shown alone, badge
+    of a recognized domain, requester of a data source, brand logo): the header may be written by the sender.
+  - entry of the mail into our servers: the block of the top only, a false « Received ... by <our server> » put
+    lower by the sender no longer makes its anti-spam headers believed; without servers declared, the anti-spam
+    engine of inbox no longer leaves aside a mail that brings its own verdict.
+  - bank details: the text and the HTML of the mail read (a mail could show its IBAN in HTML only); groups of an IBAN
+    separated by dots, dashes or narrow spaces, invisible characters inside the words or the numbers, still found.
+  - « Replace the number of the card »: offered and accepted for a proven sender only (no Reply-To elsewhere, never
+    the requester of a data source).
+
+- FIX: security audit of 2026-11-11, protected mailboxes keep their promise :   1.89.3
+  - level « The password and the content »: the index of Meilisearch removed before the local data (it was left
+    there), refused while Meilisearch does not answer or while mails wait in the queue; the files of the cache and
+    of the queue and the journal of the actions removed with the rest; the sources left by a session that died
+    removed after a day; the answer of the mail server to a sending refused no longer written in the log.
+  - level « The password »: the index, the cache and the search of a mailbox not unlocked in the session are never
+    read, an access given without a copy of the password opens nothing; back to this level from a session that
+    unlocked the mailbox only.
+  - master user of the mail server: a mailbox of its server cannot be protected, a master user cannot be set for a
+    server with protected mailboxes, nor a mailbox in master mode made for the address of a protected one.
+  - the other scripts of the page never get the private key of the device; the fingerprint of a device computed
+    from its key, a copy given only to the key whose fingerprint was shown.
+  - 5 passwords refused per user and per mailbox in 15 minutes; the older copies of the colleagues made obsolete by
+    who decides or manages the mailbox only; a copy found in Drafts sent only if marked by a page; the notices told
+    once forgotten by a POST.
+  - « Does not protect against » also names a script run in the page and a user who keeps the password he knew.
+
+- FIX: security audit of 2026-11-11, addresses of the anti-spam engine chosen by an administrator of Dolibarr :   1.89.2
+  - the mails and the password of the controller are sent to these addresses: a manager of the mailboxes who is
+    not an administrator of Dolibarr sees them without changing them (as the master user of the mail server).
+  - the saved password of the controller is removed when its server changes, never sent to another one.
+
+- FIX: security audit of 2026-11-11, what inbox writes in the agenda of Dolibarr :   1.89.1
+  - an invitation could run a script in the agenda: its description and its organizer are written in the note of
+    the event as text; its title and its place on one line, without tag nor double quote (the form of the event
+    prints them as they are).
+  - a mail recorded on a piece: the text written is put in the note of the event as text, a tag typed stays a text.
+  - delivery reports: the recipient read in the report must be an address; the title of the event « not delivered »
+    and of a mail sent cleaned the same way.
+
 - NEW: protected mailboxes, opened only by the browsers of their users, nothing kept in Dolibarr :   1.89.0
   - Card of the mailbox > Server, row Protection under the password (admin of the mailboxes; the owner of a personal
     mailbox in the tab Encrypted accesses), login and password only, the password tried on the mail server. Two

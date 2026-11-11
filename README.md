@@ -158,8 +158,9 @@ the controller (port 11334, its password in Settings > Anti-spam > Settings) for
 - Docker (tests and production): `dev/rspamd/docker-compose.yml`, two services: Rspamd (ports on 127.0.0.1) and Redis
   (its learning, on an internal network: reached by Rspamd only, no way out). Start with
   `RSPAMD_PASSWORD='...' dev/rspamd/run.sh` (writes the hashed password of the controller, then `docker compose up
-  -d`; restarted with the server); without `RSPAMD_PASSWORD`, the password of the tests. Type the same password in
-  Settings > Anti-spam. `dev/rspamd/run.sh stop` stops both.
+  -d`; restarted with the server); without `RSPAMD_PASSWORD`, a random password shown once. Type the same password
+  in Settings > Anti-spam. `dev/rspamd/run.sh stop` stops both. Rspamd still asks the DNS for the SPF, DKIM and
+  DMARC records of the senders of the mails it judges (the hour of arrival and the resolver of the server show).
 - Without Docker: the Debian package of rspamd with redis-server, and the same `local.d/` and `override.d/` files.
   Publish the ports on 127.0.0.1 only. These files (checked on Rspamd 3.11.1, 2026-11-11):
   - turn off what asks outside: public fuzzy storage of rspamd.com, update of the rules from updates.rspamd.com,

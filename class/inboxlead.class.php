@@ -332,7 +332,9 @@ class InboxLead
 	 */
 	public static function cleanValue($field, $value)
 	{
-		$v = self::plainLines(strip_tags((string) $value));
+		// A tag coded in entities is a tag too: decoded, then removed (audit INBX-072); no < > left
+		$v = self::plainLines(strip_tags(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+		$v = str_replace(array('<', '>'), '', $v);
 		$v = trim(preg_replace('/\s+/u', ' ', $v), " \t,;:|*_-");
 		if ($v === '') {
 			return '';
@@ -1070,6 +1072,36 @@ class InboxLead
 	}
 
 	/**
+	 * Extrafields the page of creation would let the user fill (audit INBX-070): enabled, shown on creation, allowed
+	 * by their permission, not computed
+	 *
+	 * @param string $elementType societe or socpeople
+	 * @return array<string,true> options_xxx
+	 */
+	protected function writableExtrafields($elementType)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$ef = new ExtraFields($this->db);
+		$ef->fetch_name_optionals_label($elementType);
+		$a = (array) ($ef->attributes[$elementType] ?? array());
+		$ok = function ($expr) {
+			$expr = trim((string) $expr);
+			return $expr === '' || (bool) dol_eval($expr, 1, 1, '2');
+		};
+		$out = array();
+		foreach (array_keys((array) ($a['label'] ?? array())) as $key) {
+			$list = $a['list'][$key] ?? 1;
+			$list = is_numeric($list) ? (int) $list : (int) dol_eval((string) $list, 1, 1, '2');
+			if (!empty($a['computed'][$key]) || !in_array(abs($list), array(1, 3), true) || !$ok($a['enabled'][$key] ?? '') || !$ok($a['perms'][$key] ?? '')) {
+				continue;
+			}
+			$out['options_'.$key] = true;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Mandatory extrafields shown on the page of creation and without a default value: the panel cannot fill them
 	 *
 	 * @param string $elementType societe or socpeople
@@ -1328,8 +1360,9 @@ class InboxLead
 			// As the page of creation: the payment terms of the setup
 			$s->cond_reglement_id = (int) ($form['defaults']['soc']['cond_reglement_id'] ?? getDolGlobalInt('MAIN_DEFAULT_PAYMENT_TERM_ID'));
 			$s->mode_reglement_id = (int) ($form['defaults']['soc']['mode_reglement_id'] ?? getDolGlobalInt('MAIN_DEFAULT_PAYMENT_TYPE_ID'));
+			$writable = $this->writableExtrafields('societe');
 			foreach ($soc as $k => $v) {
-				if (strpos($k, 'options_') === 0) {
+				if (isset($writable[$k])) {
 					$s->array_options[$k] = $v;
 				}
 			}
@@ -1374,8 +1407,9 @@ class InboxLead
 				$c->phone_mobile = (string) ($contact['phone_mobile'] ?? '');
 				$c->email = (string) ($contact['email'] ?? '');
 				$c->statut = 1;
+				$writable = $this->writableExtrafields('socpeople');
 				foreach ($contact as $k => $v) {
-					if (strpos($k, 'options_') === 0) {
+					if (isset($writable[$k])) {
 						$c->array_options[$k] = $v;
 					}
 				}
@@ -1397,6 +1431,13 @@ class InboxLead
 			$matcher->refreshAddress($e);
 		}
 		$this->remember($user, $soc, $opts);
+		// What this panel made, the only things its undo may remove (audit INBX-069)
+		if ($useSoc <= 0) {
+			$_SESSION['inbox_lead_made']['societe'][(int) $socId] = dol_now();
+		}
+		if ($contactId > 0) {
+			$_SESSION['inbox_lead_made']['contact'][(int) $contactId] = dol_now();
+		}
 
 		return array('soc' => (int) $socId, 'contact' => (int) $contactId, 'contact_error' => $contactError);
 	}
@@ -1447,6 +1488,13 @@ class InboxLead
 		require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 		$recent = dol_now() - 600;
 		$linker = new InboxLink($this->db);
+		// Only what this panel made in this session, a few minutes ago (audit INBX-069)
+		$made = function ($type, $id) use ($recent) {
+			return (int) ($_SESSION['inbox_lead_made'][$type][(int) $id] ?? 0) >= $recent;
+		};
+		if (($contactId > 0 && !$made('contact', $contactId)) || ($socId > 0 && !$made('societe', $socId))) {
+			return (bool) $this->fail('undo', 'InboxErrorCannotCreate');
+		}
 		if ($contactId > 0) {
 			$c = new Contact($this->db);
 			if ($c->fetch($contactId) <= 0 || (int) $c->user_creation_id !== (int) $user->id || $c->date_creation < $recent) {
@@ -1456,6 +1504,7 @@ class InboxLead
 				return (bool) $this->fail('undo', $c->error);
 			}
 			$linker->forgetElement('contact', $contactId);
+			unset($_SESSION['inbox_lead_made']['contact'][(int) $contactId]);
 		}
 		if ($socId > 0) {
 			$s = new Societe($this->db);
@@ -1467,6 +1516,7 @@ class InboxLead
 				return (bool) $this->fail('undo', $s->error);
 			}
 			$linker->forgetElement('societe', $socId);
+			unset($_SESSION['inbox_lead_made']['societe'][(int) $socId]);
 		}
 
 		return true;
@@ -1623,6 +1673,10 @@ class InboxLead
 		$out = array();
 		foreach (is_array($list) ? $list : array() as $x) {
 			if ((int) ($x['mail'] ?? 0) !== (int) $mailId || (int) ($x['at'] ?? 0) < dol_now() - 7 * 86400) {
+				continue;
+			}
+			// The thirdparty read with the rights of the user, in his entity (audit INBX-058)
+			if ((int) ($x['soc'] ?? 0) <= 0 || !InboxElements::canRead($user, 'societe', (int) $x['soc'])) {
 				continue;
 			}
 			$c = (array) ($x['contact'] ?? array());

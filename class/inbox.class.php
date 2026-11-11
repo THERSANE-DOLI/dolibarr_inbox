@@ -533,6 +533,15 @@ class Inbox
 			$retention->run($user);
 		}
 
+		// Sources of the sendings of protected mailboxes kept during their delay (sealed by a key of the session): left
+		// for good when the session died, removed after a day (audit INBX-062)
+		require_once __DIR__.'/inboxoutbox.class.php';
+		foreach ((array) glob(InboxOutbox::dir().'/live/*.sealed') as $path) {
+			if (is_file($path) && filemtime($path) < dol_now() - 86400) {
+				@unlink($path);
+			}
+		}
+
 		// Leftovers of a directory emptied by hand: lines without file, files without line (left a day, a reading may
 		// be writing its line right now)
 		$known = array();

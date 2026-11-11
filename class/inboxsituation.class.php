@@ -814,9 +814,11 @@ class InboxSituation
 				$this->db->rollback();
 				return -2;
 			}
-			// The other mails of the address follow, but the ones chosen by hand
+			// The other mails of the address follow, but the ones chosen by hand; in the mailboxes of the entity only
+			// (audit INBX-060)
 			$this->db->query("UPDATE ".$p."inbox_mail SET fk_soc = ".((int) $socId).", fk_socpeople = ".(is_object($contact) ? (int) $contact->rowid : 'NULL')
-				." WHERE ".InboxContactMatcher::addressWhere($this->db, $email)." AND soc_manual = 0");
+				." WHERE ".InboxContactMatcher::addressWhere($this->db, $email)." AND soc_manual = 0"
+				." AND fk_account IN (SELECT a.rowid FROM ".$p."inbox_account as a WHERE a.entity = ".((int) $conf->entity).")");
 		}
 		$this->db->commit();
 

@@ -120,12 +120,12 @@ class InboxTrustedDomain
 		if ($v === '') {
 			return '';
 		}
-		if (strpos($v, '@') !== false) {
-			$v = substr($v, strrpos($v, '@') + 1);
-		}
+		// An URL first: an address in its path or its query is not its host (audit INBX-073); an address after
 		if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $v)) {
 			$host = parse_url($v, PHP_URL_HOST);
 			$v = is_string($host) ? $host : '';
+		} elseif (strpos($v, '@') !== false) {
+			$v = substr($v, strrpos($v, '@') + 1);
 		}
 		$v = preg_replace('#[/?\#:].*$#s', '', $v);
 		$v = trim(mb_strtolower((string) $v, 'UTF-8'), ". \t");
@@ -440,6 +440,9 @@ class InboxTrustedDomain
 				$case = 3;
 			} elseif ($sender && mb_strlen($eName, 'UTF-8') >= 8 && strpos($skel, $eSkel) !== false) {
 				$case = 4;
+			} elseif (strlen($host) > strlen($reg) && strpos('.'.substr($host, 0, -strlen('.'.$reg)).'.', '.'.$eReg.'.') !== false) {
+				// The recognized domain written to the left of another one: thersane.fr.secure-pay.io (audit INBX-073)
+				$case = 2;
 			}
 			if ($case && (!$found || $case < $found['case'])) {
 				$found = array('entry' => $e, 'case' => $case);

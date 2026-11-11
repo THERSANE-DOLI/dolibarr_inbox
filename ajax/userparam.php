@@ -59,7 +59,8 @@ switch ($action) {
 		// The presence is written by the call of state of the Mail space only (audit INBX-028)
 		// The consents of the voice typing go through ajax/dictation.php (journal), the count of the pieces of voice
 		// sent to the transcription server is kept by it: never set nor removed here (audit INBX-033, INBX-044)
-		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', InboxDictation::PARAM, InboxDictation::USAGE), true)) {
+		// The memory of the panel « New customer » is written by ajax/lead.php only: never a thirdparty chosen here (INBX-058)
+		if (in_array((string) inboxAjaxParam('param', 'aZ09'), array('presence', InboxDictation::PARAM, InboxDictation::USAGE, 'lead_last', 'lead_pending'), true)) {
 			inboxAjaxError('Unknown param', 400);
 		}
 		if ($action === 'remove') {

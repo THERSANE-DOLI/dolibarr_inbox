@@ -71,7 +71,8 @@ class InboxBankCheck
 	 */
 	protected static function norm($text)
 	{
-		return (string) preg_replace('/\s+/u', ' ', strtolower(dol_string_unaccent((string) $text)));
+		// Invisible characters cutting a word (zero width, soft hyphen) never hide it (audit INBX-053)
+		return (string) preg_replace('/\s+/u', ' ', strtolower(dol_string_unaccent((string) preg_replace('/[\p{Cf}\x{00AD}]/u', '', (string) $text))));
 	}
 
 	/**
@@ -84,7 +85,9 @@ class InboxBankCheck
 	{
 		$out = array();
 		$m = array();
-		if (preg_match_all('/\b([A-Z]{2}\d{2}(?:[ \x{00A0}]?[A-Z0-9]{4}){2,7}(?:[ \x{00A0}]?[A-Z0-9]{1,4})?)\b/u', strtoupper((string) $text), $m)) {
+		// Groups separated by any space, dot or dash (audit INBX-053), invisible characters removed first
+		$text = (string) preg_replace('/[\p{Cf}\x{00AD}]/u', '', (string) $text);
+		if (preg_match_all('/\b([A-Z]{2}\d{2}(?:[\s.\-\x{00A0}\x{2007}\x{2009}\x{202F}]?[A-Z0-9]{4}){2,7}(?:[\s.\-\x{00A0}\x{2007}\x{2009}\x{202F}]?[A-Z0-9]{1,4})?)\b/u', strtoupper($text), $m)) {
 			foreach ($m[1] as $raw) {
 				$iban = (string) preg_replace('/[^A-Z0-9]/', '', $raw);
 				if (strlen($iban) >= 15 && strlen($iban) <= 34 && self::validIban($iban)) {

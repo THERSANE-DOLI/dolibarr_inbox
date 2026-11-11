@@ -24,6 +24,7 @@
 // dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once __DIR__.'/inboxaccess.class.php';
+require_once __DIR__.'/inboxagenda.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxcomposer.class.php';
@@ -545,9 +546,11 @@ class InboxOutbox
 			$event = new ActionComm($this->db);
 			$event->type_code = 'AC_EMAIL';
 			$event->code = 'AC_EMAIL';
-			$event->label = dol_trunc($langs->transnoentities('InboxEventMailSent', (string) $row->subject), 250, 'right', 'UTF-8', 1);
+			// The subject may be the one of the mail answered; the text is plain text again (entities decoded): both
+			// escaped for the agenda (audit INBX-047, INBX-048)
+			$event->label = InboxAgenda::field($langs->transnoentities('InboxEventMailSent', (string) $row->subject));
 			// What was written only (1.83.1): no signature, no quoted or forwarded mail, the attachments listed
-			$event->note_private = dol_trunc(self::writtenText($message), 60000, 'right', 'UTF-8', 1);
+			$event->note_private = InboxAgenda::note(self::writtenText($message));
 			$event->datep = dol_now();
 			$event->datef = dol_now();
 			$event->percentage = -1;

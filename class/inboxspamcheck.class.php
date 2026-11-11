@@ -24,6 +24,7 @@
 require_once __DIR__.'/inboxspamrspamd.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxsenderauth.class.php';
+require_once __DIR__.'/inboxknownsenders.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
@@ -188,7 +189,9 @@ class InboxSpamCheck
 			}
 			$headEnd = strpos($raw, "\r\n\r\n");
 			$headers = InboxSenderAuth::parseHeaders($headEnd === false ? $raw : substr($raw, 0, $headEnd));
-			if (!$all && InboxReader::spamVerdict($headers) !== null) {
+			// Judged by our server only when its servers are declared: else the verdict may be written by the sender
+			// (« X-Spam-Flag: NO », audit INBX-052)
+			if (!$all && InboxKnownSenders::trustedServers() && InboxReader::spamVerdict($headers) !== null) {
 				// Judged by the filter of the server already
 				$this->done((int) $r->rowid, null);
 				continue;
@@ -306,6 +309,17 @@ class InboxSpamCheck
 			return 0;
 		}
 		$p = $this->db->prefix();
+		// The learning is common to every mailbox: a cap per user and per day (INBOX_RSPAMD_LEARN_MAX_PER_DAY, 200), a
+		// user cannot teach the engine alone with mails he put in his own mailbox (audit INBX-077)
+		if ($origin === 'user' && is_object($user) && (int) $user->id > 0) {
+			$done = $this->db->getRow("SELECT COUNT(rowid) as n FROM ".$p."inbox_spam_learn WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $user->id)
+				." AND origin = 'user' AND date_creation > '".$this->db->idate(dol_now() - 86400)."'");
+			$left = max(0, getDolGlobalInt('INBOX_RSPAMD_LEARN_MAX_PER_DAY', 200) - (is_object($done) ? (int) $done->n : 0));
+			$mailIds = array_slice($mailIds, 0, $left);
+			if (!$mailIds) {
+				return 0;
+			}
+		}
 		// Asked again in the other way: the last one wins, the waiting one goes
 		$this->db->query("DELETE FROM ".$p."inbox_spam_learn WHERE state = 0 AND fk_mail IN (".implode(',', $mailIds).")");
 		$values = array();

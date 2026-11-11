@@ -129,12 +129,47 @@ class InboxServerTester
 			}
 		}
 		foreach (array_filter($ips) as $ip) {
-			if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+			if (self::ipPrivate($ip)) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * An address of this server or of a private network, an IPv4 written in an IPv6 included (audit INBX-051: PHP
+	 * takes ::ffff:127.0.0.1 for a public address, the connection goes to 127.0.0.1)
+	 *
+	 * @param string $ip IP address
+	 * @return bool      Private, reserved, or not an address
+	 */
+	public static function ipPrivate($ip)
+	{
+		$ip = strtolower(trim((string) $ip, " []"));
+		if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+			return true;
+		}
+		if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+			$bin = (string) inet_pton($ip);
+			$head = substr($bin, 0, 12);
+			// ::ffff:a.b.c.d (mapped), ::a.b.c.d (compatible, :: and ::1 included), 64:ff9b::a.b.c.d (NAT64)
+			if ($head === str_repeat("\0", 10)."\xff\xff" || $head === str_repeat("\0", 12) || $head === "\x00\x64\xff\x9b".str_repeat("\0", 8)) {
+				return self::ipPrivate((string) inet_ntop(substr($bin, 12)));
+			}
+			// 6to4: 2002:a.b.c.d::/16
+			if (substr($bin, 0, 2) === "\x20\x02") {
+				return self::ipPrivate((string) inet_ntop(substr($bin, 2, 4)));
+			}
+		} else {
+			// Shared address space of the operators (100.64.0.0/10) and benchmarking (198.18.0.0/15): not public
+			$n = (int) ip2long($ip);
+			if (($n & 0xFFC00000) === (int) ip2long('100.64.0.0') || ($n & 0xFFFE0000) === (int) ip2long('198.18.0.0')) {
+				return true;
+			}
+		}
+
+		return !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
 	}
 
 	/**

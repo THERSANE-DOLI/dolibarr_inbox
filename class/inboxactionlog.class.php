@@ -150,8 +150,33 @@ class InboxActionLog
 	public static function undoes(DoliDB $db, $what, array $ids, array $params, array $lines)
 	{
 		$moves = array('move', 'archive', 'delete', 'junk', 'notjunk');
+		$nb = 0;
+		$mids = array();
+		$named = true;
 		foreach ($lines as $l) {
 			if ($l->action !== 'tag' && !in_array($l->action, $moves, true)) {
+				return false;
+			}
+			$nb += max(1, (int) ($l->nb ?? 1));
+			// A line of one mail names it: the undo gives back that mail, not another one (audit INBX-080)
+			if ((string) ($l->message_id ?? '') !== '') {
+				$mids[] = (string) $l->message_id;
+			} else {
+				$named = false;
+			}
+		}
+		// Never more mails than the lines did
+		if (!$ids || count(array_unique($ids)) > $nb) {
+			return false;
+		}
+		if ($named) {
+			$rows = $db->getRows("SELECT message_id FROM ".$db->prefix()."inbox_mail WHERE rowid IN (".implode(',', array_map('intval', $ids)).") LIMIT 1000");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if (!in_array((string) $r->message_id, $mids, true)) {
+					return false;
+				}
+			}
+			if (!is_array($rows) || count($rows) !== count(array_unique($ids))) {
 				return false;
 			}
 		}

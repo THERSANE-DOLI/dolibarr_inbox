@@ -443,6 +443,17 @@ class InboxSenderAuth
 	 * @param	string	$text	Text after "method=result" (comments already removed)
 	 * @return	array<string,string>
 	 */
+	public static function properties($text)
+	{
+		return self::parseProperties($text);
+	}
+
+	/**
+	 * Properties of a result ("header.d=example.com smtp.mailfrom=a@b.fr"), values maybe quoted
+	 *
+	 * @param	string	$text	Text after "method=result" (comments already removed)
+	 * @return	array<string,string>
+	 */
 	protected static function parseProperties($text)
 	{
 		$properties = array();

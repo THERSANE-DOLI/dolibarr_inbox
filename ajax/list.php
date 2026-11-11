@@ -67,6 +67,8 @@ function inboxListLivePage($folder, array $query)
 $readable = array_keys(array_filter($access->getLevels($user), function ($level) {
 	return InboxAccess::rank($level) >= InboxAccess::rank(InboxAccess::LEVEL_READ);
 }));
+// A protected mailbox not unlocked in this session: its index and its cache are never read (audit INBX-055)
+$readable = array_values(array_diff($readable, (new InboxProtect($db))->lockedIds()));
 // Only the active mailboxes
 if ($readable) {
 	$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', array_map('intval', $readable)).") AND status = ".InboxAccount::STATUS_ACTIVE." LIMIT 10000");

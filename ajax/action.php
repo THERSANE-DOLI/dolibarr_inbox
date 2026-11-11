@@ -74,7 +74,7 @@ $undoOf = array_filter(array_map('intval', is_array($undoOf) ? $undoOf : array()
 // batches gives the same lines each time), and gives back what they did: no other action hides itself from the
 // journal behind a line of its author (audit INBX-016)
 if ($undoOf) {
-	$lines = $db->getRows("SELECT rowid, action, fk_account, fk_account_to, folder_from, folder_to FROM ".$db->prefix()."inbox_action_log WHERE rowid IN (".implode(',', $undoOf).")"
+	$lines = $db->getRows("SELECT rowid, action, nb, message_id, fk_account, fk_account_to, folder_from, folder_to FROM ".$db->prefix()."inbox_action_log WHERE rowid IN (".implode(',', $undoOf).")"
 		." AND fk_user = ".((int) $user->id)." AND date_action > '".$db->idate(dol_now() - 600)."' LIMIT 1000");
 	if (!is_array($lines) || count($lines) !== count(array_unique($undoOf)) || !InboxActionLog::undoes($db, $what, $ids, $params, $lines)) {
 		inboxAjaxError('Bad undo', 400);

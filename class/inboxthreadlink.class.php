@@ -223,7 +223,22 @@ class InboxThreadLink
 			if (!$links) {
 				continue;
 			}
+			// Only from a correspondent of the conversation (sender or recipient of its mails): a Message-ID or a
+			// subject copied by someone else never gives him the pieces of the conversation (audit INBX-067)
+			$known = array();
+			$oldIds = array();
+			foreach ($old[$key] as $o) {
+				$known[strtolower(trim((string) $o->from_email))] = true;
+				$oldIds[] = (int) $o->rowid;
+			}
+			$addrs = $this->db->getRows("SELECT DISTINCT LOWER(email) as e FROM ".$p."inbox_mail_address WHERE fk_mail IN (".implode(',', $oldIds).") LIMIT 5000");
+			foreach (is_array($addrs) ? $addrs : array() as $a) {
+				$known[trim((string) $a->e)] = true;
+			}
 			foreach ($rows as $r) {
+				if (!isset($known[strtolower(trim((string) $r->from_email))])) {
+					continue;
+				}
 				$ref = $refs->fetchOrCreate($r);
 				if ($ref <= 0 || $this->detachedOf(array($ref))) {
 					continue;

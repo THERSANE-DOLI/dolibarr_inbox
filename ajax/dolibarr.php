@@ -31,6 +31,7 @@ dol_include_once('/inbox/class/inboxthreadlink.class.php');
 dol_include_once('/inbox/class/inboxactivity.class.php');
 dol_include_once('/inbox/class/inboxcreate.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
+dol_include_once('/inbox/class/inboxsenderauth.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
 dol_include_once('/inbox/class/inboxcited.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
@@ -54,8 +55,31 @@ function inboxDolibarrFail($key)
 
 	$codes = array('InboxMailNotFound' => 404, 'InboxErrorPieceNotReadable' => 403, 'InboxErrorNoteNotFound' => 404, 'InboxErrorNoteNotYours' => 403,
 		'InboxErrorNoteEmpty' => 422, 'InboxErrorLinkNotYours' => 403, 'InboxErrorNoMessageId' => 422, 'Bad parameters' => 400, 'InboxErrorCannotCreate' => 403, 'InboxErrorCannotAttach' => 403,
-		'InboxErrorAttachmentInfected' => 422);
+		'InboxErrorAttachmentInfected' => 422, 'InboxErrorResocRemember' => 403);
 	inboxAjaxReply(array('error' => preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key) : $key, 'code' => $key), $codes[$key] ?? 500);
+}
+
+/**
+ * The sender of the mail is proven (audit INBX-059): authenticated by our receiving server for its own domain, no
+ * Reply-To elsewhere, not the requester of a data source (typed by anyone in a form). Only then are the numbers of
+ * its signature offered to replace the ones of the card, the numbers the alerts tell to call.
+ *
+ * @param InboxReader                         $reader  Mail loaded
+ * @param array<int,array{0:string,1:string}> $headers Its headers
+ * @return bool
+ */
+function inboxDolibarrSenderProven(InboxReader $reader, array $headers)
+{
+	if ((string) ($reader->row->requester_email ?? '') !== '') {
+		return false;
+	}
+	$from = strtolower(trim((string) $reader->row->from_email));
+	$replyTo = strtolower(trim((string) InboxSenderAuth::extractAddress(InboxReader::headerValue($headers, 'reply-to'))));
+	if ($from === '' || ($replyTo !== '' && $replyTo !== $from)) {
+		return false;
+	}
+
+	return InboxReader::authPass(InboxReader::authResults($headers), $from);
 }
 
 /**
@@ -124,6 +148,10 @@ switch ($action) {
 			|| !InboxElements::canWriteType($user, 'contact')) {
 			inboxDolibarrFail('InboxErrorPieceNotReadable');
 		}
+		$raw = $reader->raw($user);
+		if ($raw === null || !inboxDolibarrSenderProven($reader, InboxReader::headers($raw))) {
+			inboxDolibarrFail('InboxErrorPieceNotReadable');
+		}
 		$situation = new InboxSituation($db);
 		$before = $situation->setContactPhone($user, $contactId, (string) inboxAjaxParam('field', 'aZ09'), (string) inboxAjaxParam('number', 'alphanohtml'));
 		if ($before === null) {
@@ -139,8 +167,14 @@ switch ($action) {
 		if ($socId <= 0 || !InboxElements::canRead($user, 'societe', $socId)) {
 			inboxDolibarrFail('InboxErrorPieceNotReadable');
 		}
+		// Remembered for the address: the mails of every mailbox of the entity follow, a choice of who may write from
+		// this mailbox, not of a reader (audit INBX-060)
+		$remember = (int) inboxAjaxParam('remember', 'int') === 1;
+		if ($remember && !in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			inboxDolibarrFail('InboxErrorResocRemember');
+		}
 		$situation = new InboxSituation($db);
-		$n = $situation->setThirdparty($user, $reader->row, $socId, (int) inboxAjaxParam('remember', 'int') === 1);
+		$n = $situation->setThirdparty($user, $reader->row, $socId, $remember);
 		if ($n < 0) {
 			inboxDolibarrFail($situation->error);
 		}
@@ -358,7 +392,7 @@ switch ($action) {
 		// Phones of the signature that the cards of the contact and of the thirdparty do not have (1.69.0)
 		$contactId = (int) $reader->row->fk_socpeople;
 		$phones = array();
-		if ($contactId > 0 && InboxElements::canRead($user, 'contact', $contactId)) {
+		if ($contactId > 0 && InboxElements::canRead($user, 'contact', $contactId) && inboxDolibarrSenderProven($reader, $headers)) {
 			$situation = new InboxSituation($db);
 			$phones = $situation->newPhones($body, $contactId, (int) $reader->row->fk_soc);
 		}
@@ -404,7 +438,9 @@ switch ($action) {
 	case 'detach':
 		// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go
 		$reader = inboxDolibarrMail();
-		if (!$reader->level) {
+		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
+		// mailbox (as INBX-006), never by a reader (audit INBX-068)
+		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
 			inboxAjaxNotFound();
 		}
 		$threads = new InboxThreadLink($db);
@@ -418,7 +454,9 @@ switch ($action) {
 	case 'attach_thread':
 		// Undo of the detachment: back in its conversation, the links given back
 		$reader = inboxDolibarrMail();
-		if (!$reader->level) {
+		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
+		// mailbox (as INBX-006), never by a reader (audit INBX-068)
+		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
 			inboxAjaxNotFound();
 		}
 		$links = inboxAjaxParam('links', 'none');
