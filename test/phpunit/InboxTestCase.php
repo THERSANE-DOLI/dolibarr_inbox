@@ -113,6 +113,8 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_bounce WHERE message_id LIKE '%inbox-test.invalid%' OR recipient LIKE '%.invalid'");
 		$db->query("DELETE FROM ".$p."actioncomm WHERE code = 'AC_INBOX_BOUNCE' AND label LIKE '%.invalid%'");
 		$db->query("DELETE FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid'");
+		// Learning queue of the anti-spam engine (1.88.0): the rows whose mail is gone
+		$db->query("DELETE FROM ".$p."inbox_spam_learn WHERE fk_mail NOT IN (SELECT rowid FROM ".$p."inbox_mail)");
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_tag WHERE fk_account = 0 AND keyword LIKE 'zz_test%'");

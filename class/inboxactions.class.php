@@ -78,13 +78,13 @@ class InboxActions
 	 * The access of the user is not checked (he is the user of the job); only « blocked » (junk) is allowed.
 	 *
 	 * @param User   $user    User written in the journal
-	 * @param string $action  blocked
+	 * @param string $action  blocked (blocked sender), spam (judged spam by the engine of inbox, 1.88.0)
 	 * @param int[]  $mailIds Rows of the index
 	 * @return array{ok:bool,count:int,undo:array<int,array<string,mixed>>,error:string,ids:array<int,int>,rest:int[]}
 	 */
 	public function runAsSystem(User $user, $action, array $mailIds)
 	{
-		if ($action !== 'blocked') {
+		if (!in_array($action, array('blocked', 'spam'), true)) {
 			return array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => 'Unknown action', 'ids' => array(), 'rest' => array());
 		}
 		$this->system = true;
@@ -158,8 +158,10 @@ class InboxActions
 					$res = $this->junk($user, $list, $action === 'junk');
 					break;
 				case 'blocked':
-					// Blocked sender (1.85.0): junk, written « blocked » in the journal; by inbox itself only
-					$res = $this->system ? $this->junk($user, $list, true, 'blocked') : null;
+				case 'spam':
+					// Blocked sender (1.85.0), judged spam by the engine of inbox (1.88.0): junk, written as such in the
+					// journal; by inbox itself only
+					$res = $this->system ? $this->junk($user, $list, true, $action) : null;
 					if ($res === null && !$this->system) {
 						$this->error = 'Unknown action';
 					}
@@ -635,6 +637,11 @@ class InboxActions
 		$moved = $this->moveTo($user, $list, (int) $target->rowid, $kind !== '' ? $kind : ($junk ? 'junk' : 'notjunk'));
 		if ($moved === null) {
 			return null;
+		}
+		// « Junk » or « Not junk » of a user: learned by the engine of inbox (1.88.0), the mails at their new place
+		if ($kind === '' && !empty($moved['ids'])) {
+			require_once __DIR__.'/inboxspamcheck.class.php';
+			(new InboxSpamCheck($this->db))->queue($user, array_values($moved['ids']), $junk);
 		}
 		// Undo: back to the folder, then the keywords as they were
 		$undo = $moved['undo'];

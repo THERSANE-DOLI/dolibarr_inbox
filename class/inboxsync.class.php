@@ -163,6 +163,17 @@ class InboxSync
 			$moved = (new InboxBlockedSender($this->db))->moveNew($user, (int) $account->id, $this->blockedNew);
 			$this->stats['blocked'] = $moved;
 		}
+		// Anti-spam engine of inbox (1.88.0): the new mails of the inbox judged, within the time left
+		// (marked at once, judged now or at a next pass)
+		require_once __DIR__.'/inboxspamcheck.class.php';
+		if (InboxSpamCheck::enabled()) {
+			global $user;
+			$spam = new InboxSpamCheck($this->db);
+			$spam->markNew($this->blockedNew);
+			if (microtime(true) < $deadline - 1) {
+				$this->stats['spam'] = $spam->checkPending($user, (int) $account->id, $deadline - 0.5)['moved'];
+			}
+		}
 
 		return $res;
 	}
@@ -490,7 +501,13 @@ class InboxSync
 			require_once __DIR__.'/inboxblockedsender.class.php';
 			$blocked = (new InboxBlockedSender($this->db))->applyAll($deadline);
 		}
-		$this->output = ($blocked ? $blocked.' Sieve block(s) of the blocked senders written, ' : '').count($accounts).' mailbox(es), '.$total['new'].' new, '.$total['changed'].' changed, '.$total['deleted'].' removed, '.$total['errors'].' error(s), '.round(microtime(true) - $start, 1).' s';
+		// Anti-spam engine of inbox (1.88.0): « Junk » and « Not junk » of the users learned, with the time left
+		$learned = 0;
+		require_once __DIR__.'/inboxspamcheck.class.php';
+		if (InboxSpamCheck::enabled() && microtime(true) < $deadline - 2) {
+			$learned = (new InboxSpamCheck($this->db))->processQueue($deadline)['learned'];
+		}
+		$this->output = ($blocked ? $blocked.' Sieve block(s) of the blocked senders written, ' : '').($learned ? $learned.' mail(s) learned by the anti-spam engine, ' : '').count($accounts).' mailbox(es), '.$total['new'].' new, '.$total['changed'].' changed, '.$total['deleted'].' removed, '.$total['errors'].' error(s), '.round(microtime(true) - $start, 1).' s';
 
 		return 0;
 	}

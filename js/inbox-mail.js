@@ -7403,7 +7403,8 @@
 		if (sp && !opts.inline && (sp.spam || m.folder_role === 'junk')) {
 			const score = sp.score === null ? '' : (sp.required === null ? th('InboxSpamScore', sp.score.toLocaleString(locale())) : th('InboxSpamScoreOf', sp.score.toLocaleString(locale()), sp.required.toLocaleString(locale())));
 			const why = spamReasons(sp.tests);
-			const text = (sp.spam ? th('InboxSpamJudged') : th('InboxSpamFilter')) + (score ? ' ' + score : '') + (why.length ? '<div class="ibx-muted">' + esc(why.join(' · ')) + '</div>' : '');
+			// The engine of inbox (1.88.0) is named as such, never as the filter of the server
+			const text = (sp.local ? th(sp.spam ? 'InboxSpamJudgedLocal' : 'InboxSpamFilterLocal') : (sp.spam ? th('InboxSpamJudged') : th('InboxSpamFilter'))) + (score ? ' ' + score : '') + (why.length ? '<div class="ibx-muted">' + esc(why.join(' · ')) + '</div>' : '');
 			if (sp.spam && m.folder_role !== 'junk') {
 				banners += '<div class="ibx-banner ibx-banner--warning">' + ic('junk') + '<div class="ibx-banner__text"' + (sp.tests.length ? ' title="' + esc(sp.tests.join(', ')) + '"' : '') + '>' + text + '</div>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-isjunk">' + ic('junk') + ' ' + th('InboxJunk') + '</button></div>';

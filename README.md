@@ -151,6 +151,20 @@ How it is applied, and what changes on the mail server:
 - **Turn it off**: Settings > Anti-spam, switch « Blocked senders » (`INBOX_BLOCKED_SENDERS`): the block is removed
   from the scripts at the next pass, the list is kept.
 
+Anti-spam engine of inbox (1.88.0, off by default): Rspamd installed **beside Dolibarr**, never on the mail server,
+so that the mails do not leave our servers. inbox calls `/checkv2` (port 11333) for the new mails of the inbox and
+the controller (port 11334, its password in Settings > Anti-spam > Settings) for `/learnspam`, `/learnham`, `/stat`.
+
+- Tests: `dev/rspamd/run.sh` (containers inbox-rspamd and inbox-redis on 127.0.0.1, test password in the script).
+- Production: Docker with the same `local.d/` files, or the Debian package of rspamd with Redis. Publish the ports on
+  127.0.0.1 only. The files of `dev/rspamd/local.d/` turn off what asks outside: public fuzzy storage of
+  rspamd.com, remote phishing lists, ASN zone, following of short links, monitoring. Check it once installed (for
+  example `tcpdump -i any port 53 or port 443` while a mail is checked).
+- The lists of reputation by DNS (Spamhaus, SURBL...) stay in the configuration but inbox turns them off at each
+  check (header `Settings`) unless Settings > Anti-spam allows them. They refuse the public resolvers (8.8.8.8...):
+  give Rspamd a local resolver (unbound) before turning them on; Spamhaus is free only for a low volume and non
+  commercial use (else its DQS key in `local.d/rbl.conf`).
+
 Living with another anti-spam tool: a tool that takes the known senders out of the junk (authenticated mails of the
 customers and suppliers) does not know this list; a known sender blocked here may come back to the inbox through it.
 Add the address to the blacklist of that tool as well, or turn its rescue off for that sender.

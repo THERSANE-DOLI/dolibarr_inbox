@@ -73,6 +73,15 @@ function inboxGeneralSettings()
 		'INBOX_JUNK_LEGIT_CHECK' => array('default' => '1', 'check' => 'int:0:1'),
 		// Verdict of the anti-spam filter of the server read in the headers (1.86.1)
 		'INBOX_SPAM_SERVER_VERDICT' => array('default' => '1', 'check' => 'int:0:1'),
+		// Anti-spam engine of inbox (1.88.0): Rspamd beside Dolibarr; its password in ajax/rspamd.php (never sent back)
+		'INBOX_RSPAMD_ENABLED' => array('default' => '0', 'check' => 'int:0:1'),
+		'INBOX_RSPAMD_URL' => array('default' => 'http://127.0.0.1:11333', 'check' => 'url'),
+		'INBOX_RSPAMD_CONTROLLER_URL' => array('default' => 'http://127.0.0.1:11334', 'check' => 'url'),
+		'INBOX_RSPAMD_SCOPE' => array('default' => 'noverdict', 'check' => array('noverdict', 'all')),
+		'INBOX_RSPAMD_MOVE' => array('default' => '1', 'check' => 'int:0:1'),
+		'INBOX_RSPAMD_LEARN' => array('default' => '1', 'check' => 'int:0:1'),
+		// Lists of reputation asked by DNS to outside services (Spamhaus, SURBL...): off by default
+		'INBOX_RSPAMD_DNSLISTS' => array('default' => '0', 'check' => 'int:0:1'),
 	);
 }
 
@@ -91,6 +100,10 @@ function inboxGeneralValid($check, $value)
 	}
 	if ($check === 'color') {
 		return (bool) preg_match('/^#[0-9a-f]{6}$/i', $value);
+	}
+	if ($check === 'url') {
+		dol_include_once('/inbox/class/inboxspamrspamd.class.php');
+		return InboxSpamRspamd::validUrl($value);
 	}
 	if ($check === 'hosts') {
 		return $value === '' || (bool) preg_match('/^[a-z0-9.-]{1,253}(\s*,\s*[a-z0-9.-]{1,253}){0,9}$/i', $value);

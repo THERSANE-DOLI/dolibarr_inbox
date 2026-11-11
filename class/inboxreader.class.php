@@ -245,7 +245,8 @@ class InboxReader
 				'sender_why' => self::untrustableSenderWhy($trusted, $message->fromEmail, $passed), 'links' => $links['domains']) : null,
 			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
 			// Setting of Settings > Anti-spam (1.86.1): off, no banner nor score from the headers
-			'spam' => getDolGlobalInt('INBOX_SPAM_SERVER_VERDICT', 1) ? self::spamVerdict($headers) : null,
+			// Without it, the verdict of the anti-spam engine of inbox kept on the mail (1.88.0), said as such
+			'spam' => (getDolGlobalInt('INBOX_SPAM_SERVER_VERDICT', 1) ? self::spamVerdict($headers) : null) ?: self::localSpamVerdict($this->row),
 			'spam_ignored' => self::spamIgnored($headers),
 			// Blocked sender (1.85.0): who blocked it and when, the user may unblock or not
 			'blocked' => (new InboxBlockedSender($this->db))->viewFor($user, $message->fromEmail),
@@ -742,6 +743,19 @@ class InboxReader
 		$out['fail'] = $out['dmarc'] === 'fail' || ($out['dkim'] === 'fail' && in_array($out['spf'], array('fail', 'softfail'), true));
 
 		return $out;
+	}
+
+	/**
+	 * Verdict of the anti-spam engine of inbox kept on the row (1.88.0)
+	 *
+	 * @param object|null $row Row of the index
+	 * @return array<string,mixed>|null
+	 */
+	protected static function localSpamVerdict($row)
+	{
+		require_once __DIR__.'/inboxspamcheck.class.php';
+
+		return InboxSpamCheck::verdictOf($row);
 	}
 
 	/** Headers of the anti-spam filters read by inbox (SpamAssassin, Rspamd) */

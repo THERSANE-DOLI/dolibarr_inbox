@@ -2903,6 +2903,7 @@
 			r = await api('blockedsender', 'list', state.type === 'known' ? Object.assign({}, state, { type: '', known: 1 }) : state);
 			if (admin && tab === 'settings') {
 				s = (await api('general', 'get')).settings;
+				s.rspamd = await api('rspamd', 'state');
 			}
 		} catch (err) {
 			main.replaceChildren(errorBox(err, () => renderAntispam(main, parts, state)));
@@ -2962,6 +2963,7 @@
 				+ '<div class="ibx-formrow__help">' + th('InboxAntispamServerVerdictHelp') + '</div>'
 				+ (s.INBOX_AUTH_SERVERS ? '' : '<div class="ibx-formrow__help ibx-formrow__warn">' + ic('warning') + ' ' + th('InboxAntispamServerUnverifiable') + '</div>') + '</div></div>'
 				+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div></section>'
+				+ rspamdSection(s)
 				+ '</div>';
 		}
 		html += '</div>';
@@ -2969,6 +2971,7 @@
 		main._bs = { r, state };
 		if (tab === 'settings') {
 			bindGeneralFields(main);
+			bindRspamd(main, s);
 		}
 		if (tab !== 'blocked') {
 			main.onclick = null;
@@ -3029,6 +3032,86 @@
 				}
 			}
 		};
+	}
+
+	/**
+	 * Anti-spam engine of inbox (1.88.0): Rspamd installed beside Dolibarr (self-hosted), its switches, the password of
+	 * its controller (written only), the test of the connection, the learning and the training of the start. The lists
+	 * of reputation by DNS ask outside services: off by default, a dialog says what leaves when turned on.
+	 */
+	function rspamdSection(s) {
+		const st = s.rspamd || {};
+		const sw = (name, label, def) => '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + name + '" aria-checked="' + ((s[name] === undefined ? def : s[name] !== '0') ? 'true' : 'false') + '" aria-label="' + esc(label) + '"></button>';
+		const row = (label, body, help) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + label + '</span><div>' + body + (help ? '<div class="ibx-formrow__help">' + help + '</div>' : '') + '</div></div>';
+		const q = st.queue || {};
+		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxRspamdSection') + '</h2>'
+			+ '<p class="ibx-muted">' + th('InboxRspamdHelp') + '</p>'
+			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(), st.error.message) + '</div></div>' : '')
+			+ row(th('InboxRspamdEnabled'), sw('INBOX_RSPAMD_ENABLED', t('InboxRspamdEnabled'), false), th('InboxRspamdEnabledHelp'))
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsctl">' + th('InboxRspamdController') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsctl" data-name="INBOX_RSPAMD_CONTROLLER_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_CONTROLLER_URL) + '"></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rspw">' + th('InboxRspamdPassword') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--medium ibx-js-rspw" type="password" id="g-rspw" autocomplete="new-password" placeholder="' + th(st.has_password ? 'InboxRspamdPasswordSaved' : 'InboxRspamdPasswordNone') + '">'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rspwsave">' + th('InboxSave') + '</button></div><div class="ibx-formrow__help">' + th('InboxRspamdPasswordHelp') + '</div></div></div>'
+			+ row('', '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rstest">' + ic('plug') + ' ' + th('InboxRspamdTest') + '</button><div class="ibx-js-rstestres ibx-formrow__help" role="status"></div>')
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsscope">' + th('InboxRspamdScope') + '</label><div><select class="ibx-field ibx-field--medium" id="g-rsscope" data-name="INBOX_RSPAMD_SCOPE">'
+				+ ['noverdict', 'all'].map(v => '<option value="' + v + '"' + (v === s.INBOX_RSPAMD_SCOPE ? ' selected' : '') + '>' + th('InboxRspamdScope_' + v) + '</option>').join('') + '</select><div class="ibx-formrow__help">' + th('InboxRspamdScopeHelp') + '</div></div></div>'
+			+ row(th('InboxRspamdMove'), sw('INBOX_RSPAMD_MOVE', t('InboxRspamdMove'), true), th('InboxRspamdMoveHelp'))
+			+ row(th('InboxRspamdLearn'), sw('INBOX_RSPAMD_LEARN', t('InboxRspamdLearn'), true), th('InboxRspamdLearnHelp'))
+			+ row(th('InboxRspamdTrain'), '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rstrain">' + th('InboxRspamdTrainButton') + '</button>'
+				+ '<div class="ibx-muted ibx-js-rsqueue">' + th('InboxRspamdQueue', q.waiting || 0, q.done || 0, q.failed || 0) + '</div>', th('InboxRspamdTrainHelp'))
+			+ row(th('InboxRspamdDnsLists'), '<button type="button" class="ibx-switch ibx-js-rsoutside" role="switch" aria-checked="' + (s.INBOX_RSPAMD_DNSLISTS === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxRspamdDnsLists') + '"></button>',
+				th('InboxRspamdDnsListsHelp'))
+			+ '</section>';
+	}
+	function bindRspamd(main, s) {
+		const res = $('.ibx-js-rstestres', main);
+		if (!res) {
+			return;
+		}
+		$('.ibx-js-rspwsave', main).addEventListener('click', async () => {
+			try {
+				await post('rspamd', 'password', { value: $('.ibx-js-rspw', main).value });
+				$('.ibx-js-rspw', main).value = '';
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
+		$('.ibx-js-rstest', main).addEventListener('click', async () => {
+			res.textContent = t('InboxRspamdTesting');
+			try {
+				const e = (await api('rspamd', 'state', { ask: 1 })).engine || {};
+				res.textContent = e.ok ? t('InboxRspamdTestOk', e.version || '?', e.learned_spam, e.learned_ham) + (e.learned_spam < 200 || e.learned_ham < 200 ? ' ' + t('InboxRspamdTestFew') : '') : t('InboxRspamdTestFail', e.error || '?');
+			} catch (err) {
+				res.textContent = err.message;
+			}
+		});
+		$('.ibx-js-rstrain', main).addEventListener('click', async () => {
+			if (!await confirmDialog({ title: t('InboxRspamdTrain'), text: t('InboxRspamdTrainConfirm'), confirm: t('InboxRspamdTrainButton') })) {
+				return;
+			}
+			try {
+				const r = await post('rspamd', 'train', {});
+				toast(t('InboxRspamdTrainQueued', r.queued.spam, r.queued.ham));
+				$('.ibx-js-rsqueue', main).textContent = t('InboxRspamdQueue', r.queue.waiting, r.queue.done, r.queue.failed);
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
+		// Outside services: turned on after a dialog that says what leaves and to whom
+		const out = $('.ibx-js-rsoutside', main);
+		out.addEventListener('click', async () => {
+			const on = out.getAttribute('aria-checked') !== 'true';
+			if (on && !await confirmDialog({ title: t('InboxRspamdDnsLists'), text: t('InboxRspamdDnsListsConfirm'), confirm: t('InboxEnable') })) {
+				return;
+			}
+			try {
+				await post('general', 'set', { name: 'INBOX_RSPAMD_DNSLISTS', value: on ? '1' : '0' });
+				out.setAttribute('aria-checked', on ? 'true' : 'false');
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
 	}
 
 	/** One page of the blocked senders, with its pager */

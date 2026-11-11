@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: anti-spam engine of inbox, Rspamd installed beside Dolibarr (self-hosted, off by default) :   1.88.0
+  - The new mails of the inbox are judged at the synchronisation (after the blocked senders, 20 per pass, never
+    the old mails nor the other folders): those without verdict of the filter of the server, or all of them. A mail
+    judged spam goes to the junk (journal « put in junk, judged spam »), never when its sender is known to Dolibarr
+    or protected, never a mail marked « not junk »; the reading says « the anti-spam engine of inbox judges... ».
+  - « Junk » (J) and « Not junk » (Shift+J) are learned by the scheduled job (queue, the click stays instant; an
+    engine stopped fails nothing); training of the start: the junk of the last 6 months as spam, the mails answered
+    as legitimate.
+  - Settings > Anti-spam > Settings: switch, addresses of Rspamd and of its controller, password of the controller
+    (encrypted, never sent back), test of the connection (version, mails learned), mails checked, put away, learn;
+    the lists of reputation by DNS (Spamhaus, SURBL...) ask outside services: off by default, turned off request
+    by request, a dialog says what leaves when turned on. Nothing is ever sent to rspamd.com.
+  - dev/rspamd/run.sh: Rspamd and Redis of the tests (Docker), configuration without any call to rspamd.com.
+
 - NEW: the blocked senders are checked again every night :   1.87.0
   - Scheduled job « Check the blocked senders again » (every night, 2 minutes at most, the entries checked longest
     ago first): a sender blocked while unknown that became known to Dolibarr (a new customer, a contact created)
