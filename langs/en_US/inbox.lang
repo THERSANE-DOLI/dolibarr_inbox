@@ -2869,3 +2869,11 @@ InboxComboMinChars = Type at least %s characters
 InboxComboSearching = Searching…
 InboxComboClear = Clear
 InboxComboRemove = Remove %s
+# New customer: suggestions, nothing in silence (1.81.1)
+InboxLeadSalesRepNone = No sales representative
+InboxLeadSalesRepSrc_assigned = assigned
+InboxLeadSalesRepSrc_owner = personal mailbox
+InboxLeadSalesRepWhy_assigned = The mail is assigned to this person
+InboxLeadSalesRepWhy_owner = Owner of the personal mailbox that received the mail
+InboxLeadVatNotSubject = Not subject to VAT
+InboxLeadCategoriesCount = %s categories

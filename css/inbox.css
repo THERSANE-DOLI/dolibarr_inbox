@@ -2511,3 +2511,10 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	--dol-combo-selected: var(--ibx-accent-soft); --dol-combo-accent: var(--ibx-accent); --dol-combo-radius: var(--ibx-radius); --dol-combo-shadow: var(--ibx-shadow-float); --dol-combo-z: 70; }
 .ibx-lead__field > .dol-combo, .ibx-formrow .dol-combo { flex: 1; }
 .dol-combo__pop { font-family: var(--ibx-font); font-size: var(--ibx-fs-md); }
+/* Nature of the thirdparty as on the page of creation of Dolibarr (theme eldy: spannature, prospect-back...) */
+.ibx-lead__nature { display: inline-flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s3); border-radius: 5px; background: var(--ibx-bg-sunken); cursor: pointer; user-select: none; }
+.ibx-lead__nature > input { margin: 0; cursor: pointer; }
+.ibx-lead__nature--prospect:has(input:checked) { background: #a3c0ad; color: #fff; }
+.ibx-lead__nature--customer:has(input:checked) { background: #55955d; color: #fff; }
+.ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
+.ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }

@@ -284,7 +284,7 @@ class InboxLeadTest extends InboxTestCase
 			.((int) $box->id).", ".$folder.", '1:1', 1, 'a1@lead.inbox-test.invalid', '".$this->db->idate(dol_now())."', 'paul@zzlead.invalid', 'Devis', 10, '".$this->db->idate(dol_now())."')");
 		$row = $this->db->getRow("SELECT * FROM ".$p."inbox_mail WHERE rowid = ".((int) $this->db->last_insert_id($p.'inbox_mail')));
 		$res = $lead->create($this->admin, $row, array('name' => 'Zzlead Quick', 'phone' => '04 00 00 00 00', 'town' => 'Lyon'),
-			array('firstname' => 'Paul', 'lastname' => 'ZZLEAD Martin', 'email' => 'paul@zzlead.invalid'), array('prospect' => 1, 'commercial' => 1));
+			array('firstname' => 'Paul', 'lastname' => 'ZZLEAD Martin', 'email' => 'paul@zzlead.invalid'), array('prospect' => 1, 'commercial' => array((int) $this->admin->id)));
 		$this->assertIsArray($res, $lead->error);
 		$soc = $this->db->getRow("SELECT nom, client, code_client, town FROM ".$p."societe WHERE rowid = ".((int) $res['soc']));
 		$this->assertSame('Zzlead Quick', $soc->nom);
@@ -301,6 +301,19 @@ class InboxLeadTest extends InboxTestCase
 		$dups = $lead->duplicates($this->admin, $f);
 		$this->assertSame((int) $res['soc'], $dups[0]['id']);
 		$this->assertSame(array('phone', 'name'), $dups[0]['why']);
+
+		// Nothing taken again in silence: only the nature and the type are kept for the next panel
+		$last = json_decode((string) (new InboxUserParam($this->db))->get($this->admin, 'lead_last'), true);
+		$this->assertSame(array('prospect', 'customer', 'supplier', 'typent_id'), array_keys($last));
+		// Suggestions: nobody on a shared mailbox; the owner of a personal one; the person the mail is assigned to first
+		$this->assertSame(array('nature' => '', 'commercial' => array(), 'commercial_why' => ''), $lead->suggestions($row));
+		$this->db->query("UPDATE ".$p."inbox_account SET fk_user_owner = ".((int) $this->admin->id).", usage_profile = 'purchase' WHERE rowid = ".((int) $box->id));
+		$sug = $lead->suggestions($row);
+		$this->assertSame(array('supplier', array((int) $this->admin->id), 'owner'), array($sug['nature'], $sug['commercial'], $sug['commercial_why']));
+		// The full page gets what the panel says, nobody and « not subject to VAT » included
+		$url = InboxLead::fullUrl(array('name' => 'X'), null, array('prospect' => 1, 'vat_subject' => 0, 'commercial' => array()));
+		$this->assertStringContainsString('assujtva_value=&', $url.'&');
+		$this->assertStringContainsString(urlencode('commercial[0]').'=0', $url);
 
 		// Undone: the contact and the thirdparty go
 		$this->assertTrue($lead->undo($this->admin, $res['soc'], $res['contact']), $lead->error);

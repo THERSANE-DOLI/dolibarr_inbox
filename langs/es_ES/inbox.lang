@@ -2869,3 +2869,11 @@ InboxComboMinChars = Escriba al menos %s caracteres
 InboxComboSearching = Buscando…
 InboxComboClear = Borrar
 InboxComboRemove = Quitar %s
+# New customer: suggestions, nothing in silence (1.81.1)
+InboxLeadSalesRepNone = Ningún comercial asignado
+InboxLeadSalesRepSrc_assigned = asignado
+InboxLeadSalesRepSrc_owner = buzón personal
+InboxLeadSalesRepWhy_assigned = El correo está asignado a esta persona
+InboxLeadSalesRepWhy_owner = Titular del buzón personal que recibió el correo
+InboxLeadVatNotSubject = No sujeto a IVA
+InboxLeadCategoriesCount = %s categorías
