@@ -287,6 +287,30 @@ class InboxComposeTest extends InboxImapTestCase
 	}
 
 	/**
+	 * Text of a mail sent kept in the agenda (1.83.1): what was written only, the attachments listed
+	 *
+	 * @return void
+	 */
+	public function testWrittenText()
+	{
+		dol_include_once('/inbox/class/inboxoutbox.class.php');
+		$m = new InboxMessage();
+		$m->bodyHtml = '<p>Bonjour,</p><p>Voici notre devis.</p><div class="inbox-signature"><p>Jean Dupont<br>Tél. 01 02 03 04 05</p></div>'
+			.'<div class="inbox-quote"><p>Le 10/11/2026, Client a écrit :</p><blockquote>Pouvez-vous chiffrer ?</blockquote></div>';
+		$m->addAttachment('devis.pdf', str_repeat('x', 2048), 'application/pdf');
+		$text = InboxOutbox::writtenText($m);
+		$this->assertStringContainsString('Voici notre devis.', $text);
+		$this->assertStringNotContainsString('Jean Dupont', $text, 'no signature');
+		$this->assertStringNotContainsString('chiffrer', $text, 'no quoted mail');
+		$this->assertStringNotContainsString('xxxx', $text, 'no content of an attachment');
+		$this->assertMatchesRegularExpression('/devis\.pdf \(2/', $text, 'the attachment listed with its size');
+		// A mail without the marks of inbox: found in the text
+		$m2 = new InboxMessage();
+		$m2->bodyText = "Merci pour votre retour.\n-- \nJean\n\nLe 10 nov. 2026, Client <c@x.invalid> a écrit :\n> ancien";
+		$this->assertSame('Merci pour votre retour.', InboxOutbox::writtenText($m2));
+	}
+
+	/**
 	 * A mailbox without identity sends with its own address
 	 *
 	 * @return void

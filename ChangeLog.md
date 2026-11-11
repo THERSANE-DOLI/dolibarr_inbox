@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: sending recorded on a piece, the agenda keeps what was written only and no copy of the mail goes in the
+  documents of the piece: no signature, no quoted or forwarded mail, the attachments listed by name and size; the
+  mail stays in the mailbox, linked to the piece :   1.83.1
+
 - NEW: insert a piece of Dolibarr in a writing (lot A5) :   1.83.0
   - « Insert a piece » in the bar of the writing: proposals, orders and invoices of the thirdparties of the
     recipients and of the pieces linked to the mail answered (« All thirdparties » to widen), searched by reference

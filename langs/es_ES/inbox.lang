@@ -1307,6 +1307,7 @@ InboxComposeOtherMailbox = Responde desde %s, el correo llegó a %s
 InboxCronOutbox = Inbox: correos pendientes de envío
 InboxCronOutboxComment = Envía los correos cuyo plazo o fecha ha llegado, cuando ninguna página de inbox está abierta
 InboxEventMailSent = Correo enviado: %s
+InboxEventAttachments = Adjuntos: %s
 InboxGuardAttachTitle = ¿Adjunto olvidado?
 InboxGuardAttachText = El texto habla de un adjunto, pero no hay ningún archivo adjunto.
 InboxGuardManyTitle = %s destinatarios se ven entre sí

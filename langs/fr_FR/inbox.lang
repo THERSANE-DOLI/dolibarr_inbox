@@ -1307,6 +1307,7 @@ InboxComposeOtherMailbox = Vous répondez depuis %s, le mail est arrivé sur %s
 InboxCronOutbox = Inbox : mails en attente d'envoi
 InboxCronOutboxComment = Envoie les mails dont le délai ou la date est venu, quand aucune page d'inbox n'est ouverte pour le faire
 InboxEventMailSent = Mail envoyé : %s
+InboxEventAttachments = Pièces jointes : %s
 InboxGuardAttachTitle = Pièce jointe oubliée ?
 InboxGuardAttachText = Le texte parle d'une pièce jointe, mais aucun fichier n'est joint.
 InboxGuardManyTitle = %s destinataires se voient entre eux

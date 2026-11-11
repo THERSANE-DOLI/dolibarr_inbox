@@ -1307,6 +1307,7 @@ InboxComposeOtherMailbox = Sie antworten von %s, die E-Mail kam an %s
 InboxCronOutbox = Inbox: E-Mails, die auf den Versand warten
 InboxCronOutboxComment = Sendet die E-Mails, deren Frist oder Datum erreicht ist, wenn keine Seite von inbox offen ist
 InboxEventMailSent = E-Mail gesendet: %s
+InboxEventAttachments = Anhänge: %s
 InboxGuardAttachTitle = Anhang vergessen?
 InboxGuardAttachText = Der Text erwähnt einen Anhang, aber es ist keine Datei angehängt.
 InboxGuardManyTitle = %s Empfänger sehen sich gegenseitig

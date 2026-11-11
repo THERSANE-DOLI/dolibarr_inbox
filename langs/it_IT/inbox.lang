@@ -1307,6 +1307,7 @@ InboxComposeOtherMailbox = Rispondi da %s, la mail è arrivata su %s
 InboxCronOutbox = Inbox: mail in attesa di invio
 InboxCronOutboxComment = Invia le mail il cui ritardo o data è arrivato, quando nessuna pagina di inbox è aperta
 InboxEventMailSent = Mail inviata: %s
+InboxEventAttachments = Allegati: %s
 InboxGuardAttachTitle = Allegato dimenticato?
 InboxGuardAttachText = Il testo parla di un allegato, ma nessun file è allegato.
 InboxGuardManyTitle = %s destinatari si vedono tra loro

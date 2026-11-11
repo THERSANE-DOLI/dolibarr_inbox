@@ -1307,6 +1307,7 @@ InboxComposeOtherMailbox = You answer from %s, the mail came to %s
 InboxCronOutbox = Inbox: mails waiting to be sent
 InboxCronOutboxComment = Sends the mails whose delay or date has come, when no page of inbox is open to do it
 InboxEventMailSent = Mail sent: %s
+InboxEventAttachments = Attachments: %s
 InboxGuardAttachTitle = Attachment forgotten?
 InboxGuardAttachText = The text speaks of an attachment, but no file is attached.
 InboxGuardManyTitle = %s recipients see each other
