@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: writing of a protected mailbox, nothing in clear on the disk :   1.89.11
+  - its files (state, mail quoted, attachments) sealed by the key of the session (AES-256-GCM, the key in the cookie
+    of the browser): readable by a request of this browser in this session only, a copy of the disk shows nothing.
+  - a writing begun from another mailbox is sealed as soon as an identity of a protected mailbox is chosen; never
+    opened when the key of the session is missing; the writings of the other mailboxes as before.
+
 - FIX: settings of the mailboxes, actions easier to find :   1.89.11
   - card of a mailbox: « Delete the mailbox » always shown, greyed while the mailbox is not disabled, with the
     reason on hover and on click (it only appeared once the mailbox was disabled).
