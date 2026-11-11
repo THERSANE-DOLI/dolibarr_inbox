@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: settings of the application, who may change each one written in its definition :   1.89.10
+  - each setting declares who may change it: manager (managers of the mailboxes) or dolibarr_admin; a right missing
+    or mistyped is read as dolibarr_admin: a setting added later is never opened to more people than meant.
+  - the constants that go with a change (password of the controller of Rspamd when its server changes, last error)
+    declared with the setting, no longer written apart.
+  - the screens read the settings this user sees without changing them from the server: fields and switches
+    frozen, nothing written by hand in the script.
+
 - FIX: security audit of 2026-11-11, remarks :   1.89.9
   - protected mailbox: its port of Sieve kept as its servers (the password goes there); its encrypted copies and its
     notices removed with the mailbox.

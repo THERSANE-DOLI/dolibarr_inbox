@@ -3027,6 +3027,7 @@ InboxRspamdEnabledHelp = Apagado por defecto: instale Rspamd primero (vea el REA
 InboxRspamdUrl = Dirección de Rspamd (análisis)
 InboxRspamdController = Dirección del controlador (aprendizaje)
 InboxRspamdUrlAdminOnly = Solo un administrador de Dolibarr puede cambiar las direcciones del motor anti-spam: los correos y la contraseña del controlador se envían allí
+InboxErrorSettingAdminOnly = Solo un administrador de Dolibarr puede cambiar este ajuste.
 InboxRspamdUrlAdminHelp = Modificables solo por un administrador de Dolibarr (los correos y la contraseña del controlador se envían a estas direcciones). La contraseña se elimina cuando cambia la dirección del controlador.
 InboxRspamdPassword = Contraseña del controlador
 InboxRspamdPasswordSaved = Guardada (escriba otra para cambiarla)

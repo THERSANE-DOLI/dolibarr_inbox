@@ -3319,8 +3319,24 @@
 	}
 
 	/** Fields of the general settings (General, Security): a value saved when changed, a switch at once */
-	function bindGeneralFields(main) {
-		$$('[data-name]', main).forEach(f => f.addEventListener('change', async () => {
+	/**
+	 * @param {HTMLElement} main   Screen
+	 * @param {string[]}    locked Settings this user sees without changing them (their right, ajax/general.php)
+	 */
+	function bindGeneralFields(main, locked) {
+		const off = name => (locked || []).includes(name);
+		$$('[data-name]', main).forEach(f => {
+			if (off(f.dataset.name)) {
+				f.readOnly = true;
+				f.disabled = f.tagName === 'SELECT';
+			}
+		});
+		$$('.ibx-js-gswitch', main).forEach(sw => {
+			if (off(sw.dataset.switch)) {
+				sw.disabled = true;
+			}
+		});
+		$$('[data-name]', main).filter(f => !off(f.dataset.name)).forEach(f => f.addEventListener('change', async () => {
 			try {
 				await post('general', 'set', { name: f.dataset.name, value: f.value });
 				toast(t('InboxSaved'));
@@ -3330,7 +3346,7 @@
 			}
 		}));
 		// Switches: saved at once, back if the server refuses
-		$$('.ibx-js-gswitch', main).forEach(sw => sw.addEventListener('click', async () => {
+		$$('.ibx-js-gswitch', main).filter(sw => !off(sw.dataset.switch)).forEach(sw => sw.addEventListener('click', async () => {
 			const on = sw.getAttribute('aria-checked') !== 'true';
 			sw.setAttribute('aria-checked', on ? 'true' : 'false');
 			try {
@@ -3380,7 +3396,9 @@
 		main.innerHTML = skeleton();
 		let s;
 		try {
-			s = (await api('general', 'get')).settings;
+			const g = await api('general', 'get');
+			s = g.settings;
+			s.locked = g.locked || [];
 		} catch (err) {
 			main.replaceChildren(errorBox(err, () => renderSecurity(main)));
 			return;
@@ -3400,7 +3418,7 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAuthServers') + '</span><div><a href="#/settings/antispam/settings">' + th('InboxAuthServersMoved') + '</a></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
 			+ '</div></div>';
-		bindGeneralFields(main);
+		bindGeneralFields(main, s.locked);
 	}
 
 
@@ -3428,7 +3446,10 @@
 		try {
 			r = await api('blockedsender', 'list', state.type === 'known' ? Object.assign({}, state, { type: '', known: 1 }) : state);
 			if (admin && tab === 'settings') {
-				s = (await api('general', 'get')).settings;
+				const g = await api('general', 'get');
+				s = g.settings;
+				// Settings seen without being changed (their right is in their definition, ajax/general.php)
+				s.locked = g.locked || [];
 				s.rspamd = await api('rspamd', 'state');
 			}
 		} catch (err) {
@@ -3496,7 +3517,7 @@
 		main.innerHTML = html;
 		main._bs = { r, state };
 		if (tab === 'settings') {
-			bindGeneralFields(main);
+			bindGeneralFields(main, s.locked);
 			bindRspamd(main, s);
 		}
 		if (tab !== 'blocked') {
@@ -3571,14 +3592,15 @@
 		const row = (label, body, help) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + label + '</span><div>' + body + (help ? '<div class="ibx-formrow__help">' + help + '</div>' : '') + '</div></div>';
 		const q = st.queue || {};
 		// Addresses of the engine: an administrator of Dolibarr only, the mails and the password go there (INBX-049)
-		const urlLock = isDolibarrAdmin() ? '' : ' readonly aria-describedby="g-rsurlhelp"';
+		const locked = name => (s.locked || []).includes(name);
+		const urlLock = name => (locked(name) ? ' readonly aria-describedby="g-rsurlhelp"' : '');
 		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + I.thTerms('InboxRspamdSection') + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxRspamdHelp') + '</p>'
 			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(), st.error.message) + '</div></div>' : '')
 			+ row(th('InboxRspamdEnabled'), sw('INBOX_RSPAMD_ENABLED', t('InboxRspamdEnabled'), false), th('InboxRspamdEnabledHelp'))
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"' + urlLock + '>'
-				+ (isDolibarrAdmin() ? '' : '<div class="ibx-formrow__help" id="g-rsurlhelp">' + th('InboxRspamdUrlAdminHelp') + '</div>') + '</div></div>'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsctl">' + th('InboxRspamdController') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsctl" data-name="INBOX_RSPAMD_CONTROLLER_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_CONTROLLER_URL) + '"' + urlLock + '></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"' + urlLock('INBOX_RSPAMD_URL') + '>'
+				+ (locked('INBOX_RSPAMD_URL') ? '<div class="ibx-formrow__help" id="g-rsurlhelp">' + th('InboxRspamdUrlAdminHelp') + '</div>' : '') + '</div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsctl">' + th('InboxRspamdController') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsctl" data-name="INBOX_RSPAMD_CONTROLLER_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_CONTROLLER_URL) + '"' + urlLock('INBOX_RSPAMD_CONTROLLER_URL') + '></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rspw">' + th('InboxRspamdPassword') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--medium ibx-js-rspw" type="password" id="g-rspw" autocomplete="new-password" placeholder="' + th(st.has_password ? 'InboxRspamdPasswordSaved' : 'InboxRspamdPasswordNone') + '">'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rspwsave">' + th('InboxSave') + '</button></div><div class="ibx-formrow__help">' + th('InboxRspamdPasswordHelp') + '</div></div></div>'
 			+ row('', '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rstest">' + ic('plug') + ' ' + th('InboxRspamdTest') + '</button><div class="ibx-js-rstestres ibx-formrow__help" role="status"></div>')
@@ -3720,6 +3742,7 @@
 		try {
 			const g = await api('general', 'get');
 			s = g.settings;
+			s.locked = g.locked || [];
 			aiModule = g.ai_module;
 		} catch (err) {
 			main.replaceChildren(errorBox(err, () => renderGeneral(main, parts)));
@@ -3843,7 +3866,7 @@
 		});
 		$$('[name="g-greys"]', look).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_GREYS', greysValue())));
 		// Saved field by field, at once (as the switches), with a toast
-		bindGeneralFields(main);
+		bindGeneralFields(main, s.locked);
 		tabTags($('.ibx-js-tags', main), null);
 		renderWhisperSettings($('.ibx-js-whisper', main));
 		const searchDone = renderSearchSettings($('.ibx-js-searchsettings', main));
