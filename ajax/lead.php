@@ -61,10 +61,12 @@ function inboxLeadInput()
 	$contact = is_array($c) && $c ? InboxLead::clean($c, InboxLead::CONTACT_FIELDS) : null;
 	$o = (array) inboxAjaxParam('opts', 'none');
 	$opts = array();
-	foreach (array('prospect', 'customer', 'supplier', 'private', 'vat_subject', 'commercial', 'use_soc') as $k) {
+	foreach (array('prospect', 'customer', 'supplier', 'private', 'vat_subject', 'use_soc') as $k) {
 		$opts[$k] = (int) ($o[$k] ?? 0);
 	}
 	$opts['categories'] = array_values(array_filter(array_map('intval', (array) ($o['categories'] ?? array()))));
+	$opts['commercial'] = array_values(array_filter(array_map('intval', (array) ($o['commercial'] ?? array()))));
+	$opts['categories_supplier'] = array_values(array_filter(array_map('intval', (array) ($o['categories_supplier'] ?? array()))));
 
 	return array($soc, $contact, $opts);
 }
@@ -94,7 +96,7 @@ switch ($action) {
 			inboxAjaxError($reader->error ?: $langs->transnoentities('InboxMailNotFound'), 502);
 		}
 		$found = $lead->extract($reader->row, InboxMimeParser::parse($raw));
-		inboxAjaxReply(array('found' => $found, 'duplicates' => $lead->duplicates($user, $found), 'form' => $lead->form($user)));
+		inboxAjaxReply(array('found' => $found, 'duplicates' => $lead->duplicates($user, $found), 'form' => $lead->form($user), 'suggest' => $lead->suggestions($reader->row)));
 		// no break
 
 	case 'create':

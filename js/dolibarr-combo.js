@@ -32,6 +32,10 @@
  *                                                 options asked to the server as one types: GET ?term=...,
  *                                                 answer [{value, label, sub?, group?}], {results: [...]} or {value: label}
  *   <option data-sub="Lyon">ACME</option>        second line of an option (text only)
+ *   <select data-combo multiple data-combo-chips> the choices as chips in the field, each with its « × »
+ *   <option data-color="#3b82f6">                colour of the option (a dot in the list, the colour of its chip)
+ *   <option data-depth="1" data-path="Sales > Wholesale">
+ *                                                 place in a tree: indented, searched on its whole path
  *
  *   Dolibarr.tools.combo.attach(select, {source: async (term, signal) => items, minLength, delay, placeholder,
  *                                        clear, nativeOnTouch})  => {open, close, refresh, destroy}
@@ -49,7 +53,7 @@
 
 	const L = {
 		search: 'Search…', none: 'None', noResult: 'No result', typeMore: '%s more, type to narrow', moreChosen: '+%s',
-		minChars: 'Type at least %s characters', searching: 'Searching…', clear: 'Clear',
+		minChars: 'Type at least %s characters', searching: 'Searching…', clear: 'Clear', remove: 'Remove %s',
 	};
 	const CHEVRON = '<svg class="dol-combo__chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 	const CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12l5 5L20 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -59,6 +63,16 @@
 	const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c]));
 	const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 	const fmt = (s, v) => String(s).replace('%s', v);
+	/** A colour #rgb / #rrggbb (else ''), and the text that reads on it */
+	const color = v => (/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v || '').trim()) ? '#' + String(v).trim().replace(/^#/, '') : '');
+	const ink = hex => {
+		let h = hex.slice(1);
+		if (h.length === 3) {
+			h = h.split('').map(x => x + x).join('');
+		}
+		const [r, g, b] = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16) / 255).map(x => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#1f2328' : '#ffffff';
+	};
 
 	/** Items of an answer of a server, whatever its usual shape */
 	function normalize(data) {
@@ -112,14 +126,20 @@
 		const delay = +(o.delay ?? 250);
 		const placeholder = o.placeholder ?? d.comboPlaceholder ?? '';
 		const clearable = !!(o.clear ?? (d.comboClear === '1')) && !sel.multiple;
+		const chips = sel.multiple && !!(o.chips ?? (d.comboChips !== undefined && d.comboChips !== '0'));
 		const n = ++seq;
 		const wrap = document.createElement('span');
-		wrap.className = 'dol-combo';
+		wrap.className = 'dol-combo' + (chips ? ' dol-combo--chips' : '');
 		const btn = document.createElement('button');
 		btn.type = 'button';
 		// The classes of style of the select: the button looks like the other fields of the page. Never the classes the
 		// code looks for (js-..., x-js-...): a search by class must find the select, not the button
-		btn.className = (Array.from(sel.classList).filter(k => !/(^|-)js(-|$)/.test(k)).join(' ') + ' dol-combo__btn').trim();
+		const styles = Array.from(sel.classList).filter(k => !/(^|-)js(-|$)/.test(k)).join(' ');
+		btn.className = ((chips ? '' : styles) + ' dol-combo__btn').trim();
+		if (chips) {
+			// The field is the frame: the chips, then the button that opens the list
+			wrap.className += ' ' + styles;
+		}
 		btn.id = (sel.id || 'dol-combo' + n) + '-combo';
 		btn.setAttribute('aria-haspopup', 'listbox');
 		btn.setAttribute('aria-expanded', 'false');
@@ -137,6 +157,12 @@
 		}
 		let clearBtn = null;
 		sel.parentNode.insertBefore(wrap, sel);
+		let chipBox = null;
+		if (chips) {
+			chipBox = document.createElement('span');
+			chipBox.className = 'dol-combo__chips';
+			wrap.appendChild(chipBox);
+		}
 		wrap.appendChild(btn);
 		if (clearable) {
 			clearBtn = document.createElement('button');
@@ -166,6 +192,16 @@
 				text = chosen.slice(0, 2).map(x => x.textContent.trim()).join(', ') + ' ' + fmt(L.moreChosen, chosen.length - 2);
 			} else {
 				text = chosen.map(x => x.textContent.trim()).join(', ');
+			}
+			if (chipBox) {
+				chipBox.innerHTML = chosen.map(x => {
+					const col = color(x.dataset.color);
+					const path = x.dataset.path || '';
+					return '<span class="dol-combo__chip"' + (col ? ' style="background:' + col + ';color:' + ink(col) + '"' : '') + (path ? ' title="' + esc(path) + '"' : '') + '>'
+						+ '<span>' + esc(x.textContent.trim()) + '</span>' + (sel.disabled ? '' : '<button type="button" class="dol-combo__unchip" data-v="' + esc(x.value) + '" aria-label="' + esc(fmt(L.remove, x.textContent.trim())) + '" tabindex="-1">'
+						+ '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>') + '</span>';
+				}).join('');
+				text = empty ? text : '';
 			}
 			c.val.textContent = text;
 			c.val.classList.toggle('is-empty', empty);
@@ -209,7 +245,7 @@
 			let active = -1;
 			let timer = 0;
 			const place = () => {
-				const r = btn.getBoundingClientRect();
+				const r = (chips ? wrap : btn).getBoundingClientRect();
 				const w = Math.max(r.width, 240);
 				const below = window.innerHeight - r.bottom;
 				pop.style.left = Math.max(4, Math.min(r.left, window.innerWidth - w - 4)) + 'px';
@@ -249,9 +285,14 @@
 						html += '<li class="dol-combo__group" role="presentation">' + esc(it.group) + '</li>';
 					}
 					group = it.group || null;
-					html += '<li class="dol-combo__opt' + (it.disabled ? ' is-disabled' : '') + '" role="option" id="' + lid + '-' + i + '" data-i="' + i + '" aria-selected="' + (it.selected ? 'true' : 'false') + '"' + (it.disabled ? ' aria-disabled="true"' : '') + '>'
+					// The depth shows only on the whole tree: a search lists the paths
+					const depth = input.value.trim() ? 0 : Math.min(it.depth || 0, 8);
+					const sub = it.sub || (input.value.trim() && it.path && it.path !== it.label ? it.path : '');
+					html += '<li class="dol-combo__opt' + (it.disabled ? ' is-disabled' : '') + '" role="option" id="' + lid + '-' + i + '" data-i="' + i + '" aria-selected="' + (it.selected ? 'true' : 'false') + '"' + (it.disabled ? ' aria-disabled="true"' : '')
+						+ (depth ? ' style="padding-left:' + (0.5 + depth * 1.1) + 'rem"' : '') + (it.path ? ' title="' + esc(it.path) + '"' : '') + '>'
 						+ (sel.multiple ? '<span class="dol-combo__check" aria-hidden="true">' + (it.selected ? CHECK : '') + '</span>' : '')
-						+ '<span class="dol-combo__text"><span>' + esc(it.label || L.none) + '</span>' + (it.sub ? '<span class="dol-combo__sub">' + esc(it.sub) + '</span>' : '') + '</span></li>';
+						+ (it.color ? '<span class="dol-combo__dot" style="background:' + it.color + '" aria-hidden="true"></span>' : '')
+						+ '<span class="dol-combo__text"><span>' + esc(it.label || L.none) + '</span>' + (sub ? '<span class="dol-combo__sub">' + esc(sub) + '</span>' : '') + '</span></li>';
 				});
 				const extra = more + Math.max(0, items.length - shown.length);
 				if (!shown.length) {
@@ -265,12 +306,13 @@
 			};
 			const local = () => Array.from(sel.options).filter(x => !x.hidden && !(sel.multiple && x.value === '')).map(x => ({
 				value: x.value, label: x.textContent.trim(), sub: x.dataset.sub || '', group: x.parentElement && x.parentElement.tagName === 'OPTGROUP' ? x.parentElement.label : '',
-				selected: x.selected, disabled: x.disabled, opt: x,
+				selected: x.selected, disabled: x.disabled, opt: x, color: color(x.dataset.color), depth: +(x.dataset.depth || 0), path: x.dataset.path || '',
 			}));
 			const filter = () => {
 				const words = fold(input.value).split(/\s+/).filter(Boolean);
 				if (!source) {
-					draw(local().filter(it => words.every(w => fold(it.label + ' ' + it.sub).includes(w))), 0);
+					// In a tree, the whole path is searched: the parent finds its children
+					draw(local().filter(it => words.every(w => fold(it.label + ' ' + it.sub + ' ' + it.path).includes(w))), 0);
 					return;
 				}
 				clearTimeout(timer);
@@ -347,6 +389,15 @@
 					close(true);
 				} else if (e.key === 'Tab') {
 					close(false);
+				} else if (e.key === 'Backspace' && chips && input.value === '') {
+					// Backspace in an empty search: the last chip goes
+					const last = Array.from(sel.selectedOptions).filter(x => x.value !== '').pop();
+					if (last) {
+						last.selected = false;
+						fire();
+						paint();
+						filter();
+					}
 				}
 			});
 			list.addEventListener('mousedown', e => e.preventDefault());
@@ -382,6 +433,30 @@
 				fire();
 				paint();
 				btn.focus();
+			});
+		}
+		if (chipBox) {
+			chipBox.addEventListener('click', e => {
+				const x = e.target.closest('.dol-combo__unchip');
+				if (x) {
+					const opt = Array.from(sel.options).find(op => op.value === x.dataset.v);
+					if (opt) {
+						opt.selected = false;
+						fire();
+						paint();
+						if (current === c) {
+							close(false);
+						}
+					}
+					return;
+				}
+				open('');
+			});
+			wrap.addEventListener('mousedown', e => {
+				if (e.target === wrap) {
+					e.preventDefault();
+					open('');
+				}
 			});
 		}
 		// The code that focuses the select (first field of a form, invalid field) reaches the button

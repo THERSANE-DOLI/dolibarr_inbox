@@ -44,3 +44,14 @@
 .dol-combo__sub { font-size: 0.85em; color: var(--dol-combo-muted, #6b7280); }
 .dol-combo__group { padding: 0.5rem 0.5rem 0.25rem; font-size: 0.85em; font-weight: 600; color: var(--dol-combo-muted, #6b7280); }
 .dol-combo__note { padding: 0.5rem; font-size: 0.85em; color: var(--dol-combo-muted, #6b7280); }
+/* Choices as chips (data-combo-chips): the field is the frame, the chips then the button that opens the list */
+.dol-combo--chips { flex-wrap: wrap; gap: 0.25rem; min-height: 2.25rem; height: auto !important; padding-top: 0.1875rem !important; padding-bottom: 0.1875rem !important; cursor: pointer; }
+.dol-combo--chips > .dol-combo__btn { flex: 1 1 4rem; width: auto; min-height: 1.625rem; padding: 0 0.25rem; border: 0; background: transparent; color: inherit; font: inherit; }
+.dol-combo--chips > .dol-combo__btn:focus-visible { outline: 2px solid var(--dol-combo-accent, #2563eb); outline-offset: 1px; border-radius: 4px; }
+.dol-combo__chips { display: contents; }
+.dol-combo__chip { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; padding: 0.0625rem 0.25rem 0.0625rem 0.5rem; border-radius: 999px; font-size: 0.875em; line-height: 1.4;
+	background: var(--dol-combo-selected, #e8eefc); color: var(--dol-combo-text, #1f2328); }
+.dol-combo__chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dol-combo__unchip { display: inline-flex; align-items: center; justify-content: center; width: 1.125rem; height: 1.125rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; opacity: .75; }
+.dol-combo__unchip:hover { opacity: 1; background: rgb(0 0 0 / .12); }
+.dol-combo__dot { flex: none; width: 0.625rem; height: 0.625rem; border-radius: 50%; box-shadow: 0 0 0 1px rgb(0 0 0 / .15); }

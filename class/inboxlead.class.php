@@ -944,9 +944,55 @@ class InboxLead
 			'blockers' => $blockers,
 			'defaults' => $defaults,
 			'last' => is_array($last) ? $last : array(),
-			'categories' => isModEnabled('category') && $user->hasRight('categorie', 'lire') ? $this->categories() : array(),
-			'me' => array('id' => (int) $user->id, 'name' => $user->getFullName($langs)),
+			'categories' => isModEnabled('category') && $user->hasRight('categorie', 'lire') ? $this->categories(2) : array(),
+			'categories_supplier' => isModEnabled('category') && $user->hasRight('categorie', 'lire') ? $this->categories(1) : array(),
+			'users' => $this->users(),
 		);
+	}
+
+	/**
+	 * What the mail suggests, never filled in silence: the nature by the usage of the mailbox (purchase, transport:
+	 * supplier; sales, support: prospect), the sales representatives (the people the mail is assigned to, else the
+	 * owner of a personal mailbox, else nobody: on a shared mailbox the user who clicks is not the one of the customer)
+	 *
+	 * @param object $row Mail of the index
+	 * @return array{nature:string,commercial:int[],commercial_why:string}
+	 */
+	public function suggestions($row)
+	{
+		$p = $this->db->prefix();
+		$acc = $this->db->getRow("SELECT usage_profile, fk_user_owner FROM ".$p."inbox_account WHERE rowid = ".((int) $row->fk_account));
+		$usage = is_object($acc) ? (string) $acc->usage_profile : '';
+		$nature = in_array($usage, array('purchase', 'transport'), true) ? 'supplier' : (in_array($usage, array('sales', 'support'), true) ? 'prospect' : '');
+		$commercial = array();
+		$why = '';
+		require_once __DIR__.'/inboxassign.class.php';
+		$assigned = (new InboxAssign($this->db))->forRows(array($row));
+		if (!empty($assigned[(int) $row->rowid])) {
+			$commercial = array_values(array_unique(array_map('intval', $assigned[(int) $row->rowid])));
+			$why = 'assigned';
+		} elseif (is_object($acc) && (int) $acc->fk_user_owner > 0) {
+			$commercial = array((int) $acc->fk_user_owner);
+			$why = 'owner';
+		}
+
+		return array('nature' => $nature, 'commercial' => $commercial, 'commercial_why' => $why);
+	}
+
+	/**
+	 * @return array<int,array{id:int,label:string}> Active internal users, who may be sales representatives
+	 */
+	protected function users()
+	{
+		$rows = $this->db->getRows("SELECT u.rowid, u.firstname, u.lastname, u.login FROM ".$this->db->prefix()."user as u WHERE u.statut = 1 AND (u.fk_soc IS NULL OR u.fk_soc = 0)"
+			." AND u.entity IN (".getEntity('user').") ORDER BY u.lastname, u.firstname LIMIT 1000");
+		$out = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$name = trim($r->firstname.' '.$r->lastname);
+			$out[] = array('id' => (int) $r->rowid, 'label' => $name !== '' ? $name : (string) $r->login);
+		}
+
+		return $out;
 	}
 
 	/**
@@ -1119,15 +1165,36 @@ class InboxLead
 	}
 
 	/**
-	 * @return array<int,array{id:int,label:string}> Categories of customers and prospects
+	 * Categories of a type in the order of their tree, as Dolibarr shows them: colour, depth, path « Parent > Child »
+	 *
+	 * @param int $type 2 customers and prospects, 1 suppliers
+	 * @return array<int,array{id:int,label:string,color:string,depth:int,path:string}>
 	 */
-	protected function categories()
+	protected function categories($type)
 	{
-		$rows = $this->db->getRows("SELECT rowid, label FROM ".$this->db->prefix()."categorie WHERE type = 2 AND entity IN (".getEntity('category').") ORDER BY label LIMIT 300");
-		$out = array();
+		$rows = $this->db->getRows("SELECT rowid, label, fk_parent, color FROM ".$this->db->prefix()."categorie WHERE type = ".((int) $type)." AND entity IN (".getEntity('category').") ORDER BY label LIMIT 500");
+		$byParent = array();
+		$ids = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			$out[] = array('id' => (int) $r->rowid, 'label' => (string) $r->label);
+			$ids[(int) $r->rowid] = true;
 		}
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			// A parent out of the list (another entity): the category is a root
+			$parent = isset($ids[(int) $r->fk_parent]) ? (int) $r->fk_parent : 0;
+			$byParent[$parent][] = $r;
+		}
+		$out = array();
+		$walk = function ($parent, $depth, $path) use (&$walk, &$out, $byParent) {
+			foreach ($byParent[$parent] ?? array() as $r) {
+				$p = ($path !== '' ? $path.' > ' : '').(string) $r->label;
+				$color = preg_match('/^#?[0-9a-f]{6}$/i', (string) $r->color) ? '#'.ltrim((string) $r->color, '#') : '';
+				$out[] = array('id' => (int) $r->rowid, 'label' => (string) $r->label, 'color' => $color, 'depth' => $depth, 'path' => $p);
+				if ($depth < 10) {
+					$walk((int) $r->rowid, $depth + 1, $p);
+				}
+			}
+		};
+		$walk(0, 0, '');
 
 		return $out;
 	}
@@ -1275,12 +1342,19 @@ class InboxLead
 				$this->db->rollback();
 				return $this->fail('soc', $s->error);
 			}
-			if (!empty($opts['commercial'])) {
-				$s->add_commercial($user, (int) $user->id);
+			// Sales representatives chosen in the panel (nobody by default)
+			foreach (array_unique(array_filter(array_map('intval', (array) ($opts['commercial'] ?? array())))) as $uid) {
+				if (is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."user WHERE rowid = ".$uid." AND statut = 1"))) {
+					$s->add_commercial($user, $uid);
+				}
 			}
 			$cats = array_filter(array_map('intval', (array) ($opts['categories'] ?? array())));
-			if ($cats && $user->hasRight('categorie', 'creer')) {
+			if ($cats && $s->client && $user->hasRight('categorie', 'creer')) {
 				$s->setCategories($cats, 'customer');
+			}
+			$sup = array_filter(array_map('intval', (array) ($opts['categories_supplier'] ?? array())));
+			if ($sup && $s->fournisseur && $user->hasRight('categorie', 'creer')) {
+				$s->setCategories($sup, 'supplier');
 			}
 		}
 		$contactId = 0;
@@ -1399,7 +1473,7 @@ class InboxLead
 	}
 
 	/**
-	 * Last choices of the user (nature, type, commercial, categories, country), the next panel starts with them
+	 * Last choices of the user (nature, type), the next panel starts with them
 	 *
 	 * @param User                $user User
 	 * @param array<string,string> $soc  Thirdparty typed
@@ -1408,9 +1482,10 @@ class InboxLead
 	 */
 	protected function remember(User $user, array $soc, array $opts)
 	{
+		// Only what varies little from a customer to the next and stays in sight: never the categories, the sales
+		// representatives, the country or the VAT (taken again in silence they would be wrong for the next one)
 		$last = array('prospect' => !empty($opts['prospect']) ? 1 : 0, 'customer' => !empty($opts['customer']) ? 1 : 0, 'supplier' => !empty($opts['supplier']) ? 1 : 0,
-			'typent_id' => (int) ($soc['typent_id'] ?? 0), 'country_id' => (int) ($soc['country_id'] ?? 0), 'commercial' => !empty($opts['commercial']) ? 1 : 0,
-			'vat_subject' => !empty($opts['vat_subject']) ? 1 : 0, 'categories' => array_values(array_map('intval', (array) ($opts['categories'] ?? array()))));
+			'typent_id' => (int) ($soc['typent_id'] ?? 0));
 		(new InboxUserParam($this->db))->set($user, 'lead_last', json_encode($last));
 	}
 
@@ -1436,13 +1511,17 @@ class InboxLead
 			$q['firstname'] = (string) ($contact['firstname'] ?? '');
 		}
 		$q['type'] = !empty($opts['customer']) ? 'c' : (!empty($opts['prospect']) ? 'p' : (!empty($opts['supplier']) ? 'f' : ''));
-		if (!empty($opts['vat_subject'])) {
-			$q['assujtva_value'] = 1;
-		}
+		// The page of Dolibarr ticks the VAT and takes the user as sales representative when nothing is given: what the
+		// panel says is sent, nobody included
+		$q['assujtva_value'] = !empty($opts['vat_subject']) ? 1 : '';
+		$com = array_values(array_filter(array_map('intval', (array) ($opts['commercial'] ?? array()))));
+		$q['commercial'] = $com ? $com : array(0);
 
-		return DOL_URL_ROOT.'/societe/card.php?action=create&'.http_build_query(array_filter($q, function ($v) {
-			return $v !== '' && $v !== null;
-		}));
+		$keep = array('assujtva_value');
+
+		return DOL_URL_ROOT.'/societe/card.php?action=create&'.http_build_query(array_filter($q, function ($v, $k) use ($keep) {
+			return in_array($k, $keep, true) || ($v !== '' && $v !== null);
+		}, ARRAY_FILTER_USE_BOTH));
 	}
 
 	/**
