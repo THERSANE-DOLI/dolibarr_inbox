@@ -938,7 +938,10 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 }
 .ibx-sorthead { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 0.125rem; }
 .ibx-sorthead:focus-visible { outline: 2px solid var(--ibx-accent); }
-.ibx-mailrow:focus-visible, .ibx-mailcard:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-mailrow:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+/* Keyboard focus on a card = the selection border, 2px thick (an inset outline over the rounded 1px border drew a double line) */
+.ibx-mailcard:focus-visible { outline: none; border-color: var(--ibx-accent); box-shadow: inset 0 0 0 1px var(--ibx-accent); }
+.ibx-mailcard.is-unread:focus-visible { box-shadow: inset 3px 0 0 var(--ibx-accent), inset 0 0 0 1px var(--ibx-accent); }
 .ibx-listmore { padding: var(--ibx-s3); }
 .ibx-newpill {
 	position: absolute; left: 50%; top: 8.5rem; z-index: 3; transform: translateX(-50%); padding: var(--ibx-s1) var(--ibx-s3);
