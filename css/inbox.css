@@ -1292,6 +1292,8 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-blockform .ibx-notice { margin-bottom: var(--ibx-s3); }
 .ibx-blockform .ibx-notice .ibx-field { width: 100%; }
 .ibx-bstable td { overflow-wrap: anywhere; }
+.ibx-bsknown { display: flex; align-items: flex-start; gap: var(--ibx-s1); margin-top: var(--ibx-s1); color: var(--ibx-warning); font-size: var(--ibx-fs-sm); }
+.ibx-bsknown .ibx-icon { margin-top: .15em; }
 .ibx-bstools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin: var(--ibx-s3) 0; }
 .ibx-bstools .ibx-spacer { flex: 1; }
 .ibx-bstools .ibx-js-bssearch { flex: 1 1 16rem; width: auto; max-width: 24rem; }

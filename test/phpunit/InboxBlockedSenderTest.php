@@ -301,4 +301,50 @@ class InboxBlockedSenderTest extends InboxImapTestCase
 		$this->assertNotEmpty($this->onServer((string) $junk->path, 'blk1'), 'in the junk');
 		$this->assertTrue(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_action_log WHERE action = 'blocked' AND fk_account = ".((int) $a->id))), 'journal');
 	}
+
+	/**
+	 * Nightly check (1.87.0): became known = told and still blocked, kept on purpose = no longer told; became
+	 * protected = unblocked
+	 *
+	 * @return void
+	 */
+	public function testNightlyCheck()
+	{
+		$p = $this->db->prefix();
+		$b = new InboxBlockedSender($this->db);
+		$id = $b->create($this->admin, 'address', 'buyer@newcust.zzblock-test.invalid');
+		$this->assertGreaterThan(0, $id, $b->error);
+		$prot = $b->create($this->admin, 'domain', 'carrier2.zzblock-test.invalid');
+		$this->assertGreaterThan(0, $prot, $b->error);
+
+		// Nothing changed: nothing said
+		$this->assertSame(0, $b->cronCheck(), $b->output);
+		$this->assertSame(0, (int) $b->fetch($id)['known_since']);
+
+		// A new customer with this address
+		$this->db->query("INSERT INTO ".$p."societe (entity, nom, email, client, status, datec) VALUES (1, 'inboxtest_newcust', 'buyer@newcust.zzblock-test.invalid', 1, 1, '".$this->db->idate(dol_now())."')");
+		// The domain becomes a recognized one
+		$this->db->query("INSERT INTO ".$p."inbox_trusted_domain (entity, domain, label, subdomains, date_creation) VALUES (1, 'carrier2.zzblock-test.invalid', 'ZzTrusted carrier2', 1, '".$this->db->idate(dol_now())."')");
+		InboxTrustedDomain::clearCache();
+		$this->assertSame(0, $b->cronCheck(), $b->output);
+		InboxBlockedSender::clearCache();
+		$e = $b->fetch($id);
+		$this->assertGreaterThan(0, $e['known_since'], 'became known: told');
+		$this->assertStringContainsString('inboxtest_newcust', $e['known_now']);
+		$this->assertGreaterThan(0, $b->isBlocked('buyer@newcust.zzblock-test.invalid'), 'still blocked');
+		$this->assertSame(1, count($b->fetchAll(0, array('known' => true, 'search' => 'zzblock-test'))));
+		$this->assertNull($b->fetch($prot), 'became protected: unblocked');
+		$this->assertTrue(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_action_log WHERE action = 'unblock_auto' AND subject = 'carrier2.zzblock-test.invalid'")));
+
+		// Kept blocked by a manager: no longer told, the next nights neither
+		$bob = $this->user('blockbob2');
+		$this->manager($bob, false);
+		$this->assertSame(-1, $b->keep($bob, $id), 'a manager only');
+		$this->assertSame(1, $b->keep($this->admin, $id));
+		$b->cronCheck();
+		$e = $b->fetch($id);
+		$this->assertSame(0, $e['known_since']);
+		$this->assertStringContainsString('inboxtest_newcust', $e['known_reason']);
+		$this->db->query("DELETE FROM ".$p."inbox_action_log WHERE subject LIKE '%zzblock-test.invalid'");
+	}
 }

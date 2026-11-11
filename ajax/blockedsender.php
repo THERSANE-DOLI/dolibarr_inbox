@@ -27,7 +27,7 @@ dol_include_once('/inbox/class/inboxblockedsender.class.php');
 dol_include_once('/inbox/class/inboxactions.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('create', 'delete'), true));
+inboxAjaxStart(in_array($action, array('create', 'delete', 'keep'), true));
 $blocked = new InboxBlockedSender($db);
 
 /**
@@ -62,12 +62,12 @@ function inboxBlockedReply(InboxBlockedSender $blocked)
 {
 	global $user;
 
-	$filters = array('search' => (string) inboxAjaxParam('search'), 'type' => (string) inboxAjaxParam('type', 'aZ09'));
+	$filters = array('search' => (string) inboxAjaxParam('search'), 'type' => (string) inboxAjaxParam('type', 'aZ09'), 'known' => (int) inboxAjaxParam('known', 'int') === 1);
 	$total = $blocked->count($filters);
 	$page = max(0, min((int) inboxAjaxParam('page', 'int'), (int) max(0, ceil($total / INBOX_BLOCKED_PAGE) - 1)));
 	$out = array('enabled' => InboxBlockedSender::enabled(), 'manager' => InboxBlockedSender::isManager($user), 'me' => (int) $user->id,
 		'entries' => $blocked->fetchAll(0, $filters + array('offset' => $page * INBOX_BLOCKED_PAGE, 'limit' => INBOX_BLOCKED_PAGE)),
-		'total' => $total, 'all' => $blocked->count(), 'page' => $page, 'per_page' => INBOX_BLOCKED_PAGE, 'many' => InboxBlockedSender::MANY);
+		'total' => $total, 'all' => $blocked->count(), 'known' => $blocked->count(array('known' => true)), 'page' => $page, 'per_page' => INBOX_BLOCKED_PAGE, 'many' => InboxBlockedSender::MANY);
 	if ($user->hasRight('inbox', 'account', 'admin') || !empty($user->admin)) {
 		require_once dirname(__DIR__).'/lib/inboxapp.lib.php';
 		$out['update_pending'] = inboxUpdatePending();
@@ -142,6 +142,18 @@ switch ($action) {
 
 	case 'delete':
 		$result = $blocked->delete($user, (int) inboxAjaxParam('id', 'int'));
+		if ($result === 0) {
+			inboxAjaxNotFound();
+		}
+		if ($result < 0) {
+			inboxAjaxError($blocked->error, 403);
+		}
+		inboxAjaxReply(inboxBlockedReply($blocked));
+		// no break
+
+	case 'keep':
+		// Became known, kept blocked on purpose by a manager of the list (1.87.0)
+		$result = $blocked->keep($user, (int) inboxAjaxParam('id', 'int'));
 		if ($result === 0) {
 			inboxAjaxNotFound();
 		}

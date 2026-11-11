@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.86.1';
+		$this->version = '1.87.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -163,6 +163,24 @@ class modInbox extends DolibarrModules
 			'status' => 1,
 			'test' => 'isModEnabled("inbox")',
 			'priority' => 60,
+		);
+
+		// Blocked senders (1.87.0): checked again every night; became known to Dolibarr = told to the managers of the
+		// list (still blocked), became protected (user, recognized domain...) = unblocked
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronBlockedCheck',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxblockedsender.class.php',
+			'objectname' => 'InboxBlockedSender',
+			'method' => 'cronCheck',
+			'parameters' => '',
+			'comment' => 'InboxCronBlockedCheckComment',
+			'frequency' => 1,
+			'unitfrequency' => 86400,
+			'datestart' => strtotime('tomorrow 04:10'),
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 70,
 		);
 
 		// Notifications (lot W8 1.21.0): those still unread after 15 minutes go by mail to the users who chose it

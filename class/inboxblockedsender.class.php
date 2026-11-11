@@ -291,6 +291,10 @@ class InboxBlockedSender
 		global $conf;
 
 		$w = "b.entity = ".((int) $conf->entity).($id > 0 ? " AND b.rowid = ".((int) $id) : "");
+		// Became known to Dolibarr since the blocking (nightly check, 1.87.0)
+		if (!empty($filters['known'])) {
+			$w .= " AND b.known_since IS NOT NULL";
+		}
 		$type = (string) ($filters['type'] ?? '');
 		if (in_array($type, array(self::TYPE_ADDRESS, self::TYPE_DOMAIN), true)) {
 			$w .= " AND b.type = '".$this->db->escape($type)."'";
@@ -749,6 +753,94 @@ class InboxBlockedSender
 		self::clearCache();
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET blocked_state = '".self::STATE_PENDING."' WHERE entity = ".((int) $conf->entity)
 			." AND (blocked_hash IS NULL OR blocked_hash <> '".$this->db->escape($this->hash())."')");
+	}
+
+	// ---------- Nightly check (1.87.0) ----------
+
+	/** Time budget of the nightly check (seconds); the entries checked longest ago first, the rest the next night */
+	const CHECK_SECONDS = 120;
+
+	/** @var string Output of the scheduled job */
+	public $output = '';
+
+	/**
+	 * Scheduled job « Check the blocked senders again » (every night): a sender blocked while unknown that became
+	 * known to Dolibarr (a new customer, a contact created) stays blocked and is shown to the managers of the list,
+	 * who unblock it or keep it (lifting it alone would be a decision nobody took); a sender that became protected
+	 * (a user, our domain, a recognized domain, a data source) is unblocked: it could never have been blocked.
+	 *
+	 * @return int 0 if OK
+	 */
+	public function cronCheck()
+	{
+		global $conf, $user, $langs;
+
+		// The reasons are written in the list: in the language of the job, never as keys
+		if (is_object($langs)) {
+			$langs->loadLangs(array('main', 'inbox@inbox'));
+		}
+		$start = microtime(true);
+		$p = $this->db->prefix();
+		$rows = $this->db->getRows("SELECT rowid, type, value, known_reason, known_since FROM ".$p."inbox_blocked_sender WHERE entity = ".((int) $conf->entity)
+			." ORDER BY date_check IS NOT NULL, date_check, rowid LIMIT 5000");
+		$stats = array('checked' => 0, 'known' => 0, 'unblocked' => 0);
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			if (microtime(true) - $start > self::CHECK_SECONDS) {
+				break;
+			}
+			$stats['checked']++;
+			$lv = $this->levelOf((string) $r->type, (string) $r->value);
+			$set = "date_check = '".$this->db->idate(dol_now())."'";
+			if ($lv['level'] === self::LEVEL_PROTECTED) {
+				$this->db->query("DELETE FROM ".$p."inbox_blocked_sender WHERE rowid = ".((int) $r->rowid));
+				InboxActionLog::add($this->db, $user, 0, 'unblock_auto', array((object) array('message_id' => '', 'subject' => (string) $r->value)), '', '', 0,
+					dol_trunc($r->type.' '.$r->value.': '.$lv['reason'], 250, 'right', 'UTF-8', 1));
+				$stats['unblocked']++;
+				continue;
+			}
+			if ($lv['level'] === self::LEVEL_KNOWN && (string) $r->known_reason === '') {
+				// Blocked while unknown, known now: told once (the date of the first time kept)
+				$set .= ", known_now = '".$this->db->escape(dol_trunc($lv['reason'], 250, 'right', 'UTF-8', 1))."'".($r->known_since ? '' : ", known_since = '".$this->db->idate(dol_now())."'");
+				$stats['known']++;
+			} elseif ($lv['level'] === self::LEVEL_UNKNOWN && $r->known_since) {
+				// Unknown again (the contact removed): nothing to tell any more
+				$set .= ", known_since = NULL, known_now = NULL";
+			}
+			$this->db->query("UPDATE ".$p."inbox_blocked_sender SET ".$set." WHERE rowid = ".((int) $r->rowid));
+		}
+		if ($stats['unblocked']) {
+			$this->changed();
+		}
+		$this->output = $stats['checked'].' blocked sender(s) checked, '.$stats['known'].' became known, '.$stats['unblocked'].' unblocked (protected), '.round(microtime(true) - $start, 1).' s';
+
+		return 0;
+	}
+
+	/**
+	 * A sender that became known stays blocked on purpose (manager of the list): no longer shown as « became known »
+	 *
+	 * @param User $user User
+	 * @param int  $id   Entry
+	 * @return int 1 OK, 0 not found, -1 refused
+	 */
+	public function keep(User $user, $id)
+	{
+		global $conf, $langs;
+
+		if (!self::isManager($user)) {
+			$this->error = $langs->transnoentities('InboxBlockedUnblockNeedRight');
+			return -1;
+		}
+		$p = $this->db->prefix();
+		$row = $this->db->getRow("SELECT rowid, value, known_now FROM ".$p."inbox_blocked_sender WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity)." AND known_since IS NOT NULL");
+		if (!is_object($row)) {
+			return 0;
+		}
+		// The reason becomes the one of the blocking: known, kept blocked by a manager
+		$this->db->query("UPDATE ".$p."inbox_blocked_sender SET known_reason = '".$this->db->escape((string) $row->known_now)."', known_since = NULL, known_now = NULL WHERE rowid = ".((int) $id));
+		InboxActionLog::add($this->db, $user, 0, 'block_keep', array((object) array('message_id' => '', 'subject' => (string) $row->value)), '', '', 0, (string) $row->known_now);
+
+		return 1;
 	}
 
 	// ---------- Mails ----------

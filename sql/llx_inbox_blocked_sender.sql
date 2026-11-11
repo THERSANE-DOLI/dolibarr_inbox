@@ -26,6 +26,7 @@ CREATE TABLE llx_inbox_blocked_sender(
 	fk_mailref integer DEFAULT NULL,
 	known_since datetime DEFAULT NULL,
 	known_now varchar(255) DEFAULT NULL,
+	date_check datetime DEFAULT NULL,
 	date_creation datetime NOT NULL,
 	fk_user_creat integer DEFAULT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

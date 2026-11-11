@@ -2900,7 +2900,7 @@
 		let r;
 		let s = null;
 		try {
-			r = await api('blockedsender', 'list', state);
+			r = await api('blockedsender', 'list', state.type === 'known' ? Object.assign({}, state, { type: '', known: 1 }) : state);
 			if (admin && tab === 'settings') {
 				s = (await api('general', 'get')).settings;
 			}
@@ -2927,9 +2927,12 @@
 		if (tab === 'blocked') {
 			html += '<p class="ibx-muted">' + th('InboxAntispamBlockedHelp') + '</p>'
 				+ (r.enabled ? '' : '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxBlockedOff') + '</div></div>')
+				// Became known to Dolibarr since the blocking (nightly check, 1.87.0): the managers decide
+				+ (r.known && r.manager && state.type !== 'known' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxBlockedBecameKnownCount', r.known)
+					+ ' <button type="button" class="ibx-linkbtn ibx-js-bsknown">' + th('InboxBlockedBecameKnownShow') + '</button></div></div>' : '')
 				+ (r.all > r.many ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxBlockedMany', r.many) + '</div></div>' : '')
 				+ '<div class="ibx-bstools"><input class="ibx-field ibx-field--medium ibx-js-bssearch" type="search" placeholder="' + th('InboxBlockedFilter') + '" aria-label="' + th('InboxBlockedFilter') + '" spellcheck="false" value="' + esc(state.search) + '">'
-				+ '<select class="ibx-field ibx-field--small ibx-js-bstype" aria-label="' + th('InboxBlockedType') + '">' + [['', 'InboxBlockedTypeAll'], ['address', 'InboxBlockedTypeAddress'], ['domain', 'InboxBlockedTypeDomain']]
+				+ '<select class="ibx-field ibx-field--small ibx-js-bstype" aria-label="' + th('InboxBlockedType') + '">' + [['', 'InboxBlockedTypeAll'], ['address', 'InboxBlockedTypeAddress'], ['domain', 'InboxBlockedTypeDomain'], ['known', 'InboxBlockedTypeKnown']]
 					.map(([v, k]) => '<option value="' + v + '"' + (v === state.type ? ' selected' : '') + '>' + th(k) + '</option>').join('') + '</select>'
 				+ (r.manager ? '<span class="ibx-spacer"></span><button type="button" class="ibx-btn ibx-js-bsadd">' + ic('plus') + ' ' + th('InboxBlockedAdd') + '</button>' : '') + '</div>'
 				+ '<div class="ibx-js-bslist">' + blockedListHtml(r, state) + '</div>';
@@ -2993,6 +2996,24 @@
 				go(Object.assign({}, st, { page: st.page + 1 }));
 				return;
 			}
+			if (e.target.closest('.ibx-js-bsknown')) {
+				$('.ibx-js-bstype', main).value = 'known';
+				go(Object.assign({}, st, { type: 'known', page: 0 }));
+				return;
+			}
+			const keep = e.target.closest('[data-keep]');
+			if (keep) {
+				try {
+					await post('blockedsender', 'keep', { id: +keep.dataset.keep });
+					toast(t('InboxBlockedKept'));
+					// The whole tab again: the count of the ones became known changed
+					main.dataset.antispam = '';
+					renderAntispam(main, ['blocked'], st);
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+				return;
+			}
 			const b = e.target.closest('[data-unblock]');
 			if (!b) {
 				return;
@@ -3023,10 +3044,12 @@
 			+ '<table class="ibx-table ibx-bstable"><thead><tr><th>' + th('InboxBlockedSender') + '</th><th>' + th('InboxBlockedBy') + '</th><th>' + th('InboxBlockedNoteCol') + '</th><th></th></tr></thead><tbody>'
 			+ list.map(e => '<tr data-row="' + e.id + '">'
 				+ '<td data-label="' + th('InboxBlockedSender') + '"><b>' + esc(e.value) + '</b>' + (e.type === 'domain' ? ' <span class="ibx-badge">' + th('InboxBlockedTypeDomain') + '</span>' : '')
-				+ (e.known_reason ? '<div class="ibx-muted">' + th('InboxBlockedWasKnown', e.known_reason) + '</div>' : '') + '</td>'
+				+ (e.known_reason ? '<div class="ibx-muted">' + th('InboxBlockedWasKnown', e.known_reason) + '</div>' : '')
+				+ (e.known_since ? '<div class="ibx-bsknown">' + ic('warning') + ' ' + th('InboxBlockedBecameKnown', date(e.known_since), e.known_now) + '</div>' : '') + '</td>'
 				+ '<td class="ibx-muted" data-label="' + th('InboxBlockedBy') + '">' + esc(e.user_creat || '-') + '<div>' + esc(date(e.date_creation)) + '</div></td>'
 				+ '<td data-label="' + th('InboxBlockedNoteCol') + '">' + esc(e.note) + (e.mail_subject ? '<div class="ibx-muted">' + th('InboxBlockedFromMail', e.mail_subject) + '</div>' : '') + '</td>'
-				+ '<td class="ibx-table__actions">' + (r.manager || e.user_id === r.me ? '<button type="button" class="ibx-btn ibx-btn--sm" data-unblock="' + e.id + '">' + th('InboxUnblock') + '</button>' : '') + '</td></tr>').join('')
+				+ '<td class="ibx-table__actions">' + (e.known_since && r.manager ? '<button type="button" class="ibx-btn ibx-btn--sm" data-keep="' + e.id + '">' + th('InboxBlockedKeep') + '</button> ' : '')
+				+ (r.manager || e.user_id === r.me ? '<button type="button" class="ibx-btn ibx-btn--sm" data-unblock="' + e.id + '">' + th('InboxUnblock') + '</button>' : '') + '</td></tr>').join('')
 			+ '</tbody></table>'
 			+ (pages > 1 ? '<div class="ibx-dompager"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-bsprev"' + (r.page ? '' : ' disabled') + '>' + ic('chevron-left') + ' ' + th('InboxDomainsPrev') + '</button>'
 				+ '<span class="ibx-muted">' + th('InboxDomainsPage', r.page + 1, pages) + '</span>'

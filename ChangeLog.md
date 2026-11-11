@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the blocked senders are checked again every night :   1.87.0
+  - Scheduled job « Check the blocked senders again » (every night, 2 minutes at most, the entries checked longest
+    ago first): a sender blocked while unknown that became known to Dolibarr (a new customer, a contact created)
+    stays blocked and is shown to the managers of the list in Settings > Anti-spam (warning, filter « became
+    known », reason and date on the row), who unblock it or « keep blocked »; a sender that became protected (a
+    user, our domain, a recognized domain, a data source) is unblocked. Journal: unblocked (became protected), kept
+    blocked (became known).
+
 - FIX: the verdict of the anti-spam filter of the server (SpamAssassin, Rspamd) is believed only when written by our
   servers: with trusted receiving servers declared, the anti-spam headers below the entry of the mail into them
   (a « Received: ... by » or « Authentication-Results » of these servers) are ignored and named in the window of
