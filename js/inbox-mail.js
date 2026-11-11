@@ -8124,6 +8124,28 @@
 		a.remove();
 	}
 
+	/**
+	 * Drag of an attachment out of the browser (desktop, folder of the file manager), as a mail client does:
+	 * value of DownloadURL (Chrome, Edge), « type:name:absolute url », the browser downloads it with the session.
+	 * Only a file the antivirus found clean and without warning: the drag cannot wait for a verdict nor show the
+	 * warning of a file not scanned or risky, the download button stays the way for those.
+	 * @param {object} m Mail
+	 * @param {object} a Attachment
+	 * @returns {string} Value, '' when the file may not leave by a drag
+	 */
+	function dragOutUrl(m, a) {
+		if (!a || m.compose || !m.scan || m.scan.pending || !m.scan.parts) {
+			return '';
+		}
+		const v = m.scan.parts.find(p => +p.part === +a.part);
+		if (!v || v.blocked || v.warn || (v.warnings || []).length || (a.warnings || []).length) {
+			return '';
+		}
+		// The colon separates the three fields
+		const name = String(a.name || 'file').replace(/[:\\/]/g, '_');
+		return 'application/octet-stream:' + name + ':' + new URL(attUrl(m, a, 'download'), location.href).href;
+	}
+
 	function attUrl(m, a, mode, force) {
 		// A file of a writing (lot A5, 1.82.0): the very file that leaves with the mail, same answers and protections
 		if (m.compose) {
@@ -10292,7 +10314,12 @@
 			}
 			S.attDrag = { m, a: m.attachments[+tileEl.dataset.att] };
 			e.dataTransfer.effectAllowed = 'copy';
-			e.dataTransfer.setData('text/plain', S.attDrag.a ? S.attDrag.a.name : '');
+			// Private type, not text/plain: a file manager turns a text into a .txt file holding the name
+			e.dataTransfer.setData('application/x-inbox-attachment', S.attDrag.a ? S.attDrag.a.name : '');
+			const out = dragOutUrl(m, S.attDrag.a);
+			if (out) {
+				e.dataTransfer.setData('DownloadURL', out);
+			}
 		});
 		readPaneEl.addEventListener('dragend', () => {
 			S.attDrag = null;

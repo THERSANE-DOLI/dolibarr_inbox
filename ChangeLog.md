@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: attachment dragged out of the browser, no more text file holding its name :   1.89.13
+  - the name travels in a private type, no longer as text: a file manager made a .txt file of it.
+  - a file found clean by the antivirus, without warning, is given to the browser to download (Chrome, Edge on
+    Windows and macOS); a file not scanned, risky or infected leaves only by the download button and its warning.
+  - Linux: Nautilus (GTK 4) does not take such a drop, the download button stays the way there.
+
 - FIX: writing of a protected mailbox, nothing in clear on the disk :   1.89.12
   - its files (state, mail quoted, attachments) sealed by the key of the session (AES-256-GCM, the key in the cookie
     of the browser): readable by a request of this browser in this session only, a copy of the disk shows nothing.
