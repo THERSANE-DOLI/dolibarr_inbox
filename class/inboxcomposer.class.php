@@ -321,9 +321,21 @@ class InboxComposer
 				dol_delete_dir_recursive($dir);
 				return $this->fail('unsub_none');
 			}
-			if (InboxReader::authResults($headers)['dkim'] !== 'pass') {
+			$auth = InboxReader::authResults($headers);
+			if ($auth['dkim'] !== 'pass') {
 				dol_delete_dir_recursive($dir);
 				return $this->fail('unsub_unsigned');
+			}
+			// The address asked must belong to who signed the mail or to its sender: never a text of the sender sent
+			// to a third party from the address of the company (audit INBX-081)
+			require_once __DIR__.'/inboxtrusteddomain.class.php';
+			$to = InboxTrustedDomain::registrable(InboxTrustedDomain::normalize($info['mailto']));
+			$own = array_map(function ($d) {
+				return InboxTrustedDomain::registrable(InboxTrustedDomain::normalize($d));
+			}, array_merge($auth['dkim_domains'], array((string) $reader->row->from_email)));
+			if ($to === '' || !in_array($to, $own, true)) {
+				dol_delete_dir_recursive($dir);
+				return $this->fail('unsub_foreign');
 			}
 			$out['to'] = array(array('email' => $info['mailto'], 'name' => ''));
 			$out['subject'] = $info['mailto_subject'] !== '' ? $info['mailto_subject'] : 'unsubscribe';

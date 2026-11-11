@@ -25,6 +25,7 @@
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxblockedsender.class.php');
 dol_include_once('/inbox/class/inboxactions.class.php');
+dol_include_once('/inbox/class/inboxreader.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('create', 'delete', 'keep'), true));
@@ -46,6 +47,26 @@ function inboxBlockedMail($id)
 	}
 
 	return $row;
+}
+
+/**
+ * The sender of a mail is proven (authenticated by our receiving server for its domain): else, blocking it for every
+ * mailbox is for the managers of the list (audit INBX-076)
+ *
+ * @param object $row Row of the index (rowid)
+ * @return bool
+ */
+function inboxBlockedProven($row)
+{
+	global $db, $user;
+
+	$reader = new InboxReader($db);
+	if (!$reader->load($user, (int) $row->rowid)) {
+		return false;
+	}
+	$raw = $reader->raw($user);
+
+	return $raw !== null && InboxReader::authPass(InboxReader::authResults(InboxReader::headers($raw)), (string) $row->from_email);
 }
 
 /** Entries per page of Settings > Anti-spam */
@@ -115,6 +136,7 @@ switch ($action) {
 	case 'offer':
 		// What the user may block from this mail: the address, the domain, the mails already received of each
 		$row = inboxBlockedMail((int) inboxAjaxParam('mail', 'int'));
+		$blocked->unproven = !InboxBlockedSender::isManager($user) && !inboxBlockedProven($row);
 		$offer = $blocked->offer($user, (string) $row->from_email, (int) $row->fk_account);
 		$offer['past_address'] = $offer['can_address'] ? $blocked->pastMails($user, InboxBlockedSender::TYPE_ADDRESS, $offer['address']) : array('ids' => array(), 'accounts' => 0);
 		$offer['past_domain'] = $offer['can_domain'] ? $blocked->pastMails($user, InboxBlockedSender::TYPE_DOMAIN, $offer['domain']) : array('ids' => array(), 'accounts' => 0);
@@ -137,6 +159,7 @@ switch ($action) {
 		if ($mailId > 0) {
 			// From a mail: the sender of the mail, never another value sent with it
 			$row = inboxBlockedMail($mailId);
+			$blocked->unproven = !InboxBlockedSender::isManager($user) && !inboxBlockedProven($row);
 			$accountId = (int) $row->fk_account;
 			$from = InboxBlockedSender::normalizeAddress((string) $row->from_email);
 			$value = $type === InboxBlockedSender::TYPE_DOMAIN ? InboxBlockedSender::domainOf($from) : $from;

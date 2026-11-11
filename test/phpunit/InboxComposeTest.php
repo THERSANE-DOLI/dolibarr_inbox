@@ -664,6 +664,8 @@ class InboxComposeTest extends InboxImapTestCase
 		$p = $this->imap();
 		$p->appendMessage('INBOX.ZzActA', $news('n1', true));
 		$p->appendMessage('INBOX.ZzActA', $news('n2', false));
+		// Signed by its own domain, the mailto of a third party (audit INBX-081)
+		$p->appendMessage('INBOX.ZzActA', str_replace('mailto:leave@list.invalid', 'mailto:compta@thirdparty.invalid', $news('n3', true)));
 		$this->sync($a);
 		$n1 = $this->row($a, 'n1');
 		$this->assertNotNull($n1);
@@ -694,6 +696,8 @@ class InboxComposeTest extends InboxImapTestCase
 		// Refused: header not signed, no List-Unsubscribe, level below manage
 		$this->assertNull($c->open($this->admin, 'unsubscribe', (int) $this->row($a, 'n2')->rowid));
 		$this->assertSame('unsub_unsigned', $c->errorCode);
+		$this->assertNull($c->open($this->admin, 'unsubscribe', (int) $this->row($a, 'n3')->rowid), 'the address of a third party');
+		$this->assertSame('unsub_foreign', $c->errorCode);
 		$this->assertNull($c->open($this->admin, 'unsubscribe', (int) $this->row($a, 'm1')->rowid));
 		$this->assertSame('unsub_none', $c->errorCode);
 		$sender = $this->user('inboxtest_reader');

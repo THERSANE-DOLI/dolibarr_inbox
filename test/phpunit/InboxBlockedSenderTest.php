@@ -234,6 +234,11 @@ class InboxBlockedSenderTest extends InboxImapTestCase
 		$this->assertTrue($o['can_address']);
 		$this->assertFalse($o['can_domain']);
 		$this->assertSame('unknown', $o['level']);
+		// From a mail whose sender is not proven: the managers of the list only (audit INBX-076)
+		$b->unproven = true;
+		$this->assertFalse($b->offer($bob, 'd@unknown.zzblock-test.invalid', (int) $a->id)['can_address']);
+		$this->assertSame(-2, $b->create($bob, 'address', 'd@unknown.zzblock-test.invalid', (int) $a->id));
+		$b->unproven = false;
 	}
 
 	/**
@@ -334,6 +339,16 @@ class InboxBlockedSenderTest extends InboxImapTestCase
 		$this->assertGreaterThan(0, $b->isBlocked('buyer@newcust.zzblock-test.invalid'), 'still blocked');
 		$this->assertSame(1, count($b->fetchAll(0, array('known' => true, 'search' => 'zzblock-test'))));
 		$this->assertNull($b->fetch($prot), 'became protected: unblocked');
+		// Became the address of a user of Dolibarr: told, never unblocked alone (audit INBX-076)
+		$lift = $b->create($this->admin, 'address', 'lift@other.zzblock-test.invalid');
+		$this->assertGreaterThan(0, $lift, $b->error);
+		$u = $this->user('blocklift');
+		$this->db->query("UPDATE ".$p."user SET email = 'lift@other.zzblock-test.invalid' WHERE rowid = ".((int) $u->id));
+		$b->cronCheck();
+		InboxBlockedSender::clearCache();
+		$this->assertNotNull($b->fetch($lift), 'still blocked');
+		$this->assertGreaterThan(0, $b->fetch($lift)['known_since'], 'told to the managers');
+		$b->delete($this->admin, $lift);
 		$this->assertTrue(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_action_log WHERE action = 'unblock_auto' AND subject = 'carrier2.zzblock-test.invalid'")));
 
 		// Kept blocked by a manager: no longer told, the next nights neither

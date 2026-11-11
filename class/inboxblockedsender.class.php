@@ -561,6 +561,9 @@ class InboxBlockedSender
 		return (bool) $user->hasRight('inbox', 'blockedsender', 'write');
 	}
 
+	/** @var bool The sender of the mail the block comes from is not proven (set by the caller, audit INBX-076) */
+	public $unproven = false;
+
 	/**
 	 * What the user may do with the sender of a mail, said before he confirms (dialog), and checked again at the
 	 * creation
@@ -632,6 +635,11 @@ class InboxBlockedSender
 		}
 		if (!$manager && !$manage) {
 			return $langs->transnoentities('InboxBlockedNeedManage');
+		}
+		// The list is common to every mailbox: from a mail whose sender is not proven (From forged, or put by IMAP in
+		// a personal mailbox), the managers of the list only (audit INBX-076)
+		if (!$manager && $this->unproven) {
+			return $langs->transnoentities('InboxBlockedUnprovenNeedRight');
 		}
 
 		return '';
@@ -791,6 +799,17 @@ class InboxBlockedSender
 			$stats['checked']++;
 			$lv = $this->levelOf((string) $r->type, (string) $r->value);
 			$set = "date_check = '".$this->db->idate(dol_now())."'";
+			// Became the address of a user of Dolibarr: told to the managers, never unblocked alone (a user who may
+			// change his own address would lift any block, audit INBX-076); our own domains are unblocked
+			$byUser = in_array($lv['reason'], array($langs->transnoentities('InboxBlockedProtectedUser'), $langs->transnoentities('InboxBlockedProtectedUserDomain')), true);
+			if ($lv['level'] === self::LEVEL_PROTECTED && $byUser) {
+				if (!$r->known_since) {
+					$set .= ", known_now = '".$this->db->escape(dol_trunc($lv['reason'], 250, 'right', 'UTF-8', 1))."', known_since = '".$this->db->idate(dol_now())."'";
+					$stats['known']++;
+				}
+				$this->db->query("UPDATE ".$p."inbox_blocked_sender SET ".$set." WHERE rowid = ".((int) $r->rowid));
+				continue;
+			}
 			if ($lv['level'] === self::LEVEL_PROTECTED) {
 				$this->db->query("DELETE FROM ".$p."inbox_blocked_sender WHERE rowid = ".((int) $r->rowid));
 				InboxActionLog::add($this->db, $user, 0, 'unblock_auto', array((object) array('message_id' => '', 'subject' => (string) $r->value)), '', '', 0,

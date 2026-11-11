@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, anti-spam and unsubscribing :   1.89.8
+  - blocked senders: from a mail whose sender is not proven, the block for every mailbox by the managers of the
+    list; a blocked address become the one of a user of Dolibarr told to the managers, no longer unblocked alone
+    (our own domains still are).
+  - learning of the anti-spam engine: 200 mails per user and per day (INBOX_RSPAMD_LEARN_MAX_PER_DAY), the base
+    being common to every mailbox.
+  - unsubscribing by mail: the address asked must belong to who signed the mail or to its sender, never a text of
+    the sender to a third party from the address of the company.
+
 - FIX: security audit of 2026-11-11, links, imitations and pieces :   1.89.7
   - the link follows the conversation for a correspondent of it only (sender or recipient of its mails): a
     Message-ID or a subject copied by someone else never gives him its pieces.
