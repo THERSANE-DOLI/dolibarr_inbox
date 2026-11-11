@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: cards of the list of mails wider :   1.88.8
+  - The dot of a new mail goes before the date: no more empty column on the left of the cards.
+  - Comfortable density: a bigger picture of the correspondent (32 px) beside the name and the subject, the
+    snippet and the bottom line on the whole width.
+  - The bottom line of a card is hidden when empty in every density, comfortable included.
+
 - FIX: sender cards lighter :   1.88.7
   - Open thirdparty or active contact (the expected status): a small green dot beside the name, its label on
     hover and for the screen readers, instead of the « Open » badge.

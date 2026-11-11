@@ -415,7 +415,7 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-faint); background: var(--ibx-bg);
 }
 .ibx-mailcard {
-	position: relative; display: grid; grid-template-columns: 0.875rem 1fr auto; column-gap: 0.375rem; row-gap: 0.125rem;
+	position: relative; display: grid; grid-template-columns: 1fr auto; column-gap: 0.375rem; row-gap: 0.125rem;
 	padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s2); margin-bottom: var(--ibx-s1);
 	background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); cursor: pointer;
 }
@@ -423,15 +423,15 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-mailcard[aria-selected="true"] { border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-mailcard.is-unread { box-shadow: inset 3px 0 0 var(--ibx-accent); }
 .ibx-mailcard.is-unread .ibx-mailcard__from, .ibx-mailcard.is-unread .ibx-mailcard__subject { font-weight: 700; }
-.ibx-mailcard__dot { grid-row: 1; align-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; }
-/* The dot says new (arrived since the last visit of the folder), bold and the bar say unread */
-.ibx-mailcard.is-new .ibx-mailcard__dot { background: var(--ibx-accent); }
-.ibx-mailcard__from { grid-column: 2; }
-.ibx-mailcard__meta { grid-column: 3; display: flex; align-items: center; gap: 0.375rem; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); font-variant-numeric: tabular-nums; }
-.ibx-mailcard__subject { grid-column: 2 / 4; }
-.ibx-mailcard__foot { grid-column: 2 / 4; display: flex; align-items: center; gap: 0.375rem; min-height: 1.25rem; }
+.ibx-mailcard__dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ibx-accent); }
+/* The dot before the date says new (arrived since the last visit of the folder), bold and the bar say unread */
+.ibx-mailcard:not(.is-new) .ibx-mailcard__dot { display: none; }
+.ibx-mailcard__from { grid-column: 1; }
+.ibx-mailcard__meta { grid-column: 2; display: flex; align-items: center; gap: 0.375rem; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); font-variant-numeric: tabular-nums; }
+.ibx-mailcard__subject { grid-column: 1 / 3; }
+.ibx-mailcard__foot { grid-column: 1 / 3; display: flex; align-items: center; gap: 0.375rem; min-height: 1.25rem; }
 .ibx-mailcard__foot .ibx-spacer { flex: 1; }
-.ibx-mailcard__snippet { grid-column: 2 / 4; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); }
+.ibx-mailcard__snippet { grid-column: 1 / 3; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); }
 .ibx-star { border: 0; background: none; cursor: pointer; color: var(--ibx-text-faint); padding: 0.125rem; font-size: 0.8125rem; }
 .ibx-star[aria-pressed="true"] { color: var(--ibx-tag-2); }
 .ibx-thread { margin: 0 0 var(--ibx-s2) 1.25rem; padding-left: var(--ibx-s3); border-left: 2px dotted var(--ibx-border-strong); }
@@ -1035,6 +1035,15 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 /* Name of the card with the picture of the correspondent, centred on the line */
 .ibx-mailcard__from { display: flex; align-items: center; gap: 0.375rem; min-width: 0; }
 .ibx-mailcard__from .ibx-avatar--xs { width: 1.25rem; height: 1.25rem; border: 0; font-size: 0.5625rem; line-height: 1; }
+/* Comfortable density: a bigger picture in a first column beside the name and the subject, snippet and foot on the whole width */
+:root[data-ibx-density="comfortable"] .ibx-mailcard:has(> .ibx-mailcard__from > .ibx-avatar) { grid-template-columns: 2rem 1fr auto; column-gap: 0.5rem; }
+:root[data-ibx-density="comfortable"] .ibx-mailcard:has(> .ibx-mailcard__from > .ibx-avatar) > .ibx-mailcard__from { grid-column: 2; }
+:root[data-ibx-density="comfortable"] .ibx-mailcard:has(> .ibx-mailcard__from > .ibx-avatar) > .ibx-mailcard__meta { grid-column: 3; }
+:root[data-ibx-density="comfortable"] .ibx-mailcard:has(> .ibx-mailcard__from > .ibx-avatar) > .ibx-mailcard__subject { grid-column: 2 / 4; }
+:root[data-ibx-density="comfortable"] .ibx-mailcard:has(> .ibx-mailcard__from > .ibx-avatar) > :is(.ibx-mailcard__snippet, .ibx-mailcard__foot) { grid-column: 1 / 4; }
+:root[data-ibx-density="comfortable"] .ibx-mailcard__from > .ibx-avatar--xs {
+	position: absolute; top: calc(var(--ibx-s2) + 0.125rem); left: var(--ibx-s2); width: 2rem; height: 2rem; font-size: 0.75rem;
+}
 .ibx-presence { color: var(--ibx-accent); font-weight: 600; align-items: center; }
 /* List of mails: Shift + click selects a range of mails, never the text of the rows (as the mail clients) */
 .ibx-pane--list .ibx-maillist, .ibx-pane--list .ibx-mailtable { user-select: none; -webkit-user-select: none; }
@@ -1221,10 +1230,10 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-toasts, .ibx-sendbars { background: transparent; }
 /* Scrollbars in the colors of the theme (Chrome 121+, Firefox): thumb of the borders, track transparent */
 .ibx-app, .ibx-app *, .ibx-dialog, .ibx-dialog *, .ibx-menu { scrollbar-color: var(--ibx-border-strong) transparent; }
-/* Bottom line of a card (tags, thread, attachment, star): only when it holds something, in compact and normal
-   densities; comfortable keeps it, even empty. Compact also drops the snippet. */
+/* Bottom line of a card (tags, thread, attachment, star): only when it holds something, in every density.
+   Compact also drops the snippet. */
 :root[data-ibx-density="compact"] .ibx-mailcard__snippet { display: none; }
-:root:not([data-ibx-density="comfortable"]) .ibx-mailcard__foot:not(:has(> :not(.ibx-spacer))) { display: none; }
+.ibx-mailcard__foot:not(:has(> :not(.ibx-spacer))) { display: none; }
 
 /* ---------- Tags and colour blindness (settings, tab Tags) ---------- */
 .ibx-tagrisk { display: inline-flex; vertical-align: middle; margin-left: var(--ibx-s2); color: var(--ibx-warning); }
@@ -2563,3 +2572,4 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-pieceins__amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ibx-pieceins__opts { display: flex; flex-direction: column; gap: var(--ibx-s2); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
 .ibx-pieceins__opts > legend { padding: 0 var(--ibx-s1); font-weight: 600; }
+

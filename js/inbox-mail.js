@@ -1630,7 +1630,6 @@
 				}).join('') + '<td></td></tr>').join('');
 		}
 		return '<div class="ibx-thread" role="group" aria-label="' + th('InboxThreadCount', list.length) + '">' + kids.map(m => '<div class="ibx-mailcard ibx-mailcard--child' + (seenOf(m) ? '' : ' is-unread') + (isMine(m) ? ' is-mine' : '') + '" role="option" data-mail="' + m.id + '" data-child="1" aria-selected="' + S.selected.has(m.id) + '" tabindex="-1">'
-			+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
 			+ '<span class="ibx-mailcard__from"><span class="ibx-ellipsis">' + (isMine(m) ? ic('sent', 'ibx-faint') + ' <span class="ibx-sr-only">' + th('InboxSent') + ' </span>' + esc(mineLabel(m))
 				: '<span class="ibx-sr-only">' + th('InboxReceived') + ' </span>' + esc(m.from_name || m.from_email || t('InboxNoSender'))) + '</span></span>'
 			+ '<span class="ibx-mailcard__meta">' + assigneesHtml(m.assignees) + (m.attachments ? ic('attachment') : '') + '<span title="' + esc(longDate(m.date)) + '">' + esc(shortDate(m.date)) + '</span></span>'
@@ -1936,13 +1935,12 @@
 				}
 				const sel = S.selected.has(r.id);
 				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
-					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span>'
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
 					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? ic('reply') : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
 					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
-					+ '<span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
+					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span><span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
 						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
@@ -4940,6 +4938,8 @@
 			return '';
 		}
 		const type = Number.isInteger(d.status_type) && d.status_type >= 0 && d.status_type <= 9 ? d.status_type : -1;
+		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
+	}
 	/**
 	 * Expected status of a sender card (open thirdparty, active contact, 1.88.7): a discreet dot beside the name, its
 	 * label in the title and for the screen readers; any other status (closed, inactive) keeps its badge, to be seen
@@ -4952,8 +4952,6 @@
 		}
 		const label = d.status || d.status_short || '';
 		return '<span class="ibx-stdot"' + (label ? ' title="' + esc(label) + '"' : '') + ' aria-hidden="true"></span>' + (label ? '<span class="ibx-sr-only">' + esc(label) + '</span>' : '');
-	}
-		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
 	}
 	/**
 	 * Second line of a piece: its thirdparty, left out when it is the one of the sender (the title of a project or ticket
