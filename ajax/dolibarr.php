@@ -318,35 +318,15 @@ switch ($action) {
 	case 'attach':
 		// A file of the mail put in the documents of a piece, after the antivirus
 		$reader = inboxDolibarrMail();
-		$raw = $reader->raw($user);
-		if ($raw === null) {
-			inboxDolibarrFail('InboxMailNotFound');
-		}
-		$message = InboxMimeParser::parse($raw);
-		$part = (int) inboxAjaxParam('part', 'int');
-		$a = $message->attachments[$part] ?? null;
-		if (!is_array($a) || !empty($a['inline']) || !empty($a['embedded'])) {
-			inboxAjaxNotFound();
-		}
-		$scan = new InboxAttachmentScan($db);
-		$verdict = $scan->check($a['content'], $a['name']);
-		if ($verdict['state'] === InboxAttachmentScan::INFECTED) {
-			inboxDolibarrFail('InboxErrorAttachmentInfected');
-		}
-		$type = (string) inboxAjaxParam('type', 'aZ09');
-		$element = (int) inboxAjaxParam('element', 'int');
 		$creator = new InboxCreate($db);
-		$name = $creator->attach($user, $type, $element, (string) $a['name'], (string) $a['content']);
-		if ($name === '') {
+		$done = $creator->attachFromMail($user, $reader, (int) inboxAjaxParam('part', 'int'), (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('element', 'int'));
+		if ($done === null) {
+			if ($creator->error === 'InboxErrorAttachmentNotFound') {
+				inboxAjaxNotFound();
+			}
 			inboxDolibarrFail($creator->error);
 		}
-		// The piece is linked to the mail too (a file of it is there now)
-		$refId = $refs->fetchOrCreate($reader->row, $user);
-		if ($refId > 0) {
-			(new InboxLink($db))->link($refId, $type, $element, $user);
-		}
-		InboxActionLog::add($db, $user, (int) $reader->row->fk_account, 'attach', array($reader->row), (string) $reader->row->folder_path, '', 0, $name);
-		inboxAjaxReply(array('name' => $name, 'unscanned' => $verdict['state'] !== InboxAttachmentScan::CLEAN && $verdict['state'] !== InboxAttachmentScan::OFF));
+		inboxAjaxReply($done);
 		// no break
 
 	case 'cited':
