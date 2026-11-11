@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: glossary of the terms explained where they are named, their word underlined with dots (<dfn>) opening the
+  definition :   1.88.9
+  - SPF, DKIM, DMARC in « All the headers » and in « Recognize this domain »; Gravatar, BIMI, lists of reputation
+    and Rspamd in the « Outside services » and the section of the engine.
+  - One definition per term (js/inbox.js, 5 languages); in the code by term(), in the texts only by markers
+    [[key:word]] of new language keys read with thTerms(), never by th() or t(): an existing text read elsewhere
+    never shows a marker. A test checks the markers (known terms, the same in the 5 languages, read with
+    thTerms() only).
+
 - FIX: cards of the list of mails wider :   1.88.8
   - The dot of a new mail goes before the date: no more empty column on the left of the cards.
   - Comfortable density: a bigger picture of the correspondent (32 px) beside the name and the subject, the
