@@ -160,6 +160,16 @@ class InboxSpamEngineTest extends InboxImapTestCase
 
 		$r->answers['/checkv2'] = array('code' => 200, 'body' => '{"action":"no action","score":-1.5,"required_score":15}');
 		$this->assertFalse($r->check('x')['spam']);
+		// The threshold « add header » of Rspamd decides, not the action (made for a mail server), as Rspamd 3.11 answers
+		$r->answers['/checkv2'] = array('code' => 200, 'body' => '{"score":11.35,"required_score":15,"action":"soft reject","thresholds":{"reject":15,"add header":6,"greylist":4}}');
+		$v = $r->check('x');
+		$this->assertTrue($v['spam']);
+		$this->assertSame('add header', $v['action']);
+		$this->assertSame(6.0, $v['required']);
+		// A module of a mail server ended the check: no verdict, said
+		$r->answers['/checkv2'] = array('code' => 200, 'body' => '{"passthrough_module":"greylist","score":0,"action":"soft reject","thresholds":{"add header":6}}');
+		$this->assertNull($r->check('x'));
+		$this->assertStringContainsString('greylist', $r->error);
 		$r->answers['/checkv2'] = array('code' => 500, 'body' => '{"error":"oops"}');
 		$this->assertNull($r->check('x'));
 		$this->assertStringContainsString('oops', $r->error);
@@ -168,7 +178,9 @@ class InboxSpamEngineTest extends InboxImapTestCase
 		$r->answers['/learnspam'] = array('code' => 208, 'body' => '{"error":"already learned"}');
 		$this->assertTrue($r->learn('x', true));
 		$this->assertSame('pw', end($r->calls)['headers']['Password']);
-		$r->answers['/learnham'] = array('code' => 403, 'body' => '{"error":"Unauthorized"}');
+		$r->answers['/learnham'] = array('code' => 204, 'body' => '');
+		$this->assertTrue($r->learn('x', false), 'nothing to learn in it');
+		$r->answers['/learnham'] = array('code' => 401, 'body' => '{"error":"Unauthorized"}');
 		$this->assertFalse($r->learn('x', false));
 
 		// State

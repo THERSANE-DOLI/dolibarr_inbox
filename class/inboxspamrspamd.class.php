@@ -207,13 +207,23 @@ class InboxSpamRspamd implements InboxSpamEngine
 		uasort($symbols, function ($a, $b) {
 			return abs($b) <=> abs($a);
 		});
+		// A module that ends the check before the score (greylist, ratelimit: made for a mail server): no verdict,
+		// said in Settings > Anti-spam (the configuration of Rspamd must turn it off)
+		if (!empty($json['passthrough_module'])) {
+			$this->error = 'check stopped by the module '.(string) $json['passthrough_module'].' of Rspamd';
+			return null;
+		}
 		$action = strtolower((string) $json['action']);
+		$score = round((float) ($json['score'] ?? 0), 2);
+		// Spam from the threshold « add header » of Rspamd (the action depends on modules made for a mail server)
+		$threshold = isset($json['thresholds']['add header']) ? (float) $json['thresholds']['add header'] : null;
+		$spam = $threshold !== null ? $score >= $threshold : in_array($action, self::SPAM_ACTIONS, true);
 
 		return array(
-			'spam' => in_array($action, self::SPAM_ACTIONS, true),
-			'action' => $action,
-			'score' => round((float) ($json['score'] ?? 0), 2),
-			'required' => isset($json['required_score']) ? round((float) $json['required_score'], 2) : null,
+			'spam' => $spam,
+			'action' => $spam && !in_array($action, self::SPAM_ACTIONS, true) ? 'add header' : $action,
+			'score' => $score,
+			'required' => $threshold !== null ? round($threshold, 2) : (isset($json['required_score']) ? round((float) $json['required_score'], 2) : null),
 			'symbols' => array_slice(array_keys($symbols), 0, 30),
 		);
 	}
@@ -231,8 +241,8 @@ class InboxSpamRspamd implements InboxSpamEngine
 			return false;
 		}
 		$json = json_decode($res['body'], true);
-		// 208: already learned this way, nothing to do
-		if ($res['code'] === 200 || $res['code'] === 208) {
+		// 208: already learned this way; 204: nothing to learn in it (too short): nothing to do
+		if (in_array($res['code'], array(200, 204, 208), true)) {
 			return true;
 		}
 		$this->error = 'HTTP '.$res['code'].' '.(is_array($json) && isset($json['error']) ? (string) $json['error'] : dol_trunc($res['body'], 120));
@@ -254,7 +264,7 @@ class InboxSpamRspamd implements InboxSpamEngine
 		}
 		$stat = $this->http($this->controller.'/stat', '', array('Password' => $this->password));
 		if ($stat === null || $stat['code'] !== 200) {
-			$out['error'] = $stat === null ? $this->error : ($stat['code'] === 403 ? 'controller password refused' : 'HTTP '.$stat['code']);
+			$out['error'] = $stat === null ? $this->error : (in_array($stat['code'], array(401, 403), true) ? 'controller password refused' : 'HTTP '.$stat['code']);
 			return $out;
 		}
 		$json = json_decode($stat['body'], true);

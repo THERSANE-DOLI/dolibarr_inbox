@@ -156,12 +156,18 @@ so that the mails do not leave our servers. inbox calls `/checkv2` (port 11333) 
 the controller (port 11334, its password in Settings > Anti-spam > Settings) for `/learnspam`, `/learnham`, `/stat`.
 
 - Tests: `dev/rspamd/run.sh` (containers inbox-rspamd and inbox-redis on 127.0.0.1, test password in the script).
-- Production: Docker with the same `local.d/` files, or the Debian package of rspamd with Redis. Publish the ports on
-  127.0.0.1 only. The files of `dev/rspamd/local.d/` turn off what asks outside: public fuzzy storage of
-  rspamd.com, remote phishing lists, ASN zone, following of short links, monitoring. Check it once installed (for
-  example `tcpdump -i any port 53 or port 443` while a mail is checked).
-- The lists of reputation by DNS (Spamhaus, SURBL...) stay in the configuration but inbox turns them off at each
-  check (header `Settings`) unless Settings > Anti-spam allows them. They refuse the public resolvers (8.8.8.8...):
+- Production: Docker with the same `local.d/` and `override.d/` files, or the Debian package of rspamd with Redis.
+  Publish the ports on 127.0.0.1 only. These files (checked on Rspamd 3.11.1, 2026-11-11):
+  - turn off what asks outside: public fuzzy storage of rspamd.com, update of the rules from updates.rspamd.com,
+    lists downloaded from maps.rspamd.com (multimap, whitelist; mid and mime_types read the copies of the image),
+    phishing lists, ASN zone, following of short links, monitoring, lists of reputation by DNS (rbl);
+  - turn off what is made for a mail server and ends the check without a score: greylist, ratelimit.
+  `local.d/` merges its lists with the defaults (a remote list stays): `override.d/` replaces them. Check it once
+  installed: no « https:// » in `docker logs`, and the connections of the container (`/proc/net/tcp`) go to Redis
+  only, DNS apart (SPF, DKIM, DMARC of the senders).
+- The lists of reputation by DNS (Spamhaus, SURBL...) need two keys: `enabled = true;` in `local.d/rbl.conf` and the
+  switch of Settings > Anti-spam (inbox turns the groups rbl and surbl off at each check otherwise, header
+  `Settings`). They refuse the public resolvers (8.8.8.8...):
   give Rspamd a local resolver (unbound) before turning them on; Spamhaus is free only for a low volume and non
   commercial use (else its DQS key in `local.d/rbl.conf`).
 

@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: anti-spam engine checked on a real Rspamd 3.11.1 :   1.88.1
+  - Spam decided by the threshold « add header » that Rspamd sends back (its action depends on modules made for a
+    mail server), shown as the threshold of the mail; a check ended by such a module (greylist) is an error said
+    in the settings, never a verdict; « nothing to learn » (HTTP 204) is not an error; wrong password of the
+    controller said as such (HTTP 401).
+  - dev/rspamd: greylist and ratelimit off; the lists of maps.rspamd.com and the update of the rules off for good
+    (override.d: local.d merges its lists with the defaults); lists of reputation by DNS off in the configuration
+    too. Checked: the container connects to Redis only.
+
 - NEW: anti-spam engine of inbox, Rspamd installed beside Dolibarr (self-hosted, off by default) :   1.88.0
   - The new mails of the inbox are judged at the synchronisation (after the blocked senders, 20 per pass, never
     the old mails nor the other folders): those without verdict of the filter of the server, or all of them. A mail
