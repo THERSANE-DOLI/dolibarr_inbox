@@ -1464,6 +1464,11 @@
 		return h + '</div>';
 	}
 
+	/** Mark of a mail answered in the list: accent color, with its label on hover and for the screen readers */
+	function answeredMark() {
+		return '<span class="ibx-answered" title="' + th('InboxAnswered') + '">' + ic('reply') + '<span class="ibx-sr-only">' + th('InboxAnswered') + ' </span></span>';
+	}
+
 	/** Forwarded (keyword $Forwarded, set by inbox or by another software) */
 	function forwarded(row) {
 		return (row.tags || []).some(k => String(k).toLowerCase() === '$forwarded');
@@ -1697,7 +1702,7 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? ic('reply', 'ibx-faint') + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
 		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
@@ -1938,7 +1943,7 @@
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
-					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? ic('reply') : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
+					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? answeredMark() : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
 					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span><span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
@@ -7921,7 +7926,7 @@
 		}
 		if (offer.sender) {
 			body += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSender') + '</span><div>'
-				+ check(offer.sender.domain, true, offer.sender.like, th('InboxTrustDialogAuth') + ' SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc))
+				+ check(offer.sender.domain, true, offer.sender.like, th('InboxTrustDialogAuth') + ' ' + I.term('spf', 'SPF') + ' ' + res(auth.spf) + ' · ' + I.term('dkim', 'DKIM') + ' ' + res(auth.dkim) + ' · ' + I.term('dmarc', 'DMARC') + ' ' + res(auth.dmarc))
 				+ (offer.sender.parent ? '<div>' + check(offer.sender.parent, false, null, th('InboxTrustDialogParent')) + '</div>' : '') + '</div></div>';
 		}
 		if ((offer.links || []).length) {
@@ -7993,12 +7998,14 @@
 		dialog({
 			title: t('InboxAllHeaders'),
 			wide: true,
-			body: '<p>SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc) + '</p>'
+			body: '<p>' + I.term('spf', 'SPF') + ' ' + res(auth.spf) + ' · ' + I.term('dkim', 'DKIM') + ' ' + res(auth.dkim) + ' · ' + I.term('dmarc', 'DMARC') + ' ' + res(auth.dmarc) + '</p>'
 				// Anti-spam headers that came with the mail, below its entry into our servers (1.86.1): never believed
 				+ ((m.spam_ignored || []).length ? '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxSpamIgnored', m.spam_ignored.join(', ')) + '</div></div>' : '')
 				+ '<div class="ibx-headers"><table class="ibx-table"><tbody>' + (m.headers || []).map(h => '<tr><th>' + esc(h[0]) + '</th><td class="ibx-breakall">' + esc(h[1]) + '</td></tr>').join('') + '</tbody></table></div>',
 			noCancel: true,
 			actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }],
+			// The focus on « Close », never on the first term (its bubble would open by itself)
+			onOpen: dlg => $('.ibx-dialog__foot .ibx-btn--primary', dlg).focus(),
 		});
 	}
 

@@ -657,7 +657,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip,
+		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,
@@ -685,6 +685,49 @@
 	 * (aria-describedby). infotip(title, text) gives the markup; the events are bound once for the whole page.
 	 */
 	let tipSeq = 0;
+	/**
+	 * Glossary of inbox (1.88.5): a term explained where it is named, its word underlined with dots (<dfn>) opening
+	 * its definition. Key => language keys of its title and its definition. Used only by term() in the code and by
+	 * the markers [[key:word]] of new language keys read with thTerms(): never by th() or t(), so a text read
+	 * elsewhere (PHP, mails, other modules) never shows a marker.
+	 */
+	const GLOSSARY = {
+		spf: ['InboxTerm_spf_title', 'InboxTerm_spf'],
+		dkim: ['InboxTerm_dkim_title', 'InboxTerm_dkim'],
+		dmarc: ['InboxTerm_dmarc_title', 'InboxTerm_dmarc'],
+		gravatar: ['InboxTerm_gravatar_title', 'InboxTerm_gravatar'],
+		bimi: ['InboxTerm_bimi_title', 'InboxTerm_bimi'],
+		dnslists: ['InboxTerm_dnslists_title', 'InboxTerm_dnslists'],
+		rspamd: ['InboxRspamdWhatTitle', 'InboxRspamdWhat'],
+	};
+	/**
+	 * A term of the glossary: the word (not escaped) underlined with dots, its definition in a bubble
+	 * @param {string} key  Key of the glossary
+	 * @param {string} word Word shown
+	 * @returns {string} HTML
+	 */
+	function term(key, word) {
+		const g = GLOSSARY[key];
+		return g ? infotip(t(g[0]), t(g[1]), word) : esc(word);
+	}
+	/**
+	 * A language key whose text marks terms as [[key:word]]: escaped as th(), the markers become terms
+	 * @param {string} key  Language key (a new one, made for this)
+	 * @param {...*}   args Values of its %s
+	 * @returns {string} HTML
+	 */
+	function thTerms(key, ...args) {
+		const text = t(key, ...args);
+		let out = '';
+		let last = 0;
+		text.replace(/\[\[([a-z0-9]+):([^\]]+)\]\]/g, (m, k, w, at) => {
+			out += esc(text.slice(last, at)) + term(k, w);
+			last = at + m.length;
+			return m;
+		});
+		return out + esc(text.slice(last));
+	}
+
 	function infotip(title, text, term) {
 		const id = 'ibx-tip' + (++tipSeq);
 		// A term (1.88.4): the word itself, underlined with dots, opens the bubble (as an abbreviation, but by the
