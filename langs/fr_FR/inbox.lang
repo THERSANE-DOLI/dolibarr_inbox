@@ -298,6 +298,7 @@ InboxAccountsDisabledCount = Boîtes désactivées : %s
 InboxAccountsFailedCount = %s boîtes n'ont pas changé, encore sélectionnées : %s
 InboxDisableManyTitle = Désactiver %s boîtes ?
 InboxDeleteAccount = Supprimer la boîte
+InboxDeleteNeedsDisable = Désactivez d'abord la boîte : elle peut être supprimée une fois désactivée.
 InboxDeleteTitle = Supprimer %s ?
 InboxDeleteText = La boîte, ses identités, ses accès et ses réglages sont retirés d'inbox. Les mails restent sur le serveur mail.
 InboxAccountDeleted = Boîte %s supprimée d'inbox

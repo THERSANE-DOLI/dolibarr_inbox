@@ -1158,15 +1158,15 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 	background: var(--ibx-bg); box-shadow: var(--ibx-shadow-float);
 }
 .ibx-pane--list.has-bulk > .ibx-pane__body { padding-bottom: 4rem; }
-/* Bulk bar on the accent: seen at once over the cards */
+/* Bulk bar on the accent: seen at once over the cards. Its white buttons only there: the bar of the settings stays light (1.89.11) */
 .ibx-pane--list > .ibx-bulkbar { background: var(--ibx-accent); color: var(--ibx-on-accent); border-color: var(--ibx-accent); }
-.ibx-bulkbar .ibx-btn { color: var(--ibx-on-accent); background: transparent; border-color: color-mix(in srgb, var(--ibx-on-accent) 45%, transparent); }
-.ibx-bulkbar .ibx-btn .ibx-icon { color: inherit; }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn { color: var(--ibx-on-accent); background: transparent; border-color: color-mix(in srgb, var(--ibx-on-accent) 45%, transparent); }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn .ibx-icon { color: inherit; }
 /* Hover colors through the variables of .ibx-btn (its rule :hover:not(...) is stronger than a class here) */
-.ibx-bulkbar .ibx-btn { --_fg-h: var(--ibx-on-accent); --_bg-h: color-mix(in srgb, var(--ibx-on-accent) 16%, transparent); --_bd-h: var(--ibx-on-accent); }
-.ibx-bulkbar .ibx-btn:focus-visible { outline: 2px solid var(--ibx-on-accent); outline-offset: 1px; box-shadow: none; }
-.ibx-bulkbar .ibx-btn--danger-quiet { --_fg-h: #ffffff; --_bg-h: var(--ibx-danger); --_bd-h: var(--ibx-danger); }
-.ibx-bulkbar .ibx-btn[aria-disabled="true"]:hover { background: transparent; }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn { --_fg-h: var(--ibx-on-accent); --_bg-h: color-mix(in srgb, var(--ibx-on-accent) 16%, transparent); --_bd-h: var(--ibx-on-accent); }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn:focus-visible { outline: 2px solid var(--ibx-on-accent); outline-offset: 1px; box-shadow: none; }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn--danger-quiet { --_fg-h: #ffffff; --_bg-h: var(--ibx-danger); --_bd-h: var(--ibx-danger); }
+.ibx-pane--list > .ibx-bulkbar .ibx-btn[aria-disabled="true"]:hover { background: transparent; }
 
 
 /* ---------- Tooltips (js/inbox.js tooltips()) ----------

@@ -298,6 +298,7 @@ InboxAccountsDisabledCount = Deaktivierte Postfächer: %s
 InboxAccountsFailedCount = %s Postfächer unverändert, weiter ausgewählt: %s
 InboxDisableManyTitle = %s Postfächer deaktivieren?
 InboxDeleteAccount = Postfach löschen
+InboxDeleteNeedsDisable = Deaktivieren Sie zuerst das Postfach: es kann gelöscht werden, sobald es deaktiviert ist.
 InboxDeleteTitle = %s löschen?
 InboxDeleteText = Das Postfach, seine Identitäten, Zugriffe und Einstellungen werden aus inbox entfernt. Die E-Mails bleiben auf dem Mailserver.
 InboxAccountDeleted = Postfach %s aus inbox gelöscht

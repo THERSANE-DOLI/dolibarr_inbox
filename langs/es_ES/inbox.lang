@@ -298,6 +298,7 @@ InboxAccountsDisabledCount = Buzones desactivados: %s
 InboxAccountsFailedCount = %s buzones sin cambios, aún seleccionados: %s
 InboxDisableManyTitle = ¿Desactivar %s buzones?
 InboxDeleteAccount = Eliminar el buzón
+InboxDeleteNeedsDisable = Desactive primero el buzón: puede eliminarse una vez desactivado.
 InboxDeleteTitle = ¿Eliminar %s?
 InboxDeleteText = El buzón, sus identidades, accesos y ajustes se retiran de inbox. Los correos permanecen en el servidor de correo.
 InboxAccountDeleted = Buzón %s eliminado de inbox

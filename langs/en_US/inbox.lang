@@ -298,6 +298,7 @@ InboxAccountsDisabledCount = Mailboxes turned off: %s
 InboxAccountsFailedCount = %s mailboxes did not change, still selected: %s
 InboxDisableManyTitle = Turn off %s mailboxes?
 InboxDeleteAccount = Delete the mailbox
+InboxDeleteNeedsDisable = Disable the mailbox first: it can be deleted once disabled.
 InboxDeleteTitle = Delete %s?
 InboxDeleteText = The mailbox, its identities, its accesses and its settings are removed from inbox. The mails stay on the mail server.
 InboxAccountDeleted = Mailbox %s deleted from inbox

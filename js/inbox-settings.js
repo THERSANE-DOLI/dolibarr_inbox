@@ -1627,7 +1627,12 @@
 		});
 	}
 	function statusActions(account) {
-		return account.status === 9 ? '<button type="button" class="ibx-btn ibx-btn--danger ibx-js-delete">' + ic('delete') + ' ' + th('InboxDeleteAccount') + '</button>' : '';
+		if (!isAdmin()) {
+			return '';
+		}
+		// Always shown (1.89.11): greyed with the reason while the mailbox is not disabled, else nobody finds it
+		const why = account.status === 9 ? '' : th(account.status === 1 ? 'InboxDeleteNeedsDisable' : 'InboxErrorDeleteNotDisabled');
+		return '<button type="button" class="ibx-btn ibx-btn--danger ibx-js-delete"' + (why ? ' aria-disabled="true" title="' + why + '"' : '') + '>' + ic('delete') + ' ' + th('InboxDeleteAccount') + '</button>';
 	}
 	function bindStatusActions(form, account) {
 		if (!account) {
@@ -1639,7 +1644,11 @@
 				b.addEventListener('click', fn);
 			}
 		};
-		on('.ibx-js-delete', async () => {
+		on('.ibx-js-delete', async e => {
+			if (e.currentTarget.getAttribute('aria-disabled') === 'true') {
+				toast(e.currentTarget.title, { error: true });
+				return;
+			}
 			const ok = await confirmDialog({ title: t('InboxDeleteTitle', account.email), text: t('InboxDeleteText'), confirm: t('InboxDeleteAccount'), danger: true, typeToConfirm: account.email });
 			if (!ok) {
 				return;
