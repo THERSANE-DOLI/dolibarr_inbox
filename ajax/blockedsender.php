@@ -52,6 +52,32 @@ function inboxBlockedMail($id)
 const INBOX_BLOCKED_PAGE = 50;
 
 /**
+ * What a user sees of an entry or an offer (audit INBX-075): the names of the thirdparties and contacts with the right
+ * to read the thirdparties, the subject of the mail of the block for the managers of the list and its author only
+ *
+ * @param array<string,mixed> $e    Entry (fetchAll) or offer
+ * @param string[]            $keys Keys holding a sentence that may name a thirdparty or a contact
+ * @return array<string,mixed>
+ */
+function inboxBlockedShown(array $e, array $keys)
+{
+	global $langs, $user;
+
+	if (!$user->hasRight('societe', 'lire')) {
+		foreach ($keys as $k) {
+			if (!empty($e[$k])) {
+				$e[$k] = $langs->transnoentities('InboxBlockedKnownHidden');
+			}
+		}
+	}
+	if (array_key_exists('mail_subject', $e) && !InboxBlockedSender::isManager($user) && (int) ($e['user_id'] ?? 0) !== (int) $user->id) {
+		$e['mail_subject'] = '';
+	}
+
+	return $e;
+}
+
+/**
  * The page of the list asked (search, type, page), the state of the block on each mailbox for the administrators of
  * the mailboxes, and an update not finished (module not activated again: new tables and columns missing)
  *
@@ -66,7 +92,9 @@ function inboxBlockedReply(InboxBlockedSender $blocked)
 	$total = $blocked->count($filters);
 	$page = max(0, min((int) inboxAjaxParam('page', 'int'), (int) max(0, ceil($total / INBOX_BLOCKED_PAGE) - 1)));
 	$out = array('enabled' => InboxBlockedSender::enabled(), 'manager' => InboxBlockedSender::isManager($user), 'me' => (int) $user->id,
-		'entries' => $blocked->fetchAll(0, $filters + array('offset' => $page * INBOX_BLOCKED_PAGE, 'limit' => INBOX_BLOCKED_PAGE)),
+		'entries' => array_map(function ($e) {
+			return inboxBlockedShown($e, array('known_reason', 'known_now'));
+		}, $blocked->fetchAll(0, $filters + array('offset' => $page * INBOX_BLOCKED_PAGE, 'limit' => INBOX_BLOCKED_PAGE))),
 		'total' => $total, 'all' => $blocked->count(), 'known' => $blocked->count(array('known' => true)), 'page' => $page, 'per_page' => INBOX_BLOCKED_PAGE, 'many' => InboxBlockedSender::MANY);
 	if ($user->hasRight('inbox', 'account', 'admin') || !empty($user->admin)) {
 		require_once dirname(__DIR__).'/lib/inboxapp.lib.php';
@@ -94,9 +122,10 @@ switch ($action) {
 			$offer[$k] = array('count' => count($offer[$k]['ids']), 'accounts' => $offer[$k]['accounts']);
 		}
 		if ($offer['blocked']) {
-			$offer['entry'] = $blocked->fetch($offer['blocked']);
+			$entry = $blocked->fetch($offer['blocked']);
+			$offer['entry'] = is_array($entry) ? inboxBlockedShown($entry, array('known_reason', 'known_now')) : $entry;
 		}
-		inboxAjaxReply($offer);
+		inboxAjaxReply(inboxBlockedShown($offer, array('reason', 'domain_reason')));
 		// no break
 
 	case 'create':

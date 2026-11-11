@@ -505,7 +505,7 @@ class InboxBlockedSender
 		// The sender of a mail linked to a piece of Dolibarr (orders of a platform from an address of nobody)
 		$from = $isDomain ? "(LOWER(r.from_email) LIKE '%@".$like."' OR LOWER(r.from_email) LIKE '%.".$like."')" : "LOWER(r.from_email) = '".$this->db->escape($value)."'";
 		$r = $this->db->getRow("SELECT l.element_type FROM ".$p."inbox_link as l INNER JOIN ".$p."inbox_mailref as r ON r.rowid = l.fk_mailref"
-			." WHERE l.entity = ".((int) $conf->entity)." AND ".$from." LIMIT 1");
+			." WHERE l.entity = ".((int) $conf->entity)." AND ".$from);
 		if (is_object($r)) {
 			return $langs->transnoentities('InboxBlockedKnownPiece');
 		}

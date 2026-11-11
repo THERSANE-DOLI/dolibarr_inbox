@@ -350,7 +350,9 @@ class InboxComposer
 				}
 			}
 			$out['subject'] = (string) $message->subject;
-			$parts = self::splitDraft($message->bodyHtml !== '' ? self::inlinePictures($message) : nl2br(dol_escape_htmltag($message->bodyText)));
+			// Its tracking pictures never go again, its remote pictures as for a quote (audit INBX-079)
+			$removed = array();
+			$parts = self::splitDraft($message->bodyHtml !== '' ? self::quoteRemote(self::inlinePictures($message), 'reply', $removed) : nl2br(dol_escape_htmltag($message->bodyText)));
 			$out['html'] = $parts['body'];
 			foreach ($message->getFileAttachments() as $a) {
 				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);

@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, links, imitations and pieces :   1.89.7
+  - the link follows the conversation for a correspondent of it only (sender or recipient of its mails): a
+    Message-ID or a subject copied by someone else never gives him its pieces.
+  - links of a mail: the host of a link read before the address in its query (an imitation was missed); a
+    recognized domain written to the left of another one (thersane.fr.secure-pay.io) said as an imitation.
+  - blocked senders: the names of the thirdparties and contacts for who may read the thirdparties, the subject of
+    the mail of a block for the managers of the list and its author; « sender of a mail linked to a piece » found
+    again (its query never answered).
+  - « Edit as new » and a draft taken back: no style that lays a block over the page or loads an address, tracking
+    pictures removed and remote pictures as for a quote (Settings > Security).
+  - « New customer »: the extrafields that the page of creation lets the user fill only.
+
 - FIX: security audit of 2026-11-11, hardenings :   1.89.6
   - « Detach from the conversation » and its undo: by who may send from the mailbox, the links being shared by every
     copy of the mail.

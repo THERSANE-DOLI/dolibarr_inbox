@@ -1072,6 +1072,36 @@ class InboxLead
 	}
 
 	/**
+	 * Extrafields the page of creation would let the user fill (audit INBX-070): enabled, shown on creation, allowed
+	 * by their permission, not computed
+	 *
+	 * @param string $elementType societe or socpeople
+	 * @return array<string,true> options_xxx
+	 */
+	protected function writableExtrafields($elementType)
+	{
+		require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$ef = new ExtraFields($this->db);
+		$ef->fetch_name_optionals_label($elementType);
+		$a = (array) ($ef->attributes[$elementType] ?? array());
+		$ok = function ($expr) {
+			$expr = trim((string) $expr);
+			return $expr === '' || (bool) dol_eval($expr, 1, 1, '2');
+		};
+		$out = array();
+		foreach (array_keys((array) ($a['label'] ?? array())) as $key) {
+			$list = $a['list'][$key] ?? 1;
+			$list = is_numeric($list) ? (int) $list : (int) dol_eval((string) $list, 1, 1, '2');
+			if (!empty($a['computed'][$key]) || !in_array(abs($list), array(1, 3), true) || !$ok($a['enabled'][$key] ?? '') || !$ok($a['perms'][$key] ?? '')) {
+				continue;
+			}
+			$out['options_'.$key] = true;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Mandatory extrafields shown on the page of creation and without a default value: the panel cannot fill them
 	 *
 	 * @param string $elementType societe or socpeople
@@ -1330,8 +1360,9 @@ class InboxLead
 			// As the page of creation: the payment terms of the setup
 			$s->cond_reglement_id = (int) ($form['defaults']['soc']['cond_reglement_id'] ?? getDolGlobalInt('MAIN_DEFAULT_PAYMENT_TERM_ID'));
 			$s->mode_reglement_id = (int) ($form['defaults']['soc']['mode_reglement_id'] ?? getDolGlobalInt('MAIN_DEFAULT_PAYMENT_TYPE_ID'));
+			$writable = $this->writableExtrafields('societe');
 			foreach ($soc as $k => $v) {
-				if (strpos($k, 'options_') === 0) {
+				if (isset($writable[$k])) {
 					$s->array_options[$k] = $v;
 				}
 			}
@@ -1376,8 +1407,9 @@ class InboxLead
 				$c->phone_mobile = (string) ($contact['phone_mobile'] ?? '');
 				$c->email = (string) ($contact['email'] ?? '');
 				$c->statut = 1;
+				$writable = $this->writableExtrafields('socpeople');
 				foreach ($contact as $k => $v) {
-					if (strpos($k, 'options_') === 0) {
+					if (isset($writable[$k])) {
 						$c->array_options[$k] = $v;
 					}
 				}

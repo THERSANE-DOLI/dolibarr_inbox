@@ -2944,6 +2944,7 @@ InboxBlockedProtectedOwn = Es ist eine Adresse oder eine Domain Ihrer Postfäche
 InboxBlockedProtectedTrusted = Anerkannte Domain (%s).
 InboxBlockedProtectedSource = Absender einer Datenquelle (%s): ihn zu blockieren würde alle ihre Anfragen stoppen.
 InboxBlockedKnownSoc = Adresse des Partners %s.
+InboxBlockedKnownHidden = In Dolibarr bekannt (eine Karte, die Sie nicht sehen können)
 InboxBlockedKnownContact = Kontakt %s.
 InboxBlockedKnownContactOf = %s, Kontakt von %s.
 InboxBlockedKnownSocDomain = Domain des Partners %s (%s).

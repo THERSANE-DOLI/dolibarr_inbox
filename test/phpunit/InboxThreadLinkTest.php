@@ -100,6 +100,12 @@ class InboxThreadLinkTest extends InboxTestCase
 		$d = $this->mail('t4@inbox-test.invalid', 'tk1');
 		$this->assertSame(1, $threads->followNew($this->account, array((int) $d->rowid)));
 		$this->assertSame(array('societe'), array_column($this->linksOf($d), 'type'));
+		// Someone who is not a correspondent of the conversation (Message-ID copied): no piece (audit INBX-067)
+		$forged = $this->mail('t8@inbox-test.invalid', 'tk1');
+		$this->db->query("UPDATE ".$p."inbox_mail SET from_email = 'stranger@evil.inbox-test.invalid' WHERE rowid = ".((int) $forged->rowid));
+		$this->assertSame(0, $threads->followNew($this->account, array((int) $forged->rowid)));
+		$this->assertSame(array(), $this->linksOf($forged));
+		$this->db->query("DELETE FROM ".$p."inbox_mail WHERE rowid = ".((int) $forged->rowid));
 
 		// Detached: its links of the conversation go, it gets no new one, its own links stay on it
 		$removed = $threads->detach($this->admin, $c);

@@ -2944,6 +2944,7 @@ InboxBlockedProtectedOwn = Es una dirección o un dominio de sus buzones.
 InboxBlockedProtectedTrusted = Dominio reconocido (%s).
 InboxBlockedProtectedSource = Remitente de una fuente de datos (%s): bloquearlo detendría todas sus solicitudes.
 InboxBlockedKnownSoc = Dirección del tercero %s.
+InboxBlockedKnownHidden = Conocido en Dolibarr (una ficha que usted no puede ver)
 InboxBlockedKnownContact = Contacto %s.
 InboxBlockedKnownContactOf = %s, contacto de %s.
 InboxBlockedKnownSocDomain = Dominio del tercero %s (%s).

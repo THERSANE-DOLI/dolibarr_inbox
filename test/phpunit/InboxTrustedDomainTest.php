@@ -68,6 +68,9 @@ class InboxTrustedDomainTest extends InboxTestCase
 		$this->assertSame('', InboxTrustedDomain::normalize('a..b'));
 		$this->assertSame('', InboxTrustedDomain::normalize('localhost'));
 		$this->assertSame('', InboxTrustedDomain::normalize('<b>x</b>.com'));
+		// An address in the query of a link is not its host (audit INBX-073)
+		$this->assertSame('paypa1.com', InboxTrustedDomain::normalize('https://paypa1.com/login?e=bob@gmail.com'));
+		$this->assertSame('evil.example', InboxTrustedDomain::normalize('https://user@evil.example/x'));
 	}
 
 	/**
@@ -123,6 +126,9 @@ class InboxTrustedDomainTest extends InboxTestCase
 		// Cyrillic « о » in place of the Latin one
 		$this->assertSame(2, $case("c\u{043E}lissimo-laposte.info"));
 		$this->assertSame(3, $case('colissimo-lapost.info'));
+		// The recognized domain written to the left of another one (audit INBX-073)
+		$this->assertSame(2, $case('colissimo-laposte.info.secure-pay.io'));
+		$this->assertSame(2, $case('https://suivi.colissimo-laposte.info.evil.io/colis'));
 		$this->assertSame(3, $case('colisimo-laposte.info'));
 		// Containing: the sender only
 		$this->assertSame(4, $case('secure-colissimo-laposte.com', true));
