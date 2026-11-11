@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: a mail put in the trash or in junk is marked read :   1.90.0
+  - « Delete », « Junk » and a move by hand to the trash or to junk mark the mail read first: it no longer counts
+    as unread there.
+  - the undo gives the mail back to its folder, unread again.
+  - My account, Reading: switch « Mark as read what I delete or put in junk » (on by default), shown whatever the
+    marking mode: a mail can leave the list without being opened.
+  - mails moved to junk by inbox itself (blocked sender, judged spam) stay unread, so that a mistake is seen.
+
 - FIX: list of the mails, card reached with the keyboard drawn like a selected card :   1.89.14
   - a 2px border of the accent color instead of a second outline inside the card (a double line with a gap).
 

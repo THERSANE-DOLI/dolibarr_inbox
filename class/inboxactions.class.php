@@ -146,17 +146,24 @@ class InboxActions
 					$res = $this->tag($user, $list, (array) ($params['add'] ?? array()), (array) ($params['remove'] ?? array()));
 					break;
 				case 'move':
-					$res = $this->moveTo($user, $list, (int) ($params['folder'] ?? 0), 'move');
+					$folder = (int) ($params['folder'] ?? 0);
+					$res = $this->readFirst($user, $list, $folder !== (int) $list[0]->fk_folder && in_array($this->folderRole($list[0], $folder), array('trash', 'junk'), true), function () use ($user, $list, $folder) {
+						return $this->moveTo($user, $list, $folder, 'move');
+					});
 					break;
 				case 'archive':
 					$res = $this->archive($user, $list);
 					break;
 				case 'delete':
-					$res = $this->delete($user, $list, !empty($params['confirm']));
+					$res = $this->readFirst($user, $list, (string) $list[0]->role !== 'trash' && $this->roleFolder((int) $list[0]->fk_account, 'trash'), function () use ($user, $list, $params) {
+						return $this->delete($user, $list, !empty($params['confirm']));
+					});
 					break;
 				case 'junk':
 				case 'notjunk':
-					$res = $this->junk($user, $list, $action === 'junk');
+					$res = $this->readFirst($user, $list, $action === 'junk' && (string) $list[0]->role !== 'junk' && $this->roleFolder((int) $list[0]->fk_account, 'junk'), function () use ($user, $list, $action) {
+						return $this->junk($user, $list, $action === 'junk');
+					});
 					break;
 				case 'blocked':
 				case 'spam':
@@ -300,6 +307,79 @@ class InboxActions
 		}
 
 		return $this->accounts[$accountId];
+	}
+
+	/**
+	 * A mail put in the trash or in junk by a user is marked read first (1.90.0, setting read_on_trash of My account):
+	 * it no longer counts as unread there. The undo gives the mails back to their folder, then unread again.
+	 *
+	 * @param User     $user User
+	 * @param object[] $list Rows of one folder
+	 * @param bool     $read Mark read before the action
+	 * @param callable $go   The action, returns its result (or null)
+	 * @return array<string,mixed>|null
+	 */
+	protected function readFirst(User $user, array $list, $read, callable $go)
+	{
+		// Setting of My account (on by default)
+		if ($read && !$this->system) {
+			require_once __DIR__.'/inboxuserparam.class.php';
+			$read = (int) (new InboxUserParam($this->db))->get($user, 'read_on_trash') === 1;
+		}
+		// Unread, or unknown (mail of a protected mailbox, seen = -1: marked read, never made unread by the undo)
+		$unread = $read ? array_values(array_filter($list, function ($r) {
+			return (int) $r->seen !== 1;
+		})) : array();
+		$back = array();
+		if ($unread) {
+			if ($this->flag($user, $unread, true, '\\Seen') === null) {
+				// Never blocks the action: the mail moves unread
+				$this->error = '';
+			} else {
+				foreach ($unread as $r) {
+					if ((int) $r->seen === 0) {
+						$back[] = (int) $r->rowid;
+					}
+					$r->seen = 1;
+				}
+			}
+		}
+		$res = $go();
+		if ($res === null || !$back) {
+			return $res;
+		}
+		// Undo: after the move back, with the rows the mails have after the move
+		// (a mail not found again after the move is left out)
+		$ids = array();
+		foreach ($back as $id) {
+			if (!empty($res['ids'][$id])) {
+				$ids[] = (int) $res['ids'][$id];
+			}
+		}
+		if ($ids) {
+			$res['undo'][] = array('action' => 'seen', 'on' => 0, 'ids' => $ids);
+		}
+
+		return $res;
+	}
+
+	/**
+	 * Role of a target folder (trash, junk...), '' when unknown
+	 *
+	 * @param object $first    A row of the moved mails
+	 * @param int    $folderId Target folder
+	 * @return string
+	 */
+	protected function folderRole($first, $folderId)
+	{
+		if (InboxLive::isLive($folderId)) {
+			$account = $this->account((int) $first->fk_account);
+			$f = ($account && $account->isLive()) ? $this->live()->folder($account, (int) $folderId) : null;
+		} else {
+			$f = $this->db->getRow("SELECT role FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId));
+		}
+
+		return is_object($f) ? (string) $f->role : '';
 	}
 
 	/**

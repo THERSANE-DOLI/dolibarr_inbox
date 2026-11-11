@@ -56,6 +56,8 @@ class InboxUserParam
 			// Mail marked as read: at once, after a delay, or only by hand (key M), lot W3
 			'read_mode' => array('delay', array('immediate', 'delay', 'manual')),
 			'read_delay' => array('3', 'int:0:600'),
+			// A mail put in the trash or in junk by the user is marked read first (1.90.0)
+			'read_on_trash' => array('1', 'int:0:1'),
 			// Display (lot W3): table or cards for all the folders, as Thunderbird
 			'view' => array('cards', array('table', 'cards')),
 			'list_columns' => array('', 'json'),

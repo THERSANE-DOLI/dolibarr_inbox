@@ -5068,6 +5068,10 @@
 			+ '<section class="ibx-section" data-section="reading">' + title('reading') + '<div class="ibx-form">'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_mode">' + th('InboxReadMode') + '</label><div>' + opt('read_mode', ['immediate', 'delay', 'manual'], p.read_mode) + '<div class="ibx-formrow__help">' + th('InboxReadModeHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" data-param="read_delay" id="me-read_delay" value="' + esc(p.read_delay) + '"> ' + th('InboxSeconds') + '</div></div>'
+			// Trash and junk marked read (1.90.0): also with « at once », a mail can leave the list without being opened
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxReadOnTrash') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-readtrash" role="switch" aria-checked="' + (p.read_on_trash === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxReadOnTrash') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxReadOnTrashHelp') + '</div></div></div>'
 			// Read receipts asked (lot W8 1.22.0): never sent without a click
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-mdn_mode">' + th('InboxMdnMode') + '</label><div>' + opt('mdn_mode', ['ask', 'never'], p.mdn_mode) + '<div class="ibx-formrow__help">' + th('InboxMdnModeHelp') + '</div></div></div>'
 			+ '</div></section>';
@@ -5166,6 +5170,20 @@
 				}
 			});
 		}
+		const readTrash = $('.ibx-js-readtrash', main);
+		readTrash.addEventListener('click', async () => {
+			const on = readTrash.getAttribute('aria-checked') !== 'true';
+			// Shown at once, put back if the server refuses
+			readTrash.setAttribute('aria-checked', on ? 'true' : 'false');
+			try {
+				const r = await post('userparam', 'set', { id: 0, param: 'read_on_trash', value: on ? '1' : '0' });
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+				toast(t('InboxSaved'));
+			} catch (err) {
+				readTrash.setAttribute('aria-checked', on ? 'false' : 'true');
+				toast(err.message, { error: true });
+			}
+		});
 		$$('[data-param]', main).forEach(f => {
 			const evt = f.type === 'range' ? 'change' : 'change';
 			if (f.type === 'range') {

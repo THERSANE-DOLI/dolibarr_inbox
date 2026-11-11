@@ -180,7 +180,8 @@ class InboxActionLog
 				return false;
 			}
 		}
-		if ($what === 'tag') {
+		// Unread again after a move to the trash or to junk (1.90.0)
+		if ($what === 'tag' || $what === 'seen') {
 			return true;
 		}
 		if ($what !== 'move' || !$ids) {
