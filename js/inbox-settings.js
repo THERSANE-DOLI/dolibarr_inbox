@@ -3570,12 +3570,15 @@
 		const sw = (name, label, def) => '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + name + '" aria-checked="' + ((s[name] === undefined ? def : s[name] !== '0') ? 'true' : 'false') + '" aria-label="' + esc(label) + '"></button>';
 		const row = (label, body, help) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + label + '</span><div>' + body + (help ? '<div class="ibx-formrow__help">' + help + '</div>' : '') + '</div></div>';
 		const q = st.queue || {};
+		// Addresses of the engine: an administrator of Dolibarr only, the mails and the password go there (INBX-049)
+		const urlLock = isDolibarrAdmin() ? '' : ' readonly aria-describedby="g-rsurlhelp"';
 		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + I.thTerms('InboxRspamdSection') + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxRspamdHelp') + '</p>'
 			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(), st.error.message) + '</div></div>' : '')
 			+ row(th('InboxRspamdEnabled'), sw('INBOX_RSPAMD_ENABLED', t('InboxRspamdEnabled'), false), th('InboxRspamdEnabledHelp'))
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"></div></div>'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsctl">' + th('InboxRspamdController') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsctl" data-name="INBOX_RSPAMD_CONTROLLER_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_CONTROLLER_URL) + '"></div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"' + urlLock + '>'
+				+ (isDolibarrAdmin() ? '' : '<div class="ibx-formrow__help" id="g-rsurlhelp">' + th('InboxRspamdUrlAdminHelp') + '</div>') + '</div></div>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsctl">' + th('InboxRspamdController') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsctl" data-name="INBOX_RSPAMD_CONTROLLER_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_CONTROLLER_URL) + '"' + urlLock + '></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rspw">' + th('InboxRspamdPassword') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--medium ibx-js-rspw" type="password" id="g-rspw" autocomplete="new-password" placeholder="' + th(st.has_password ? 'InboxRspamdPasswordSaved' : 'InboxRspamdPasswordNone') + '">'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rspwsave">' + th('InboxSave') + '</button></div><div class="ibx-formrow__help">' + th('InboxRspamdPasswordHelp') + '</div></div></div>'
 			+ row('', '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-rstest">' + ic('plug') + ' ' + th('InboxRspamdTest') + '</button><div class="ibx-js-rstestres ibx-formrow__help" role="status"></div>')

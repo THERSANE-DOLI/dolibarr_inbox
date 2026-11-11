@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, addresses of the anti-spam engine chosen by an administrator of Dolibarr :   1.89.2
+  - the mails and the password of the controller are sent to these addresses: a manager of the mailboxes who is
+    not an administrator of Dolibarr sees them without changing them (as the master user of the mail server).
+  - the saved password of the controller is removed when its server changes, never sent to another one.
+
 - FIX: security audit of 2026-11-11, what inbox writes in the agenda of Dolibarr :   1.89.1
   - an invitation could run a script in the agenda: its description and its organizer are written in the note of
     the event as text; its title and its place on one line, without tag nor double quote (the form of the event

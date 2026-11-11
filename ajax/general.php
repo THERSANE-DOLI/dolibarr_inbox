@@ -130,6 +130,23 @@ switch ($action) {
 		if (!isset($settings[$name]) || !inboxGeneralValid($settings[$name]['check'], $value)) {
 			inboxAjaxError($langs->transnoentities('InboxErrorUserParam'), 422);
 		}
+		// The mails and the password of the controller go to the addresses of the anti-spam engine: chosen by an
+		// administrator of Dolibarr, as the master user of the mail server (audit INBX-049)
+		$previous = getDolGlobalString($name, $settings[$name]['default']);
+		if (in_array($name, array('INBOX_RSPAMD_URL', 'INBOX_RSPAMD_CONTROLLER_URL'), true) && $value !== $previous) {
+			if (empty($user->admin)) {
+				inboxAjaxError($langs->transnoentities('InboxRspamdUrlAdminOnly'), 403);
+			}
+			$host = function ($url) {
+				return strtolower((string) parse_url($url, PHP_URL_HOST)).':'.((int) parse_url($url, PHP_URL_PORT));
+			};
+			if ($name === 'INBOX_RSPAMD_CONTROLLER_URL' && $host($value) !== $host($previous)) {
+				// Never sent to another server than the one it was given for
+				dolibarr_del_const($db, 'INBOX_RSPAMD_PASSWORD', $conf->entity);
+			}
+			dolibarr_del_const($db, 'INBOX_RSPAMD_LAST_ERROR', $conf->entity);
+			dol_syslog('inbox: '.$name.' changed by '.$user->login.' to '.$value, LOG_NOTICE);
+		}
 		dolibarr_set_const($db, $name, $value, 'chaine', 0, '', $conf->entity);
 		inboxAjaxReply(array('name' => $name, 'value' => $value));
 		// no break
