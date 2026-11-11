@@ -1,11 +1,16 @@
-# Branch « release »: the module as deployed (Git deployment of Plesk), without dev/ nor test/.
-# Built at each push on main from git archive (entries export-ignore of .gitattributes), one commit per push on top
-# of the previous release, so that a deployment by git pull always moves forward.
+# GitHub release with the module zip, installable from Dolibarr (Setup > Modules > Deploy an external module).
+# Work goes on develop; a version is published by pushing it on stable (git push origin develop:stable): tag vX.Y.Z,
+# release marked Latest, branch X.Y moved on it. A fix of an older series goes on its branch X.Y (release not
+# marked Latest), then X.Y is merged into develop. Details in .github/release.sh.
+# Can be run by hand (Actions > release > Run workflow) on stable or on a branch X.Y.
+# Stable links: .../releases/latest (page of the last release),
+# .../releases/download/vX.Y.Z/module_inbox-X.Y.Z.zip (zip of a given version).
 name: release
 
 on:
   push:
-    branches: [main]
+    branches: ['stable', '[0-9]+.[0-9]+']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,36 +22,16 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MODULE: inbox
+      DESCRIPTOR: core/modules/modInbox.class.php
+      TITLE: Inbox
     steps:
       - name: Source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Build the branch release
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          sha=$(git rev-parse --short HEAD)
-          subject=$(git log -1 --format=%s HEAD)
-          git archive --format=tar HEAD > /tmp/module.tar
-          if git ls-remote --exit-code --heads origin release >/dev/null; then
-            git fetch origin release
-            git worktree add /tmp/release origin/release
-            git -C /tmp/release checkout -B release
-          else
-            git worktree add --detach /tmp/release
-            git -C /tmp/release checkout --orphan release
-          fi
-          # Everything replaced by the archive: files removed from main go away too
-          git -C /tmp/release rm -rq --ignore-unmatch . || true
-          find /tmp/release -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          tar -xf /tmp/module.tar -C /tmp/release
-          git -C /tmp/release add -A
-          if git -C /tmp/release diff --cached --quiet; then
-            echo "Nothing changed for the deployment"
-            exit 0
-          fi
-          git -C /tmp/release commit -q -m "Release ${sha}: ${subject}"
-          git -C /tmp/release push origin release
+      - name: Tag, zip, release and branch X.Y
+        run: bash .github/release.sh

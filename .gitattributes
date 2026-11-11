@@ -1,4 +1,4 @@
-# Never deployed: development tools, tests, deployment workflow (git archive, branch release)
+# Never deployed: development tools, tests, deployment workflow (git archive, branch release, zips of the GitHub releases)
 /dev export-ignore
 /test export-ignore
 /.github export-ignore
