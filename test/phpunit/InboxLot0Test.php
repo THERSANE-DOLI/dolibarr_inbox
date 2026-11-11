@@ -145,7 +145,9 @@ class InboxLot0Test extends InboxTestCase
 		$this->assertIsString($raw);
 		$this->assertFalse($inbox->fromCache);
 		$row = $this->db->getRow("SELECT uid FROM ".$this->db->prefix()."inbox_message WHERE mailbox = '".self::BOX."' AND message_id = 'seed-2@inbox-test.invalid'");
-		$this->assertSame(2, (int) $row->uid);
+		// The UID of the mail on the server, whatever the test box holds (seed.py run again appends the mail again)
+		$this->assertGreaterThan(0, (int) $row->uid, 'UID of the mail kept');
+		$this->assertMatchesRegularExpression('/^Message-ID:\s*<seed-2@inbox-test\.invalid>/mi', $raw, 'the mail asked');
 		$this->assertSame($raw, $inbox->fetchRaw(self::BOX, 'seed-2@inbox-test.invalid', $this->admin, 'phpunit', true));
 		$this->assertTrue($inbox->fromCache);
 		$this->assertNull($inbox->fetchRaw(self::BOX, 'nope-x@inbox-test.invalid', $this->admin, 'phpunit', true));

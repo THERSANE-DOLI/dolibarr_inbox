@@ -73,9 +73,10 @@ class InboxModuleTest extends InboxTestCase
 			$this->assertStringNotContainsString("\u{2014}", (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'));
 			// Public module: no customer named in the texts shown to the users
 			$this->assertDoesNotMatchRegularExpression('/thersane/i', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'), $lang);
-			// Nor the products the interface is inspired by (« as Thunderbird »); the import from the QR codes of
-			// Thunderbird (InboxQr*, 1.24.0) names it: it is where the user finds the export
-			$text = preg_replace('/^Inbox(Qr|ImportSourceQr)[A-Za-z0-9_]*\s*=.*$/m', '', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'));
+			// Nor the products the interface is inspired by (« as Thunderbird »). Named where the user acts in it: the
+			// import from its QR codes (InboxQr*, 1.24.0: where the export is found) and the tags kept in step with it
+			// (InboxTagsThunderbird*, InboxTagsAliasHelp, 1.65.0 and 1.66.0: what to change in Thunderbird)
+			$text = preg_replace('/^(Inbox(Qr|ImportSourceQr|TagsThunderbird)[A-Za-z0-9_]*|InboxTagsAliasHelp)\s*=.*$/m', '', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'));
 			$this->assertDoesNotMatchRegularExpression('/thunderbird|gmail|trello|roundcube/i', $text, $lang);
 		}
 	}

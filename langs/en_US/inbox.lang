@@ -1956,6 +1956,7 @@ InboxImageAltLabel = Description of the picture
 InboxImageAltHelp = Read by the screen readers and shown when the mail software of the recipient blocks the pictures.
 InboxImageDelete = Remove the picture
 InboxForwarded = Forwarded
+InboxAnswered = Answered
 InboxSentCopy = Copy in Sent
 InboxSentCopy_auto = Automatic, from the sending server
 InboxSentCopy_inbox = Filed by inbox

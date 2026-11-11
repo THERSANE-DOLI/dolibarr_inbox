@@ -1956,6 +1956,7 @@ InboxImageAltLabel = Beschreibung des Bildes
 InboxImageAltHelp = Von Bildschirmlesern vorgelesen und angezeigt, wenn das Mailprogramm des Empfängers Bilder blockiert.
 InboxImageDelete = Bild entfernen
 InboxForwarded = Weitergeleitet
+InboxAnswered = Beantwortet
 InboxSentCopy = Kopie in Gesendet
 InboxSentCopy_auto = Automatisch, je nach Postausgangsserver
 InboxSentCopy_inbox = Von inbox abgelegt

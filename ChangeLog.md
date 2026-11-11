@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: mails answered easier to see in the list :   1.88.10
+  - The reply mark takes the accent color, a little bigger and thicker, in the cards and in the table.
+  - Its label « Answered » on hover and for the screen readers (5 languages).
+
 - FIX: glossary of the terms explained where they are named, their word underlined with dots (<dfn>) opening the
   definition :   1.88.9
   - SPF, DKIM, DMARC in « All the headers » and in « Recognize this domain »; Gravatar, BIMI, lists of reputation
