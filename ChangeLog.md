@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: an update of inbox not finished is told to the administrators :   1.86.0
+  - The version of the files newer than the one of the last activation (written by Dolibarr in the constant of the
+    module): the new tables, columns and rights are not there yet. A bar at the top of the application and a
+    warning on the setup page; the list of the modules for the administrators of Dolibarr, « ask an administrator
+    of Dolibarr » for the other administrators of inbox, nothing for the users. Never activated again from inbox.
+
+- FIX: Settings > Anti-spam in tabs (blocked senders, mailboxes, settings): the list of the blocked senders alone in
+  its tab, by pages of 50 with the search (address, domain, note, author) and the type done by the server :   1.85.1
+
 - NEW: blocked senders, one list for all the mailboxes, and a page Settings > Anti-spam :   1.85.0
   - « Block the sender… » in the menu ⋯ of a mail: the address, or the whole domain (and its subdomains); its mails
     go to the junk of every mailbox, never to the trash. The mails already received go too, in the mailboxes where

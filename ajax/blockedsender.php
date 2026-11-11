@@ -48,7 +48,13 @@ function inboxBlockedMail($id)
 	return $row;
 }
 
+/** Entries per page of Settings > Anti-spam */
+const INBOX_BLOCKED_PAGE = 50;
+
 /**
+ * The page of the list asked (search, type, page), the state of the block on each mailbox for the administrators of
+ * the mailboxes, and an update not finished (module not activated again: new tables and columns missing)
+ *
  * @param InboxBlockedSender $blocked Helper
  * @return array<string,mixed>
  */
@@ -56,9 +62,16 @@ function inboxBlockedReply(InboxBlockedSender $blocked)
 {
 	global $user;
 
+	$filters = array('search' => (string) inboxAjaxParam('search'), 'type' => (string) inboxAjaxParam('type', 'aZ09'));
+	$total = $blocked->count($filters);
+	$page = max(0, min((int) inboxAjaxParam('page', 'int'), (int) max(0, ceil($total / INBOX_BLOCKED_PAGE) - 1)));
 	$out = array('enabled' => InboxBlockedSender::enabled(), 'manager' => InboxBlockedSender::isManager($user), 'me' => (int) $user->id,
-		'entries' => $blocked->fetchAll(), 'many' => InboxBlockedSender::MANY);
-	// State of the block on each mailbox: the administrators of the mailboxes
+		'entries' => $blocked->fetchAll(0, $filters + array('offset' => $page * INBOX_BLOCKED_PAGE, 'limit' => INBOX_BLOCKED_PAGE)),
+		'total' => $total, 'all' => $blocked->count(), 'page' => $page, 'per_page' => INBOX_BLOCKED_PAGE, 'many' => InboxBlockedSender::MANY);
+	if ($user->hasRight('inbox', 'account', 'admin') || !empty($user->admin)) {
+		require_once dirname(__DIR__).'/lib/inboxapp.lib.php';
+		$out['update_pending'] = inboxUpdatePending();
+	}
 	if ($user->hasRight('inbox', 'account', 'admin')) {
 		$out['states'] = $blocked->states();
 	}

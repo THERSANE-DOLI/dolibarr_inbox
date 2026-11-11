@@ -129,6 +129,13 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 $head = inboxAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'inbox@inbox');
 
+// Update not finished (1.85.0): the module is activated again from the list of the modules, never from here
+require_once dirname(__DIR__).'/lib/inboxapp.lib.php';
+$pending = inboxUpdatePending();
+if ($pending) {
+	print info_admin($langs->trans('InboxUpdatePending', $pending['from'], $pending['to']).' '.$langs->trans('InboxUpdatePendingAdmin')
+		.' <a href="'.DOL_URL_ROOT.'/admin/modules.php?search_keyword=inbox">'.$langs->trans('InboxUpdatePendingGo').'</a>', 0, 0, 'warning');
+}
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
 // The webmail settings live in the application, not here (analyse-lot-w1 §5)
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupAppHelp').'</span> <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxOpenSettings').'</a><br><br>';

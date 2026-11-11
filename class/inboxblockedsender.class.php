@@ -238,18 +238,19 @@ class InboxBlockedSender
 	/**
 	 * The list for the settings, the newest first
 	 *
-	 * @param int $id One entry only (0: all)
+	 * @param int                 $id      One entry only (0: all)
+	 * @param array<string,mixed> $filters search (address, domain, note, author), type (address, domain), offset, limit
 	 * @return list<array<string,mixed>>
 	 */
-	public function fetchAll($id = 0)
+	public function fetchAll($id = 0, array $filters = array())
 	{
-		global $conf;
-
 		$p = $this->db->prefix();
+		$limit = isset($filters['limit']) ? max(1, min(500, (int) $filters['limit'])) : 50000;
+		$offset = max(0, (int) ($filters['offset'] ?? 0));
 		$rows = $this->db->getRows("SELECT b.rowid, b.type, b.value, b.known_reason, b.note, b.fk_mailref, b.known_since, b.known_now, b.date_creation, b.fk_user_creat,"
 			." u.firstname, u.lastname, u.login, r.subject FROM ".$p."inbox_blocked_sender as b LEFT JOIN ".$p."user as u ON u.rowid = b.fk_user_creat"
-			." LEFT JOIN ".$p."inbox_mailref as r ON r.rowid = b.fk_mailref WHERE b.entity = ".((int) $conf->entity).($id > 0 ? " AND b.rowid = ".((int) $id) : "")
-			." ORDER BY b.date_creation DESC, b.rowid DESC LIMIT 50000");
+			." LEFT JOIN ".$p."inbox_mailref as r ON r.rowid = b.fk_mailref WHERE ".$this->where($id, $filters)
+			." ORDER BY b.date_creation DESC, b.rowid DESC LIMIT ".$limit.($offset ? " OFFSET ".$offset : ""));
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$name = trim((string) $r->firstname.' '.(string) $r->lastname);
@@ -264,6 +265,43 @@ class InboxBlockedSender
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Number of entries matching the filters (pages of the settings)
+	 *
+	 * @param array<string,mixed> $filters search, type
+	 * @return int
+	 */
+	public function count(array $filters = array())
+	{
+		$p = $this->db->prefix();
+		$r = $this->db->getRow("SELECT COUNT(b.rowid) as n FROM ".$p."inbox_blocked_sender as b LEFT JOIN ".$p."user as u ON u.rowid = b.fk_user_creat WHERE ".$this->where(0, $filters));
+
+		return is_object($r) ? (int) $r->n : 0;
+	}
+
+	/**
+	 * @param int                 $id      One entry only (0: all)
+	 * @param array<string,mixed> $filters search, type
+	 * @return string Condition on b (entry) and u (author)
+	 */
+	protected function where($id, array $filters)
+	{
+		global $conf;
+
+		$w = "b.entity = ".((int) $conf->entity).($id > 0 ? " AND b.rowid = ".((int) $id) : "");
+		$type = (string) ($filters['type'] ?? '');
+		if (in_array($type, array(self::TYPE_ADDRESS, self::TYPE_DOMAIN), true)) {
+			$w .= " AND b.type = '".$this->db->escape($type)."'";
+		}
+		$q = mb_substr(trim((string) ($filters['search'] ?? '')), 0, 100);
+		if ($q !== '') {
+			$like = $this->db->escape($this->db->escapeforlike(mb_strtolower($q)));
+			$w .= " AND (b.value LIKE '%".$like."%' OR LOWER(b.note) LIKE '%".$like."%' OR LOWER(CONCAT(COALESCE(u.firstname, ''), ' ', COALESCE(u.lastname, ''), ' ', COALESCE(u.login, ''))) LIKE '%".$like."%')";
+		}
+
+		return $w;
 	}
 
 	/**

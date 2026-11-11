@@ -128,7 +128,9 @@ class InboxBlockedSenderTest extends InboxImapTestCase
 		// Turned off: nothing is blocked, the list is kept
 		$GLOBALS['conf']->global->INBOX_BLOCKED_SENDERS = 0;
 		$this->assertSame(0, $b->isBlocked('prospect@unknown.zzblock-test.invalid'));
-		$this->assertSame(2, count($b->fetchAll()));
+		$this->assertSame(2, count($b->fetchAll(0, array('search' => 'zzblock-test'))));
+		$this->assertSame(2, $b->count(array('search' => 'zzblock-test')));
+		$this->assertSame(1, $b->count(array('search' => 'zzblock-test', 'type' => 'domain')));
 		$GLOBALS['conf']->global->INBOX_BLOCKED_SENDERS = 1;
 	}
 

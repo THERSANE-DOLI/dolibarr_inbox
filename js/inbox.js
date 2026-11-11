@@ -144,6 +144,41 @@
 	}
 
 	/**
+	 * Inbox updated but not activated again (1.85.0): the administrators are told; the page of the modules of
+	 * Dolibarr is given to the administrators of Dolibarr only (the others ask one). Never done from here. Closed for
+	 * the session of the browser.
+	 */
+	function updatePendingBar() {
+		const pending = String(ctx('INBOX_UPDATE_PENDING', '')).split(' ');
+		if (pending.length !== 2) {
+			return;
+		}
+		try {
+			if (sessionStorage.getItem(scope('inbox-update-pending')) === pending[1]) {
+				return;
+			}
+		} catch (e) {
+			// private window: shown again, harmless
+		}
+		const url = String(ctx('INBOX_MODULES_URL', ''));
+		const bar = document.createElement('div');
+		bar.className = 'ibx-updatebar ibx-updatebar--warning';
+		bar.setAttribute('role', 'alert');
+		bar.innerHTML = ic('warning') + '<span>' + esc(t('InboxUpdatePending', pending[0], pending[1])) + ' ' + esc(t(url ? 'InboxUpdatePendingAdmin' : 'InboxUpdatePendingAsk')) + '</span>'
+			+ (url ? '<a class="ibx-btn ibx-btn--sm ibx-btn--primary" href="' + esc(url) + '">' + esc(t('InboxUpdatePendingGo')) + '</a>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-updateclose" aria-label="' + esc(t('InboxLater')) + '" title="' + esc(t('InboxLater')) + '">' + ic('close') + '</button>';
+		$('.ibx-js-updateclose', bar).addEventListener('click', () => {
+			try {
+				sessionStorage.setItem(scope('inbox-update-pending'), pending[1]);
+			} catch (e) {
+				// not kept
+			}
+			bar.parentNode.removeChild(bar);
+		});
+		document.body.appendChild(bar);
+	}
+
+	/**
 	 * Send a file (multipart POST, the token added): attachments of a writing (lot W6)
 	 * @param {string} endpoint File of ajax/ without .php
 	 * @param {string} action   Action
@@ -821,6 +856,7 @@
 		$('#ibx-app').removeAttribute('data-loading');
 		window.addEventListener('hashchange', () => router.render());
 		router.render();
+		updatePendingBar();
 		Dolibarr.executeHook('inbox:app:ready', { inbox });
 	}
 	// Deferred scripts run while readyState is "interactive", before DOMContentLoaded: wait for it so that the

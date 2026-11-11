@@ -77,6 +77,35 @@ function inboxCanSend(User $user)
 }
 
 /**
+ * Inbox updated but not activated again since (1.85.0): Dolibarr writes the version of each activation in the note of
+ * the constant MAIN_MODULE_INBOX (lastactivationversion); a newer version of the files means the new tables, columns
+ * and rights are not there yet. Never guessed: an activation without version (very old) says nothing.
+ *
+ * @param bool $fresh Read again (tests), else once per request
+ * @return array{from:string,to:string}|null null when nothing is pending
+ */
+function inboxUpdatePending($fresh = false)
+{
+	global $db, $conf;
+
+	static $pending = false;
+	if ($pending !== false && !$fresh) {
+		return $pending;
+	}
+	$pending = null;
+	$text = (string) @file_get_contents(dirname(__DIR__).'/core/modules/modInbox.class.php', false, null, 0, 8192);
+	$file = preg_match("/->version\s*=\s*'([^']+)'/", $text, $m) ? $m[1] : '';
+	$row = $db->getRow("SELECT note FROM ".$db->prefix()."const WHERE ".$db->decrypt('name')." = 'MAIN_MODULE_INBOX' AND entity IN (0, ".((int) $conf->entity).") ORDER BY entity DESC");
+	$note = is_object($row) && $row->note ? json_decode((string) $row->note, true) : null;
+	$active = is_array($note) && !empty($note['lastactivationversion']) ? (string) $note['lastactivationversion'] : '';
+	if ($file !== '' && preg_match('/^\d+(\.\d+)*$/', $active) && version_compare($file, $active, '>')) {
+		$pending = array('from' => $active, 'to' => $file);
+	}
+
+	return $pending;
+}
+
+/**
  * Values of the JavaScript context of the application
  *
  * @param User $user User
@@ -100,6 +129,8 @@ function inboxAppContextVars(User $user)
 		$GLOBALS['langs']->load('admin');
 	}
 
+	$updatePending = $user->hasRight('inbox', 'account', 'admin') || !empty($user->admin) ? inboxUpdatePending() : null;
+
 	return array(
 		'INBOX_VERSION' => $moduleVersion,
 		'INBOX_URL' => dol_buildpath('/inbox/index.php', 1),
@@ -120,6 +151,10 @@ function inboxAppContextVars(User $user)
 		// Blocked senders (1.85.0): the right to block a known sender or a domain; the list turned on or off
 		'INBOX_RIGHT_BLOCKED_SENDER' => (bool) $user->hasRight('inbox', 'blockedsender', 'write'),
 		'INBOX_BLOCKED_SENDERS' => (bool) getDolGlobalInt('INBOX_BLOCKED_SENDERS', 1),
+		// Update not finished (module not activated again since): told to the administrators only, the page of the
+		// modules of Dolibarr to the administrators of Dolibarr only
+		'INBOX_UPDATE_PENDING' => $updatePending ? $updatePending['from'].' '.$updatePending['to'] : '',
+		'INBOX_MODULES_URL' => !empty($user->admin) ? DOL_URL_ROOT.'/admin/modules.php?search_keyword=inbox' : '',
 		// Settings > Server (1.54.0): admins of Dolibarr only
 		'INBOX_RIGHT_DOLIBARR_ADMIN' => !empty($user->admin),
 		// Lot W6: the user may write (an active mailbox with the level « send » at least)
