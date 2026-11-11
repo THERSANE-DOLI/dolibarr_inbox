@@ -22,6 +22,7 @@
  */
 
 require_once __DIR__.'/inboxmimeparser.class.php';
+require_once __DIR__.'/inboxagenda.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
 require_once __DIR__.'/inboxnotification.class.php';
 
@@ -118,7 +119,9 @@ class InboxBounce
 			$fields = self::fields($group);
 			$email = '';
 			foreach (array('final-recipient', 'original-recipient') as $k) {
-				if ($email === '' && isset($fields[$k]) && preg_match('/^(?:[^;]*;)?\s*<?([^\s<>;]+@[^\s<>;]+)>?/', $fields[$k], $m)) {
+				// An address only: no quote, bracket nor backslash, it goes in the title of an event (audit INBX-048)
+				if ($email === '' && isset($fields[$k]) && preg_match('/^(?:[^;]*;)?\s*<?([^\s<>;"\'`\\\\()]+@[^\s<>;"\'`\\\\()]+)>?/', $fields[$k], $m)
+					&& isValidEmail($m[1])) {
 					$email = strtolower(InboxMimeParser::clean($m[1]));
 				}
 			}
@@ -290,7 +293,7 @@ class InboxBounce
 	 */
 	public static function noteHtml($text)
 	{
-		return dol_nl2br(dol_escape_htmltag((string) $text, 0, 1));
+		return InboxAgenda::note((string) $text);
 	}
 
 	/**
@@ -347,7 +350,7 @@ class InboxBounce
 			$event = new ActionComm($this->db);
 			$event->type_code = 'AC_OTH_AUTO';
 			$event->code = 'AC_INBOX_BOUNCE';
-			$event->label = dol_trunc($langs->transnoentities('InboxEventNotDelivered', $emails, $subject), 250, 'right', 'UTF-8', 1);
+			$event->label = InboxAgenda::field($langs->transnoentities('InboxEventNotDelivered', $emails, $subject));
 			$event->note_private = self::noteHtml(implode("\n\n", $note));
 			$event->datep = dol_now();
 			$event->datef = dol_now();

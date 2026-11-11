@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, what inbox writes in the agenda of Dolibarr :   1.89.1
+  - an invitation could run a script in the agenda: its description and its organizer are written in the note of
+    the event as text; its title and its place on one line, without tag nor double quote (the form of the event
+    prints them as they are).
+  - a mail recorded on a piece: the text written is put in the note of the event as text, a tag typed stays a text.
+  - delivery reports: the recipient read in the report must be an address; the title of the event « not delivered »
+    and of a mail sent cleaned the same way.
+
 - NEW: protected mailboxes, opened only by the browsers of their users, nothing kept in Dolibarr :   1.89.0
   - Card of the mailbox > Server, row Protection under the password (admin of the mailboxes; the owner of a personal
     mailbox in the tab Encrypted accesses), login and password only, the password tried on the mail server. Two

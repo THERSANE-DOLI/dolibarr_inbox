@@ -207,6 +207,50 @@ class InboxInviteTest extends InboxImapTestCase
 	}
 
 	/**
+	 * Title, place, organizer and description written by the sender: never a tag nor an attribute in the agenda
+	 * (audit INBX-046, INBX-048)
+	 *
+	 * @return void
+	 */
+	public function testHostileInviteInAgenda()
+	{
+		$a = $this->ready();
+		if (!isModEnabled('agenda')) {
+			$this->markTestSkipped('Module Agenda off on the test database');
+		}
+		$ics = strtr(self::ics(), array(
+			"SUMMARY;LANGUAGE=fr-FR:Revue du devis \r\n DV2026-001" => 'SUMMARY:Revue" autofocus onfocus="alert(1)',
+			'LOCATION:Salle B' => 'LOCATION:Salle <img src=x onerror=alert(2)>',
+			'DESCRIPTION;LANGUAGE=fr-FR:Ordre du jour\\n1. Prix\\, délais\\; suite' => 'DESCRIPTION:Ordre du jour <img src=x onerror=alert(3)> &lt;script&gt;',
+			'ORGANIZER;CN="Durand, Marc"' => 'ORGANIZER;CN="<b onmouseover=alert(4)>Marc"',
+		));
+		$this->assertStringContainsString('onerror=alert(3)', $ics, 'hostile invitation built');
+		$raw = "Message-ID: <inv9".self::MARK.">\r\nFrom: Marc Durand <orga@inbox-test.invalid>\r\nTo: ".self::BOX."\r\nSubject: ZzInvite inv9\r\n"
+			."Date: ".date('r', mktime(10, 0, 0, 11, 2, 2026))."\r\nMIME-Version: 1.0\r\nContent-Type: text/calendar; charset=utf-8; method=REQUEST\r\n"
+			."Content-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($ics));
+		$this->put($raw);
+		$this->sync($a);
+		$row = $this->row($a, 'inv9');
+		$this->assertNotNull($row);
+
+		$invite = new InboxInvite($this->db);
+		$res = $invite->agenda($this->admin, (int) $row->rowid, 'add');
+		$this->assertNotNull($res, $invite->errorCode.' '.$invite->error);
+		require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
+		$ev = new ActionComm($this->db);
+		$this->assertGreaterThan(0, $ev->fetch($res['agenda']));
+		$this->assertStringNotContainsString('"', $ev->label, 'no attribute out of value="" in the form of the core');
+		$this->assertStringStartsWith('Revue', $ev->label);
+		$this->assertStringNotContainsString('<', $ev->location);
+		$shown = dol_string_onlythesehtmltags(dol_htmlentitiesbr($ev->note_private));
+		$this->assertStringNotContainsString('<img', $shown, 'as comm/action/card.php shows the note');
+		$this->assertStringNotContainsString('<b ', $shown);
+		$this->assertStringNotContainsString('<script', $shown);
+		$this->assertStringContainsString('Ordre du jour', $shown);
+		$this->assertStringContainsString('orga@inbox-test.invalid', $shown);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testAnswerAgendaUpdateCancel()

@@ -25,6 +25,7 @@ require_once __DIR__.'/inboxical.class.php';
 require_once __DIR__.'/inboxsystemmail.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
+require_once __DIR__.'/inboxagenda.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 
@@ -400,10 +401,11 @@ class InboxInvite
 			$event->datep = (int) $e['start'];
 			$event->datef = (int) $e['end'];
 		}
-		$event->label = dol_trunc($e['summary'] !== '' ? $e['summary'] : $langs->transnoentities('InboxInviteNoTitle'), 250, 'right', 'UTF-8', 1);
-		$event->location = dol_trunc($e['location'], 128, 'right', 'UTF-8', 1);
+		// Summary, place, description and organizer are written by the sender of the invitation (audit INBX-046, INBX-048)
+		$event->label = InboxAgenda::field($e['summary'] !== '' ? $e['summary'] : $langs->transnoentities('InboxInviteNoTitle'));
+		$event->location = InboxAgenda::field($e['location'], 128);
 		$org = $e['organizer'];
-		$event->note_private = dol_trunc(trim(($org ? $langs->transnoentities('InboxInviteOrganizer').' : '.($org['name'] !== '' ? $org['name'].' <'.$org['email'].'>' : $org['email'])."\n\n" : '').$e['description']), 60000, 'right', 'UTF-8', 1);
+		$event->note_private = InboxAgenda::note(trim(($org ? $langs->transnoentities('InboxInviteOrganizer').' : '.($org['name'] !== '' ? $org['name'].' <'.$org['email'].'>' : $org['email'])."\n\n" : '').$e['description']));
 		$event->transparency = 1;
 		if (!$exists) {
 			$event->type_code = 'AC_RDV';
@@ -479,7 +481,7 @@ class InboxInvite
 		$langs->loadLangs(array('main', 'inbox@inbox'));
 		$prefix = $langs->transnoentities('InboxInviteCancelledPrefix').' ';
 		if (strpos((string) $event->label, $prefix) !== 0) {
-			$event->label = dol_trunc($prefix.$event->label, 250, 'right', 'UTF-8', 1);
+			$event->label = InboxAgenda::field($prefix.$event->label);
 		}
 		$event->transparency = 0;
 		if ($event->update($user) <= 0) {
