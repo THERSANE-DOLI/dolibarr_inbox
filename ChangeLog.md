@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: list of the mails, card reached with the keyboard drawn like a selected card :   1.89.14
+  - a 2px border of the accent color instead of a second outline inside the card (a double line with a gap).
+
 - FIX: attachment dragged out of the browser, no more text file holding its name :   1.89.13
   - the name travels in a private type, no longer as text: a file manager made a .txt file of it.
   - a file found clean by the antivirus, without warning, is given to the browser to download (Chrome, Edge on
