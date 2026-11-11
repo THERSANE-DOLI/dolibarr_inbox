@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: known senders of the company no longer flagged « Probable imitation » when Plesk repeats its results :   1.88.11
+  - Plesk writes its dmarc and dkim results twice in its Authentication-Results header (mails between colleagues,
+    forwarded or written on the server): a result repeated as is now counts once.
+  - Two spf or dmarc results that differ (value or domain) in the header of the server stay refused, the detail
+    tells « conflicting results ».
+
 - FIX: mails answered easier to see in the list :   1.88.10
   - The reply mark takes the accent color, a little bigger and thicker, in the cards and in the table.
   - Its label « Answered » on hover and for the screen readers (5 languages).

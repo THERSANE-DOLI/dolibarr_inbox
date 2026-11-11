@@ -38,6 +38,9 @@
  * 4. no DMARC policy at the sender: dkim=pass with header.d equal to the From domain (or one of its parents), or
  *    spf=pass with the domain of smtp.mailfrom equal to the From domain (or one of its parents): authenticated;
  * 5. no result added by our server: not verifiable (neither rescued nor flagged).
+ *
+ * A result repeated as is in the header is counted once (Plesk writes its dmarc and dkim results twice); two
+ * different spf or dmarc results in the same header: not authenticated (1.88.11).
  */
 class InboxSenderAuth
 {
@@ -365,7 +368,7 @@ class InboxSenderAuth
 		$summary = array();
 
 		$seen = array();
-		$duplicate = false;
+		$conflict = false;
 		foreach ($results as $result) {
 			if (!preg_match('/^\s*([a-z0-9_-]+)\s*=\s*([a-z]+)(.*)$/is', $result, $reg)) {
 				continue;
@@ -373,10 +376,20 @@ class InboxSenderAuth
 			$method = strtolower($reg[1]);
 			$value = strtolower($reg[2]);
 			$properties = self::parseProperties($reg[3]);
-			// One result of spf and of dmarc per header: a second one is a forged value (several dkim are normal)
-			if (in_array($method, array('spf', 'dmarc'), true) && isset($seen[$method])) {
-				$duplicate = true;
+			// A result repeated as is is counted once: some servers (Plesk) write the same dmarc and dkim results
+			// twice in their header. One spf and one dmarc per header: a second one that differs is a forged or
+			// contradictory value (several different dkim are normal, one per signature)
+			$key = $method.'='.$value;
+			foreach (array('header.from', 'header.d', 'header.i', 'smtp.mailfrom') as $property) {
+				$key .= '|'.(isset($properties[$property]) ? strtolower(trim($properties[$property])) : '');
 			}
+			if (isset($seen[$key])) {
+				continue;
+			}
+			if (in_array($method, array('spf', 'dmarc'), true) && isset($seen[$method])) {
+				$conflict = true;
+			}
+			$seen[$key] = true;
 			$seen[$method] = true;
 
 			if ($method === 'dmarc') {
@@ -402,8 +415,8 @@ class InboxSenderAuth
 
 		$detail = implode(', ', $summary).' ['.$authservId.']';
 
-		if ($duplicate) {
-			return array('result' => self::RESULT_FAIL, 'detail' => $detail.' (duplicate result)');
+		if ($conflict) {
+			return array('result' => self::RESULT_FAIL, 'detail' => $detail.' (conflicting results)');
 		}
 		if ($headerFrom !== '' && $headerFrom !== $fromDomain) {
 			return array('result' => self::RESULT_FAIL, 'detail' => $detail.' header.from='.$headerFrom);
