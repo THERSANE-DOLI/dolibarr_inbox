@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: insert a piece of Dolibarr in a writing (lot A5) :   1.83.0
+  - « Insert a piece » in the bar of the writing: proposals, orders and invoices of the thirdparties of the
+    recipients and of the pieces linked to the mail answered (« All thirdparties » to widen), searched by reference
+    or thirdparty, the readable ones only.
+  - for the piece chosen: a line that recalls it (reference, date, amounts), the table of its lines (a table of
+    the editor, styles in the cells for the mail software, totals under it), its PDF attached (seen in Dolibarr
+    before; a piece without PDF is said), the link to sign a proposal online and to pay an order or an invoice
+    online, only when Dolibarr offers them. Written in the language of the thirdparty, as its PDF.
+  - the piece joins « Record the sending on », ticked: the sending noted on it and the mail sent linked to it.
+
 - NEW: the files of a writing open in the viewer, to check them before sending (lot A5) :   1.82.0
   - a click on the name of an attachment of a writing (file sent, document of a piece, attachment of a forward)
     opens it in the viewer of inbox, the writing seen behind: the very file that leaves with the mail, read in the

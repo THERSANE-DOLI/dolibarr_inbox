@@ -215,6 +215,30 @@ switch ($action) {
 		}
 		inboxAjaxReply(array('pieces' => $res));
 		break;
+	case 'piecesearch':
+		// Insert a piece (lot A5, 1.83.0): the pieces of the thirdparties of the recipients, or of all
+		$emails = inboxAjaxParam('emails', 'none');
+		$res = $composer->pieceSearch($user, $token, (string) inboxAjaxParam('term', 'alphanohtml'), (int) inboxAjaxParam('all', 'int') === 1, is_array($emails) ? array_map('strval', $emails) : array());
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
+	case 'pieceoffer':
+		$res = $composer->pieceOffer($user, $token, (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('id', 'int'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
+	case 'pieceinsert':
+		$ask = inboxAjaxParam('ask', 'none');
+		$res = $composer->pieceInsert($user, $token, (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('id', 'int'), is_array($ask) ? $ask : array());
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
 	case 'attachdoc':
 		$res = $composer->attachDocument($user, $token, (string) inboxAjaxParam('piece', 'alphanohtml'), (string) inboxAjaxParam('name', 'none'));
 		if ($res === null) {

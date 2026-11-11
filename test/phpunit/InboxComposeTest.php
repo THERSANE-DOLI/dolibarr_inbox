@@ -311,6 +311,27 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertSame(array('devis.pdf', '%PDF-1.4 devis'), array($file['name'], $file['content']));
 		$this->assertNull($c->attachmentFile($this->admin, $open['token'], 'deadbeefdeadbeef'), 'not one of the writing');
 		$this->assertNull($c->attachmentFile($this->user('composefile'), $open['token'], $att['id']), 'another user');
+		// A piece inserted (lot A5, 1.83.0): its recall in the text, offered to record the sending on it
+		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+		$soc = new Societe($this->db);
+		$soc->name = 'Zzcompose Piece';
+		$soc->client = 1;
+		$soc->code_client = -1;
+		$soc->create($this->admin);
+		$order = new Commande($this->db);
+		$order->socid = $soc->id;
+		$order->date = dol_now();
+		$order->create($this->admin);
+		$order->addline('Coude', 8, 3, 20);
+		$res = $c->pieceInsert($this->admin, $open['token'], 'commande', (int) $order->id, array('summary' => 1, 'lines' => 1, 'pdf' => 1));
+		$this->db->query("DELETE FROM ".$this->db->prefix()."commandedet WHERE fk_commande = ".((int) $order->id));
+		$this->db->query("DELETE FROM ".$this->db->prefix()."commande WHERE rowid = ".((int) $order->id));
+		$this->db->query("DELETE FROM ".$this->db->prefix()."societe WHERE rowid = ".((int) $soc->id));
+		$this->assertNotNull($res, $c->error);
+		$this->assertStringContainsString('Coude', $res['html']);
+		$this->assertNull($res['attachment'], 'no PDF generated for this order: nothing attached');
+		$this->assertSame(array('commande', (int) $order->id), array($res['piece']['type'], $res['piece']['id']));
 		$this->assertTrue($c->close($this->admin, $open['token'], true));
 	}
 

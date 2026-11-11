@@ -1887,6 +1887,158 @@
 	}
 
 	// ---------- Documents of the linked pieces (lot W6 1.18.0) ----------
+	/**
+	 * Insert a piece of Dolibarr (lot A5, 1.83.0): the pieces of the thirdparties of the recipients first; for the one
+	 * chosen, what goes in the mail (recall, table of its lines, PDF, online signature or payment)
+	 */
+	function pieceDialog(w) {
+		const emails = ['to', 'cc'].flatMap(k => w[k].get().map(r => (r && r.email) || r)).filter(x => typeof x === 'string' && x);
+		let chosen = null;
+		let seqSearch = 0;
+		let timer = 0;
+		const dlg = dialog({
+			title: t('InboxPieceInsert'),
+			wide: true,
+			body: '<div class="ibx-pieceins">'
+				+ '<div class="ibx-linksearch"><span class="ibx-linksearch__field"><input type="search" class="ibx-field ibx-js-psearch" autocomplete="off" placeholder="' + th('InboxPieceSearch') + '" aria-label="' + th('InboxPieceSearch') + '"></span>'
+				+ '<label class="ibx-inline"><input type="checkbox" class="ibx-js-pall"> ' + th('InboxPieceAll') + '</label></div>'
+				+ '<div class="ibx-muted ibx-js-pstate" role="status"></div>'
+				+ '<div class="ibx-picklist ibx-js-plist" role="listbox" aria-label="' + th('InboxPieceInsert') + '"></div>'
+				+ '<fieldset class="ibx-pieceins__opts ibx-js-popts" hidden></fieldset></div>',
+			actions: [{ label: t('InboxPieceInsertIt'), primary: true, run: async dd => {
+				if (!chosen) {
+					return false;
+				}
+				const ask = {};
+				dd.querySelectorAll('.ibx-js-pask').forEach(c => {
+					ask[c.value] = c.checked ? 1 : 0;
+				});
+				let res;
+				try {
+					res = await post('compose', 'pieceinsert', { compose: w.token, type: chosen.type, id: chosen.id, ask });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				if (res.html) {
+					if (w.sourceMode) {
+						const src = $('.ibx-compose__source', w.dlg);
+						src.value += res.html;
+					} else {
+						w.editor.insertHtml(res.html);
+					}
+				}
+				if (res.attachment) {
+					w.attachments.push(res.attachment);
+					paintAttachments(w);
+				}
+				if (res.piece) {
+					addRecordPiece(w, res.piece);
+				}
+				w.changed();
+				return true;
+			} }],
+		});
+		const list = $('.ibx-js-plist', dlg);
+		const opts = $('.ibx-js-popts', dlg);
+		const state = $('.ibx-js-pstate', dlg);
+		const search = async () => {
+			const mine = ++seqSearch;
+			let res;
+			try {
+				res = await post('compose', 'piecesearch', { compose: w.token, term: $('.ibx-js-psearch', dlg).value.trim(), all: $('.ibx-js-pall', dlg).checked ? 1 : 0, emails });
+			} catch (err) {
+				state.textContent = err.message;
+				return;
+			}
+			if (mine !== seqSearch) {
+				return;
+			}
+			state.textContent = res.scoped ? t('InboxPieceScoped') : '';
+			list.innerHTML = res.pieces.length ? res.pieces.map((p, i) => '<div class="ibx-picklist__item ibx-pieceins__item" role="option" tabindex="-1" aria-selected="false" data-i="' + i + '">'
+				+ ic(p.icon) + '<span class="ibx-pieceins__ref"><b>' + esc(p.ref) + '</b> <span class="ibx-muted">' + esc(p.kind) + '</span></span>'
+				+ '<span class="ibx-ellipsis ibx-pieceins__soc">' + esc(p.soc) + '</span>'
+				+ '<span class="ibx-muted">' + (p.date ? esc(new Date(p.date * 1000).toLocaleDateString()) : '') + '</span>'
+				+ '<span class="ibx-pieceins__amount">' + esc(p.total) + '</span></div>').join('') : '<div class="ibx-empty">' + th('InboxPieceNone') + '</div>';
+			list._pieces = res.pieces;
+		};
+		const pick = async el => {
+			list.querySelectorAll('[aria-selected="true"]').forEach(x => x.setAttribute('aria-selected', 'false'));
+			el.setAttribute('aria-selected', 'true');
+			chosen = list._pieces[+el.dataset.i];
+			opts.hidden = false;
+			opts.innerHTML = '<legend>' + esc(chosen.kind + ' ' + chosen.ref) + '</legend><span class="ibx-spinner" aria-hidden="true"></span>';
+			let o;
+			try {
+				o = await post('compose', 'pieceoffer', { compose: w.token, type: chosen.type, id: chosen.id });
+			} catch (err) {
+				opts.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
+				return;
+			}
+			const box = (value, label, checked, extra) => '<label class="ibx-check"><input type="checkbox" class="ibx-js-pask" value="' + value + '"' + (checked ? ' checked' : '') + '> ' + label + '</label>' + (extra || '');
+			opts.innerHTML = '<legend>' + esc(chosen.kind + ' ' + chosen.ref) + '</legend>'
+				+ box('summary', th('InboxPieceAskSummary'), true)
+				+ box('lines', th('InboxPieceAskLines'), chosen.type === 'propal')
+				+ (o.pdf ? box('pdf', esc(t('InboxPieceAskPdf', o.pdf)), true, ' <a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="' + esc(o.pdf_url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxPiecePreview') + '</a>')
+					: '<p class="ibx-muted">' + ic('info') + ' ' + th('InboxPieceNoPdf') + '</p>')
+				+ (o.sign ? box('sign', th('InboxPieceAskSign'), true) : '')
+				+ (o.pay ? box('pay', esc(t('InboxPieceAskPay', o.remain)), true) : '');
+		};
+		list.addEventListener('click', e => {
+			const el = e.target.closest('[data-i]');
+			if (el) {
+				pick(el);
+			}
+		});
+		list.addEventListener('keydown', e => {
+			const items = Array.from(list.querySelectorAll('[data-i]'));
+			const cur = items.indexOf(document.activeElement);
+			if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+				e.preventDefault();
+				const n = items[Math.max(0, Math.min(items.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)))];
+				if (n) {
+					n.focus();
+				}
+			} else if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				if (items[cur]) {
+					pick(items[cur]);
+				}
+			}
+		});
+		const input = $('.ibx-js-psearch', dlg);
+		input.addEventListener('input', () => {
+			clearTimeout(timer);
+			timer = setTimeout(search, 250);
+		});
+		input.addEventListener('keydown', e => {
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				const first = $('[data-i]', list);
+				if (first) {
+					first.focus();
+				}
+			}
+		});
+		$('.ibx-js-pall', dlg).addEventListener('change', search);
+		search();
+		input.focus();
+	}
+	/** A piece inserted joins the pieces to record the sending on, ticked */
+	function addRecordPiece(w, pc) {
+		const box = $('.ibx-js-recordbox', w.dlg);
+		const key = pc.type + ':' + pc.id;
+		if (!box) {
+			return;
+		}
+		const have = Array.from(box.querySelectorAll('.ibx-js-record')).find(c => c.value === key);
+		if (have) {
+			have.checked = true;
+		} else {
+			box.insertAdjacentHTML('beforeend', '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(key) + '" checked> ' + esc(pc.kind + ' ' + pc.ref) + '</label>');
+		}
+		box.hidden = false;
+	}
 	async function documentsDialog(w) {
 		let pieces;
 		try {
@@ -2048,14 +2200,17 @@
 				+ '<iframe sandbox="allow-same-origin" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteon" hidden>' + th('InboxComposePutQuoteBack') + '</button>' : '')
 			+ '<ul class="ibx-compose__atts ibx-js-atts" hidden aria-label="' + th('InboxAttachments') + '"></ul>'
-			+ ((d.pieces || []).length ? '<div class="ibx-compose__record" role="group" aria-label="' + th('InboxRecordOn') + '">' + ic('event-new') + '<span class="ibx-muted">' + th('InboxRecordOn') + '</span>'
-				+ d.pieces.map(pc => '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(pc.type + ':' + pc.id) + '"> ' + esc(pc.kind + ' ' + pc.ref) + '</label>').join('') + '</div>' : '')
+			// Pieces to record the sending on (and to link the mail sent): the linked ones, the inserted ones (A5) added
+			+ '<div class="ibx-compose__record ibx-js-recordbox" role="group" aria-label="' + th('InboxRecordOn') + '"' + ((d.pieces || []).length ? '' : ' hidden') + '>' + ic('event-new') + '<span class="ibx-muted">' + th('InboxRecordOn') + '</span>'
+				+ (d.pieces || []).map(pc => '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(pc.type + ':' + pc.id) + '"> ' + esc(pc.kind + ' ' + pc.ref) + '</label>').join('') + '</div>'
 			+ '<div class="ibx-compose__drop" hidden>' + ic('attachment') + ' ' + th('InboxComposeDropHere') + '</div>'
 			+ '</div>'
 			+ '<div class="ibx-window__foot ibx-compose__foot">'
 			+ '<span class="ibx-sendsplit"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-sendsplit__arrow ibx-js-sendlater" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSendLater') + '" aria-label="' + th('InboxSendLater') + '">' + ic('chevron-down') + '</button></span>'
 			+ '<label class="ibx-btn ibx-btn--icon" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
+			// Insert a piece of Dolibarr (lot A5, 1.83.0): recall, lines, PDF, online links
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-insertpiece" aria-haspopup="dialog" title="' + th('InboxPieceInsert') + '" aria-label="' + th('InboxPieceInsert') + '">' + ic('piece') + '</button>'
 			+ ((d.linked || []).length ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-docs" title="' + th('InboxComposeAttachDocs') + '" aria-label="' + th('InboxComposeAttachDocs') + '">' + ic('document') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-templates" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxTemplates') + '" aria-label="' + th('InboxTemplates') + '">' + ic('template') + '</button>'
 			+ '<span class="ibx-compose__status ibx-js-status" role="status" aria-live="polite"></span>'
@@ -2240,6 +2395,7 @@
 		$('.ibx-js-cdiscard', dlg).addEventListener('click', () => discard(w));
 		$('.ibx-js-cmore', dlg).addEventListener('click', e => moreMenu(w, e.currentTarget));
 		$('.ibx-js-templates', dlg).addEventListener('click', e => templateMenu(w, e.currentTarget));
+		$('.ibx-js-insertpiece', dlg).addEventListener('click', () => pieceDialog(w));
 		const docs = $('.ibx-js-docs', dlg);
 		if (docs) {
 			docs.addEventListener('click', () => documentsDialog(w));

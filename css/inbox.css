@@ -2521,3 +2521,10 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
 .ibx-compose__attname { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
 .ibx-compose__attname:hover { color: var(--ibx-accent); }
+/* Insert a piece of Dolibarr (lot A5, 1.83.0) */
+.ibx-pieceins { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: min(40rem, 80vw); }
+.ibx-pieceins__item { display: grid; grid-template-columns: auto minmax(8rem, auto) minmax(0, 1fr) auto auto; gap: var(--ibx-s3); }
+.ibx-pieceins__soc { min-width: 0; }
+.ibx-pieceins__amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ibx-pieceins__opts { display: flex; flex-direction: column; gap: var(--ibx-s2); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-pieceins__opts > legend { padding: 0 var(--ibx-s1); font-weight: 600; }
