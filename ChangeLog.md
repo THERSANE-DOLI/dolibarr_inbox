@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: contact of the sender on the pieces created from a mail, files of the linked mails for the other modules :   1.84.0
+  - « Create ▾ » a quote, an order or a ticket: the known contact of the sender is the default contact of the page of
+    creation; a supplier order (no contact on its page) gets him as supplier contact for the follow-up once created.
+    Only a contact of the thirdparty of the piece (not when the thirdparty is found by the domain only).
+  - public API of InboxCreate: mailFiles() lists the files of the mails linked to a piece (mailboxes the user can
+    read), attachFromMail() puts one in the documents of the piece (antivirus, link, journal), also used by the panel.
+
+- FIX: a file of a mail put in the documents of a piece (and the .eml of a piece created from a mail) is indexed
+  like a file uploaded on the piece: listed by the ECM, and the modules reading the files given to a piece start at
+  once (trigger ECMFILES_CREATE) :   1.83.4
+
 - FIX: the delete button of the reading header turns red on hover and keyboard focus, as a destructive action;
   in the trash (destroy for good) its icon is red at rest too :   1.83.3
 

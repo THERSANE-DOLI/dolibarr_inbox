@@ -24,6 +24,9 @@
 require_once __DIR__.'/inboxelements.class.php';
 require_once __DIR__.'/inboxlink.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
+require_once __DIR__.'/inboxaccess.class.php';
+require_once __DIR__.'/inboxmailref.class.php';
+require_once __DIR__.'/inboxmimeparser.class.php';
 
 /**
  * « Create ▾ » opens the page of creation of Dolibarr, filled from the mail (decided 2026-11-07: all the fields,
@@ -50,6 +53,12 @@ class InboxCreate
 		'ticket' => array('url' => '/ticket/card.php?action=create', 'trigger' => 'TICKET_CREATE', 'label' => 'InboxCreateTicket'),
 		'project' => array('url' => '/projet/card.php?action=create', 'trigger' => 'PROJECT_CREATE', 'label' => 'InboxCreateProject'),
 	);
+
+	/** Pieces whose page of creation takes the default contact (contactid) */
+	const CONTACT_IN_FORM = array('propal', 'commande', 'ticket');
+
+	/** Pieces whose page of creation has no contact: the contact of the sender added after the creation, with this type */
+	const CONTACT_AFTER = array('order_supplier' => 'CUSTOMER');
 
 	/** @var DoliDB */
 	protected $db;
@@ -118,7 +127,10 @@ class InboxCreate
 			$file = $this->tempFile($raw);
 		}
 		$intents = $this->intents($user);
-		$intents[] = array('type' => $type, 'mailref' => $refId, 'mail' => (int) $row->rowid, 'subject' => (string) $row->subject, 'file' => $file, 'at' => dol_now());
+		$contact = (int) ($known['contact'] ?? 0);
+		$contactAfter = isset(self::CONTACT_AFTER[$type]) && $this->isContactOf($contact, (int) ($known['soc'] ?? 0)) ? $contact : 0;
+		$intents[] = array('type' => $type, 'mailref' => $refId, 'mail' => (int) $row->rowid, 'subject' => (string) $row->subject, 'file' => $file, 'at' => dol_now(),
+			'contactid' => $contactAfter);
 		$this->saveIntents($user, array_slice($intents, -10));
 
 		return $this->createUrl($type, $row, $known);
@@ -151,6 +163,21 @@ class InboxCreate
 		$this->saveIntents($user, array_slice($intents, -10));
 
 		return $url;
+	}
+
+	/**
+	 * @param int $contactId Contact
+	 * @param int $socId     Thirdparty
+	 * @return bool Active contact of this thirdparty
+	 */
+	protected function isContactOf($contactId, $socId)
+	{
+		if ((int) $contactId <= 0 || (int) $socId <= 0) {
+			return false;
+		}
+		$row = $this->db->getRow("SELECT fk_soc FROM ".$this->db->prefix()."socpeople WHERE rowid = ".((int) $contactId)." AND statut = 1 AND entity IN (".getEntity('contact').")");
+
+		return is_object($row) && (int) $row->fk_soc === (int) $socId;
 	}
 
 	/**
@@ -218,6 +245,11 @@ class InboxCreate
 		}
 		if ($soc > 0) {
 			$q['socid'] = $soc;
+			// Contact of the sender as default contact of the piece, only when he belongs to its thirdparty
+			$contact = (int) ($known['contact'] ?? 0);
+			if (in_array($type, self::CONTACT_IN_FORM, true) && $this->isContactOf($contact, $soc)) {
+				$q['contactid'] = $contact;
+			}
 		}
 
 		return DOL_URL_ROOT.self::TYPES[$type]['url'].($q ? '&'.http_build_query($q) : '');
@@ -258,6 +290,13 @@ class InboxCreate
 		$this->saveIntents($user, array_values($intents));
 		$linker = new InboxLink($this->db);
 		$linker->link((int) $found['mailref'], $type, (int) $object->id, $user, 'inbox');
+		// Contact of the sender, for the pieces whose page of creation has no contact (still of the thirdparty chosen)
+		$contact = (int) ($found['contactid'] ?? 0);
+		if ($contact > 0 && isset(self::CONTACT_AFTER[$type]) && method_exists($object, 'add_contact') && $this->isContactOf($contact, (int) ($object->socid ?? 0))) {
+			if ($object->add_contact($contact, self::CONTACT_AFTER[$type], 'external') < 0) {
+				dol_syslog(__METHOD__.' contact '.$contact.' not added to '.$type.' '.$object->id.': '.$object->error, LOG_WARNING);
+			}
+		}
 		// From the panel « New customer » (A1): its contact, the conversation
 		if (!empty($found['lead'])) {
 			require_once __DIR__.'/inboxlead.class.php';
@@ -298,6 +337,100 @@ class InboxCreate
 	}
 
 	/**
+	 * A file of a mail put in the documents of a piece, after the antivirus; the piece is linked to the mail too. Used by
+	 * the panel of the mail and by the modules that offer the files of the mails linked to a piece (public API).
+	 *
+	 * @param User        $user    User
+	 * @param InboxReader $reader  Mail loaded (access checked by InboxReader::load)
+	 * @param int         $part    Index of the attachment in the parsed mail
+	 * @param string      $type    Type of the piece
+	 * @param int         $element Piece
+	 * @return array{name:string,unscanned:bool}|null Null if refused ($this->error: a key of the langs of inbox)
+	 */
+	public function attachFromMail(User $user, InboxReader $reader, $part, $type, $element)
+	{
+		$raw = $reader->raw($user);
+		if ($raw === null) {
+			$this->error = 'InboxMailNotFound';
+			return null;
+		}
+		$message = InboxMimeParser::parse($raw);
+		$a = $message->attachments[(int) $part] ?? null;
+		if (!is_array($a) || !empty($a['inline']) || !empty($a['embedded'])) {
+			$this->error = 'InboxErrorAttachmentNotFound';
+			return null;
+		}
+		require_once __DIR__.'/inboxattachmentscan.class.php';
+		$verdict = (new InboxAttachmentScan($this->db))->check($a['content'], $a['name']);
+		if ($verdict['state'] === InboxAttachmentScan::INFECTED) {
+			$this->error = 'InboxErrorAttachmentInfected';
+			return null;
+		}
+		$name = $this->attach($user, (string) $type, (int) $element, (string) $a['name'], (string) $a['content']);
+		if ($name === '') {
+			return null;
+		}
+		// The piece is linked to the mail too (a file of it is there now)
+		$refId = (new InboxMailRef($this->db))->fetchOrCreate($reader->row, $user);
+		if ($refId > 0) {
+			(new InboxLink($this->db))->link($refId, (string) $type, (int) $element, $user);
+		}
+		InboxActionLog::add($this->db, $user, (int) $reader->row->fk_account, 'attach', array($reader->row), (string) $reader->row->folder_path, '', 0, $name);
+
+		return array('name' => $name, 'unscanned' => $verdict['state'] !== InboxAttachmentScan::CLEAN && $verdict['state'] !== InboxAttachmentScan::OFF);
+	}
+
+	/**
+	 * Files attached to the mails linked to a piece, in the mailboxes the user can read, newest mail first (public API:
+	 * a module offers them to be put in the documents of the piece with attachFromMail). Mails read from the cache of
+	 * inbox, else from their server: call it on demand, not on every display.
+	 *
+	 * @param User     $user       User
+	 * @param string   $type       Type of the piece
+	 * @param int      $element    Piece
+	 * @param string[] $extensions Extensions kept (lower case), empty = all
+	 * @param int      $maxMails   Mails read at most
+	 * @return array<int,array{mail:int,part:int,name:string,size:int,sha1:string,from:string,subject:string,date:int}>
+	 */
+	public function mailFiles(User $user, $type, $element, array $extensions = array(), $maxMails = 10)
+	{
+		require_once __DIR__.'/inboxreader.class.php';
+		$out = array();
+		if (!InboxElements::canRead($user, (string) $type, (int) $element)) {
+			return $out;
+		}
+		$accounts = array_map('intval', array_keys((new InboxAccess($this->db))->getAccounts($user)));
+		$ids = (new InboxLink($this->db))->mailrefsOf((string) $type, (int) $element);
+		if (empty($accounts) || empty($ids)) {
+			return $out;
+		}
+		$rows = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."inbox_mailref WHERE rowid IN (".implode(',', array_map('intval', $ids)).")"
+			." ORDER BY date_mail DESC LIMIT ".((int) $maxMails));
+		$refs = new InboxMailRef($this->db);
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$copy = $refs->locate((int) $r->rowid, $accounts);
+			$reader = new InboxReader($this->db);
+			if ($copy === null || !$reader->load($user, (int) $copy['mail'])) {
+				continue;
+			}
+			$raw = $reader->raw($user);
+			if ($raw === null) {
+				continue;
+			}
+			foreach (InboxMimeParser::parse($raw)->attachments as $part => $a) {
+				$ext = strtolower(pathinfo((string) $a['name'], PATHINFO_EXTENSION));
+				if (!empty($a['inline']) || !empty($a['embedded']) || ($extensions && !in_array($ext, $extensions, true))) {
+					continue;
+				}
+				$out[] = array('mail' => (int) $copy['mail'], 'part' => (int) $part, 'name' => (string) $a['name'], 'size' => (int) $a['size'], 'sha1' => (string) $a['sha1'],
+					'from' => strtolower((string) $reader->row->from_email), 'subject' => (string) $reader->row->subject, 'date' => (int) $this->db->jdate($reader->row->date_mail));
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * @param string $type    Type
 	 * @param object $object  Piece
 	 * @param string $name    File name
@@ -322,6 +455,12 @@ class InboxCreate
 			return '';
 		}
 		dolChmod($dir.'/'.$name);
+		// Indexed like a file uploaded on the piece: listed by the ECM, and the modules that read the files given to a
+		// piece hear of it (trigger ECMFILES_CREATE) at once, not at the next display of its documents
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		if (addFileIntoDatabaseIndex($dir, $name, '', 'uploaded', 0, $object) <= 0) {
+			dol_syslog(__METHOD__.' file '.$name.' written but not indexed', LOG_WARNING);
+		}
 
 		return $name;
 	}
