@@ -229,6 +229,12 @@ class InboxElements
 		if (method_exists($o, 'getLibStatut')) {
 			$out = array_merge($out, self::statusOf((string) $o->getLibStatut(0), (string) $o->getLibStatut(5)));
 		}
+		// Expected status of a sender (open thirdparty, active contact): the application shows a discreet dot, the badge
+		// only for another status (closed, inactive)
+		if ($type === 'societe' || $type === 'contact') {
+			$raw = $type === 'contact' ? ($o->statut ?? ($o->status ?? null)) : ($o->status ?? null);
+			$out['status_normal'] = $raw !== null && (int) $raw === 1;
+		}
 
 		return $out;
 	}

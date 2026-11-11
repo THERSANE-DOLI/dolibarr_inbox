@@ -104,6 +104,7 @@ class InboxLinkNoteTest extends InboxTestCase
 		// Status as the badge of Dolibarr: short label and kind (an open thirdparty = status4)
 		$this->assertSame(4, $d['status_type']);
 		$this->assertNotSame('', $d['status_short']);
+		$this->assertTrue($d['status_normal'], 'open thirdparty: expected status, a dot instead of the badge (1.88.7)');
 		$this->assertFalse($elements->describe($alice, 'societe', $soc)['readable'], 'nothing of the piece without the right');
 
 		// Search (1.46.0): the events only when asked, « contains » from 3 characters, the exact name first

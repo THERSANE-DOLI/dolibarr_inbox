@@ -4940,6 +4940,19 @@
 			return '';
 		}
 		const type = Number.isInteger(d.status_type) && d.status_type >= 0 && d.status_type <= 9 ? d.status_type : -1;
+	/**
+	 * Expected status of a sender card (open thirdparty, active contact, 1.88.7): a discreet dot beside the name, its
+	 * label in the title and for the screen readers; any other status (closed, inactive) keeps its badge, to be seen
+	 * @param {object} d Thirdparty or contact {status, status_short, status_type, status_normal}
+	 * @returns {string} html
+	 */
+	function senderDot(d) {
+		if (!d.status_normal) {
+			return '';
+		}
+		const label = d.status || d.status_short || '';
+		return '<span class="ibx-stdot"' + (label ? ' title="' + esc(label) + '"' : '') + ' aria-hidden="true"></span>' + (label ? '<span class="ibx-sr-only">' + esc(label) + '</span>' : '');
+	}
 		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
 	}
 	/**
@@ -5094,7 +5107,7 @@
 			+ '<div class="ibx-soccard__top ibx-js-soczone" data-card="' + card + '" title="' + th(open ? 'InboxCardFold' : 'InboxCardUnfold') + '">'
 			+ '<div class="ibx-soccard__head">' + ic(x.icon)
 			+ '<span class="ibx-soccard__namecell"><a class="ibx-soccard__name" href="' + esc(x.url || '#') + '" target="_blank" rel="noopener"' + (tip ? ' data-objtip="' + esc(tip) + '"' : ' title="' + esc(x.kind + ' ' + (x.ref || '')) + '"') + '>' + esc(x.ref || '') + '</a>'
-			+ (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + statusBadge(x)
+			+ senderDot(x) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (x.status_normal ? '' : statusBadge(x))
 			+ (first ? '<span class="ibx-soccard__sig ibx-soccard__sig--' + first.level + '">' + ic(first.level === 'alert' ? 'warning' : 'info') + '<span>' + esc(first.short) + '</span>'
 				+ (sig.length > 1 ? '<span class="ibx-soccard__more" title="' + esc(sig.slice(1).map(s => s.short).join(' · ')) + '">+' + (sig.length - 1) + '</span>' : '') + '</span>' : '')
 			+ '</div>'

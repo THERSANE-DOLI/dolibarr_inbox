@@ -1472,6 +1472,9 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-soccard__name:hover, .ibx-soccard__name:focus-visible { text-decoration: underline; }
 .ibx-soccard__namecell small { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
 .ibx-soccard__head > .ibx-st { grid-area: st; }
+/* Expected status of a sender (open thirdparty, active contact): a dot beside the name instead of the badge */
+.ibx-stdot { flex: none; align-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ibx-st-4); }
+@media (forced-colors: active) { .ibx-stdot { background: CanvasText; } }
 .ibx-soccard__sig { grid-area: sig; display: flex; align-items: center; gap: 0.25rem; min-width: 0; font-size: var(--ibx-fs-sm); }
 .ibx-soccard__sig > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-soccard__sig--alert { color: var(--ibx-warning); font-weight: 600; }

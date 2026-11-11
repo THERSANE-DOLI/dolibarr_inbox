@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: sender cards lighter :   1.88.7
+  - Open thirdparty or active contact (the expected status): a small green dot beside the name, its label on
+    hover and for the screen readers, instead of the « Open » badge.
+  - Any other status (closed thirdparty, inactive contact) keeps its badge, to be seen; the pieces keep theirs.
+
 - FIX: BIMI logos safer :   1.88.6
   - Shown only for a known sender (domain recognized or address linked to a thirdparty), besides DMARC: a
     lookalike domain may publish the logo of another company.
