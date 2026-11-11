@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: risks said in Settings > General > Pictures of the correspondents :   1.88.5
+  - Gravatar not recommended: anyone can attach any picture to their address, it proves nothing about the sender.
+  - BIMI renamed « Brand logos »: the logo confirms the sending domain, not the company (a lookalike domain may
+    publish the logo of another one); no more promise that a forged mail never shows it.
+
 - FIX: « Rspamd » explained where it is named (Outside services, section of the engine in Settings > Anti-spam): the
   word underlined with dots (<dfn>) opens a bubble on hover, keyboard focus or touch; the infotips of inbox take a
   term as well as their icon :   1.88.4
