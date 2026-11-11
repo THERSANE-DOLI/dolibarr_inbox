@@ -1455,7 +1455,7 @@
 			+ '<div class="ibx-ai__pane" data-pane="rephrase"><p class="ibx-ai__hint">' + th('InboxAiOnSelection') + '</p><div class="ibx-ai__row">'
 			+ ['shorter', 'formal', 'warm', 'correct'].map(s => '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-airun" data-kind="rephrase" data-style="' + s + '">' + th('InboxAiStyle_' + s) + '</button>').join('') + '</div></div>'
 			+ '<div class="ibx-ai__pane" data-pane="translate"><p class="ibx-ai__hint">' + th('InboxAiOnSelection') + '</p><div class="ibx-ai__row">'
-			+ '<label for="' + w.id + '-ailang">' + th('InboxAiLang') + '</label><select class="ibx-field ibx-field--medium ibx-js-ailang" id="' + w.id + '-ailang">'
+			+ '<label for="' + w.id + '-ailang">' + th('InboxAiLang') + '</label><select class="ibx-field ibx-field--medium ibx-js-ailang" data-combo id="' + w.id + '-ailang">'
 			+ langs.map(c => '<option value="' + c + '"' + (c === defLang ? ' selected' : '') + '>' + esc(langName(c)) + '</option>').join('') + '</select>'
 			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-airun" data-kind="translate">' + th('InboxAiTranslate') + '</button></div></div>'
 			+ '<div class="ibx-ai__result ibx-js-airesult" aria-live="polite" hidden></div>'

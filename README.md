@@ -111,6 +111,49 @@ Other modules add their domains with the hook `inboxSharedDomains` (context `inb
 `$this->results['domains'] = array('example-group.com' => 'shared')` (categories `public`, `disposable`, `shared`);
 they show with the origin « other module », read only.
 
+## Searchable lists (tool combo)
+
+`js/dolibarr-combo.js` and `css/dolibarr-combo.css` define `Dolibarr.tools.combo`, a searchable list of choices
+written to go into the core: no dependency (no jQuery, nothing of inbox), defined only when the core has none.
+Opt-in: `<select data-combo>` (with `multiple`, `data-combo-clear="1"`, `data-combo-placeholder`,
+`data-combo-source="url"` + `data-combo-min`, `<option data-sub>`), or `Dolibarr.tools.combo.attach(select, opts)`.
+The native select stays in the page and stays the truth (value, options, native `change`, browser validation); see
+the head of the file. Colours: the variables `--dol-combo-*`, set by inbox from its theme.
+
+## New customer from a mail
+
+On a mail of an unknown sender, the Dolibarr band offers « New customer »: a side panel on the left, the mail left
+readable on the right. It shows what the mail says of its sender, each value with its source (data source headers,
+vCard, display name, signature, « Label: value » lines, domain), the thirdparties that may be the same one, and
+creates the thirdparty and its contact in one click (« Create ») or opens the page of Dolibarr filled (« Full
+page… », the contact follows when the thirdparty is saved). The mail and its conversation are linked, no copy of the
+mail is kept.
+
+The panel asks what the page of creation asks: rules of the core, mandatory settings of the thirdparties, mandatory
+extrafields and the mandatory fields per page (Setup > Default values, `societe/card.php` and `contact/card.php`),
+checked again on the server. A mandatory field the panel cannot fill (an extrafield, another field of the page)
+sends the user to the full page. The default values of the forms of creation are the first values of the panel.
+The quick creation calls the classes of Dolibarr: the triggers of the modules run, the page of creation (and what a
+module adds to it) does not.
+
+A module adds values and fields with the hook `inboxLeadExtract` (context `inbox`):
+
+```php
+public function inboxLeadExtract($parameters, &$object, &$action, $hookmanager)
+{
+	// $parameters['mail'] (row of the index), $parameters['message'] (InboxMessage), $parameters['found'] (values found)
+	$this->results['values'] = array(array('part' => 'soc', 'field' => 'idprof2', 'value' => '99910000100075', 'source' => 'My register'));
+	// A field of the page of creation (an extrafield: options_xxx), shown in the panel and sent to the page
+	$this->results['fields'] = array(array('part' => 'soc', 'field' => 'options_naf', 'label' => 'Activity code'));
+	return 0;
+}
+```
+
+In the browser (file of `inboxjs`), the event `inbox:lead:render` on `document` gives `{ panel, slot, mail, found,
+get(part, field), set(part, field, value, source) }`: a module appends its block to `slot` (a search in a register of
+companies from the SIRET found, for example) and fills the panel with `set()`; the panel is drawn again after a
+`set()`, the event comes again.
+
 ## Development
 
 - Icons: `dev/icons.json` (usage name => Tabler icon) and `dev/tabler/` (Tabler Icons 3.50.0, MIT license, see

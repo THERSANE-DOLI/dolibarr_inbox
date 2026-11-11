@@ -1,5 +1,54 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: searchable lists, tool « combo » of the JavaScript context, written for the core :   1.80.0
+  - js/dolibarr-combo.js and css/dolibarr-combo.css, no dependency (no jQuery, nothing of inbox): Dolibarr.tools.combo
+    is defined only when the core has none. Opt-in: the selects marked data-combo, or attach(). Search with case
+    and accents ignored, single or multiple, groups, a second line per option, clear button, options asked to the
+    server as one types (function or URL), keyboard and ARIA combobox; the native list kept on a phone for a single
+    choice.
+  - the native select stays the truth: visually hidden (a required field is still checked by the browser), in sync,
+    a native « change » on each choice; a value set by the code or options loaded later show on the button; a focus
+    on the select goes to the button; the classes the code looks for (js-) are never given to the button.
+  - in inbox: country, type and categories of the panel « New customer », folder, tag and mailbox of the rules,
+    user of the journal, folders per role, carriers, language of the AI. Colours from the theme of inbox.
+
+- FIX: panel « New customer », signature found and read better :   1.79.3
+  - the HTML of the mail is read (a tool of signatures may leave « Sent from ... as Plain Text » in the text part);
+    the signature found after « -- », else from the line of the name of the sender, else after a closing formula,
+    never in the footers (confidentiality, environment, « Sent from »).
+  - short labels « T : » (phone) and « M : » (mobile) per piece of a line; the site of a line holding an email; a
+    line of address in pieces (« street - town CP 11609 - country »): zip code after its label, town, country of the
+    dictionary; zip code or town from the dictionary of zip codes when it gives one answer; phones of other
+    countries keep their grouping.
+  - « Label: value » lines kept only when the mail has two known labels at least (a form), never one « Address: »
+    of a mail written by hand.
+
+- FIX: panel « New customer », values cleaned before they are offered and when they are received: no target of a
+  link (« Tel: + 33 199 00 12 34<tel:...> » of a HTML mail), phones written plainly (+33 1 99 00 12 34), emails
+  checked, site without its scheme, identifiers without spaces; a street without its zip code and the company named
+  like the domain read in the signature :   1.79.2
+
+- FIX: a mail whose body part says « Content-Disposition: inline » was shown empty, its body listed as a file
+  « piece-jointe » (the IMAP library takes any part with a disposition for an attachment) :   1.79.1
+
+- NEW: new customer from a mail (lot A1, level 1) :   1.79.0
+  - on a mail of an unknown sender, « New customer » in the Dolibarr band opens a side panel on the left, the mail
+    left readable on the right. Values read in the mail, each with its source and its line of the mail lit on hover,
+    the other values offered: data source headers, attached vCard, display name (« Swap first and last name »),
+    signature (phones sorted mobile or not, SIRET / SIREN checked by their key, VAT computed, address, job, site;
+    never the quoted mail), « Label: value » lines in 5 languages, domain (never a public, disposable or shared one).
+  - thirdparties that may be the same one (domain, phone, SIREN, VAT, near name) with « Use this one » (the contact
+    is added to it).
+  - « Create »: the thirdparty (nature, form, type, automatic code, coordinates, identifiers; sales representative,
+    categories, VAT under « More fields »), its contact, the mail and its conversation linked to both, all or
+    nothing; « Undo » in the toast. « Full page… »: the page of Dolibarr filled, the contact created when the
+    thirdparty is saved; a contact that needs its own page is offered in the band. No copy of the mail is kept.
+  - the panel asks what the page of creation asks (rules of the core, mandatory settings, mandatory extrafields,
+    mandatory fields per page of Setup > Default values), checked again on the server; a field it cannot fill sends
+    to the full page. The default values of the forms are its first values, the last choices are kept.
+  - modules: hook inboxLeadExtract (values and fields) and the browser event inbox:lead:render (a block of the
+    module in the panel), see README.
+
 - NEW: remote pictures of a quote and security settings (lot F1) :   1.78.0
   - the quote of an answer or a forward no longer carries the tracking pictures of the mail quoted (1 x 1 pictures,
     known tracking addresses): kept, the reader of the answer told the first sender that it was answered, and the

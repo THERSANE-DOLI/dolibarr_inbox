@@ -1,0 +1,46 @@
+/* Copyright (C) 2026 THERSANE www.thersane.fr
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/*
+ * Searchable list of choices (tool « combo », js/dolibarr-combo.js). Its colours are variables: a page or a theme
+ * sets them (--dol-combo-bg, -text, -muted, -border, -hover, -selected, -accent, -radius, -shadow, -z).
+ */
+.dol-combo { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: 100%; vertical-align: middle; }
+.dol-combo__btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; min-width: 0; text-align: left; cursor: pointer; }
+.dol-combo__btn:disabled { cursor: default; }
+.dol-combo__chevron { flex: none; color: var(--dol-combo-muted, #6b7280); }
+.dol-combo__val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dol-combo__val.is-empty { color: var(--dol-combo-muted, #6b7280); }
+.dol-combo__clear { position: absolute; right: 1.75rem; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--dol-combo-muted, #6b7280); cursor: pointer; }
+.dol-combo__clear:hover { background: var(--dol-combo-hover, #f1f2f4); color: var(--dol-combo-text, #1f2328); }
+.dol-combo__clear[hidden] { display: none; }
+/* The native select: out of sight, still in the page (form, validation of a required field, labels) */
+.dol-combo__native { position: absolute !important; left: 0; bottom: 0; width: 1px !important; height: 1px !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; opacity: 0; pointer-events: none; clip-path: inset(50%); }
+.dol-combo__pop { position: fixed; z-index: var(--dol-combo-z, 1000); display: flex; flex-direction: column; gap: 0.25rem; padding: 0.25rem; box-sizing: border-box; background: var(--dol-combo-bg, #fff); color: var(--dol-combo-text, #1f2328);
+	border: 1px solid var(--dol-combo-border, #d0d5dd); border-radius: var(--dol-combo-radius, 6px); box-shadow: var(--dol-combo-shadow, 0 8px 24px rgb(15 23 42 / .18)); font: inherit; }
+.dol-combo__search { box-sizing: border-box; width: 100%; min-height: 2rem; padding: 0.25rem 0.5rem; font: inherit; color: inherit; background: var(--dol-combo-bg, #fff); border: 1px solid var(--dol-combo-border, #d0d5dd); border-radius: var(--dol-combo-radius, 6px); }
+.dol-combo__search:focus { outline: 2px solid var(--dol-combo-accent, #2563eb); outline-offset: -1px; }
+.dol-combo__list { list-style: none; margin: 0; padding: 0; max-height: min(45vh, 18rem); overflow: auto; overscroll-behavior: contain; }
+.dol-combo__opt { display: flex; align-items: center; gap: 0.5rem; min-height: 2rem; padding: 0.125rem 0.5rem; border-radius: calc(var(--dol-combo-radius, 6px) - 2px); cursor: pointer; }
+.dol-combo__opt:hover, .dol-combo__opt.is-active { background: var(--dol-combo-hover, #f1f2f4); }
+.dol-combo__opt[aria-selected="true"] { background: var(--dol-combo-selected, #e8eefc); }
+.dol-combo__opt.is-active[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--dol-combo-accent, #2563eb); }
+.dol-combo__opt.is-disabled { opacity: .5; cursor: default; }
+.dol-combo__check { display: inline-flex; width: 1rem; flex: none; color: var(--dol-combo-accent, #2563eb); }
+.dol-combo__text { display: flex; flex-direction: column; min-width: 0; }
+.dol-combo__sub { font-size: 0.85em; color: var(--dol-combo-muted, #6b7280); }
+.dol-combo__group { padding: 0.5rem 0.5rem 0.25rem; font-size: 0.85em; font-weight: 600; color: var(--dol-combo-muted, #6b7280); }
+.dol-combo__note { padding: 0.5rem; font-size: 0.85em; color: var(--dol-combo-muted, #6b7280); }

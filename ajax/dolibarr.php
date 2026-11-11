@@ -34,6 +34,7 @@ dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
 dol_include_once('/inbox/class/inboxcited.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
+dol_include_once('/inbox/class/inboxlead.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('link', 'unlink', 'detach', 'attach_thread', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
@@ -294,6 +295,8 @@ switch ($action) {
 			return $a;
 		}, (new InboxActivity($db))->sentIn($row));
 		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
+			// New customer from a mail (lot A1, 1.79.0): contacts left to create from their page
+			'lead_pending' => (new InboxLead($db))->pendingFor($user, (int) $row->rowid),
 			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);

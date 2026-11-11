@@ -5347,6 +5347,7 @@
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			// Mail sent by a site for a requester (data sources, 1.72.0): who asked, through which source, and the piece
 			// the source offers to create
+			const canLead = !!I.lead && (d.create || []).some(c => c.type === 'societe');
 			const rq = d.requester;
 			const rqRef = rq && rq.data && rq.data.ref ? rq.data.ref : '';
 			html += '<div class="ibx-dolibar__body">'
@@ -5359,8 +5360,18 @@
 					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
 					+ '</span></div>' : '')
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
-				+ (sender.length ? sender.join('') : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>'
-					+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-resoc">' + ic('arrows-exchange') + ' ' + th('InboxResocAttach') + '</button></span>' : '')) + '</span></div>'
+				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
+				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
+					+ '<span class="ibx-dolibar__tools">'
+					+ (canLead ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-newcustomer" aria-haspopup="dialog">' + ic('user-plus') + ' ' + th('InboxLeadOpen') + '</button>' : '')
+					// Beside « New customer »: a short label, so that both stay on one line in a narrow band
+					+ (canWrite ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-resoc"' + (canLead ? ' title="' + th('InboxResocAttach') + '"' : '') + '>' + ic('arrows-exchange') + ' ' + th(canLead ? 'InboxLeadExisting' : 'InboxResocAttach') + '</button>' : '') + '</span>') + '</span></div>'
+				// Contacts left to create from their page (a mandatory field of the contact): one click, filled
+				+ (d.lead_pending || []).map(x => '<div class="ibx-dolibar__row ibx-leadpending"><span class="ibx-dolibar__label">' + th('InboxLeadPendingLabel') + '</span><span class="ibx-dolibar__items">'
+					+ '<span>' + esc(t('InboxLeadPending', x.name, x.soc_name)) + '</span><span class="ibx-dolibar__tools">'
+					+ '<a class="ibx-btn ibx-btn--sm ibx-btn--primary" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + ic('user-plus') + ' ' + esc(t('InboxLeadPendingCreate', x.name)) + '</a>'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-btn--ghost ibx-js-leaddismiss" data-soc="' + x.soc + '" aria-label="' + th('InboxLeadPendingDismiss') + '" title="' + th('InboxLeadPendingDismiss') + '">' + ic('close') + '</button>'
+					+ '</span></span></div>').join('')
 				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
@@ -5585,6 +5596,16 @@
 		}
 		if (e.target.closest('.ibx-js-createpiece')) {
 			createDialog(box);
+			return;
+		}
+		const lead = e.target.closest('.ibx-js-newcustomer');
+		if (lead && I.lead) {
+			I.lead.open({ mail: +box.dataset.mail, app: $('.ibx-mailapp', S.el), back: lead, onDone: () => loadDolibar(box) });
+			return;
+		}
+		const dismiss = e.target.closest('.ibx-js-leaddismiss');
+		if (dismiss) {
+			post('lead', 'dismiss', { id: +box.dataset.mail, soc: +dismiss.dataset.soc }).then(() => loadDolibar(box), err => toast(err.message, { error: true }));
 			return;
 		}
 		const seeSent = e.target.closest('.ibx-js-activitysee');
