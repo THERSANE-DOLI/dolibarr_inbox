@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.84.0';
+		$this->version = '1.88.7';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -165,6 +165,24 @@ class modInbox extends DolibarrModules
 			'priority' => 60,
 		);
 
+		// Blocked senders (1.87.0): checked again every night; became known to Dolibarr = told to the managers of the
+		// list (still blocked), became protected (user, recognized domain...) = unblocked
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronBlockedCheck',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxblockedsender.class.php',
+			'objectname' => 'InboxBlockedSender',
+			'method' => 'cronCheck',
+			'parameters' => '',
+			'comment' => 'InboxCronBlockedCheckComment',
+			'frequency' => 1,
+			'unitfrequency' => 86400,
+			'datestart' => strtotime('tomorrow 04:10'),
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 70,
+		);
+
 		// Notifications (lot W8 1.21.0): those still unread after 15 minutes go by mail to the users who chose it
 		$this->cronjobs[] = array(
 			'label' => 'InboxCronNotifMail',
@@ -203,6 +221,13 @@ class modInbox extends DolibarrModules
 		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
 		$this->rights[$r][1] = 'InboxRightTrustedDomainWrite';
 		$this->rights[$r][4] = 'trusteddomain';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		// Blocked senders (1.85.0): block a sender known to Dolibarr or a domain, unblock any entry (an unknown address
+		// needs only the level « manage » on the mailbox of the mail)
+		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'InboxRightBlockedSenderWrite';
+		$this->rights[$r][4] = 'blockedsender';
 		$this->rights[$r][5] = 'write';
 		$r++;
 

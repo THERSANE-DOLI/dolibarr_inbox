@@ -1,5 +1,100 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: sender cards lighter :   1.88.7
+  - Open thirdparty or active contact (the expected status): a small green dot beside the name, its label on
+    hover and for the screen readers, instead of the « Open » badge.
+  - Any other status (closed thirdparty, inactive contact) keeps its badge, to be seen; the pieces keep theirs.
+
+- FIX: BIMI logos safer :   1.88.6
+  - Shown only for a known sender (domain recognized or address linked to a thirdparty), besides DMARC: a
+    lookalike domain may publish the logo of another company.
+  - SVG rebuilt from an allow list (InboxSvg, pure PHP): no script, event, style sheet, foreignObject, outer
+    reference nor entity; the logos already kept are cleaned when read.
+
+- FIX: risks said in Settings > General > Pictures of the correspondents :   1.88.5
+  - Gravatar not recommended: anyone can attach any picture to their address, it proves nothing about the sender.
+  - BIMI renamed « Brand logos »: the logo confirms the sending domain, not the company (a lookalike domain may
+    publish the logo of another one); no more promise that a forged mail never shows it.
+
+- FIX: « Rspamd » explained where it is named (Outside services, section of the engine in Settings > Anti-spam): the
+  word underlined with dots (<dfn>) opens a bubble on hover, keyboard focus or touch; the infotips of inbox take a
+  term as well as their icon :   1.88.4
+
+- FIX: Settings > Security opens on the « Outside services »: every function of inbox that asks a service out of
+  our servers (Gravatar, BIMI logos, AI of the writing, voice typing, lists of reputation by DNS of Rspamd), what
+  leaves and to whom, its state and the way to its setting :   1.88.3
+
+- FIX: Rspamd started with dev/rspamd/docker-compose.yml (Rspamd and Redis, Redis on an internal network without way
+  out, restarted with the server); run.sh writes the hashed password of the controller (RSPAMD_PASSWORD) :   1.88.2
+
+- FIX: anti-spam engine checked on a real Rspamd 3.11.1 :   1.88.1
+  - Spam decided by the threshold « add header » that Rspamd sends back (its action depends on modules made for a
+    mail server), shown as the threshold of the mail; a check ended by such a module (greylist) is an error said
+    in the settings, never a verdict; « nothing to learn » (HTTP 204) is not an error; wrong password of the
+    controller said as such (HTTP 401).
+  - dev/rspamd: greylist and ratelimit off; the lists of maps.rspamd.com and the update of the rules off for good
+    (override.d: local.d merges its lists with the defaults); lists of reputation by DNS off in the configuration
+    too. Checked: the container connects to Redis only.
+
+- NEW: anti-spam engine of inbox, Rspamd installed beside Dolibarr (self-hosted, off by default) :   1.88.0
+  - The new mails of the inbox are judged at the synchronisation (after the blocked senders, 20 per pass, never
+    the old mails nor the other folders): those without verdict of the filter of the server, or all of them. A mail
+    judged spam goes to the junk (journal « put in junk, judged spam »), never when its sender is known to Dolibarr
+    or protected, never a mail marked « not junk »; the reading says « the anti-spam engine of inbox judges... ».
+  - « Junk » (J) and « Not junk » (Shift+J) are learned by the scheduled job (queue, the click stays instant; an
+    engine stopped fails nothing); training of the start: the junk of the last 6 months as spam, the mails answered
+    as legitimate.
+  - Settings > Anti-spam > Settings: switch, addresses of Rspamd and of its controller, password of the controller
+    (encrypted, never sent back), test of the connection (version, mails learned), mails checked, put away, learn;
+    the lists of reputation by DNS (Spamhaus, SURBL...) ask outside services: off by default, turned off request
+    by request, a dialog says what leaves when turned on. Nothing is ever sent to rspamd.com.
+  - dev/rspamd/run.sh: Rspamd and Redis of the tests (Docker), configuration without any call to rspamd.com.
+
+- NEW: the blocked senders are checked again every night :   1.87.0
+  - Scheduled job « Check the blocked senders again » (every night, 2 minutes at most, the entries checked longest
+    ago first): a sender blocked while unknown that became known to Dolibarr (a new customer, a contact created)
+    stays blocked and is shown to the managers of the list in Settings > Anti-spam (warning, filter « became
+    known », reason and date on the row), who unblock it or « keep blocked »; a sender that became protected (a
+    user, our domain, a recognized domain, a data source) is unblocked. Journal: unblocked (became protected), kept
+    blocked (became known).
+
+- FIX: the verdict of the anti-spam filter of the server (SpamAssassin, Rspamd) is believed only when written by our
+  servers: with trusted receiving servers declared, the anti-spam headers below the entry of the mail into them
+  (a « Received: ... by » or « Authentication-Results » of these servers) are ignored and named in the window of
+  all the headers; when our filter is off, a « No » written by the sender is no longer believed. A mail that never
+  came through these servers keeps the topmost header. Switch « Use the verdict of the filter of the server » in
+  Settings > Anti-spam > Settings :   1.86.1
+
+- NEW: an update of inbox not finished is told to the administrators :   1.86.0
+  - The version of the files newer than the one of the last activation (written by Dolibarr in the constant of the
+    module): the new tables, columns and rights are not there yet. A bar at the top of the application and a
+    warning on the setup page; the list of the modules for the administrators of Dolibarr, « ask an administrator
+    of Dolibarr » for the other administrators of inbox, nothing for the users. Never activated again from inbox.
+
+- FIX: Settings > Anti-spam in tabs (blocked senders, mailboxes, settings): the list of the blocked senders alone in
+  its tab, by pages of 50 with the search (address, domain, note, author) and the type done by the server :   1.85.1
+
+- NEW: blocked senders, one list for all the mailboxes, and a page Settings > Anti-spam :   1.85.0
+  - « Block the sender… » in the menu ⋯ of a mail: the address, or the whole domain (and its subdomains); its mails
+    go to the junk of every mailbox, never to the trash. The mails already received go too, in the mailboxes where
+    the user has the level « manage ».
+  - Who may block is worked out by the server: an unknown sender by the level « manage » on the mailbox of the mail;
+    a sender known to Dolibarr (thirdparty or contact, prospects and inactive ones too, domain of a thirdparty, an
+    address we wrote to, the sender of a mail linked to a piece) and a domain by the new right « Manage the blocked
+    senders », a known sender after the address typed again; never a user of Dolibarr, our mailboxes and their
+    domains, a recognized domain, the sender of a data source, a public mail service.
+  - Applied by a block of the Sieve script of each mailbox (scheduled job, before any rule and the out of office),
+    never shown as a rule; a mailbox without Sieve or whose script was changed by another tool: the synchronisation
+    puts the new mails of a blocked sender away (never a mail marked « not junk »).
+  - The reading says that the sender is blocked (by whom, when, « Unblock »); « Not junk » on such a mail offers to
+    unblock. A blocked sender is never « probably legitimate » in the junk.
+  - Settings > Anti-spam: the list for every user of the webmail (unblock: its author or a manager), for the
+    administrators the switches of the blocked senders and of « probably legitimate », the trusted receiving servers
+    (moved from Security) and the state of the block on each mailbox. Journal: block, unblock, put away.
+
+- FIX: « Junk » (« Not junk » in the junk folder) is a button of the reading header, between archive and delete,
+  no longer only in the « ⋯ » menu :   1.84.1
+
 - NEW: contact of the sender on the pieces created from a mail, files of the linked mails for the other modules :   1.84.0
   - « Create ▾ » a quote, an order or a ticket: the known contact of the sender is the default contact of the page of
     creation; a supplier order (no contact on its page) gets him as supplier contact for the follow-up once created.

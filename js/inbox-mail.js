@@ -3628,6 +3628,7 @@
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			+ (partial || inThread ? '' : assignLine([m.id], m.assignees || [], m.has_message_id !== false))
+			+ (partial ? '' : blockedLine(m))
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
 
@@ -4102,7 +4103,151 @@
 		return runAction('delete', ids, {}, o);
 	}
 	function doJunk(ids, junk, o) {
-		return runAction(junk ? 'junk' : 'notjunk', ids, {}, o);
+		// « Not junk » on a mail of a blocked sender (1.85.0): its next mails would go back to the junk, said with the
+		// way out
+		const b = !junk && S.mail && S.mail.blocked && ids.includes(S.mail.id) ? S.mail.blocked : null;
+		const res = runAction(junk ? 'junk' : 'notjunk', ids, {}, o);
+		if (b) {
+			res.then(r => {
+				if (r) {
+					toast(t('InboxBlockedStill', b.value), b.can_unblock ? { action: t('InboxUnblock'), onAction: () => unblockEntry(b) } : {});
+				}
+			});
+		}
+		return res;
+	}
+
+	// ---------- Blocked senders (1.85.0, analyses/analyse-expediteurs-bloques.md) ----------
+	/** Date of a timestamp in the language of the user */
+	function blockedDate(ts) {
+		return new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
+	}
+	/** Line of the reading: the sender is blocked, by whom and when, « Unblock » when the user may */
+	function blockedLine(m) {
+		const b = m.blocked;
+		if (!b) {
+			return '';
+		}
+		return '<div class="ibx-readhead__line ibx-blockedline">' + ic('block') + ' <span>' + th(b.type === 'domain' ? 'InboxBlockedLineDomain' : 'InboxBlockedLine', b.value, b.by || '-', blockedDate(b.date)) + '</span>'
+			+ (b.can_unblock ? ' <button type="button" class="ibx-linkbtn ibx-js-unblock">' + th('InboxUnblock') + '</button>' : '') + '</div>';
+	}
+	/** Unblock from the reading: undone by blocking again, no confirmation */
+	async function unblockEntry(b) {
+		try {
+			await post('blockedsender', 'delete', { id: b.id });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		toast(t('InboxUnblocked', b.value));
+		if (S.mail && S.mail.blocked && S.mail.blocked.id === b.id) {
+			S.mail.blocked = null;
+			$$('.ibx-blockedline', readPane()).forEach(line => line.parentNode.removeChild(line));
+		}
+	}
+	/**
+	 * « Block the sender… »: the server says who the sender is (unknown, known, protected) and what this user may
+	 * block; a known sender asks the address typed again
+	 */
+	async function blockDialog(id) {
+		let o;
+		try {
+			o = await api('blockedsender', 'offer', { mail: id });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		if (o.blocked && o.entry) {
+			const e = o.entry;
+			const can = o.manager || e.user_id === I.ctx('INBOX_USER_ID', 0);
+			dialog({
+				title: t('InboxBlockSender'),
+				body: '<p>' + th(e.type === 'domain' ? 'InboxBlockedLineDomain' : 'InboxBlockedLine', e.value, e.user_creat || '-', blockedDate(e.date_creation)) + '</p>',
+				actions: can ? [{ label: t('InboxUnblock'), run: () => unblockEntry({ id: e.id, value: e.value }) }] : [],
+			});
+			return;
+		}
+		const opts = [
+			{ type: 'address', value: o.address, can: o.can_address, why: o.why_address, level: o.level, reason: o.reason, past: o.past_address },
+			{ type: 'domain', value: o.domain, can: o.can_domain, why: o.why_domain, level: o.domain_level, reason: o.domain_reason, past: o.past_domain },
+		];
+		if (!opts.some(x => x.can)) {
+			// Nothing this user may block: the reasons, and the junk for this mail
+			dialog({
+				title: t('InboxBlockSender'),
+				body: '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + esc(opts[0].why) + (opts[0].reason ? '<div class="ibx-muted">' + esc(opts[0].reason) + '</div>' : '') + '</div></div>'
+					+ '<p class="ibx-muted">' + th('InboxBlockedJunkInstead') + '</p>',
+			});
+			return;
+		}
+		const first = opts.find(x => x.can);
+		const radio = x => '<label class="ibx-check ibx-blockopt' + (x.can ? '' : ' is-disabled') + '"><input type="radio" name="btype" value="' + x.type + '"' + (x.can ? '' : ' disabled') + (x === first ? ' checked' : '') + '> '
+			+ '<span>' + th(x.type === 'domain' ? 'InboxBlockWhatDomain' : 'InboxBlockWhatAddress', x.value) + (x.can ? '' : '<span class="ibx-muted ibx-blockopt__why">' + esc(x.why) + '</span>') + '</span></label>';
+		const body = '<form class="ibx-form ibx-blockform" novalidate>'
+			+ '<fieldset class="ibx-blockwhat"><legend class="ibx-formrow__label">' + th('InboxBlockWhat') + '</legend>' + opts.filter(x => x.value).map(radio).join('') + '</fieldset>'
+			+ '<div class="ibx-notice ibx-notice--warning ibx-js-bknown" hidden>' + ic('warning') + '<div class="ibx-notice__text"><b>' + th('InboxBlockKnownTitle') + '</b> <span class="ibx-js-bknownwhy"></span>'
+			+ '<p>' + th('InboxBlockKnownOtherTools') + '</p>'
+			+ '<label class="ibx-blockconfirm" for="ibx-bconfirm">' + th('InboxBlockKnownType') + ' <b class="ibx-js-bknownval"></b></label>'
+			+ '<input class="ibx-field" id="ibx-bconfirm" name="confirm" type="text" autocomplete="off" spellcheck="false"></div></div>'
+			+ '<label class="ibx-check ibx-js-bpast"><input type="checkbox" name="past" checked> <span class="ibx-js-bpasttext"></span></label>'
+			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="ibx-bnote">' + th('InboxBlockNote') + '</label><div><input class="ibx-field" id="ibx-bnote" name="note" type="text" maxlength="255" autocomplete="off" placeholder="' + th('InboxBlockNotePlaceholder') + '"></div></div>'
+			+ '<p class="ibx-muted">' + th('InboxBlockEffect') + '</p></form>';
+		const current = dlg => opts.find(x => x.type === ($('input[name="btype"]:checked', dlg) || {}).value) || first;
+		const paint = dlg => {
+			const x = current(dlg);
+			const known = x.level === 'known';
+			$('.ibx-js-bknown', dlg).hidden = !known;
+			$('.ibx-js-bknownwhy', dlg).textContent = x.reason || '';
+			$('.ibx-js-bknownval', dlg).textContent = x.value;
+			$('.ibx-js-bpast', dlg).hidden = !x.past.count;
+			$('.ibx-js-bpasttext', dlg).textContent = t('InboxBlockPast', x.past.count, x.past.accounts);
+			const go = $('.ibx-dialog__foot [data-i="0"]', dlg);
+			go.textContent = t(known ? 'InboxBlockKnownButton' : 'InboxBlockButton');
+			go.classList.toggle('ibx-btn--danger', known);
+			go.classList.toggle('ibx-btn--primary', !known);
+			if (!known || $('[name="confirm"]', dlg).value.trim().toLowerCase() === x.value) {
+				go.removeAttribute('aria-disabled');
+			} else {
+				go.setAttribute('aria-disabled', 'true');
+			}
+		};
+		dialog({
+			title: t('InboxBlockSender'),
+			body,
+			actions: [{ label: t('InboxBlockButton'), primary: true, run: async dlg => {
+				const x = current(dlg);
+				const f = $('form', dlg);
+				let r;
+				try {
+					r = await post('blockedsender', 'create', { mail: id, type: x.type, confirm: f.elements.confirm.value, note: f.elements.note.value,
+						past: !$('.ibx-js-bpast', dlg).hidden && f.elements.past.checked ? 1 : 0 });
+				} catch (err) {
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(r.moved ? t('InboxBlockedDoneMoved', x.value, r.moved) : t('InboxBlockedDone', x.value));
+				if (S.mail && S.mail.id === id) {
+					S.mail.blocked = { id: r.id, type: x.type, value: x.value, by: I.ctx('INBOX_USER_NAME', ''), date: Math.floor(Date.now() / 1000), can_unblock: true };
+					const head = $('.ibx-readhead__subject', readPane());
+					if (head && !$('.ibx-blockedline', readPane())) {
+						head.insertAdjacentHTML('beforebegin', blockedLine(S.mail));
+					}
+				}
+				if (r.moved) {
+					// The open mail of the inbox went to the junk with the others
+					if (S.mail && S.mail.id === id && S.mail.folder_role === 'inbox') {
+						showNothing();
+					}
+					loadList(true);
+					refreshTree();
+				}
+			} }],
+			onOpen: dlg => {
+				dlg.addEventListener('input', () => paint(dlg));
+				dlg.addEventListener('change', () => paint(dlg));
+				paint(dlg);
+			},
+		});
 	}
 	/** Tag of the place n (keys 1 to 9) set or removed on the mails; 0 = all removed */
 	function doTagIndex(ids, n) {
@@ -4282,6 +4427,9 @@
 			{ id: 'move', icon: 'folder-move', label: t('InboxMoveToMenu'), key: 'Maj+M', disabled: !!manage, reason: manage, run: () => moveDialog(ids) },
 			inJunk ? { id: 'notjunk', icon: 'inbox', label: t('InboxNotJunk'), key: 'Maj+J', disabled: !!manage, reason: manage, run: () => doJunk(ids, false) }
 				: { id: 'junk', icon: 'junk', label: t('InboxJunk'), key: 'J', disabled: !!manage, reason: manage, run: () => doJunk(ids, true) },
+			// Blocked senders (1.85.0): one mail, never a mail of ours; the server says what may be blocked
+			...(ids.length === 1 && I.ctx('INBOX_BLOCKED_SENDERS', false) && !['sent', 'drafts'].includes(role)
+				? [{ id: 'block', icon: 'block', label: t('InboxBlockSender'), disabled: !!manage && !I.rights().blocked_sender, reason: manage, run: () => blockDialog(ids[0]) }] : []),
 			{ id: 'delete', icon: 'delete', label: t(inTrash ? 'InboxDestroy' : 'InboxDelete'), key: 'Suppr', disabled: !!manage, reason: manage, danger: true, irreversible: inTrash, run: () => doDelete(ids) },
 		];
 		return items;
@@ -4792,6 +4940,19 @@
 			return '';
 		}
 		const type = Number.isInteger(d.status_type) && d.status_type >= 0 && d.status_type <= 9 ? d.status_type : -1;
+	/**
+	 * Expected status of a sender card (open thirdparty, active contact, 1.88.7): a discreet dot beside the name, its
+	 * label in the title and for the screen readers; any other status (closed, inactive) keeps its badge, to be seen
+	 * @param {object} d Thirdparty or contact {status, status_short, status_type, status_normal}
+	 * @returns {string} html
+	 */
+	function senderDot(d) {
+		if (!d.status_normal) {
+			return '';
+		}
+		const label = d.status || d.status_short || '';
+		return '<span class="ibx-stdot"' + (label ? ' title="' + esc(label) + '"' : '') + ' aria-hidden="true"></span>' + (label ? '<span class="ibx-sr-only">' + esc(label) + '</span>' : '');
+	}
 		return ' <span class="ibx-st' + (type >= 0 ? ' ibx-st--' + type : '') + '"' + (d.status && d.status !== label ? ' title="' + esc(d.status) + '"' : '') + '>' + esc(label) + '</span>';
 	}
 	/**
@@ -4946,7 +5107,7 @@
 			+ '<div class="ibx-soccard__top ibx-js-soczone" data-card="' + card + '" title="' + th(open ? 'InboxCardFold' : 'InboxCardUnfold') + '">'
 			+ '<div class="ibx-soccard__head">' + ic(x.icon)
 			+ '<span class="ibx-soccard__namecell"><a class="ibx-soccard__name" href="' + esc(x.url || '#') + '" target="_blank" rel="noopener"' + (tip ? ' data-objtip="' + esc(tip) + '"' : ' title="' + esc(x.kind + ' ' + (x.ref || '')) + '"') + '>' + esc(x.ref || '') + '</a>'
-			+ (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + statusBadge(x)
+			+ senderDot(x) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (x.status_normal ? '' : statusBadge(x))
 			+ (first ? '<span class="ibx-soccard__sig ibx-soccard__sig--' + first.level + '">' + ic(first.level === 'alert' ? 'warning' : 'info') + '<span>' + esc(first.short) + '</span>'
 				+ (sig.length > 1 ? '<span class="ibx-soccard__more" title="' + esc(sig.slice(1).map(s => s.short).join(' · ')) + '">+' + (sig.length - 1) + '</span>' : '') + '</span>' : '')
 			+ '</div>'
@@ -6860,12 +7021,12 @@
 			list.push({ id: 'rules', icon: 'folders', label: t('InboxRulesPanelOpen'), run: () => I.rules.openPanel(m.account) });
 		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
-		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
+		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
 			// Tags at hand (1.57.0): a button of the bar, its menu under it
 			const tagAnchor = () => $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
-			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
+			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'junk', 'notjunk', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
 		// Recognized domains (1.59.0): with the right, the domain of the authenticated sender or of the links
 		const offer = m.trust_offer;
@@ -7255,7 +7416,8 @@
 		if (sp && !opts.inline && (sp.spam || m.folder_role === 'junk')) {
 			const score = sp.score === null ? '' : (sp.required === null ? th('InboxSpamScore', sp.score.toLocaleString(locale())) : th('InboxSpamScoreOf', sp.score.toLocaleString(locale()), sp.required.toLocaleString(locale())));
 			const why = spamReasons(sp.tests);
-			const text = (sp.spam ? th('InboxSpamJudged') : th('InboxSpamFilter')) + (score ? ' ' + score : '') + (why.length ? '<div class="ibx-muted">' + esc(why.join(' · ')) + '</div>' : '');
+			// The engine of inbox (1.88.0) is named as such, never as the filter of the server
+			const text = (sp.local ? th(sp.spam ? 'InboxSpamJudgedLocal' : 'InboxSpamFilterLocal') : (sp.spam ? th('InboxSpamJudged') : th('InboxSpamFilter'))) + (score ? ' ' + score : '') + (why.length ? '<div class="ibx-muted">' + esc(why.join(' · ')) + '</div>' : '');
 			if (sp.spam && m.folder_role !== 'junk') {
 				banners += '<div class="ibx-banner ibx-banner--warning">' + ic('junk') + '<div class="ibx-banner__text"' + (sp.tests.length ? ' title="' + esc(sp.tests.join(', ')) + '"' : '') + '>' + text + '</div>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-isjunk">' + ic('junk') + ' ' + th('InboxJunk') + '</button></div>';
@@ -7834,6 +7996,8 @@
 			title: t('InboxAllHeaders'),
 			wide: true,
 			body: '<p>SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc) + '</p>'
+				// Anti-spam headers that came with the mail, below its entry into our servers (1.86.1): never believed
+				+ ((m.spam_ignored || []).length ? '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxSpamIgnored', m.spam_ignored.join(', ')) + '</div></div>' : '')
 				+ '<div class="ibx-headers"><table class="ibx-table"><tbody>' + (m.headers || []).map(h => '<tr><th>' + esc(h[0]) + '</th><td class="ibx-breakall">' + esc(h[1]) + '</td></tr>').join('') + '</tbody></table></div>',
 			noCancel: true,
 			actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }],
@@ -10074,6 +10238,11 @@
 			new ResizeObserver(() => placeDolibar()).observe($('.ibx-pane--read', el));
 		}
 		$('.ibx-pane--read', el).addEventListener('click', e => {
+			const unblock = e.target.closest('.ibx-js-unblock');
+			if (unblock && S.mail && S.mail.blocked) {
+				unblockEntry(S.mail.blocked);
+				return;
+			}
 			const line = e.target.closest('.ibx-js-assignline');
 			if (!line) {
 				return;

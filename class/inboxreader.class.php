@@ -26,6 +26,7 @@ require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
+require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
@@ -243,7 +244,12 @@ class InboxReader
 			'trust_offer' => $canTrust ? array('sender' => $passed ? self::trustableSender($trusted, $message->fromEmail) : null,
 				'sender_why' => self::untrustableSenderWhy($trusted, $message->fromEmail, $passed), 'links' => $links['domains']) : null,
 			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
-			'spam' => self::spamVerdict($headers),
+			// Setting of Settings > Anti-spam (1.86.1): off, no banner nor score from the headers
+			// Without it, the verdict of the anti-spam engine of inbox kept on the mail (1.88.0), said as such
+			'spam' => (getDolGlobalInt('INBOX_SPAM_SERVER_VERDICT', 1) ? self::spamVerdict($headers) : null) ?: self::localSpamVerdict($this->row),
+			'spam_ignored' => self::spamIgnored($headers),
+			// Blocked sender (1.85.0): who blocked it and when, the user may unblock or not
+			'blocked' => (new InboxBlockedSender($this->db))->viewFor($user, $message->fromEmail),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
@@ -740,17 +746,94 @@ class InboxReader
 	}
 
 	/**
-	 * Verdict of the anti-spam filter of the receiving server (1.44.0): SpamAssassin (X-Spam-Status, X-Spam-Flag,
-	 * X-Spam-Score) or Rspamd (X-Spamd-Result, X-Rspamd-Score, X-Spam). The topmost header of each name only: the one
-	 * of our server, added last; a lower one may come from the sender (a « No » written in advance).
+	 * Verdict of the anti-spam engine of inbox kept on the row (1.88.0)
+	 *
+	 * @param object|null $row Row of the index
+	 * @return array<string,mixed>|null
+	 */
+	protected static function localSpamVerdict($row)
+	{
+		require_once __DIR__.'/inboxspamcheck.class.php';
+
+		return InboxSpamCheck::verdictOf($row);
+	}
+
+	/** Headers of the anti-spam filters read by inbox (SpamAssassin, Rspamd) */
+	const SPAM_HEADERS = array('x-spam-status', 'x-spam-flag', 'x-spam-score', 'x-spamd-result', 'x-rspamd-score', 'x-spam');
+
+	/**
+	 * Where the mail came into our servers (1.86.1): the lowest header written by a trusted receiving server
+	 * (INBOX_AUTH_SERVERS), a « Received: ... by <server> » or an « Authentication-Results: <server>; ». What is
+	 * above was added by our servers; what is below came with the mail, maybe written by the sender.
 	 *
 	 * @param array<int,array{0:string,1:string}> $headers Headers, in their order
+	 * @param string[]                            $servers Trusted receiving servers (lower case)
+	 * @return int Index of that header, -1 when the mail did not come through them (or none declared)
+	 */
+	public static function trustedEntry(array $headers, array $servers)
+	{
+		$found = -1;
+		if (!$servers) {
+			return $found;
+		}
+		foreach (array_values($headers) as $i => $h) {
+			$name = strtolower((string) $h[0]);
+			if ($name === 'received' && preg_match('/\bby\s+\[?([a-z0-9.-]+)/i', (string) $h[1], $m) && in_array(strtolower(rtrim($m[1], '.')), $servers, true)) {
+				$found = $i;
+			} elseif ($name === 'authentication-results' && in_array(strtolower(trim((string) preg_replace('/\s+\d+\s*$/', '', (string) strtok((string) $h[1], ';')))), $servers, true)) {
+				$found = $i;
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Headers of an anti-spam filter that came with the mail, below its entry into our servers: never believed (a
+	 * « No » written in advance by the sender), named in the window of all the headers
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers, in their order
+	 * @param string[]|null                       $servers Trusted receiving servers (null: the setting)
+	 * @return string[] Names, as written
+	 */
+	public static function spamIgnored(array $headers, $servers = null)
+	{
+		require_once __DIR__.'/inboxknownsenders.class.php';
+		$entry = self::trustedEntry($headers, $servers === null ? InboxKnownSenders::trustedServers() : $servers);
+		$out = array();
+		if ($entry < 0) {
+			return $out;
+		}
+		foreach (array_values($headers) as $i => $h) {
+			if ($i > $entry && in_array(strtolower((string) $h[0]), self::SPAM_HEADERS, true)) {
+				$out[strtolower((string) $h[0])] = (string) $h[0];
+			}
+		}
+
+		return array_values($out);
+	}
+
+	/**
+	 * Verdict of the anti-spam filter of the receiving server (1.44.0): SpamAssassin (X-Spam-Status, X-Spam-Flag,
+	 * X-Spam-Score) or Rspamd (X-Spamd-Result, X-Rspamd-Score, X-Spam). The topmost header of each name only: the one
+	 * of our server, added last; a lower one may come from the sender (a « No » written in advance). With trusted
+	 * receiving servers declared (1.86.1), only the headers above the entry of the mail into them: when the filter of
+	 * our server is off, a header written by the sender is no longer the topmost one believed. A mail that did not
+	 * come through these servers (another mailbox host): the topmost header, as before.
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers, in their order
+	 * @param string[]|null                       $servers Trusted receiving servers (null: the setting)
 	 * @return array{engine:string,spam:bool,score:float|null,required:float|null,tests:string[]}|null Null when no filter
 	 */
-	public static function spamVerdict(array $headers)
+	public static function spamVerdict(array $headers, $servers = null)
 	{
+		require_once __DIR__.'/inboxknownsenders.class.php';
+		$entry = self::trustedEntry($headers, $servers === null ? InboxKnownSenders::trustedServers() : $servers);
 		$top = array();
-		foreach ($headers as $h) {
+		foreach (array_values($headers) as $i => $h) {
+			if ($entry >= 0 && $i > $entry) {
+				break;
+			}
 			$name = strtolower((string) $h[0]);
 			if (!isset($top[$name])) {
 				$top[$name] = trim((string) $h[1]);

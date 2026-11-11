@@ -179,13 +179,16 @@ class InboxKnownSenders
 		$p = $this->db->prefix();
 		$rows = $this->db->getRows("SELECT rowid, remote_id, from_email FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId)." AND junk_check = 0 ORDER BY rowid DESC LIMIT 100");
 		$found = 0;
+		require_once __DIR__.'/inboxblockedsender.class.php';
+		$blocked = new InboxBlockedSender($this->db);
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			if (microtime(true) > $deadline) {
 				break;
 			}
 			$hint = 'NULL';
 			$detail = 'NULL';
-			if (self::trustedServers() && $this->find((string) $r->from_email) && method_exists($connector, 'fetchHeaders')) {
+			// A blocked sender (1.85.0) is never « probably legitimate », even known and authenticated
+			if (self::trustedServers() && !$blocked->isBlocked((string) $r->from_email) && $this->find((string) $r->from_email) && method_exists($connector, 'fetchHeaders')) {
 				$raw = $connector->fetchHeaders($path, (string) $r->remote_id);
 				if ($raw === null) {
 					continue;

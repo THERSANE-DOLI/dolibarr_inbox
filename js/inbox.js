@@ -36,7 +36,7 @@
 		}
 	};
 	/** Rights of the user, from the flat keys of the context */
-	const rights = () => ({ webmail: !!ctx('INBOX_RIGHT_WEBMAIL', false), account_admin: !!ctx('INBOX_RIGHT_ACCOUNT_ADMIN', false), dolibarr_admin: !!ctx('INBOX_RIGHT_DOLIBARR_ADMIN', false), trusted_domain: !!ctx('INBOX_RIGHT_TRUSTED_DOMAIN', false) });
+	const rights = () => ({ webmail: !!ctx('INBOX_RIGHT_WEBMAIL', false), account_admin: !!ctx('INBOX_RIGHT_ACCOUNT_ADMIN', false), dolibarr_admin: !!ctx('INBOX_RIGHT_DOLIBARR_ADMIN', false), trusted_domain: !!ctx('INBOX_RIGHT_TRUSTED_DOMAIN', false), blocked_sender: !!ctx('INBOX_RIGHT_BLOCKED_SENDER', false) });
 	const $ = (sel, root) => (root || document).querySelector(sel);
 	const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
@@ -140,6 +140,41 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-updateclose" aria-label="' + esc(t('InboxLater')) + '" title="' + esc(t('InboxLater')) + '">' + ic('close') + '</button>';
 		$('.ibx-js-updatereload', bar).addEventListener('click', () => window.location.reload());
 		$('.ibx-js-updateclose', bar).addEventListener('click', () => bar.remove());
+		document.body.appendChild(bar);
+	}
+
+	/**
+	 * Inbox updated but not activated again (1.85.0): the administrators are told; the page of the modules of
+	 * Dolibarr is given to the administrators of Dolibarr only (the others ask one). Never done from here. Closed for
+	 * the session of the browser.
+	 */
+	function updatePendingBar() {
+		const pending = String(ctx('INBOX_UPDATE_PENDING', '')).split(' ');
+		if (pending.length !== 2) {
+			return;
+		}
+		try {
+			if (sessionStorage.getItem(scope('inbox-update-pending')) === pending[1]) {
+				return;
+			}
+		} catch (e) {
+			// private window: shown again, harmless
+		}
+		const url = String(ctx('INBOX_MODULES_URL', ''));
+		const bar = document.createElement('div');
+		bar.className = 'ibx-updatebar ibx-updatebar--warning';
+		bar.setAttribute('role', 'alert');
+		bar.innerHTML = ic('warning') + '<span>' + esc(t('InboxUpdatePending', pending[0], pending[1])) + ' ' + esc(t(url ? 'InboxUpdatePendingAdmin' : 'InboxUpdatePendingAsk')) + '</span>'
+			+ (url ? '<a class="ibx-btn ibx-btn--sm ibx-btn--primary" href="' + esc(url) + '">' + esc(t('InboxUpdatePendingGo')) + '</a>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-updateclose" aria-label="' + esc(t('InboxLater')) + '" title="' + esc(t('InboxLater')) + '">' + ic('close') + '</button>';
+		$('.ibx-js-updateclose', bar).addEventListener('click', () => {
+			try {
+				sessionStorage.setItem(scope('inbox-update-pending'), pending[1]);
+			} catch (e) {
+				// not kept
+			}
+			bar.parentNode.removeChild(bar);
+		});
 		document.body.appendChild(bar);
 	}
 
@@ -650,9 +685,12 @@
 	 * (aria-describedby). infotip(title, text) gives the markup; the events are bound once for the whole page.
 	 */
 	let tipSeq = 0;
-	function infotip(title, text) {
+	function infotip(title, text, term) {
 		const id = 'ibx-tip' + (++tipSeq);
-		return '<span class="ibx-infotip"><button type="button" class="ibx-infotip__btn" aria-label="' + esc(title) + '" aria-describedby="' + id + '" aria-expanded="false">' + ic('info') + '</button>'
+		// A term (1.88.4): the word itself, underlined with dots, opens the bubble (as an abbreviation, but by the
+		// keyboard and the touch too); <dfn>, its definition being the bubble beside it
+		return '<span class="ibx-infotip' + (term ? ' ibx-infotip--term' : '') + '"><button type="button" class="ibx-infotip__btn" aria-label="' + esc(term ? term + ' : ' + title : title) + '" aria-describedby="' + id + '" aria-expanded="false">'
+			+ (term ? '<dfn>' + esc(term) + '</dfn>' : ic('info')) + '</button>'
 			+ '<span class="ibx-infotip__pop" role="tooltip" id="' + id + '" hidden><b>' + esc(title) + '</b><span>' + esc(text) + '</span></span></span>';
 	}
 	(() => {
@@ -821,6 +859,7 @@
 		$('#ibx-app').removeAttribute('data-loading');
 		window.addEventListener('hashchange', () => router.render());
 		router.render();
+		updatePendingBar();
 		Dolibarr.executeHook('inbox:app:ready', { inbox });
 	}
 	// Deferred scripts run while readyState is "interactive", before DOMContentLoaded: wait for it so that the

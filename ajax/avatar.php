@@ -21,7 +21,8 @@
  * \brief   Picture of the sender of a mail of the index (204 without picture: the application shows the initials)
  *
  * Asked by the row of the mail, never by the address (no address in an URL). reading=1: head of the reading pane,
- * BIMI allowed when this mail passed DMARC (read in the raw mail kept in the cache).
+ * BIMI allowed when this mail passed DMARC (read in the raw mail kept in the cache) and its sender is known: domain
+ * recognized, or thirdparty linked to the address (1.88.6: a lookalike domain may publish the logo of another company).
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -44,6 +45,11 @@ if (GETPOSTINT('reading') === 1 && (string) $reader->row->message_id !== '') {
 		$auth = InboxReader::authResults(InboxReader::headers($raw));
 		// The logo of a brand only when our own server checked the mail (audit INBX-022)
 		$bimi = $auth['trusted'] && $auth['dmarc'] === 'pass' && !$auth['fail'];
+	}
+	if ($bimi && (int) $reader->row->fk_soc <= 0) {
+		dol_include_once('/inbox/class/inboxtrusteddomain.class.php');
+		$host = InboxTrustedDomain::normalize((string) $reader->row->from_email);
+		$bimi = $host !== '' && (new InboxTrustedDomain($db))->find($host) !== null;
 	}
 }
 $avatar = new InboxAvatar($db);
