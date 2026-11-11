@@ -2996,3 +2996,7 @@ InboxUpdatePending = Inbox pasó de la versión %s a la versión %s, pero la act
 InboxUpdatePendingAdmin = Reactive el módulo Inbox en la lista de módulos.
 InboxUpdatePendingAsk = Pida a un administrador de Dolibarr que reactive el módulo Inbox.
 InboxUpdatePendingGo = Abrir la lista de módulos
+InboxAntispamServerVerdict = Usar el veredicto del filtro del servidor
+InboxAntispamServerVerdictHelp = Puntuación y motivos de SpamAssassin o Rspamd leídos en los encabezados del correo, aviso « considerado no deseado ». Con servidores de confianza, solo cuentan los encabezados que ellos añadieron: un encabezado escrito por el remitente se ignora.
+InboxAntispamServerUnverifiable = Sin servidor de confianza, el veredicto no es verificable: inbox cree el encabezado más alto del correo.
+InboxSpamIgnored = Encabezados anti-spam ignorados (%s): están colocados antes de la llegada del correo a nuestros servidores, pueden venir del remitente.

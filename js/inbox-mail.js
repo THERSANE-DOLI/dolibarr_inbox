@@ -7982,6 +7982,8 @@
 			title: t('InboxAllHeaders'),
 			wide: true,
 			body: '<p>SPF ' + res(auth.spf) + ' · DKIM ' + res(auth.dkim) + ' · DMARC ' + res(auth.dmarc) + '</p>'
+				// Anti-spam headers that came with the mail, below its entry into our servers (1.86.1): never believed
+				+ ((m.spam_ignored || []).length ? '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxSpamIgnored', m.spam_ignored.join(', ')) + '</div></div>' : '')
 				+ '<div class="ibx-headers"><table class="ibx-table"><tbody>' + (m.headers || []).map(h => '<tr><th>' + esc(h[0]) + '</th><td class="ibx-breakall">' + esc(h[1]) + '</td></tr>').join('') + '</tbody></table></div>',
 			noCancel: true,
 			actions: [{ label: t('InboxCloseWindow'), primary: true, run: () => true }],

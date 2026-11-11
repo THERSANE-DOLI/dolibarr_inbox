@@ -2996,3 +2996,7 @@ InboxUpdatePending = Inbox went from version %s to version %s, but the update is
 InboxUpdatePendingAdmin = Activate the module Inbox again in the list of the modules.
 InboxUpdatePendingAsk = Ask an administrator of Dolibarr to activate the module Inbox again.
 InboxUpdatePendingGo = Open the list of the modules
+InboxAntispamServerVerdict = Use the verdict of the filter of the server
+InboxAntispamServerVerdictHelp = Score and reasons of SpamAssassin or Rspamd read in the headers of the mail, banner « judged unwanted ». With trusted servers, only the headers they added count: a header written by the sender is ignored.
+InboxAntispamServerUnverifiable = Without a trusted server, the verdict cannot be checked: inbox believes the topmost header of the mail.
+InboxSpamIgnored = Anti-spam headers ignored (%s): they are placed before the arrival of the mail on our servers, they may come from the sender.

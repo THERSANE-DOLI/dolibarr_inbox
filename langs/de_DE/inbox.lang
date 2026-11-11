@@ -2996,3 +2996,7 @@ InboxUpdatePending = Inbox wurde von Version %s auf Version %s aktualisiert, abe
 InboxUpdatePendingAdmin = Aktivieren Sie das Modul Inbox in der Modulliste erneut.
 InboxUpdatePendingAsk = Bitten Sie einen Dolibarr-Administrator, das Modul Inbox erneut zu aktivieren.
 InboxUpdatePendingGo = Modulliste öffnen
+InboxAntispamServerVerdict = Urteil des Serverfilters verwenden
+InboxAntispamServerVerdictHelp = Punktzahl und Gründe von SpamAssassin oder Rspamd aus den Kopfzeilen der E-Mail, Hinweis « als unerwünscht eingestuft ». Mit vertrauenswürdigen Servern zählen nur die von ihnen hinzugefügten Kopfzeilen: eine vom Absender geschriebene Kopfzeile wird ignoriert.
+InboxAntispamServerUnverifiable = Ohne vertrauenswürdigen Server ist das Urteil nicht überprüfbar: inbox glaubt der obersten Kopfzeile der E-Mail.
+InboxSpamIgnored = Anti-Spam-Kopfzeilen ignoriert (%s): sie stehen vor dem Eingang der E-Mail auf unseren Servern und können vom Absender stammen.

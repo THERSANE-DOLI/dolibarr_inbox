@@ -71,6 +71,8 @@ function inboxGeneralSettings()
 		// Anti-spam (1.85.0): blocked senders, « probably legitimate » in the junk
 		'INBOX_BLOCKED_SENDERS' => array('default' => '1', 'check' => 'int:0:1'),
 		'INBOX_JUNK_LEGIT_CHECK' => array('default' => '1', 'check' => 'int:0:1'),
+		// Verdict of the anti-spam filter of the server read in the headers (1.86.1)
+		'INBOX_SPAM_SERVER_VERDICT' => array('default' => '1', 'check' => 'int:0:1'),
 	);
 }
 

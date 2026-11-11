@@ -2996,3 +2996,7 @@ InboxUpdatePending = Inbox est passé de la version %s à la version %s, mais la
 InboxUpdatePendingAdmin = Réactivez le module Inbox dans la liste des modules.
 InboxUpdatePendingAsk = Demandez à un administrateur de Dolibarr de réactiver le module Inbox.
 InboxUpdatePendingGo = Ouvrir la liste des modules
+InboxAntispamServerVerdict = Utiliser le verdict du filtre du serveur
+InboxAntispamServerVerdictHelp = Score et raisons de SpamAssassin ou Rspamd lus dans les en-têtes du mail, bandeau « jugé indésirable ». Avec des serveurs de confiance, seuls les en-têtes ajoutés par eux comptent : un en-tête écrit par l'expéditeur est ignoré.
+InboxAntispamServerUnverifiable = Sans serveur de confiance, le verdict n'est pas vérifiable : inbox croit l'en-tête le plus haut du mail.
+InboxSpamIgnored = En-têtes anti-spam ignorés (%s) : ils sont placés avant l'arrivée du mail sur nos serveurs, ils peuvent venir de l'expéditeur.

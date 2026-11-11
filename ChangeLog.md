@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the verdict of the anti-spam filter of the server (SpamAssassin, Rspamd) is believed only when written by our
+  servers: with trusted receiving servers declared, the anti-spam headers below the entry of the mail into them
+  (a « Received: ... by » or « Authentication-Results » of these servers) are ignored and named in the window of
+  all the headers; when our filter is off, a « No » written by the sender is no longer believed. A mail that never
+  came through these servers keeps the topmost header. Switch « Use the verdict of the filter of the server » in
+  Settings > Anti-spam > Settings :   1.86.1
+
 - NEW: an update of inbox not finished is told to the administrators :   1.86.0
   - The version of the files newer than the one of the last activation (written by Dolibarr in the constant of the
     module): the new tables, columns and rights are not there yet. A bar at the top of the application and a

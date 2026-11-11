@@ -2955,6 +2955,9 @@
 				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamLegit') + '</span><div>' + sw('INBOX_JUNK_LEGIT_CHECK', t('InboxAntispamLegit'))
 				+ '<div class="ibx-formrow__help">' + th('InboxAntispamLegitHelp') + '</div></div></div></section>'
 				+ '<section class="ibx-section" data-section="server"><h2 class="ibx-section__title">' + ic('server') + ' ' + th('InboxAntispamServer') + '</h2>'
+				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamServerVerdict') + '</span><div>' + sw('INBOX_SPAM_SERVER_VERDICT', t('InboxAntispamServerVerdict'))
+				+ '<div class="ibx-formrow__help">' + th('InboxAntispamServerVerdictHelp') + '</div>'
+				+ (s.INBOX_AUTH_SERVERS ? '' : '<div class="ibx-formrow__help ibx-formrow__warn">' + ic('warning') + ' ' + th('InboxAntispamServerUnverifiable') + '</div>') + '</div></div>'
 				+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div></section>'
 				+ '</div>';
 		}

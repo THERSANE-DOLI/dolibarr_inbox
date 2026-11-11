@@ -2996,3 +2996,7 @@ InboxUpdatePending = Inbox è passato dalla versione %s alla versione %s, ma l'a
 InboxUpdatePendingAdmin = Riattiva il modulo Inbox nell'elenco dei moduli.
 InboxUpdatePendingAsk = Chiedi a un amministratore di Dolibarr di riattivare il modulo Inbox.
 InboxUpdatePendingGo = Apri l'elenco dei moduli
+InboxAntispamServerVerdict = Usare il verdetto del filtro del server
+InboxAntispamServerVerdictHelp = Punteggio e motivi di SpamAssassin o Rspamd letti nelle intestazioni dell'e-mail, avviso « giudicata indesiderata ». Con server fidati contano solo le intestazioni aggiunte da loro: un'intestazione scritta dal mittente viene ignorata.
+InboxAntispamServerUnverifiable = Senza server fidato il verdetto non è verificabile: inbox crede all'intestazione più in alto dell'e-mail.
+InboxSpamIgnored = Intestazioni anti-spam ignorate (%s): sono poste prima dell'arrivo dell'e-mail sui nostri server, possono venire dal mittente.
