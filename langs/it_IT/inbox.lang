@@ -298,6 +298,7 @@ InboxAccountsDisabledCount = Caselle disattivate: %s
 InboxAccountsFailedCount = %s caselle non modificate, ancora selezionate: %s
 InboxDisableManyTitle = Disattivare %s caselle?
 InboxDeleteAccount = Elimina la casella
+InboxDeleteNeedsDisable = Disattivare prima la casella: può essere eliminata una volta disattivata.
 InboxDeleteTitle = Eliminare %s?
 InboxDeleteText = La casella, le sue identità, i suoi accessi e le sue impostazioni sono rimossi da inbox. Le e-mail restano sul server di posta.
 InboxAccountDeleted = Casella %s eliminata da inbox

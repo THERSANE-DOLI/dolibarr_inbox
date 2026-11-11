@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: settings of the mailboxes, actions easier to find :   1.89.11
+  - card of a mailbox: « Delete the mailbox » always shown, greyed while the mailbox is not disabled, with the
+    reason on hover and on click (it only appeared once the mailbox was disabled).
+  - list of the mailboxes: buttons of the bar of the selection readable again (white on a light background: the
+    colors of the bar of the list of mails were applied there too).
+
 - FIX: settings of the application, who may change each one written in its definition :   1.89.10
   - each setting declares who may change it: manager (managers of the mailboxes) or dolibarr_admin; a right missing
     or mistyped is read as dolibarr_admin: a setting added later is never opened to more people than meant.
