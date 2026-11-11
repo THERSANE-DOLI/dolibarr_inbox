@@ -130,7 +130,8 @@ abstract class InboxImapTestCase extends InboxTestCase
 	{
 		$p = $this->imap($email);
 		$p->selectFolder($folder);
-		$res = $p->flags(array($uid), null, true);
+		// By UID (Webklex flags($uids, $uid): a third argument made it read sequence numbers)
+		$res = $p->flags(array($uid), true);
 
 		return implode(' ', (array) ($res[$uid] ?? array()));
 	}

@@ -153,6 +153,65 @@ class InboxActionsTest extends InboxImapTestCase
 	}
 
 	/**
+	 * 1.90.0: a mail put in the trash or in junk is marked read first; the undo gives it back to its folder unread
+	 *
+	 * @return void
+	 */
+	public function testTrashAndJunkMarkRead()
+	{
+		$a = $this->ready();
+		$act = new InboxActions($this->db);
+		$p = $this->db->prefix();
+		$folderOf = function ($id) use ($p) {
+			return $this->db->getRow("SELECT f.rowid, f.path, f.role FROM ".$p."inbox_folder as f INNER JOIN ".$p."inbox_mail as m ON m.fk_folder = f.rowid WHERE m.rowid = ".((int) $id));
+		};
+		foreach (array('m1' => array('delete', 'trash'), 'm2' => array('junk', 'junk')) as $mid => list($action, $role)) {
+			$id = (int) $this->row($a, $mid)->rowid;
+			$from = $folderOf($id);
+			$this->assertSame(0, (int) $this->row($a, $mid)->seen, $mid.' unread at first');
+			$res = $act->run($this->admin, $action, array($id));
+			$this->assertTrue($res['ok'], $res['error']);
+			$to = $folderOf($id);
+			$this->assertSame($role, (string) $to->role);
+			$this->assertSame(1, (int) $this->row($a, $mid)->seen, $mid.' read in the index');
+			$uid = $this->onServer((string) $to->path, $mid)[0];
+			$this->assertStringContainsString('Seen', $this->flagsOnServer((string) $to->path, $uid), $mid.' read on the server');
+			$this->assertSame('seen', end($res['undo'])['action'], 'unread again by the undo, after the move back');
+			foreach ($res['undo'] as $u) {
+				$this->assertTrue($act->run($this->admin, $u['action'], $u['ids'], $u)['ok']);
+			}
+			$this->assertSame((int) $from->rowid, (int) $folderOf($id)->rowid, $mid.' back in its folder');
+			$this->assertSame(0, (int) $this->row($a, $mid)->seen, $mid.' unread again');
+			$uid = $this->onServer((string) $from->path, $mid)[0];
+			$this->assertStringNotContainsString('Seen', $this->flagsOnServer((string) $from->path, $uid));
+		}
+
+		// Moved by hand to the trash: read too; to another folder: unchanged
+		$id = (int) $this->row($a, 'm3')->rowid;
+		$b = $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $a->id)." AND path = 'INBOX.ZzActB'");
+		$this->assertTrue($act->run($this->admin, 'move', array($id), array('folder' => (int) $b->rowid))['ok']);
+		$this->assertSame(0, (int) $this->row($a, 'm3')->seen, 'another folder: still unread');
+		$trash = $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $a->id)." AND role = 'trash' AND status = 1");
+		$this->assertTrue($act->run($this->admin, 'move', array($id), array('folder' => (int) $trash->rowid))['ok']);
+		$this->assertSame(1, (int) $this->row($a, 'm3')->seen, 'dropped on the trash: read');
+
+		// Setting of My account off: the mail leaves unread
+		dol_include_once('/inbox/class/inboxuserparam.class.php');
+		$up = new InboxUserParam($this->db);
+		$this->assertTrue((bool) $up->set($this->admin, 'read_on_trash', '0'));
+		try {
+			$id = (int) $this->row($a, 'm2')->rowid;
+			$this->assertSame(0, (int) $this->row($a, 'm2')->seen);
+			$res = (new InboxActions($this->db))->run($this->admin, 'delete', array($id));
+			$this->assertTrue($res['ok'], $res['error']);
+			$this->assertSame('trash', (string) $folderOf($id)->role);
+			$this->assertSame(0, (int) $this->row($a, 'm2')->seen, 'setting off: still unread');
+		} finally {
+			$up->remove($this->admin, 'read_on_trash');
+		}
+	}
+
+	/**
 	 * CA-03, CA-10: to another mailbox, the source is removed only after the copy was found; a copy refused leaves
 	 * the source as it was; the Message-ID survives
 	 *
