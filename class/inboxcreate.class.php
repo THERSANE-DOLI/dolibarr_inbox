@@ -445,6 +445,10 @@ class InboxCreate
 			return '';
 		}
 		$name = dol_sanitizeFileName((string) $name) ?: 'file';
+		// An executable file of a mail (.php, .phtml...) gets .noexe, as an upload of Dolibarr (dol_move_uploaded_file)
+		if (isAFileWithExecutableContent($name) && !getDolGlobalString('MAIN_DOCUMENT_IS_OUTSIDE_WEBROOT_SO_NOEXE_NOT_REQUIRED')) {
+			$name .= '.noexe';
+		}
 		$base = pathinfo($name, PATHINFO_FILENAME);
 		$ext = pathinfo($name, PATHINFO_EXTENSION);
 		for ($i = 2; file_exists($dir.'/'.$name) && $i < 100; $i++) {

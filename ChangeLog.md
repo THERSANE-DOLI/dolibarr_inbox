@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, remarks :   1.89.9
+  - protected mailbox: its port of Sieve kept as its servers (the password goes there); its encrypted copies and its
+    notices removed with the mailbox.
+  - an attachment filed in the documents of a piece: an executable file gets « .noexe », as an upload of Dolibarr.
+
 - FIX: security audit of 2026-11-11, anti-spam and unsubscribing :   1.89.8
   - blocked senders: from a mail whose sender is not proven, the block for every mailbox by the managers of the
     list; a blocked address become the one of a user of Dolibarr told to the managers, no longer unblocked alone

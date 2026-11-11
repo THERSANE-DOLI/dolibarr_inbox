@@ -279,7 +279,8 @@ class InboxAccount extends CommonObject
 		// Protected mailbox (1.89.0): no password typed here (it would be kept in the database), the server and the
 		// login stay those of the encrypted copies; back to the normal mode first
 		if ($old && $old->isProtected()) {
-			if ($typedImap || $typedSmtp || $certOff || $moved(self::IMAP_SECRET_FIELDS) || $moved(self::SMTP_SECRET_FIELDS)) {
+			// The port of Sieve too: the password goes there (audit INBX-085)
+			if ($typedImap || $typedSmtp || $certOff || $moved(self::IMAP_SECRET_FIELDS) || $moved(self::SMTP_SECRET_FIELDS) || $moved(array('sieve_port'))) {
 				return 'InboxProtectErrorServerLocked';
 			}
 			return '';
@@ -516,7 +517,8 @@ class InboxAccount extends CommonObject
 		$this->db->begin();
 		// Index of the mailbox (rebuilt from the server at any time) with it
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$this->db->prefix()."inbox_mail WHERE fk_account = ".((int) $this->id).")");
-		foreach (array('inbox_mail', 'inbox_folder', 'inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam', 'inbox_thread_mark', 'inbox_fulltext') as $table) {
+		// The encrypted copies of a protected mailbox and its notices go with it (audit INBX-085)
+		foreach (array('inbox_mail', 'inbox_folder', 'inbox_identity', 'inbox_account_access', 'inbox_tag', 'inbox_userparam', 'inbox_thread_mark', 'inbox_fulltext', 'inbox_account_key', 'inbox_pending_notice') as $table) {
 			if (!$this->db->query("DELETE FROM ".$this->db->prefix().$table." WHERE fk_account = ".((int) $this->id))) {
 				$this->error = $this->db->lasterror();
 				$this->db->rollback();
