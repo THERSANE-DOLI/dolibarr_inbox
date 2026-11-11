@@ -6860,12 +6860,12 @@
 			list.push({ id: 'rules', icon: 'folders', label: t('InboxRulesPanelOpen'), run: () => I.rules.openPanel(m.account) });
 		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
-		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu
+		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
 		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
 			// Tags at hand (1.57.0): a button of the bar, its menu under it
 			const tagAnchor = () => $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
-			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
+			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'junk', 'notjunk', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
 		// Recognized domains (1.59.0): with the right, the domain of the authenticated sender or of the links
 		const offer = m.trust_offer;

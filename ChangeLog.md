@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « Junk » (« Not junk » in the junk folder) is a button of the reading header, between archive and delete,
+  no longer only in the « ⋯ » menu :   1.84.1
+
 - NEW: contact of the sender on the pieces created from a mail, files of the linked mails for the other modules :   1.84.0
   - « Create ▾ » a quote, an order or a ticket: the known contact of the sender is the default contact of the page of
     creation; a supplier order (no contact on its page) gets him as supplier contact for the follow-up once created.
