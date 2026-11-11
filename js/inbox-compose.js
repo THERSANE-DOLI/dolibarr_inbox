@@ -2031,11 +2031,12 @@
 		if (!box) {
 			return;
 		}
+		// Ticked only when Dolibarr records this type of sending in the agenda by itself (automatic events)
 		const have = Array.from(box.querySelectorAll('.ibx-js-record')).find(c => c.value === key);
 		if (have) {
-			have.checked = true;
+			have.checked = have.checked || !!pc.auto;
 		} else {
-			box.insertAdjacentHTML('beforeend', '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(key) + '" checked> ' + esc(pc.kind + ' ' + pc.ref) + '</label>');
+			box.insertAdjacentHTML('beforeend', '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(key) + '"' + (pc.auto ? ' checked' : '') + '> ' + esc(pc.kind + ' ' + pc.ref) + '</label>');
 		}
 		box.hidden = false;
 	}
@@ -2202,7 +2203,8 @@
 			+ '<ul class="ibx-compose__atts ibx-js-atts" hidden aria-label="' + th('InboxAttachments') + '"></ul>'
 			// Pieces to record the sending on (and to link the mail sent): the linked ones, the inserted ones (A5) added
 			+ '<div class="ibx-compose__record ibx-js-recordbox" role="group" aria-label="' + th('InboxRecordOn') + '"' + ((d.pieces || []).length ? '' : ' hidden') + '>' + ic('event-new') + '<span class="ibx-muted">' + th('InboxRecordOn') + '</span>'
-				+ (d.pieces || []).map(pc => '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(pc.type + ':' + pc.id) + '"> ' + esc(pc.kind + ' ' + pc.ref) + '</label>').join('') + '</div>'
+				// Ticked at first when Dolibarr records this type of sending in the agenda by itself (automatic events)
+				+ (d.pieces || []).map(pc => '<label class="ibx-check"><input type="checkbox" class="ibx-js-record" value="' + esc(pc.type + ':' + pc.id) + '"' + (pc.auto ? ' checked' : '') + '> ' + esc(pc.kind + ' ' + pc.ref) + '</label>').join('') + '</div>'
 			+ '<div class="ibx-compose__drop" hidden>' + ic('attachment') + ' ' + th('InboxComposeDropHere') + '</div>'
 			+ '</div>'
 			+ '<div class="ibx-window__foot ibx-compose__foot">'

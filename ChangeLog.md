@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « Record the sending on » a piece ticked at first only when Dolibarr records this sending in the agenda by
+  itself (Agenda > Automatic events, « sent by mail » of the type of the piece), for the linked and the inserted
+  pieces; the event is made only when the box is ticked :   1.83.2
+
 - FIX: sending recorded on a piece, the agenda keeps what was written only and no copy of the mail goes in the
   documents of the piece: no signature, no quoted or forwarded mail, the attachments listed by name and size; the
   mail stays in the mailbox, linked to the piece :   1.83.1

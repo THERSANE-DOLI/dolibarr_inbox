@@ -356,6 +356,7 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertStringContainsString('Coude', $res['html']);
 		$this->assertNull($res['attachment'], 'no PDF generated for this order: nothing attached');
 		$this->assertSame(array('commande', (int) $order->id), array($res['piece']['type'], $res['piece']['id']));
+		$this->assertSame(getDolGlobalString('MAIN_AGENDA_ACTIONAUTO_ORDER_SENTBYMAIL') ? 1 : 0, $res['piece']['auto'], 'ticked as the automatic event of Dolibarr says');
 		$this->assertTrue($c->close($this->admin, $open['token'], true));
 	}
 

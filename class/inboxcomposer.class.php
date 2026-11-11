@@ -518,6 +518,11 @@ class InboxComposer
 		return $out;
 	}
 
+	/** Automatic event of the agenda of Dolibarr « sent by mail » per type of piece */
+	const SENT_BY_MAIL = array('propal' => 'PROPAL_SENTBYMAIL', 'commande' => 'ORDER_SENTBYMAIL', 'facture' => 'BILL_SENTBYMAIL', 'supplier_proposal' => 'PROPOSAL_SUPPLIER_SENTBYMAIL',
+		'order_supplier' => 'ORDER_SUPPLIER_SENTBYMAIL', 'invoice_supplier' => 'BILL_SUPPLIER_SENTBYMAIL', 'fichinter' => 'FICHINTER_SENTBYMAIL', 'shipping' => 'SHIPPING_SENTBYMAIL',
+		'project' => 'PROJECT_SENTBYMAIL', 'ticket' => 'TICKET_SENTBYMAIL', 'societe' => 'COMPANY_SENTBYMAIL', 'contact' => 'CONTACT_SENTBYMAIL');
+
 	/**
 	 * Linked pieces the user may also write, and record a sending on (an event of the agenda)
 	 *
@@ -531,9 +536,17 @@ class InboxComposer
 			return array();
 		}
 
-		return array_values(array_filter($linked, function ($pc) use ($user) {
+		$out = array_values(array_filter($linked, function ($pc) use ($user) {
 			return InboxElements::canWriteType($user, (string) $pc['type']);
 		}));
+		// Ticked at first as Dolibarr does when a piece is sent from its card: the automatic event « sent by mail » of
+		// its type in Agenda > Automatic events (1.83.2)
+		foreach ($out as $i => $pc) {
+			$code = self::SENT_BY_MAIL[(string) $pc['type']] ?? '';
+			$out[$i]['auto'] = $code !== '' && getDolGlobalString('MAIN_AGENDA_ACTIONAUTO_'.$code) ? 1 : 0;
+		}
+
+		return $out;
 	}
 
 	/**
