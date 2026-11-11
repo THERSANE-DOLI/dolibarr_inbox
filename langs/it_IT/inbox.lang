@@ -3060,3 +3060,5 @@ InboxOutsideWhat_bimi = Una richiesta DNS e il download del logo, al dominio del
 InboxOutsideWhat_ai = Il testo richiesto (e l'e-mail a cui si risponde, se l'utente la lascia spuntata), al servizio del modulo IA di Dolibarr
 InboxOutsideWhat_dictation = La voce dettata, al motore di dettatura scelto
 InboxOutsideWhat_dnslists = L'indirizzo IP del server mittente e i domini dei link, a Spamhaus, SURBL… (attivato anche in Rspamd)
+InboxRspamdWhatTitle = Che cos'è Rspamd?
+InboxRspamdWhat = Un software anti-spam libero e gratuito, installato sui tuoi server accanto a Dolibarr (non un servizio online). Valuta ogni e-mail con centinaia di regole e impara dai tuoi « Indesiderata » e « Non indesiderata ». Le e-mail non lasciano i tuoi server; solo le liste di reputazione via DNS, se le accendi, interrogano servizi esterni.

@@ -2857,6 +2857,10 @@
 		['INBOX_DICTATION_ENABLED', 'InboxDictationEnabled', 'dictation', '#/settings/general/dictation'],
 		['INBOX_RSPAMD_DNSLISTS', 'InboxRspamdDnsLists', 'dnslists', '#/settings/antispam/settings'],
 	];
+	/** What Rspamd is: its name in a text (already escaped) underlined with dots, the bubble on hover, focus, touch */
+	function rspamdTerm(html) {
+		return String(html).replace('Rspamd', () => I.infotip(t('InboxRspamdWhatTitle'), t('InboxRspamdWhat'), 'Rspamd'));
+	}
 	function outsideServices(s) {
 		return '<section class="ibx-section ibx-outside" data-section="outside"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxOutsideTitle') + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxOutsideHelp') + '</p>'
@@ -2864,7 +2868,7 @@
 			+ OUTSIDE_SERVICES.map(([k, label, id, href]) => {
 				const on = s[k] === '1';
 				return '<tr><td data-label="' + th('InboxOutsideService') + '"><b>' + th(label) + '</b></td>'
-					+ '<td data-label="' + th('InboxOutsideWhat') + '">' + th('InboxOutsideWhat_' + id) + '</td>'
+					+ '<td data-label="' + th('InboxOutsideWhat') + '">' + (id === 'dnslists' ? rspamdTerm(th('InboxOutsideWhat_' + id)) : th('InboxOutsideWhat_' + id)) + '</td>'
 					+ '<td data-label="' + th('InboxOutsideState') + '"><span class="ibx-status' + (on ? ' ibx-status--warning' : '') + '">' + th(on ? 'InboxOutsideOn' : 'InboxOutsideOff') + '</span></td>'
 					+ '<td class="ibx-table__actions"><a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="' + href + '">' + th('InboxOutsideSet') + '</a></td></tr>';
 			}).join('')
@@ -3070,7 +3074,7 @@
 		const sw = (name, label, def) => '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + name + '" aria-checked="' + ((s[name] === undefined ? def : s[name] !== '0') ? 'true' : 'false') + '" aria-label="' + esc(label) + '"></button>';
 		const row = (label, body, help) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + label + '</span><div>' + body + (help ? '<div class="ibx-formrow__help">' + help + '</div>' : '') + '</div></div>';
 		const q = st.queue || {};
-		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxRspamdSection') + '</h2>'
+		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + rspamdTerm(th('InboxRspamdSection')) + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxRspamdHelp') + '</p>'
 			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(), st.error.message) + '</div></div>' : '')
 			+ row(th('InboxRspamdEnabled'), sw('INBOX_RSPAMD_ENABLED', t('InboxRspamdEnabled'), false), th('InboxRspamdEnabledHelp'))

@@ -685,9 +685,12 @@
 	 * (aria-describedby). infotip(title, text) gives the markup; the events are bound once for the whole page.
 	 */
 	let tipSeq = 0;
-	function infotip(title, text) {
+	function infotip(title, text, term) {
 		const id = 'ibx-tip' + (++tipSeq);
-		return '<span class="ibx-infotip"><button type="button" class="ibx-infotip__btn" aria-label="' + esc(title) + '" aria-describedby="' + id + '" aria-expanded="false">' + ic('info') + '</button>'
+		// A term (1.88.4): the word itself, underlined with dots, opens the bubble (as an abbreviation, but by the
+		// keyboard and the touch too); <dfn>, its definition being the bubble beside it
+		return '<span class="ibx-infotip' + (term ? ' ibx-infotip--term' : '') + '"><button type="button" class="ibx-infotip__btn" aria-label="' + esc(term ? term + ' : ' + title : title) + '" aria-describedby="' + id + '" aria-expanded="false">'
+			+ (term ? '<dfn>' + esc(term) + '</dfn>' : ic('info')) + '</button>'
 			+ '<span class="ibx-infotip__pop" role="tooltip" id="' + id + '" hidden><b>' + esc(title) + '</b><span>' + esc(text) + '</span></span></span>';
 	}
 	(() => {

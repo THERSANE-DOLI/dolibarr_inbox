@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « Rspamd » explained where it is named (Outside services, section of the engine in Settings > Anti-spam): the
+  word underlined with dots (<dfn>) opens a bubble on hover, keyboard focus or touch; the infotips of inbox take a
+  term as well as their icon :   1.88.4
+
 - FIX: Settings > Security opens on the « Outside services »: every function of inbox that asks a service out of
   our servers (Gravatar, BIMI logos, AI of the writing, voice typing, lists of reputation by DNS of Rspamd), what
   leaves and to whom, its state and the way to its setting :   1.88.3
