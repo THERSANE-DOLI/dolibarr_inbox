@@ -137,6 +137,12 @@ class InboxServer
 			$this->error = 'InboxErrorServerValue';
 			return false;
 		}
+		// A master user would open the protected mailboxes of its server, in any entity (audit INBX-057)
+		if ($masterUser !== '' && $host !== '' && is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE protected = 1"
+			." AND LOWER(imap_host) = '".$this->db->escape($host)."'"))) {
+			$this->error = 'InboxErrorMasterProtected';
+			return false;
+		}
 		dolibarr_set_const($this->db, 'INBOX_MASTER_USER', $masterUser, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($this->db, 'INBOX_MASTER_HOST', $host, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($this->db, 'INBOX_MASTER_SEPARATOR', $separator, 'chaine', 0, '', $conf->entity);

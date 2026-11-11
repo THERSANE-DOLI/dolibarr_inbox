@@ -593,6 +593,11 @@ class InboxAccount extends CommonObject
 			if ($this->imap_auth_mode === self::AUTH_OAUTH && trim((string) $this->oauth_service) === '') {
 				$this->errors[] = 'InboxErrorAccountOAuthService';
 			}
+			// Never a mailbox opened by the master user for the address of a protected one, in any entity (INBX-057)
+			if ($this->imap_auth_mode === self::AUTH_MASTER && isValidEmail($this->email) && is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix().$this->table_element
+				." WHERE protected = 1 AND LOWER(ref) = '".$this->db->escape(strtolower(trim((string) $this->email)))."'".((int) $this->id > 0 ? " AND rowid <> ".((int) $this->id) : '')))) {
+				$this->errors[] = 'InboxErrorAccountProtectedElsewhere';
+			}
 			foreach (array('imap' => $this->imap_host, 'smtp' => $this->smtp_host) as $kind => $host) {
 				if ($host !== '' && !self::isValidHost($host)) {
 					$this->errors[] = 'InboxErrorAccountHost';

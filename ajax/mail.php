@@ -42,6 +42,9 @@ function inboxMailFail(InboxReader $reader)
 	if ($reader->errorCode === 'not_found') {
 		inboxAjaxError($langs->transnoentities('InboxMailNotFound'), 404);
 	}
+	if ($reader->errorCode === 'locked') {
+		inboxAjaxError($langs->transnoentities('InboxProtectErrorLocked'), 423);
+	}
 	inboxAjaxError($langs->transnoentities('InboxMailReadError', $reader->error), 502);
 }
 

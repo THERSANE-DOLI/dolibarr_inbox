@@ -23,6 +23,7 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxnotification.class.php');
+dol_include_once('/inbox/class/inboxprotect.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('read', 'open'), true));
@@ -59,6 +60,8 @@ switch ($action) {
 		$readable = array_keys(array_filter($access->getLevels($user), function ($level) {
 			return InboxAccess::rank($level) >= InboxAccess::rank(InboxAccess::LEVEL_READ);
 		}));
+		// Never a mail of a protected mailbox not unlocked in this session (audit INBX-055)
+		$readable = array_values(array_diff($readable, (new InboxProtect($db))->lockedIds()));
 		$target = $notify->target($user, (int) inboxAjaxParam('id', 'int'), $readable);
 		$messages = array('gone' => 'InboxNotifGone', 'no_access' => 'InboxNotifNoAccess', 'not_found' => 'InboxNotifNotFound');
 		// « problem », not « error »: an answer, said to the user (the mail gone is not a failure of the call)

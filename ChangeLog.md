@@ -1,5 +1,22 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security audit of 2026-11-11, protected mailboxes keep their promise :   1.89.3
+  - level « The password and the content »: the index of Meilisearch removed before the local data (it was left
+    there), refused while Meilisearch does not answer or while mails wait in the queue; the files of the cache and
+    of the queue and the journal of the actions removed with the rest; the sources left by a session that died
+    removed after a day; the answer of the mail server to a sending refused no longer written in the log.
+  - level « The password »: the index, the cache and the search of a mailbox not unlocked in the session are never
+    read, an access given without a copy of the password opens nothing; back to this level from a session that
+    unlocked the mailbox only.
+  - master user of the mail server: a mailbox of its server cannot be protected, a master user cannot be set for a
+    server with protected mailboxes, nor a mailbox in master mode made for the address of a protected one.
+  - the other scripts of the page never get the private key of the device; the fingerprint of a device computed
+    from its key, a copy given only to the key whose fingerprint was shown.
+  - 5 passwords refused per user and per mailbox in 15 minutes; the older copies of the colleagues made obsolete by
+    who decides or manages the mailbox only; a copy found in Drafts sent only if marked by a page; the notices told
+    once forgotten by a POST.
+  - « Does not protect against » also names a script run in the page and a user who keeps the password he knew.
+
 - FIX: security audit of 2026-11-11, addresses of the anti-spam engine chosen by an administrator of Dolibarr :   1.89.2
   - the mails and the password of the controller are sent to these addresses: a manager of the mailboxes who is
     not an administrator of Dolibarr sees them without changing them (as the master user of the mail server).

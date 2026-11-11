@@ -25,11 +25,31 @@ require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxprotect.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = !in_array($action, array('devices', 'state', 'accesses', 'pending'), true);
+// The notices told once are forgotten by take=1: a write, never by a GET (audit INBX-065)
+$write = !in_array($action, array('devices', 'state', 'accesses', 'pending'), true) || ($action === 'pending' && (int) inboxAjaxParam('take', 'int') === 1);
 inboxAjaxStart($write);
 
 $protect = new InboxProtect($db);
 $access = new InboxAccess($db);
+
+/**
+ * Tries of a password refused by the mail server: 5 per user and per mailbox in 15 minutes, counted in the journal of
+ * the mailbox (never in the session, a new session would start again): Dolibarr is not a way to guess the password,
+ * nor a reason for the mail server to ban its address (audit INBX-064)
+ *
+ * @param InboxAccount $account Mailbox
+ * @return void Answers 429 above
+ */
+function inboxProtectThrottle(InboxAccount $account)
+{
+	global $db, $langs, $user;
+
+	$row = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_account_log WHERE fk_account = ".((int) $account->id)." AND fk_user = ".((int) $user->id)
+		." AND action = '".$db->escape(InboxProtect::LOG_UNLOCK_FAILED)."' AND datec > '".$db->idate(dol_now() - 900)."'");
+	if (is_object($row) && (int) $row->n >= 5) {
+		inboxAjaxReply(array('error' => $langs->transnoentities('InboxProtectErrorTooManyTries'), 'code' => 'throttled'), 429);
+	}
+}
 
 /**
  * A mailbox the user can read (else 404), protected or not
@@ -168,6 +188,7 @@ switch ($action) {
 		if (!$account->isProtected()) {
 			inboxAjaxNotFound();
 		}
+		inboxProtectThrottle($account);
 		$secrets = inboxProtectSecrets();
 		$code = '';
 		$message = $protect->tryPasswords($account, $secrets, $code);
@@ -201,15 +222,23 @@ switch ($action) {
 		if (!$account->isProtected()) {
 			inboxAjaxNotFound();
 		}
+		inboxProtectThrottle($account);
 		$secrets = inboxProtectSecrets();
 		$code = '';
 		$message = $protect->tryPasswords($account, $secrets, $code);
 		if ($message !== '') {
+			if ($code === 'auth') {
+				(new InboxAccountLog($db))->add((int) $account->id, $user, InboxProtect::LOG_UNLOCK_FAILED, null, array('device' => $device['fingerprint']));
+			}
 			// Never 401 (the page would take it for an expired session): 422 with the code
 			inboxAjaxReply(array('error' => $message, 'code' => $code === 'auth' ? 'auth' : 'connect'), $code === 'auth' ? 422 : 502);
 		}
 		$db->begin();
-		if (!empty($_SESSION['inbox_unlock_failed'][(int) $account->id]) && !$protect->newGeneration($account)) {
+		// The older copies made obsolete by who decides or manages the mailbox only: a reader would cut the copies of
+		// every colleague with a wrong try then the right password (audit INBX-064)
+		$renew = !empty($_SESSION['inbox_unlock_failed'][(int) $account->id])
+			&& (InboxProtect::canDecide($user, $account) || $access->check($user, (int) $account->id, InboxAccess::LEVEL_MANAGE));
+		if ($renew && !$protect->newGeneration($account)) {
 			$db->rollback();
 			inboxAjaxError($db->lasterror(), 500);
 		}

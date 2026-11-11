@@ -265,7 +265,8 @@ class InboxLiveSend
 			if ($c) {
 				$c->disconnect();
 			}
-			dol_syslog('inbox live send '.$key.' '.$code.' '.$detail, LOG_WARNING);
+			// The answer of the mail server often names the recipient: the code only in the log (audit INBX-062)
+			dol_syslog('inbox live send '.$key.' '.$code, LOG_WARNING);
 			if ($beacon) {
 				// Nobody sees it now: a notice without content, the copy marked stays in Drafts
 				$this->notice($user, (int) $e['account'], $e['marked'], $code);
@@ -500,7 +501,13 @@ class InboxLiveSend
 		if ($raw === null) {
 			return $this->fail('not_found', $reader->error);
 		}
+		// A copy left in Drafts by a page, or a sending scheduled: never another mail of the mailbox sent again then
+		// removed (audit INBX-066)
+		$drafts = (new InboxComposer($this->db))->roleFolder($reader->account, 'drafts');
 		$split = preg_split("/\r?\n\r?\n/", $raw, 2);
+		if ($drafts === '' || (string) $reader->row->folder_path !== $drafts || !preg_match('/^X-Dolibarr-(Pending-Send|Scheduled):/mi', $split[0])) {
+			return $this->fail('not_found');
+		}
 		$head = preg_replace('/^(X-Dolibarr-(Pending-Send|Scheduled|Catchup|Author)):[^\r\n]*(\r?\n[ \t][^\r\n]*)*\r?\n/mi', '', $split[0]."\r\n");
 		$body = $split[1] ?? '';
 		$clean = rtrim($head, "\r\n")."\r\n\r\n".$body;

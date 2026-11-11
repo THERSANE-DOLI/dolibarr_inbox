@@ -100,6 +100,11 @@ class InboxReader
 			$this->errorCode = 'not_found';
 			return false;
 		}
+		// Protected mailbox: what the server keeps of it is read only by a session that unlocked it (audit INBX-055)
+		if ($account->isProtected() && !InboxProtect::isUnlocked((int) $account->id)) {
+			$this->errorCode = 'locked';
+			return false;
+		}
 		$this->row = $row;
 		$this->account = $account;
 		$this->level = $level;

@@ -114,6 +114,47 @@ class InboxProtectTest extends InboxTestCase
 	}
 
 	/**
+	 * Audit of 2026-11-11: fingerprint computed from the key (INBX-063), master user (INBX-057), queue (INBX-062)
+	 *
+	 * @return void
+	 */
+	public function testAuditFixes()
+	{
+		global $conf;
+
+		$p = $this->db->prefix();
+		$protect = new InboxProtect($this->db);
+		$device = $protect->registerDevice($this->admin, self::jwk(), 'ZzDevice audit');
+		$other = self::jwk();
+		$this->db->query("UPDATE ".$p."inbox_device SET public_key = '".$this->db->escape((string) json_encode($other))."' WHERE rowid = ".((int) $device['id']));
+		$this->assertSame(InboxProtect::fingerprint($other), $protect->device($device['id'])['fingerprint'], 'a key changed in the database shows its own fingerprint');
+
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$this->assertSame('', InboxProtect::refusal($box));
+		$saved = array(getDolGlobalString('INBOX_MASTER_USER'), getDolGlobalString('INBOX_MASTER_HOST'));
+		$conf->global->INBOX_MASTER_USER = 'zzmaster';
+		$conf->global->INBOX_MASTER_HOST = strtoupper((string) $box->imap_host);
+		$this->assertSame('InboxProtectErrorMasterServer', InboxProtect::refusal($box), 'the master user opens every mailbox of its server');
+		$conf->global->INBOX_MASTER_USER = $saved[0];
+		$conf->global->INBOX_MASTER_HOST = $saved[1];
+
+		$this->db->query("UPDATE ".$p."inbox_account SET protected = 1 WHERE rowid = ".((int) $box->id));
+		$master = new InboxAccount($this->db);
+		$master->email = $box->email;
+		$master->type = InboxAccount::TYPE_SHARED;
+		$master->connector = 'imap';
+		$master->imap_auth_mode = InboxAccount::AUTH_MASTER;
+		$master->imap_host = $box->imap_host;
+		$master->check();
+		$this->assertContains('InboxErrorAccountProtectedElsewhere', $master->errors, 'never opened by the master user');
+		require_once __DIR__.'/../../class/inboxserver.class.php';
+		$server = new InboxServer($this->db);
+		$this->assertFalse($server->setMaster('zzmaster', (string) $box->imap_host, '*', ''), 'no master user on a server with protected mailboxes');
+		$this->assertSame('InboxErrorMasterProtected', $server->error);
+		$this->db->query("UPDATE ".$p."inbox_account SET protected = 0 WHERE rowid = ".((int) $box->id));
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testSessionCopy()
@@ -488,12 +529,25 @@ class InboxProtectTest extends InboxTestCase
 		$this->assertFalse($fresh->canWorkNow());
 		$this->assertSame(0, $sync->run($fresh, microtime(true) + 10, array('force' => true)), 'no work without the session');
 		$this->assertNull((new Inbox($this->db))->resolveAccount(self::BOX), 'not given to the other modules out of the session');
-		// To the level content: emptied; back to password: the index comes back with the next session
+		// Locked: what the server keeps of it is never read, even with an access (audit INBX-055)
+		$this->assertContains((int) $box->id, $protect->lockedIds());
+		$mail = (int) $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $box->id)." ORDER BY rowid")->rowid;
+		$reader = new InboxReader($this->db);
+		$this->assertFalse($reader->load($this->admin, $mail), 'index and cache closed while locked');
+		$this->assertSame('locked', $reader->errorCode);
+		InboxProtect::unlock($box->id, array('imap' => self::BOX_PASSWORD));
+		$this->assertNotContains((int) $box->id, $protect->lockedIds());
+		$this->assertTrue($reader->load($this->admin, $mail), 'open again in the session that unlocked it');
+		InboxProtect::lock($box->id);
+		// To the level content: emptied; back to password: from a session that has the password only (INBX-055)
 		$this->assertTrue($protect->setLevel($this->admin, $fresh, InboxAccount::PROTECT_CONTENT), $protect->error);
 		$this->assertSame(0, (int) $this->db->getRow("SELECT COUNT(*) AS n FROM ".$p."inbox_mail WHERE fk_account = ".((int) $box->id))->n);
 		$fresh->fetch($box->id);
 		$this->assertTrue($fresh->isLive());
-		$this->assertTrue($protect->setLevel($this->admin, $fresh, InboxAccount::PROTECT_PASSWORD));
+		$this->assertFalse($protect->setLevel($this->admin, $fresh, InboxAccount::PROTECT_PASSWORD), 'locked: never back to password');
+		$this->assertSame('InboxProtectErrorLocked', $protect->error);
+		InboxProtect::unlock($box->id, array('imap' => self::BOX_PASSWORD));
+		$this->assertTrue($protect->setLevel($this->admin, $fresh, InboxAccount::PROTECT_PASSWORD), $protect->error);
 		$fresh->fetch($box->id);
 		$this->assertFalse($fresh->isLive());
 		$actions = array_column((new InboxAccountLog($this->db))->listForAccount($box->id, 100), 'action');

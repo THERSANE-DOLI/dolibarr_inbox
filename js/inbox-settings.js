@@ -934,7 +934,7 @@
 				const st = PROTECT_STATE[d.state] || PROTECT_STATE.missing;
 				const can = unlocked && d.state !== 'ok';
 				if (can) {
-					waiting.push({ fk_user: u.id, device: d.id, public_key: d.public_key });
+					waiting.push({ fk_user: u.id, device: d.id, public_key: d.public_key, fingerprint: d.fingerprint });
 				}
 				html += '<tr><td>' + (i === 0 ? esc(u.name) : '') + '</td><td>' + esc(d.label || '-') + '</td><td><code class="ibx-protect__fp">' + esc(d.fingerprint) + '</code></td>'
 					+ '<td><span class="ibx-status' + (st[0] ? ' ibx-status--' + st[0] : '') + '">' + th(st[1]) + '</span></td>'

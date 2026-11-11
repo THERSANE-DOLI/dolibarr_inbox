@@ -132,6 +132,21 @@
 		const epk = await subtle.exportKey('jwk', eph.publicKey);
 		return { v: VERSION, epk: { kty: 'EC', crv: 'P-256', x: epk.x, y: epk.y }, iv: b64u(iv), ct: b64u(ct) };
 	}
+	/**
+	 * A copy for another device, only for the key whose fingerprint was shown: a key changed behind the fingerprint
+	 * (written in the database) gets nothing (audit INBX-063)
+	 * @param {object} pub    Public key of the device
+	 * @param {string} shown  Fingerprint shown to the user
+	 * @param {string} data   Associated data
+	 * @param {object} secrets Passwords
+	 * @returns {Promise<object>} Copy
+	 */
+	async function wrapFor(pub, shown, data, secrets) {
+		if (!shown || await fingerprint(pub) !== shown) {
+			throw new Error(t('InboxProtectFingerprintMismatch'));
+		}
+		return wrap(pub, data, secrets);
+	}
 	/** Open a copy with the private key of this device */
 	async function unwrap(blob, data) {
 		const b = typeof blob === 'string' ? JSON.parse(blob) : blob;
@@ -272,7 +287,7 @@
 		pendingTimer = setTimeout(checkPending, 600000);
 		let res;
 		try {
-			res = await api('protect', 'pending', { take: 1 });
+			res = await post('protect', 'pending', { take: 1 });
 		} catch (e) {
 			return;
 		}
@@ -536,7 +551,7 @@
 				continue;
 			}
 			const s = await unwrap(b.blob, aad(b.id, ctx('INBOX_USER_ID', 0), me.deviceId));
-			copies.push({ id: b.id, blob: await wrap(d.public_key, aad(b.id, ctx('INBOX_USER_ID', 0), d.id), s) });
+			copies.push({ id: b.id, blob: await wrapFor(d.public_key, d.fingerprint, aad(b.id, ctx('INBOX_USER_ID', 0), d.id), s) });
 		}
 		if (!copies.length) {
 			throw new Error(t('InboxProtectNothingToApprove'));
@@ -548,7 +563,7 @@
 	/**
 	 * Give the access of an unlocked mailbox to devices of colleagues, after their fingerprints were shown (§5.4)
 	 * @param {number}   id      Mailbox
-	 * @param {object[]} targets [{fk_user, device, public_key}]
+	 * @param {object[]} targets [{fk_user, device, public_key, fingerprint}]
 	 * @returns {Promise<number>} copies made
 	 */
 	async function grant(id, targets) {
@@ -559,7 +574,7 @@
 		const s = await unwrap(b.blob, aad(b.id, ctx('INBOX_USER_ID', 0), me.deviceId));
 		let n = 0;
 		for (const x of targets) {
-			await post('protect', 'grant', { id, fk_user: x.fk_user, device: x.device, blob: await wrap(x.public_key, aad(id, x.fk_user, x.device), s) });
+			await post('protect', 'grant', { id, fk_user: x.fk_user, device: x.device, blob: await wrapFor(x.public_key, x.fingerprint, aad(id, x.fk_user, x.device), s) });
 			n++;
 		}
 		return n;
@@ -582,10 +597,20 @@
 		return res.account;
 	}
 
+	/**
+	 * What the other scripts of the page know of this device: never its private key (audit INBX-056, a script of the
+	 * page could open the copies with it)
+	 * @param {object|null} rec Key of this device
+	 * @returns {object|null} {deviceId, fingerprint, label}
+	 */
+	const publicView = rec => (rec ? { deviceId: rec.deviceId, fingerprint: rec.fingerprint, label: rec.label } : null);
+
 	I.protect = {
-		supported, ensure, refresh, ready, lock, openLock, askApproval, grant, protect, wrap, fingerprint, passwordFields, readPasswords,
-		/** @returns {object|null} key of this device */
-		device: () => me,
+		supported, refresh, ready, lock, openLock, askApproval, grant, protect, wrap, fingerprint, passwordFields, readPasswords,
+		/** @returns {Promise<object|null>} this device, recorded on the server when missing */
+		ensure: () => ensure().then(publicView),
+		/** @returns {object|null} this device */
+		device: () => publicView(me),
 		/** @returns {object[]} protected mailboxes of the user */
 		boxes: () => boxes,
 		byId,

@@ -407,6 +407,11 @@ class InboxProtect
 		if ((string) $account->imap_auth_mode !== InboxAccount::AUTH_LOGIN) {
 			return 'InboxProtectErrorAuthMode';
 		}
+		// The master user opens every mailbox of its server: a protection there would promise nothing (audit INBX-057)
+		$masterHost = strtolower(trim(getDolGlobalString('INBOX_MASTER_HOST')));
+		if (getDolGlobalString('INBOX_MASTER_USER') !== '' && $masterHost !== '' && strtolower(trim((string) $account->imap_host)) === $masterHost) {
+			return 'InboxProtectErrorMasterServer';
+		}
 
 		return '';
 	}
@@ -529,11 +534,14 @@ class InboxProtect
 	 */
 	protected function deviceArray($row)
 	{
+		// The fingerprint shown is the one of the key, computed again: never the column alone (audit INBX-063)
+		$jwk = json_decode((string) $row->public_key, true);
+
 		return array(
 			'id' => (int) $row->rowid,
 			'fk_user' => (int) $row->fk_user,
-			'public_key' => json_decode((string) $row->public_key, true),
-			'fingerprint' => (string) $row->fingerprint,
+			'public_key' => $jwk,
+			'fingerprint' => is_array($jwk) && isset($jwk['x'], $jwk['y']) && is_string($jwk['x']) && is_string($jwk['y']) ? self::fingerprint($jwk) : '',
 			'label' => (string) $row->label,
 			'approve_asked' => $row->approve_asked ? (int) $this->db->jdate($row->approve_asked) : null,
 			'status' => (int) $row->status,
@@ -984,8 +992,11 @@ class InboxProtect
 
 		$prefix = $this->db->prefix();
 		$id = (int) $account->id;
-		$this->db->begin();
 		$content = $level === InboxAccount::PROTECT_CONTENT;
+		if ($content && ($this->queueWaiting($id) || !$this->dropIndexFirst($id))) {
+			return false;
+		}
+		$this->db->begin();
 		$ok = $this->db->query("UPDATE ".$prefix."inbox_account SET protected = 1, protect_level = '".$this->db->escape($level)."', protect_gen = protect_gen + 1, imap_password = NULL, smtp_password = NULL"
 			.($content ? ", sync_state = NULL, sync_error = NULL, date_sync = NULL, date_folders = NULL, sync_lock = NULL, sync_retry_at = NULL, sync_fail_count = 0" : ", sync_retry_at = NULL, sync_fail_count = 0")
 			." WHERE rowid = ".$id);
@@ -1007,10 +1018,6 @@ class InboxProtect
 		$log = new InboxAccountLog($this->db);
 		$log->add($id, $user, self::LOG_PROTECT, null, array('protected' => 1, 'level' => $level));
 		$this->db->commit();
-		if ($content) {
-			require_once __DIR__.'/inboxfulltext.class.php';
-			(new InboxFulltext($this->db))->dropIndex($id);
-		}
 		self::unlock($id, $secrets, (int) $deviceId);
 		$langs->load('inbox@inbox');
 
@@ -1044,6 +1051,31 @@ class InboxProtect
 		}
 		$sqls[] = "DELETE FROM ".$p."inbox_notification WHERE fk_account = ".$id." OR fk_mailref IN (SELECT x.rowid FROM (".$refs.") as x)";
 		$sqls[] = "DELETE FROM ".$p."inbox_mailref WHERE rowid IN (SELECT x.rowid FROM (".$refs.") as x)";
+		// What the files keep of the mailbox (audit INBX-062): sources of the cache (unless another mailbox uses the
+		// same file), files of the queue; a rollback leaves lines without file, the cache job removes them
+		require_once __DIR__.'/inbox.class.php';
+		require_once __DIR__.'/inboxoutbox.class.php';
+		if ($email !== '') {
+			$cache = Inbox::storageDir();
+			$rows = $this->db->getRows("SELECT filepath FROM ".$p."inbox_message as c WHERE c.mailbox = '".$this->db->escape($email)."'"
+				." AND NOT EXISTS (SELECT 1 FROM ".$p."inbox_message as o WHERE o.filepath = c.filepath AND o.mailbox <> c.mailbox) LIMIT 100000");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$file = basename((string) $r->filepath);
+				if ($file !== '' && is_file($cache.'/'.$file)) {
+					@unlink($cache.'/'.$file);
+				}
+			}
+		}
+		$rows = $this->db->getRows("SELECT rowid FROM ".$p."inbox_outbox WHERE fk_account = ".$id." LIMIT 100000");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			foreach (array('raw', 'wire') as $kind) {
+				$file = InboxOutbox::dir().'/'.((int) $r->rowid).'.'.$kind.'.eml';
+				if (is_file($file)) {
+					@unlink($file);
+				}
+			}
+		}
+		$sqls[] = "DELETE FROM ".$p."inbox_action_log WHERE fk_account = ".$id." OR fk_account_to = ".$id;
 		$sqls[] = "DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (".$mails.")";
 		$sqls[] = "DELETE FROM ".$p."inbox_spam_learn WHERE fk_mail IN (".$mails.")";
 		foreach (array('inbox_mail', 'inbox_fulltext', 'inbox_folder', 'inbox_outbox', 'inbox_bounce', 'inbox_thread_mark') as $table) {
@@ -1126,8 +1158,17 @@ class InboxProtect
 		$prefix = $this->db->prefix();
 		$id = (int) $account->id;
 		$content = $level === InboxAccount::PROTECT_CONTENT;
+		// Back to « password », the mails are kept again by the pages of its users: decided from a session that has
+		// the password, as the return to the normal mode (audit INBX-055)
+		if (!$content && !self::isUnlocked($id)) {
+			$this->error = 'InboxProtectErrorLocked';
+			return false;
+		}
 		if ($content && (int) $account->sync_lock > dol_now()) {
 			$this->error = 'InboxProtectErrorSyncRunning';
+			return false;
+		}
+		if ($content && ($this->queueWaiting($id) || !$this->dropIndexFirst($id))) {
 			return false;
 		}
 		$this->db->begin();
@@ -1140,10 +1181,6 @@ class InboxProtect
 		}
 		(new InboxAccountLog($this->db))->add($id, $user, self::LOG_LEVEL, array('level' => $account->protect_level), array('level' => $level));
 		$this->db->commit();
-		if ($content) {
-			require_once __DIR__.'/inboxfulltext.class.php';
-			(new InboxFulltext($this->db))->dropIndex($id);
-		}
 		$account->protect_level = $level;
 
 		return true;
@@ -1212,5 +1249,56 @@ class InboxProtect
 		return array_map(function ($r) {
 			return (int) $r->rowid;
 		}, is_array($rows) ? $rows : array());
+	}
+
+	/**
+	 * Protected mailboxes not unlocked in this session: what the server keeps of them (index, cache of the mails,
+	 * search) is never read for them, an access given without a copy of the password opens nothing (audit INBX-055)
+	 *
+	 * @return int[]
+	 */
+	public function lockedIds()
+	{
+		return array_values(array_filter($this->protectedIds(), function ($id) {
+			return !self::isUnlocked($id);
+		}));
+	}
+
+	/**
+	 * Mails of the mailbox waiting in the queue: the level content empties the queue, they would be lost without a
+	 * word (audit INBX-062)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return bool Some are waiting ($this->error set)
+	 */
+	protected function queueWaiting($accountId)
+	{
+		require_once __DIR__.'/inboxoutbox.class.php';
+		if (is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_outbox WHERE fk_account = ".((int) $accountId)." AND status = ".InboxOutbox::WAITING))) {
+			$this->error = 'InboxProtectErrorOutbox';
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * The index of a mailbox removed from Meilisearch before its local data is emptied: once the state of the index
+	 * is gone, nothing can find the index again (audit INBX-054)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return bool Removed, or nothing to remove
+	 */
+	protected function dropIndexFirst($accountId)
+	{
+		require_once __DIR__.'/inboxfulltext.class.php';
+		$fulltext = new InboxFulltext($this->db);
+		if ($fulltext->dropIndex((int) $accountId)) {
+			return true;
+		}
+		dol_syslog(__METHOD__.' '.$fulltext->error, LOG_WARNING);
+		$this->error = 'InboxProtectErrorIndex';
+
+		return false;
 	}
 }
