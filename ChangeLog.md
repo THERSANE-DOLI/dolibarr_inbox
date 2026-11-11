@@ -1,6 +1,6 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-- FIX: writing of a protected mailbox, nothing in clear on the disk :   1.89.11
+- FIX: writing of a protected mailbox, nothing in clear on the disk :   1.89.12
   - its files (state, mail quoted, attachments) sealed by the key of the session (AES-256-GCM, the key in the cookie
     of the browser): readable by a request of this browser in this session only, a copy of the disk shows nothing.
   - a writing begun from another mailbox is sealed as soon as an identity of a protected mailbox is chosen; never
