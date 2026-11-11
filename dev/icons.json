@@ -39,6 +39,7 @@
 		"reply-all": ["arrow-back-up-double", "outline"],
 		"forward": ["arrow-forward-up", "outline"],
 		"junk": ["flame", "outline"],
+		"block": ["ban", "outline"],
 		"dolibarr": ["building", "outline"],
 		"spoof": ["spy", "outline"],
 		"remote-blocked": ["photo-off", "outline"],

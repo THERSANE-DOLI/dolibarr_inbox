@@ -1281,6 +1281,17 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-assignline__person { display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 600; }
 .ibx-assignline__person .ibx-avatar--xs { border: 0; }
 .ibx-assignline__actions { display: inline-flex; gap: var(--ibx-s1); }
+/* Blocked senders (1.85.0): line of the reading, dialog « Block the sender… » */
+.ibx-blockedline { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1); color: var(--ibx-text-muted); }
+.ibx-blockwhat { border: 0; margin: 0 0 var(--ibx-s3); padding: 0; display: grid; gap: var(--ibx-s2); min-width: 0; }
+.ibx-blockwhat legend { padding: 0; margin-bottom: var(--ibx-s1); }
+.ibx-blockopt { align-items: flex-start; overflow-wrap: anywhere; }
+.ibx-blockopt.is-disabled { color: var(--ibx-text-muted); }
+.ibx-blockopt__why { display: block; }
+.ibx-blockconfirm { display: block; margin: var(--ibx-s2) 0 var(--ibx-s1); }
+.ibx-blockform .ibx-notice { margin-bottom: var(--ibx-s3); }
+.ibx-blockform .ibx-notice .ibx-field { width: 100%; }
+.ibx-bstable td { overflow-wrap: anywhere; }
 .ibx-assignpick { list-style: none; margin: var(--ibx-s2) 0 0; padding: 0; max-height: 50vh; overflow: auto; }
 .ibx-assignpick__row { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.25rem; padding: 0 var(--ibx-s2); border-radius: var(--ibx-radius); cursor: pointer; }
 .ibx-assignpick__row:hover { background: var(--ibx-bg-hover); }

@@ -1,5 +1,23 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: blocked senders, one list for all the mailboxes, and a page Settings > Anti-spam :   1.85.0
+  - « Block the sender… » in the menu ⋯ of a mail: the address, or the whole domain (and its subdomains); its mails
+    go to the junk of every mailbox, never to the trash. The mails already received go too, in the mailboxes where
+    the user has the level « manage ».
+  - Who may block is worked out by the server: an unknown sender by the level « manage » on the mailbox of the mail;
+    a sender known to Dolibarr (thirdparty or contact, prospects and inactive ones too, domain of a thirdparty, an
+    address we wrote to, the sender of a mail linked to a piece) and a domain by the new right « Manage the blocked
+    senders », a known sender after the address typed again; never a user of Dolibarr, our mailboxes and their
+    domains, a recognized domain, the sender of a data source, a public mail service.
+  - Applied by a block of the Sieve script of each mailbox (scheduled job, before any rule and the out of office),
+    never shown as a rule; a mailbox without Sieve or whose script was changed by another tool: the synchronisation
+    puts the new mails of a blocked sender away (never a mail marked « not junk »).
+  - The reading says that the sender is blocked (by whom, when, « Unblock »); « Not junk » on such a mail offers to
+    unblock. A blocked sender is never « probably legitimate » in the junk.
+  - Settings > Anti-spam: the list for every user of the webmail (unblock: its author or a manager), for the
+    administrators the switches of the blocked senders and of « probably legitimate », the trusted receiving servers
+    (moved from Security) and the state of the block on each mailbox. Journal: block, unblock, put away.
+
 - FIX: « Junk » (« Not junk » in the junk folder) is a button of the reading header, between archive and delete,
   no longer only in the « ⋯ » menu :   1.84.1
 

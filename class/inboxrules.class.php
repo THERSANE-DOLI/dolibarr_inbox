@@ -24,6 +24,7 @@
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
+require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
 /**
@@ -37,6 +38,9 @@ class InboxRules
 	/** Name of the script of inbox, and of its previous version */
 	const SCRIPT = 'inbox';
 	const PREVIOUS = 'inbox-prev';
+
+	/** First line of the block of the blocked senders (1.85.0), followed by the fingerprint of the list */
+	const BLOCKED_MARK = '# Blocked senders of inbox (generated, never a rule):';
 
 	/** Bounds of a set of rules */
 	const MAX_RULES = 100;
@@ -161,15 +165,38 @@ class InboxRules
 	 * @param string[]                       $extensions Extensions of the server
 	 * @param string                         $include    Script kept from before inbox, run after the rules ('' = none)
 	 * @param array<string,mixed>            $meta       saved (timestamp), by (name)
+	 * @param array<string,mixed>|null       $blocked    Blocked senders (1.85.0): addresses, domains, hash, junk (path of the junk)
 	 * @return string
 	 */
-	public static function script(array $rules, array $away, array $folders, $trash, array $extensions, $include, array $meta)
+	public static function script(array $rules, array $away, array $folders, $trash, array $extensions, $include, array $meta, $blocked = null)
 	{
 		$has = function ($e) use ($extensions) {
 			return in_array($e, $extensions, true);
 		};
 		$req = array();
 		$body = '';
+		// Blocked senders first (1.85.0): to the junk before any rule (a rule never forwards them) and before the out of
+		// office (never answered). Generated from the list of inbox, never shown as a rule.
+		if ($blocked && (!empty($blocked['addresses']) || !empty($blocked['domains'])) && (string) ($blocked['junk'] ?? '') !== '') {
+			$req['fileinto'] = 1;
+			$tests = array();
+			if (!empty($blocked['addresses'])) {
+				$tests[] = 'address :all :is "from" '.self::ql(array_values($blocked['addresses']));
+			}
+			if (!empty($blocked['domains'])) {
+				$tests[] = 'address :domain :is "from" '.self::ql(array_values($blocked['domains']));
+				$tests[] = 'address :domain :matches "from" '.self::ql(array_map(function ($d) {
+					return '*.'.self::literalPattern($d);
+				}, array_values($blocked['domains'])));
+			}
+			$into = 'fileinto';
+			if ($has('imap4flags')) {
+				$req['imap4flags'] = 1;
+				$into .= ' :flags "$Junk"';
+			}
+			$body .= self::BLOCKED_MARK.' '.preg_replace('/[^0-9a-f]/', '', (string) ($blocked['hash'] ?? ''))."\r\n"
+				.'if '.(count($tests) === 1 ? $tests[0] : 'anyof('.implode(', ', $tests).')')." {\r\n\t".$into.' '.self::q((string) $blocked['junk']).";\r\n\tstop;\r\n}\r\n";
+		}
 		// Out of office first: it answers even to the mails the rules put away
 		if (!empty($away['on']) && $has('vacation')) {
 			$req['vacation'] = 1;
@@ -269,7 +296,7 @@ class InboxRules
 	 * What inbox wrote in a script
 	 *
 	 * @param string|null $script Content
-	 * @return array{rules:array<int,array<string,mixed>>,away:array<string,mixed>,include:string,saved:int,by:string,edited:bool}|null null when it is not a script of inbox
+	 * @return array{rules:array<int,array<string,mixed>>,away:array<string,mixed>,include:string,saved:int,by:string,blocked:string,edited:bool}|null null when it is not a script of inbox
 	 */
 	public static function read($script)
 	{
@@ -285,6 +312,8 @@ class InboxRules
 
 		return array('rules' => (array) ($data['rules'] ?? array()), 'away' => array_merge(self::defaultAway(), (array) ($data['away'] ?? array())),
 			'include' => (string) ($data['include'] ?? ''), 'saved' => (int) $m[2], 'by' => (string) base64_decode($m[3]),
+			// Fingerprint of the list of the blocked senders written in the block (1.85.0), '' when none
+			'blocked' => preg_match('/^'.preg_quote(self::BLOCKED_MARK, '/').' ([0-9a-f]*)\r?$/m', $sieve, $bm) ? $bm[1] : '',
 			// A change made outside inbox (another tool, by hand)
 			'edited' => sha1($sieve) !== $m[4]);
 	}
@@ -597,7 +626,8 @@ class InboxRules
 				$trash = 'Trash';
 			}
 			$name = trim($user->firstname.' '.$user->lastname);
-			$script = self::script($rules, $away, $folders, $trash, $s->extensions, $include, array('saved' => dol_now(), 'by' => $name !== '' ? $name : $user->login));
+			$blocked = $this->blockedFor($account);
+			$script = self::script($rules, $away, $folders, $trash, $s->extensions, $include, array('saved' => dol_now(), 'by' => $name !== '' ? $name : $user->login), $blocked);
 			if (!$s->checkScript($script)) {
 				return $this->fail('server_refused', $s->error);
 			}
@@ -611,8 +641,103 @@ class InboxRules
 			$s->close();
 		}
 		$this->afterSave($user, $account, $rules, $away, $model, $what);
+		// The block of the blocked senders was written with the rules
+		$noJunk = $blocked['junk'] === '' && ($blocked['addresses'] || $blocked['domains']);
+		(new InboxBlockedSender($this->db))->saveState((int) $account->id, (string) $blocked['hash'], $noJunk ? InboxBlockedSender::STATE_ERROR : InboxBlockedSender::STATE_OK, $noJunk ? 'no junk folder' : '');
 
 		return $this->load($account);
+	}
+
+	/**
+	 * Block of the blocked senders for a mailbox (1.85.0)
+	 *
+	 * @param InboxAccount $account Mailbox
+	 * @return array{addresses:string[],domains:string[],hash:string,junk:string}
+	 */
+	protected function blockedFor(InboxAccount $account)
+	{
+		$b = (new InboxBlockedSender($this->db))->forScript();
+		$b['junk'] = '';
+		foreach ($this->foldersOf($account) as $f) {
+			if ($f['role'] === 'junk' && $b['junk'] === '') {
+				$b['junk'] = $f['path'];
+			}
+		}
+
+		return $b;
+	}
+
+	/**
+	 * Write the block of the blocked senders in the script of a mailbox, its rules and out of office kept as they are
+	 * (scheduled job, 1.85.0). Never a script changed by another tool nor a script of another tool still active:
+	 * they are left as they are (the synchronisation puts the mails away instead). No journal line, no previous
+	 * version: the rules of the user did not change.
+	 *
+	 * @param InboxAccount $account Mailbox
+	 * @return string State: ok, foreign, nosieve, error ($this->error)
+	 */
+	public function applyBlocked(InboxAccount $account)
+	{
+		$this->error = '';
+		$blocked = $this->blockedFor($account);
+		if ($blocked['junk'] === '' && ($blocked['addresses'] || $blocked['domains'])) {
+			$this->error = 'no junk folder';
+			return InboxBlockedSender::STATE_ERROR;
+		}
+		$s = $this->session($account);
+		if (!$s) {
+			return $this->errorCode === 'sieve_disabled' ? InboxBlockedSender::STATE_NOSIEVE : InboxBlockedSender::STATE_ERROR;
+		}
+		try {
+			$scripts = $s->listScripts();
+			if ($scripts === null) {
+				$this->error = $s->error;
+				return InboxBlockedSender::STATE_ERROR;
+			}
+			$active = '';
+			$current = null;
+			foreach ($scripts as $x) {
+				$active = $x['active'] ? $x['name'] : $active;
+				if ($x['name'] === self::SCRIPT) {
+					$current = $s->getScript(self::SCRIPT);
+				}
+			}
+			$model = $current !== null ? self::read($current) : null;
+			if ($current !== null && ($model === null || $model['edited'])) {
+				$this->error = 'script changed outside inbox';
+				return InboxBlockedSender::STATE_FOREIGN;
+			}
+			// Another script active and inbox never saved rules here: the user decides in the rules (take over)
+			if ($active !== '' && $active !== self::SCRIPT && ($active !== self::PREVIOUS || $current === null)) {
+				$this->error = 'another script is active: '.$active;
+				return InboxBlockedSender::STATE_FOREIGN;
+			}
+			$none = !$blocked['addresses'] && !$blocked['domains'];
+			if ($model && ($model['blocked'] === $blocked['hash'] || ($none && $model['blocked'] === ''))) {
+				return InboxBlockedSender::STATE_OK;
+			}
+			if (!$model && $none) {
+				return InboxBlockedSender::STATE_OK;
+			}
+			$folders = array();
+			$trash = '';
+			foreach ($this->foldersOf($account) as $f) {
+				$folders[$f['path']] = $f['path'];
+				if ($f['role'] === 'trash' && $trash === '') {
+					$trash = $f['path'];
+				}
+			}
+			$script = self::script($model ? $model['rules'] : array(), $model ? $model['away'] : self::defaultAway(), $folders, $trash !== '' ? $trash : 'Trash', $s->extensions,
+				$model ? (string) $model['include'] : '', array('saved' => $model ? $model['saved'] : 0, 'by' => $model ? $model['by'] : ''), $blocked);
+			if (!$s->checkScript($script) || !$s->putScript(self::SCRIPT, $script) || ($active !== self::SCRIPT && !$s->setActive(self::SCRIPT))) {
+				$this->error = $s->error;
+				return InboxBlockedSender::STATE_ERROR;
+			}
+		} finally {
+			$s->close();
+		}
+
+		return InboxBlockedSender::STATE_OK;
 	}
 
 	/**
@@ -642,6 +767,8 @@ class InboxRules
 		}
 		$model = self::read($prev);
 		$this->afterSave($user, $account, $model ? $model['rules'] : array(), $model ? $model['away'] : self::defaultAway(), null, 'rules_undo');
+		// The previous version holds the block of its time: written again by the next pass of the scheduled job
+		(new InboxBlockedSender($this->db))->saveState((int) $account->id, '', InboxBlockedSender::STATE_PENDING, '');
 
 		return $this->load($account);
 	}

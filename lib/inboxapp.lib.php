@@ -117,6 +117,9 @@ function inboxAppContextVars(User $user)
 		'INBOX_RIGHT_WEBMAIL' => (bool) $user->hasRight('inbox', 'webmail', 'use'),
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),
 		'INBOX_RIGHT_TRUSTED_DOMAIN' => (bool) $user->hasRight('inbox', 'trusteddomain', 'write'),
+		// Blocked senders (1.85.0): the right to block a known sender or a domain; the list turned on or off
+		'INBOX_RIGHT_BLOCKED_SENDER' => (bool) $user->hasRight('inbox', 'blockedsender', 'write'),
+		'INBOX_BLOCKED_SENDERS' => (bool) getDolGlobalInt('INBOX_BLOCKED_SENDERS', 1),
 		// Settings > Server (1.54.0): admins of Dolibarr only
 		'INBOX_RIGHT_DOLIBARR_ADMIN' => !empty($user->admin),
 		// Lot W6: the user may write (an active mailbox with the level « send » at least)

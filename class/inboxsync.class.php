@@ -148,12 +148,27 @@ class InboxSync
 		if (!$this->lock((int) $account->id)) {
 			return 0;
 		}
+		$this->blockedNew = array();
 		try {
-			return $this->pass($account, $deadline, $force, $phase, (int) ($options['folder_id'] ?? 0));
+			$res = $this->pass($account, $deadline, $force, $phase, (int) ($options['folder_id'] ?? 0));
 		} finally {
 			$this->unlock((int) $account->id);
 		}
+		// Blocked senders (1.85.0): the new mails of the inbox from a blocked sender go to the junk, once the pass is
+		// over (the move reads the junk again). The only write of the synchronisation on the server with the
+		// ignored threads; covers a mailbox without Sieve, a script of another tool, a block not written yet.
+		if ($this->blockedNew) {
+			global $user;
+			require_once __DIR__.'/inboxblockedsender.class.php';
+			$moved = (new InboxBlockedSender($this->db))->moveNew($user, (int) $account->id, $this->blockedNew);
+			$this->stats['blocked'] = $moved;
+		}
+
+		return $res;
 	}
+
+	/** @var int[] New mails of the inbox in this pass (blocked senders, 1.85.0) */
+	protected $blockedNew = array();
 
 	/**
 	 * @param InboxAccount $account  Mailbox
@@ -278,6 +293,10 @@ class InboxSync
 				$mails->clearFolder($folderId);
 			}
 			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			// New mails of the inbox (never the first indexing of the older ones): checked against the blocked senders
+			if ((string) $f->role === 'inbox' && !$backfill && $mails->lastNewIds) {
+				$this->blockedNew = array_merge($this->blockedNew, array_map('intval', $mails->lastNewIds));
+			}
 			// Delivery reports among the new mails (1.25.0): their start read (the report comes before the original),
 			// linked to the mail sent; never in Sent or Drafts. Read at the end of the pass, once the copy in Sent of
 			// the mail they are about is indexed too: a report counts only for a mail sent from this mailbox (INBX-031)
@@ -295,8 +314,9 @@ class InboxSync
 			}
 			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
 			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
-			// Junk: a known sender, authenticated, is probably legitimate (lot W5 1.15.0; headers of these mails only)
-			if ((string) $f->role === 'junk') {
+			// Junk: a known sender, authenticated, is probably legitimate (lot W5 1.15.0; headers of these mails only);
+			// setting of Settings > Anti-spam (1.85.0)
+			if ((string) $f->role === 'junk' && getDolGlobalInt('INBOX_JUNK_LEGIT_CHECK', 1)) {
 				require_once __DIR__.'/inboxknownsenders.class.php';
 				$known = new InboxKnownSenders($this->db);
 				$known->checkJunk($connector, $folderId, (string) $f->path, $deadline);
@@ -464,7 +484,13 @@ class InboxSync
 				}
 			}
 		}
-		$this->output = count($accounts).' mailbox(es), '.$total['new'].' new, '.$total['changed'].' changed, '.$total['deleted'].' removed, '.$total['errors'].' error(s), '.round(microtime(true) - $start, 1).' s';
+		// Blocked senders (1.85.0): the Sieve block written again where the list changed, with the time left
+		$blocked = 0;
+		if (microtime(true) < $deadline - 2) {
+			require_once __DIR__.'/inboxblockedsender.class.php';
+			$blocked = (new InboxBlockedSender($this->db))->applyAll($deadline);
+		}
+		$this->output = ($blocked ? $blocked.' Sieve block(s) of the blocked senders written, ' : '').count($accounts).' mailbox(es), '.$total['new'].' new, '.$total['changed'].' changed, '.$total['deleted'].' removed, '.$total['errors'].' error(s), '.round(microtime(true) - $start, 1).' s';
 
 		return 0;
 	}

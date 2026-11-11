@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.84.1';
+		$this->version = '1.85.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -203,6 +203,13 @@ class modInbox extends DolibarrModules
 		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
 		$this->rights[$r][1] = 'InboxRightTrustedDomainWrite';
 		$this->rights[$r][4] = 'trusteddomain';
+		$this->rights[$r][5] = 'write';
+		$r++;
+		// Blocked senders (1.85.0): block a sender known to Dolibarr or a domain, unblock any entry (an unknown address
+		// needs only the level « manage » on the mailbox of the mail)
+		$this->rights[$r][0] = $this->numero.sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'InboxRightBlockedSenderWrite';
+		$this->rights[$r][4] = 'blockedsender';
 		$this->rights[$r][5] = 'write';
 		$r++;
 

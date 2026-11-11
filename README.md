@@ -130,6 +130,31 @@ Other modules add their domains with the hook `inboxSharedDomains` (context `inb
 `$this->results['domains'] = array('example-group.com' => 'shared')` (categories `public`, `disposable`, `shared`);
 they show with the origin « other module », read only.
 
+## Blocked senders and anti-spam
+
+Settings > Anti-spam (1.85.0): one list of blocked senders (addresses, or domains with their subdomains) for all the
+mailboxes of the entity; their mails go to the junk, never to the trash. Blocked from a mail (menu ⋯ > Block the
+sender…): an unknown sender with the level « manage » on the mailbox of the mail; a sender known to Dolibarr or a
+domain with the right « Manage the blocked senders » (strong confirmation for a known sender). Never blockable: the
+users of Dolibarr, the mailboxes of inbox and their domains, the recognized domains, the senders of the data sources,
+the public mail services as domains.
+
+How it is applied, and what changes on the mail server:
+
+- **Sieve**: the scheduled job « Synchronise the mailboxes » writes a block at the top of the script `inbox` of each
+  mailbox (before the rules and the out of office), marked `# Blocked senders of inbox`. It is never shown in the
+  rules editor and is written again when the rules are saved. A mailbox whose script was changed by another tool,
+  or whose active script belongs to another tool, is never written: Settings > Anti-spam says so.
+- **Synchronisation**: on a mailbox without Sieve, with a script of another tool, or while the block is not written
+  yet, the new mails of the inbox from a blocked sender are moved to the junk by the synchronisation (journal:
+  « put in junk (blocked sender) »). A mail marked « not junk » ($NotJunk) is never moved.
+- **Turn it off**: Settings > Anti-spam, switch « Blocked senders » (`INBOX_BLOCKED_SENDERS`): the block is removed
+  from the scripts at the next pass, the list is kept.
+
+Living with another anti-spam tool: a tool that takes the known senders out of the junk (authenticated mails of the
+customers and suppliers) does not know this list; a known sender blocked here may come back to the inbox through it.
+Add the address to the blacklist of that tool as well, or turn its rescue off for that sender.
+
 ## Searchable lists (tool combo)
 
 `js/dolibarr-combo.js` and `css/dolibarr-combo.css` define `Dolibarr.tools.combo`, a searchable list of choices

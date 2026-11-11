@@ -22,6 +22,7 @@
  *   #/settings/import                  import from the sources declared by other modules
  *   #/settings/general                 defaults of the webmail (admins of the mailboxes)
  *   #/settings/security                security: quote, pictures, unsubscribe, bank alert (1.78.0)
+ *   #/settings/antispam                anti-spam: blocked senders, junk, trusted receiving servers (1.85.0)
  *   #/settings/domains                 shared domains: public, disposable, shared (managers of the settings)
  *   #/settings/sources                 data sources: mails sent by a site for a requester (admins of Dolibarr)
  *   #/settings/me                      settings of the current user
@@ -126,7 +127,7 @@
 					pointSection(main, a.dataset.goto);
 				});
 			}
-			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, security: renderSecurity, domains: renderDomains, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
+			const pages = { accounts: renderAccounts, import: renderImport, general: renderGeneral, security: renderSecurity, antispam: renderAntispam, domains: renderDomains, server: renderServer, sources: renderSources, trusted: renderTrusted, me: renderMe, notifications: renderNotifications };
 			const fn = pages[page];
 			if (!fn) {
 				if (page) {
@@ -186,6 +187,7 @@
 			+ (isAdmin() ? link('import', 'download', 'InboxNavImport') : '')
 			+ (isAdmin() ? link('general', 'settings', 'InboxNavGeneral') : '')
 			+ (isAdmin() ? link('security', 'lock', 'InboxNavSecurity') : '')
+			+ link('antispam', 'junk', 'InboxNavAntispam')
 			+ (isAdmin() ? link('domains', 'shield', 'InboxNavDomains') : '')
 			+ (isDolibarrAdmin() ? link('server', 'server', 'InboxNavServer') : '')
 			+ (isDolibarrAdmin() ? link('sources', 'redirect', 'InboxNavSources') : '')
@@ -2868,10 +2870,174 @@
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_BANK_CHECK" aria-checked="' + (s.INBOX_BANK_CHECK === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxBankCheckSetting') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxBankCheckSettingHelp') + '</div>'
 			+ '<div class="ibx-formrow__help ibx-formrow__warn ibx-js-bankoff"' + (s.INBOX_BANK_CHECK === '0' ? '' : ' hidden') + '>' + ic('warning') + ' ' + th('InboxBankCheckOffWarning') + '</div></div></div>'
-			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div>'
+			// Trusted receiving servers: in Anti-spam since 1.85.0, said here where they were
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAuthServers') + '</span><div><a href="#/settings/antispam/server">' + th('InboxAuthServersMoved') + '</a></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-av">' + th('InboxAntivirusMax') + '</label><div><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="1" max="200" inputmode="numeric" id="g-av" data-name="INBOX_ANTIVIRUS_MAX_MB" value="' + esc(s.INBOX_ANTIVIRUS_MAX_MB) + '"> ' + th('InboxMegabytes') + '</div><div class="ibx-formrow__help">' + th('InboxAntivirusMaxHelp') + '</div></div></div>'
 			+ '</div></div>';
 		bindGeneralFields(main);
+	}
+
+
+	/**
+	 * Settings > Anti-spam (1.85.0): the blocked senders (every user of the webmail; changes by their rights), and for
+	 * the administrators the switches of the anti-spam, the trusted receiving servers and the state of the block on
+	 * each mailbox. Every function has its switch. Analyses: analyse-anti-spam.md, analyse-expediteurs-bloques.md
+	 */
+	async function renderAntispam(main, parts) {
+		if (!main.querySelector('.ibx-js-antispam')) {
+			main.innerHTML = skeleton();
+		}
+		let r;
+		let s = null;
+		try {
+			r = await api('blockedsender', 'list');
+			if (isAdmin()) {
+				s = (await api('general', 'get')).settings;
+			}
+		} catch (err) {
+			main.replaceChildren(errorBox(err, () => renderAntispam(main)));
+			return;
+		}
+		const date = ts => new Date(ts * 1000).toLocaleDateString((I.ctx('MAIN_LANG_DEFAULT', 'fr_FR') || 'fr_FR').replace('_', '-'));
+		const me = r.me;
+		const list = r.entries || [];
+		const sw = (name, on, label) => '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + name + '" aria-checked="' + (on ? 'true' : 'false') + '" aria-label="' + esc(label) + '"></button>';
+		let html = '<div class="ibx-page ibx-js-antispam"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavAntispam') + '</h1></div>'
+			+ '<p class="ibx-page__intro">' + th('InboxAntispamHelp') + '</p>';
+
+		// Blocked senders
+		html += '<section class="ibx-section" data-section="blocked"><h2 class="ibx-section__title">' + ic('block') + ' ' + th('InboxAntispamBlocked') + '</h2>'
+			+ '<p class="ibx-muted">' + th('InboxAntispamBlockedHelp') + '</p>';
+		if (s) {
+			html += '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamBlockedSwitch') + '</span><div>' + sw('INBOX_BLOCKED_SENDERS', s.INBOX_BLOCKED_SENDERS !== '0', t('InboxAntispamBlockedSwitch'))
+				+ '<div class="ibx-formrow__help">' + th('InboxAntispamBlockedSwitchHelp') + '</div></div></div>';
+		}
+		if (!r.enabled) {
+			html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxBlockedOff') + '</div></div>';
+		}
+		if (list.length > r.many) {
+			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxBlockedMany', r.many) + '</div></div>';
+		}
+		if (list.length > 10) {
+			html += '<div class="ibx-formrow"><input class="ibx-field ibx-field--medium ibx-js-bsfilter" type="search" placeholder="' + th('InboxBlockedFilter') + '" aria-label="' + th('InboxBlockedFilter') + '" spellcheck="false"></div>';
+		}
+		if (!list.length) {
+			html += '<div class="ibx-empty" style="height:auto">' + ic('block', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxBlockedNone') + '</div><div>' + th('InboxBlockedNoneHelp') + '</div></div>';
+		} else {
+			html += '<table class="ibx-table ibx-bstable"><thead><tr><th>' + th('InboxBlockedSender') + '</th><th>' + th('InboxBlockedBy') + '</th><th>' + th('InboxBlockedNoteCol') + '</th><th></th></tr></thead><tbody>'
+				+ list.map(e => '<tr data-row="' + e.id + '" data-search="' + esc((e.value + ' ' + e.note + ' ' + e.user_creat).toLowerCase()) + '">'
+					+ '<td data-label="' + th('InboxBlockedSender') + '"><b>' + esc(e.value) + '</b>' + (e.type === 'domain' ? ' <span class="ibx-badge">' + th('InboxBlockedTypeDomain') + '</span>' : '')
+					+ (e.known_reason ? '<div class="ibx-muted">' + th('InboxBlockedWasKnown', e.known_reason) + '</div>' : '') + '</td>'
+					+ '<td class="ibx-muted" data-label="' + th('InboxBlockedBy') + '">' + esc(e.user_creat || '-') + '<div>' + esc(date(e.date_creation)) + '</div></td>'
+					+ '<td data-label="' + th('InboxBlockedNoteCol') + '">' + esc(e.note) + (e.mail_subject ? '<div class="ibx-muted">' + th('InboxBlockedFromMail', e.mail_subject) + '</div>' : '') + '</td>'
+					+ '<td class="ibx-table__actions">' + (r.manager || e.user_id === me ? '<button type="button" class="ibx-btn ibx-btn--sm" data-unblock="' + e.id + '">' + th('InboxUnblock') + '</button>' : '') + '</td></tr>').join('')
+				+ '</tbody></table>';
+		}
+		if (r.manager) {
+			html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-bsadd">' + ic('plus') + ' ' + th('InboxBlockedAdd') + '</button></div>';
+		}
+		html += '</section>';
+
+		if (s) {
+			// The junk: « probably legitimate »
+			html += '<section class="ibx-section" data-section="junk"><h2 class="ibx-section__title">' + ic('junk') + ' ' + th('InboxAntispamJunk') + '</h2>'
+				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamLegit') + '</span><div>' + sw('INBOX_JUNK_LEGIT_CHECK', s.INBOX_JUNK_LEGIT_CHECK !== '0', t('InboxAntispamLegit'))
+				+ '<div class="ibx-formrow__help">' + th('InboxAntispamLegitHelp') + '</div></div></div></section>';
+			// Verdict of the server: the receiving servers whose results are believed (moved from Security)
+			html += '<section class="ibx-section" data-section="server"><h2 class="ibx-section__title">' + ic('server') + ' ' + th('InboxAntispamServer') + '</h2>'
+				+ '<div class="ibx-form"><div class="ibx-formrow"><label class="ibx-formrow__label" for="g-auth">' + th('InboxAuthServers') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-auth" data-name="INBOX_AUTH_SERVERS" autocomplete="off" spellcheck="false" placeholder="mx.example.com" value="' + esc(s.INBOX_AUTH_SERVERS || '') + '"><div class="ibx-formrow__help">' + th('InboxAuthServersHelp') + '</div></div></div></div></section>';
+			// The block on each mailbox
+			const states = r.states || [];
+			const badge = x => {
+				const cls = { ok: 'ok', pending: 'warning', foreign: 'warning', nosieve: '', error: 'error' }[x.state] || '';
+				return '<span class="ibx-status' + (cls ? ' ibx-status--' + cls : '') + '"' + (x.error ? ' title="' + esc(x.error) + '"' : '') + '>' + th('InboxBlockedState_' + x.state) + '</span>';
+			};
+			html += '<section class="ibx-section" data-section="boxes"><h2 class="ibx-section__title">' + ic('inbox') + ' ' + th('InboxAntispamBoxes') + '</h2>'
+				+ '<p class="ibx-muted">' + th('InboxAntispamBoxesHelp') + '</p>'
+				+ (states.length ? '<table class="ibx-table"><thead><tr><th>' + th('InboxNavAccounts') + '</th><th>' + th('InboxAntispamBoxState') + '</th><th></th></tr></thead><tbody>'
+					+ states.map(x => '<tr><td data-label="' + th('InboxNavAccounts') + '"><b>' + esc(x.label || x.email) + '</b>' + (x.label ? '<div class="ibx-muted">' + esc(x.email) + '</div>' : '') + '</td>'
+						+ '<td data-label="' + th('InboxAntispamBoxState') + '">' + badge(x) + '<div class="ibx-muted">' + th('InboxBlockedStateHelp_' + x.state) + '</div></td>'
+						+ '<td class="ibx-table__actions"><a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="#/settings/accounts/' + x.id + '/rules">' + th('InboxTabRules') + '</a></td></tr>').join('')
+					+ '</tbody></table>' : '<p class="ibx-muted">' + th('InboxNoAccount') + '</p>')
+				+ '</section>';
+		}
+		html += '</div>';
+		main.innerHTML = html;
+		bindGeneralFields(main);
+		if (parts && parts[0]) {
+			pointSection(main, parts[0]);
+		}
+		// A switch of the list: the page made again (the list says whether it is turned off)
+		$$('.ibx-js-gswitch[data-switch="INBOX_BLOCKED_SENDERS"]', main).forEach(b => b.addEventListener('click', () => setTimeout(() => renderAntispam(main), 400)));
+		const filter = $('.ibx-js-bsfilter', main);
+		if (filter) {
+			filter.addEventListener('input', () => {
+				const q = filter.value.trim().toLowerCase();
+				$$('[data-row]', main).forEach(tr => {
+					tr.hidden = !!q && !tr.dataset.search.includes(q);
+				});
+			});
+		}
+		const add = $('.ibx-js-bsadd', main);
+		if (add) {
+			add.addEventListener('click', () => blockedAddDialog(main));
+		}
+		main.onclick = async e => {
+			const b = e.target.closest('[data-unblock]');
+			if (!b) {
+				return;
+			}
+			const x = list.find(y => y.id === +b.dataset.unblock);
+			if (await confirmDialog({ title: t('InboxUnblockTitle', x.value), text: t('InboxUnblockText'), confirm: t('InboxUnblock') })) {
+				try {
+					await post('blockedsender', 'delete', { id: x.id });
+					toast(t('InboxUnblocked', x.value));
+					renderAntispam(main);
+				} catch (err) {
+					toast(err.message, { error: true });
+				}
+			}
+		};
+	}
+
+	/** Add an address or a domain by hand (managers of the list); a known sender asks the value typed again */
+	function blockedAddDialog(main) {
+		const body = '<form class="ibx-form" novalidate>'
+			+ field('type', t('InboxBlockedType'), 'address', { options: [['address', t('InboxBlockedTypeAddress')], ['domain', t('InboxBlockedTypeDomain')]] })
+			+ field('value', t('InboxBlockedValue'), '', { required: true, autocomplete: 'off', placeholder: 'contact@example.com', help: t('InboxBlockedValueHelp') })
+			+ field('note', t('InboxBlockNote'), '', { autocomplete: 'off', placeholder: t('InboxBlockNotePlaceholder') })
+			+ '<div class="ibx-notice ibx-notice--warning ibx-js-bknown" hidden>' + ic('warning') + '<div class="ibx-notice__text"><b>' + th('InboxBlockKnownTitle') + '</b> <span class="ibx-js-bknownwhy"></span>'
+			+ '<p>' + th('InboxBlockKnownOtherTools') + '</p>'
+			+ '<label class="ibx-blockconfirm" for="ibx-bconfirm2">' + th('InboxBlockKnownType') + ' <b class="ibx-js-bknownval"></b></label>'
+			+ '<input class="ibx-field" id="ibx-bconfirm2" name="confirm" type="text" autocomplete="off" spellcheck="false"></div></div>'
+			+ '</form>';
+		dialog({
+			title: t('InboxBlockedAdd'),
+			body,
+			actions: [{ label: t('InboxBlockButton'), primary: true, run: async dlg => {
+				const values = formValues($('form', dlg));
+				try {
+					await post('blockedsender', 'create', values);
+				} catch (err) {
+					if (err.fields && err.fields.confirm !== undefined) {
+						// Known to Dolibarr: who he is, and the value to type again
+						$('.ibx-js-bknown', dlg).hidden = false;
+						$('.ibx-js-bknownwhy', dlg).textContent = err.fields.confirm;
+						$('.ibx-js-bknownval', dlg).textContent = values.value.trim().toLowerCase();
+						$('[name="confirm"]', dlg).focus();
+						if (values.confirm) {
+							toast(err.message, { error: true });
+						}
+						return false;
+					}
+					toast(err.message, { error: true });
+					return false;
+				}
+				toast(t('InboxBlockedDone', values.value));
+				renderAntispam(main);
+			} }],
+			onOpen: dlg => $('[name="value"]', dlg).focus(),
+		});
 	}
 
 	// ---------- General (admins) ----------

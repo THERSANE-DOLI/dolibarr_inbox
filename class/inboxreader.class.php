@@ -26,6 +26,7 @@ require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
+require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxheaderparser.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
@@ -244,6 +245,8 @@ class InboxReader
 				'sender_why' => self::untrustableSenderWhy($trusted, $message->fromEmail, $passed), 'links' => $links['domains']) : null,
 			// Verdict of the anti-spam filter of the server (1.44.0): SpamAssassin or Rspamd, explained in the reading
 			'spam' => self::spamVerdict($headers),
+			// Blocked sender (1.85.0): who blocked it and when, the user may unblock or not
+			'blocked' => (new InboxBlockedSender($this->db))->viewFor($user, $message->fromEmail),
 			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)

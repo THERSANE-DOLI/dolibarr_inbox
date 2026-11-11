@@ -68,6 +68,9 @@ function inboxGeneralSettings()
 		'INBOX_IMAGES_ALWAYS' => array('default' => 'domain', 'check' => array('domain', 'sender', 'never')),
 		'INBOX_UNSUBSCRIBE' => array('default' => 'oneclick', 'check' => array('oneclick', 'mail', 'off')),
 		'INBOX_BANK_CHECK' => array('default' => '1', 'check' => 'int:0:1'),
+		// Anti-spam (1.85.0): blocked senders, « probably legitimate » in the junk
+		'INBOX_BLOCKED_SENDERS' => array('default' => '1', 'check' => 'int:0:1'),
+		'INBOX_JUNK_LEGIT_CHECK' => array('default' => '1', 'check' => 'int:0:1'),
 	);
 }
 

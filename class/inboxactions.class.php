@@ -52,6 +52,9 @@ class InboxActions
 	/** @var array<int,InboxAccount> */
 	protected $accounts = array();
 
+	/** @var bool Action of inbox itself (blocked senders put away by the synchronisation): no check of the access */
+	protected $system = false;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -67,6 +70,28 @@ class InboxActions
 	{
 		foreach ($this->connectors as $c) {
 			$c->disconnect();
+		}
+	}
+
+	/**
+	 * Action of inbox itself, not of a user: the mails of a blocked sender put away by the synchronisation (1.85.0).
+	 * The access of the user is not checked (he is the user of the job); only « blocked » (junk) is allowed.
+	 *
+	 * @param User   $user    User written in the journal
+	 * @param string $action  blocked
+	 * @param int[]  $mailIds Rows of the index
+	 * @return array{ok:bool,count:int,undo:array<int,array<string,mixed>>,error:string,ids:array<int,int>,rest:int[]}
+	 */
+	public function runAsSystem(User $user, $action, array $mailIds)
+	{
+		if ($action !== 'blocked') {
+			return array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => 'Unknown action', 'ids' => array(), 'rest' => array());
+		}
+		$this->system = true;
+		try {
+			return $this->run($user, $action, $mailIds);
+		} finally {
+			$this->system = false;
 		}
 	}
 
@@ -132,6 +157,13 @@ class InboxActions
 				case 'notjunk':
 					$res = $this->junk($user, $list, $action === 'junk');
 					break;
+				case 'blocked':
+					// Blocked sender (1.85.0): junk, written « blocked » in the journal; by inbox itself only
+					$res = $this->system ? $this->junk($user, $list, true, 'blocked') : null;
+					if ($res === null && !$this->system) {
+						$this->error = 'Unknown action';
+					}
+					break;
 				default:
 					$this->error = 'Unknown action';
 			}
@@ -174,6 +206,9 @@ class InboxActions
 		if (!is_array($rows) || count($rows) !== count($mailIds)) {
 			$this->error = 'InboxMailNotFound';
 			return null;
+		}
+		if ($this->system) {
+			return $rows;
 		}
 		$access = new InboxAccess($this->db);
 		foreach ($rows as $r) {
@@ -578,9 +613,10 @@ class InboxActions
 	 * @param User     $user User
 	 * @param object[] $list Rows of one folder
 	 * @param bool     $junk Junk
+	 * @param string   $kind Action written in the journal ('' = junk or notjunk)
 	 * @return array<string,mixed>|null
 	 */
-	protected function junk(User $user, array $list, $junk)
+	protected function junk(User $user, array $list, $junk, $kind = '')
 	{
 		$first = $list[0];
 		$target = $this->roleFolder((int) $first->fk_account, $junk ? 'junk' : 'inbox');
@@ -596,7 +632,7 @@ class InboxActions
 		if ($tags === null) {
 			return null;
 		}
-		$moved = $this->moveTo($user, $list, (int) $target->rowid, $junk ? 'junk' : 'notjunk');
+		$moved = $this->moveTo($user, $list, (int) $target->rowid, $kind !== '' ? $kind : ($junk ? 'junk' : 'notjunk'));
 		if ($moved === null) {
 			return null;
 		}
