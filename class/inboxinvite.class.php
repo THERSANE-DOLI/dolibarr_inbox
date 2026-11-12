@@ -213,7 +213,7 @@ class InboxInvite
 		$org = $e['organizer'];
 		$state = $e['uid'] !== '' ? $this->state($user, $e['uid']) : null;
 		$agenda = $state ? $this->agendaRow((int) $state->fk_actioncomm) : null;
-		$canSend = in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true);
+		$canSend = InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND);
 		$cancelled = $method === 'CANCEL' || $e['status'] === 'CANCELLED';
 		$conflicts = array();
 		if ($method === 'REQUEST' && !$cancelled && $e['start'] && !$e['allday']) {
@@ -314,7 +314,7 @@ class InboxInvite
 		}
 		$sent = false;
 		if ($send) {
-			if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 				return $this->fail('no_send');
 			}
 			$org = $e['organizer'];

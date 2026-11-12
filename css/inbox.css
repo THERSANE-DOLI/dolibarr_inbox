@@ -257,6 +257,8 @@
 	border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-sm); white-space: nowrap;
 }
 .ibx-badge--accent { color: var(--ibx-accent); background: var(--ibx-accent-soft); border-color: transparent; }
+.ibx-badge--warning { color: var(--ibx-text); background: var(--ibx-warning-soft); border-color: transparent; }
+.ibx-badge--warning .ibx-icon { color: var(--ibx-warning); }
 .ibx-badge--link { cursor: pointer; }
 .ibx-badge--link:hover { border-color: var(--ibx-accent); }
 .ibx-badge__remove { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 0.125rem; font-size: 0.6875rem; }
@@ -382,6 +384,8 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-tree__row--account { margin-top: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); }
 .ibx-tree__row--account .ibx-tree__icon { color: var(--ibx-accent); }
 .ibx-tree__row.has-unread .ibx-tree__label { font-weight: 700; }
+/* Mails on their way into the folder (1.90.1): discreet, the color of the text around */
+.ibx-tree__busy { width: 0.625rem; height: 0.625rem; border-width: 1.5px; opacity: 0.7; }
 .ibx-tree__row.has-error .ibx-tree__icon { color: var(--ibx-warning); }
 
 /* ===== 8. List toolbar, bulk bar ===== */
@@ -2458,6 +2462,9 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-requester__who { font-weight: 600; }
 
 /* Form of a data source (1.74.0): start (ready-made, from a mail), rows of pairs, analysis, glossary */
+.ibx-srctable__switch { width: 1%; }
+.ibx-srctable tr.is-off td:not(.ibx-srctable__switch):not(.ibx-table__actions) { color: var(--ibx-text-muted); }
+.ibx-srcstatus__hint { margin: 0; }
 .ibx-srcstart { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2) var(--ibx-s3); margin-bottom: var(--ibx-s3); }
 .ibx-srcfrom { display: grid; gap: var(--ibx-s2); margin-bottom: var(--ibx-s3); }
 .ibx-srcrows { display: grid; gap: var(--ibx-s1); margin-bottom: var(--ibx-s1); }
@@ -2501,6 +2508,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bank__foot { display: flex; justify-content: flex-end; margin-top: var(--ibx-s2); }
 
 /* Shared domains (lot A7, 1.76.0) */
+/* Access: what each level gives (1.91.0) */
+.ibx-levels { margin-bottom: var(--ibx-s3); }
+.ibx-levels > summary { cursor: pointer; font-weight: 600; }
+.ibx-levels__table { margin-top: var(--ibx-s2); max-width: 60rem; }
+.ibx-levels__table th[scope="row"] { font-weight: 400; text-align: left; }
+.ibx-levels__table thead th:not(:first-child), .ibx-levels__table td { text-align: center; width: 7.5rem; }
+.ibx-levels__table td .ibx-icon { color: var(--ibx-accent); }
 .ibx-domwhy { margin-bottom: var(--ibx-s3); }
 .ibx-domwhy > summary { cursor: pointer; font-weight: 600; }
 .ibx-domwhy dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--ibx-s1) var(--ibx-s3); margin: var(--ibx-s2) 0 0; }

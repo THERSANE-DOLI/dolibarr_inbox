@@ -784,9 +784,10 @@ class InboxSituation
 	 * @param object $row       Mail of the index (rowid, fk_account, thread_key, from_email)
 	 * @param int    $socId     New thirdparty (readable by the user: checked by the caller)
 	 * @param bool   $remember  For the next mails of this address too
+	 * @param ?string $email    Address of the other side (null: the requester, else the sender)
 	 * @return int Mails changed, < 0 KO
 	 */
-	public function setThirdparty(User $user, $row, $socId, $remember)
+	public function setThirdparty(User $user, $row, $socId, $remember, $email = null)
 	{
 		global $conf;
 
@@ -798,7 +799,8 @@ class InboxSituation
 		$this->db->begin();
 		// The contact: the one of the new thirdparty with the address of the sender, if any
 		// The address of the requester for a mail sent by a site (data sources, 1.72.0)
-		$email = strtolower(trim((string) (($row->requester_email ?? '') !== '' ? $row->requester_email : $row->from_email)));
+		// The address of the other side given by the caller (1.92.2): the recipient of a mail written by us
+		$email = strtolower(trim((string) ($email ?? (($row->requester_email ?? '') !== '' ? $row->requester_email : $row->from_email))));
 		$contact = $this->db->getRow("SELECT rowid FROM ".$p."socpeople WHERE fk_soc = ".((int) $socId)." AND LOWER(email) = '".$this->db->escape($email)."' AND statut = 1 ORDER BY rowid");
 		$sql = "UPDATE ".$p."inbox_mail SET fk_soc = ".((int) $socId).", fk_socpeople = ".(is_object($contact) ? (int) $contact->rowid : 'NULL').", soc_manual = 1 WHERE ".$where;
 		if (!$this->db->query($sql)) {

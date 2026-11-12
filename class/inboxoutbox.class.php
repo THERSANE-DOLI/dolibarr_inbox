@@ -207,7 +207,7 @@ class InboxOutbox
 		// The rights may have changed during the delay
 		$access = new InboxAccess($this->db);
 		InboxAccess::clearCache();
-		if (!in_array($access->getLevel($author, (int) $account->id), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($access->getLevel($author, (int) $account->id), InboxAccess::LEVEL_SEND)) {
 			return $this->failed($row, 'no_send', 'No right to send from the mailbox', $direct);
 		}
 		if (getDolGlobalString('MAIN_DISABLE_ALL_MAILS')) {

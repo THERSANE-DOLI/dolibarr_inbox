@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.90.0';
+		$this->version = '1.92.3';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -452,6 +452,13 @@ class modInbox extends DolibarrModules
 				}
 			}
 			$done = '1.35.1';
+		}
+		if (version_compare($done, '1.92.1', '<')) {
+			// 1.92.1: the mails of a data source (site form) no longer join by the subject; the conversations already
+			// merged are made again (the keys left are given by the next synchronisations)
+			dol_include_once('/inbox/class/inboxdatasource.class.php');
+			InboxDataSource::rethread($this->db, microtime(true) + 3);
+			$done = '1.92.1';
 		}
 		dolibarr_set_const($this->db, 'INBOX_SCHEMA_VERSION', $done, 'chaine', 0, 'Data changes of inbox already done', $conf->entity);
 

@@ -81,7 +81,8 @@ class InboxFolderAdmin
 	 */
 	public function create(User $user, $accountId, $parentId, $name)
 	{
-		if (!$this->open($user, (int) $accountId, InboxAccess::LEVEL_MANAGE)) {
+		// Level « handle » (1.92.0): creating and renaming a folder is part of sorting the mails
+		if (!$this->open($user, (int) $accountId, InboxAccess::LEVEL_HANDLE)) {
 			return -1;
 		}
 		$parent = null;
@@ -117,7 +118,7 @@ class InboxFolderAdmin
 	 */
 	public function rename(User $user, $folderId, $name)
 	{
-		$f = $this->managed($user, (int) $folderId);
+		$f = $this->managed($user, (int) $folderId, InboxAccess::LEVEL_HANDLE);
 		if (!$f) {
 			return -1;
 		}
@@ -149,7 +150,7 @@ class InboxFolderAdmin
 	 */
 	public function move(User $user, $folderId, $targetId)
 	{
-		$f = $this->managed($user, (int) $folderId);
+		$f = $this->managed($user, (int) $folderId, InboxAccess::LEVEL_HANDLE);
 		if (!$f) {
 			return -1;
 		}
@@ -282,8 +283,9 @@ class InboxFolderAdmin
 	 */
 	public function emptyFolder(User $user, $folderId, $confirm = false)
 	{
+		// Level « handle » (1.92.0): removing for good from the trash or junk
 		$row = $this->db->getRow("SELECT fk_account FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = ".InboxFolder::STATUS_PRESENT);
-		if (!is_object($row) || !$this->open($user, (int) $row->fk_account, InboxAccess::LEVEL_MANAGE)) {
+		if (!is_object($row) || !$this->open($user, (int) $row->fk_account, InboxAccess::LEVEL_HANDLE)) {
 			$this->error = $this->error ?: 'InboxErrorFolderNotFound';
 			return -1;
 		}
@@ -348,7 +350,7 @@ class InboxFolderAdmin
 			return false;
 		}
 		if (!$access->check($user, (int) $accountId, $level)) {
-			$this->error = 'InboxErrorNeedManage';
+			$this->error = InboxAccess::needKey($level);
 			return false;
 		}
 		$account = new InboxAccount($this->db);
@@ -375,10 +377,10 @@ class InboxFolderAdmin
 	 * @param int  $folderId Folder
 	 * @return object|null
 	 */
-	protected function managed(User $user, $folderId)
+	protected function managed(User $user, $folderId, $level = InboxAccess::LEVEL_MANAGE)
 	{
 		$row = $this->db->getRow("SELECT fk_account FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = ".InboxFolder::STATUS_PRESENT);
-		if (!is_object($row) || !$this->open($user, (int) $row->fk_account, InboxAccess::LEVEL_MANAGE)) {
+		if (!is_object($row) || !$this->open($user, (int) $row->fk_account, $level)) {
 			$this->error = $this->error ?: 'InboxErrorFolderNotFound';
 			return null;
 		}

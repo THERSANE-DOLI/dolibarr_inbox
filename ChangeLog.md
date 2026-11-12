@@ -1,5 +1,72 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: data sources, active or not with a switch :   1.92.3
+  - the list shows a switch in front of each source, saved at once (back to its state with the error if refused);
+    the badge « Active » goes, a source turned off is greyed.
+  - « Without effect » beside a source active without trusted sender (it reads no mail).
+  - « Remove » moves to the « ⋯ » menu of the row, no longer beside « Edit ».
+  - in the form, « Active » is the first setting, a switch saved with the form, its hint says what the source does.
+  - « Start from » (ready-made source, mail of the site) only when the source is created.
+
+- FIX: mail written by the mailbox, the thirdparty of its recipient instead of the ones of our domain :   1.92.2
+  - a mail sent by the mailbox (or by another address of our domains) looked for its thirdparty by its own address,
+    then offered every thirdparty using our domain (« 5 thirdparties use the domain … : which one? »).
+  - the panel Dolibarr now looks at the recipients outside of us (to, then cc), the first known in Dolibarr first,
+    under the label « Recipient »; the user of Dolibarr who wrote stays shown.
+  - our domains are never offered as a shared domain; a mail between us offers nothing.
+  - « Not the right thirdparty? » remembers the address of the recipient for such a mail, nothing for a mail between
+    us.
+  - « New customer » is no longer offered from such a mail (it would read our own signature).
+
+- FIX: mails of a site form, one conversation per requester instead of one for all :   1.92.1
+  - a form sends every request from the same address with the same subject: the fallback « same subject, same
+    correspondent » put them all in one conversation, with every answer to every customer.
+  - for a mail of a data source, the correspondent is now the requester read in its headers; without a requester
+    known, the mail never joins by the subject (only by its references: In-Reply-To, References).
+  - conversations made again when a data source is saved active, and once at the update: the mails already merged
+    are split (the links to Dolibarr stay on each mail).
+
+- NEW: access level « Handle », between « Read and send » and « Manage all » :   1.92.0
+  - « Handle » looks after the mails: tag, move (also to another mailbox handled), archive, trash and junk, delete
+    for good, empty the trash or the junk, ignore a conversation, create, rename and move folders, import mails.
+  - « Manage all » keeps the mailbox itself: deleting a folder, identities, templates, rules, blocked senders,
+    unsubscribe, accesses, journal.
+  - existing accesses unchanged: a person in « Read and send » stays there until raised.
+  - the checks « at least send » compare the ranks of the levels, so « Handle » sends too; error « this action needs
+    the level Handle » for the actions it opens.
+
+- NEW: access of a mailbox, what each level gives shown :   1.91.0
+  - levels named so that each one holds the one before: « Read », « Read and send », « Manage all » (also in the
+    messages that name them).
+  - « What each level allows »: a table of checks per level, open while nobody uses the mailbox, folded after.
+  - under the level chosen to give an access: what the person will do, and what she will not.
+  - the help no longer says that « Read » tags: tagging needs « Manage all », as moving or deleting.
+
+- FIX: one « Undo » toast at a time :   1.90.4
+  - a new toast with « Undo » replaces the previous one instead of stacking under it: the one above looked like the
+    undo of the last action. The older actions can still be undone from the journal.
+
+- FIX: undo of a move into or out of a subfolder, no more « Bad undo » :   1.90.3
+  - the journal writes the folders as people read them (« INBOX / Trash » for INBOX.Trash), the check of the undo
+    compared them with the path of the server: every undo touching a subfolder was refused (since 1.35.1).
+  - the path of the server is now compared in the form of the journal too.
+
+- FIX: undo of a mail put in the trash or in junk, the mail followed to its new row :   1.90.2
+  - a mail moved back may get a new row (mail server that does not give its new identifier: the folder is read
+    again); « unread again » (1.90.0) and the keywords now follow it to that row instead of the old one.
+
+- FIX: a mail moved, at once on the screen until the server is done :   1.90.1
+  - the mail no longer comes back in the list while the server moves it (refresh of the list, synchronisation,
+    another tab): it stays out of the lists read meanwhile.
+  - toast « Moved to … » with « Undo » as soon as the mail is dropped (under 20 mails); an undo asked before the end
+    is done once the server has finished.
+  - the folder reached counts the mail at once, with a small spinner while the server works; the counts of the
+    folders concerned are no longer taken from the server meanwhile.
+  - an error alone is told, naming the mail and the folder; the mail goes back to its place without replacing the
+    list shown now (another folder opened, another action done meanwhile).
+  - the page asks before being closed while a move runs.
+  - same behaviour for archive, delete and junk.
+
 - NEW: a mail put in the trash or in junk is marked read :   1.90.0
   - « Delete », « Junk » and a move by hand to the trash or to junk mark the mail read first: it no longer counts
     as unread there.

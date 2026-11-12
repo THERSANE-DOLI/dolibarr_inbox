@@ -516,6 +516,9 @@ class InboxDataSource
 				return -2;
 			}
 			self::reset();
+			if ($status && $senders) {
+				self::rethread($this->db, microtime(true) + 5);
+			}
 			return (int) $id;
 		}
 		$n = $this->db->getRow("SELECT COUNT(rowid) AS n FROM ".$p."inbox_source WHERE entity = ".((int) $conf->entity));
@@ -531,8 +534,34 @@ class InboxDataSource
 			return -2;
 		}
 		self::reset();
+		$newId = (int) $this->db->last_insert_id($p.'inbox_source');
+		if ($status && $senders) {
+			self::rethread($this->db, microtime(true) + 5);
+		}
 
-		return (int) $this->db->last_insert_id($p.'inbox_source');
+		return $newId;
+	}
+
+	/**
+	 * Conversations made again in the mailboxes of the entity (1.92.1): the mails of a trusted sender follow the rule
+	 * of the sources (InboxThreader), including the ones indexed before the source was declared
+	 *
+	 * @param DoliDB $db       Database handler
+	 * @param float  $deadline Microtime limit for the keys given at once (the rest at the next synchronisation)
+	 * @return int Mails whose conversation is made again
+	 */
+	public static function rethread(DoliDB $db, $deadline)
+	{
+		global $conf;
+
+		require_once __DIR__.'/inboxthreader.class.php';
+		$done = 0;
+		$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE entity = ".((int) $conf->entity)." ORDER BY rowid LIMIT 500");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$done += (new InboxThreader($db))->rethreadSources((int) $r->rowid, $deadline);
+		}
+
+		return $done;
 	}
 
 	/**

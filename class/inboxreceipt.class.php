@@ -78,7 +78,7 @@ class InboxReceipt
 	{
 		$to = self::firstAddress(InboxReader::headerValue($headers, 'Disposition-Notification-To'));
 		if ($to === '' || $mode === 'never' || (string) $reader->row->folder_role === 'junk'
-			|| !in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			|| !InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			return null;
 		}
 		foreach (preg_split('/\s+/', strtolower((string) $reader->row->keywords)) as $k) {
@@ -114,7 +114,7 @@ class InboxReceipt
 			$this->errorCode = 'not_found';
 			return null;
 		}
-		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			$this->errorCode = 'no_send';
 			return null;
 		}

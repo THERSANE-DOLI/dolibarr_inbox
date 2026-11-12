@@ -94,7 +94,7 @@ if ($res['error'] !== '') {
 	$message = preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key) : $langs->transnoentities('InboxActionServerError', $key);
 }
 if (!$res['ok']) {
-	$codes = array('InboxMailNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorNeedManageTarget' => 403, 'InboxErrorConfirmDelete' => 409,
+	$codes = array('InboxMailNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorNeedManageTarget' => 403, 'InboxErrorNeedHandle' => 403, 'InboxErrorNeedHandleTarget' => 403, 'InboxErrorConfirmDelete' => 409,
 		'InboxErrorFolderNotFound' => 404, 'No mail' => 400, 'Invalid tags' => 400);
 	inboxAjaxReply(array('error' => $message, 'code' => (string) $res['error']), $codes[(string) $res['error']] ?? 502);
 }

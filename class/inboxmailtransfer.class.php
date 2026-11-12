@@ -91,7 +91,7 @@ class InboxMailTransfer
 			return false;
 		}
 		if (!$access->check($user, (int) $f->fk_account, $level)) {
-			$this->error = 'InboxErrorNeedManage';
+			$this->error = InboxAccess::needKey($level);
 			return false;
 		}
 		$account = new InboxAccount($this->db);

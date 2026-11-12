@@ -308,6 +308,16 @@
 		if (o.key) {
 			el.dataset.toastKey = o.key;
 		}
+		// One « Undo » at a time (1.90.4): a new one replaces the previous one, never two stacked (the one above would
+		// look like the undo of the last action); the older actions stay in the journal
+		const undo = o.action && o.action === t('InboxUndo');
+		if (undo) {
+			el.dataset.toastUndo = '1';
+			box.querySelectorAll(':scope > [data-toast-undo]').forEach(x => {
+				clearTimeout(x._ibxTimer);
+				x.remove();
+			});
+		}
 		box.appendChild(el);
 		// The last two only: older ones are not worth stacking (their « Undo » stays in the journal)
 		const shown = box.querySelectorAll(':scope > .ibx-toast');

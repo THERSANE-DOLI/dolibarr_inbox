@@ -80,8 +80,8 @@ class InboxThreadMark
 			$this->error = 'InboxMailNotFound';
 			return -1;
 		}
-		if ($mode === self::IGNORE && !$access->check($user, (int) $m->fk_account, InboxAccess::LEVEL_MANAGE)) {
-			$this->error = 'InboxErrorNeedManage';
+		if ($mode === self::IGNORE && !$access->check($user, (int) $m->fk_account, InboxAccess::LEVEL_HANDLE)) {
+			$this->error = 'InboxErrorNeedHandle';
 			return -1;
 		}
 		if ((string) $m->thread_key === '') {

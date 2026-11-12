@@ -82,6 +82,9 @@
 		// Conversations unfolded in the list (key of the thread) and their mails
 		expanded: new Set(),
 		threadCache: {},
+		// Actions leaving a folder still running on the server (1.90.1): their mails stay out of the lists read
+		// meanwhile, the counts of their folders are not taken from the server
+		pending: new Set(),
 	};
 	try {
 		(JSON.parse(params.tree_collapsed || '[]') || []).forEach(k => S.collapsed.add(String(k)));
@@ -1148,6 +1151,8 @@
 			// An ordinary folder unfolded on its subfolders is drawn open
 			+ folderIcon(f, open, 'ibx-tree__icon')
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
+			// Mails on their way into it (1.90.1): the work goes on on the server
+			+ (pendingTargets().has(f.id) ? '<span class="ibx-spinner ibx-tree__busy" role="img" title="' + th('InboxProgressMove', folderName(f)) + '" aria-label="' + th('InboxProgressMove', folderName(f)) + '"></span>' : '')
 			+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
 			// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
 			+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
@@ -1399,13 +1404,13 @@
 					const again = S.rows.filter(r => r.thread && S.expanded.has(r.thread.key));
 					Promise.all(again.map(r => api('mail', 'thread', { id: r.id }).then(x => {
 						learnPeople(x.people);
-						S.threadCache[r.thread.key] = x.mails || [];
+						S.threadCache[r.thread.key] = pendingKeep(x.mails, true);
 					}).catch(() => {}))).then(() => renderList());
 				}
 			} else {
 				S.expanded.clear();
 				S.threadCache = {};
-				S.rows = res.rows;
+				S.rows = pendingKeep(res.rows);
 				S.next = res.next;
 			}
 			S.total = res.total;
@@ -1457,6 +1462,7 @@
 	 * (flags changed, mails gone, new mails on top); the rows loaded beyond it are kept. The view does not jump.
 	 */
 	function mergeRows(fresh, next) {
+		fresh = pendingKeep(fresh);
 		const oldIds = new Set(S.rows.map(r => r.id));
 		const freshIds = new Set(fresh.map(r => r.id));
 		S.newCount = fresh.filter(r => !oldIds.has(r.id)).length;
@@ -1684,7 +1690,7 @@
 			try {
 				const res = await api('mail', 'thread', { id: rowId });
 				learnPeople(res.people);
-				S.threadCache[key] = res.mails || [];
+				S.threadCache[key] = pendingKeep(res.mails, true);
 			} catch (err) {
 				S.expanded.delete(key);
 				toast(err.message, { error: true });
@@ -3726,6 +3732,12 @@
 		const e = r ? S.folders.get(r.folder) : null;
 		return e ? e.account : null;
 	}
+	/** Rank of the levels of access (1.92.0: « handle » between « send » and « manage ») */
+	const LEVEL_RANK = { read: 1, send: 2, handle: 3, manage: 4 };
+	/** A mailbox (or a mail, by its level) where the mails may be handled: tagged, moved, deleted, folders created */
+	function canHandle(x) {
+		return (LEVEL_RANK[x && x.level] || 0) >= LEVEL_RANK.handle;
+	}
 	/** Why an action is refused on these mails ('' = allowed); the server checks it again */
 	function refusal(what, ids) {
 		if (!MANAGING.has(what)) {
@@ -3733,7 +3745,7 @@
 		}
 		for (const id of ids) {
 			const a = accountOfRow(rowOf(id));
-			if (a && a.level !== 'manage') {
+			if (a && !canHandle(a)) {
 				return t('InboxReadOnlyOn', a.email);
 			}
 		}
@@ -3755,9 +3767,116 @@
 		});
 	}
 
+	// ---------- Actions still running on the server (1.90.1) ----------
+	/**
+	 * Rows of a list read from the server without the mails of the actions still running: they left the screen, a
+	 * refresh (poll, synchronisation, another action) must not show them again before the server is done
+	 * @param {object[]} list Rows or mails
+	 * @param {boolean} mailsOnly Mails of a conversation: by id only (the thread key would take them all)
+	 * @returns {object[]}
+	 */
+	function pendingKeep(list, mailsOnly) {
+		list = list || [];
+		if (!S.pending.size) {
+			return list;
+		}
+		return list.filter(r => {
+			for (const a of S.pending) {
+				if (a.ids.has(r.id) || (!mailsOnly && r.thread && a.threads.has(r.thread.key) && a.from.has(r.folder))) {
+					return false;
+				}
+			}
+			return true;
+		});
+	}
+	/** Folders left or reached by an action running: their counts stay the ones of the screen */
+	function pendingFolders() {
+		const out = new Set();
+		S.pending.forEach(a => {
+			a.from.forEach(id => out.add(id));
+			a.to.forEach(id => out.add(id));
+		});
+		return out;
+	}
+	/** Folders reached by an action running (a spinner on them in the tree) */
+	function pendingTargets() {
+		const out = new Set();
+		S.pending.forEach(a => a.to.forEach(id => out.add(id)));
+		return out;
+	}
+	/** Folder where a leaving action puts the mail (null: none known, or removed for good) */
+	function targetOf(what, r, p) {
+		if (what === 'move') {
+			const e = S.folders.get(p.folder);
+			return e ? e.folder : null;
+		}
+		if (what === 'delete') {
+			return p.confirm ? null : roleFolderOf(r, 'trash');
+		}
+		return roleFolderOf(r, { archive: 'archive', junk: 'junk', notjunk: 'inbox' }[what] || '');
+	}
+	/** The page asks before being closed while an action runs (a move to another mailbox is driven from here) */
+	function leaveGuard(e) {
+		e.preventDefault();
+		e.returnValue = '';
+	}
+	/**
+	 * An action leaving a folder registered while it runs; the folders reached count its mails at once
+	 * @returns {object} Given to pendingDone
+	 */
+	function pendingAdd(what, rows, p, expand) {
+		const a = { ids: new Set(rows.map(r => r.id)), threads: new Set(), from: new Set(), to: new Set(), added: [] };
+		rows.forEach(r => {
+			a.from.add(r.folder);
+			const n = r.thread && expand.includes(r.id) ? Math.max(1, r.thread.count || 1) : 1;
+			if (n > 1) {
+				a.threads.add(r.thread.key);
+			}
+			const f = targetOf(what, r, p);
+			if (!f || f.id === r.folder) {
+				return;
+			}
+			a.to.add(f.id);
+			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user)
+			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
+			f.total = (f.total || 0) + n;
+			f.unread = (f.unread || 0) + unread;
+			a.added.push({ f, n, unread });
+		});
+		if (!S.pending.size) {
+			window.addEventListener('beforeunload', leaveGuard);
+		}
+		S.pending.add(a);
+		renderTree();
+		return a;
+	}
+	/** The server answered: the mails are no longer kept out, the tree takes the counts of the server again */
+	function pendingDone(a, failed) {
+		S.pending.delete(a);
+		if (!S.pending.size) {
+			window.removeEventListener('beforeunload', leaveGuard);
+		}
+		if (failed) {
+			a.added.forEach(x => {
+				x.f.total = Math.max(0, (x.f.total || 0) - x.n);
+				x.f.unread = Math.max(0, (x.f.unread || 0) - x.unread);
+			});
+		}
+		renderTree();
+	}
+	/** Mails of an action told in its toast before the server counts them (a folded conversation: its mails) */
+	function estimateCount(rows, expand) {
+		return rows.reduce((n, r) => n + (r.thread && expand.includes(r.id) ? Math.max(1, r.thread.count || 1) : 1), 0);
+	}
+	/** What the list shows (folder, view, search): an answer coming late only touches the list it was given for */
+	function listKey() {
+		return JSON.stringify([S.scope, S.folderId, S.q, S.scope === 'view' ? listQuery('') : '']);
+	}
+
 	/**
 	 * Run an action: at once on the screen, then on the server by batches; refused = back as before with the reason
-	 * and « Retry »; done = toast « Undo » 8 s
+	 * and « Retry »; done = toast « Undo » 8 s. A leaving action (1.90.1) tells its toast at once and keeps its mails
+	 * out of the list until the server answers; an error alone is told after
 	 * @param {string} what seen, flag, tag, move, archive, delete, junk, notjunk
 	 * @param {number[]} ids Mails
 	 * @param {object} p on, add, remove, folder, confirm
@@ -3785,16 +3904,47 @@
 			p.confirm = 1;
 		}
 		const leaving = LEAVING.has(what) && !(what === 'move' && rows.every(r => r.folder === p.folder));
-		const restore = leaving ? leaveRows(ids, o) : applyLocal(what, rows, p);
 		const expand = foldedThreads(ids);
+		const restore = leaving ? leaveRows(ids, o) : applyLocal(what, rows, p);
 		if (expand.length) {
 			p.expand = expand;
 		}
-		const res = await sendAction(what, ids, p);
+		const track = leaving ? pendingAdd(what, rows, p, expand) : null;
+		// Under 20 mails no progress is shown: the toast comes at once, its « Undo » waits for the server if needed
+		const early = leaving && !o.quiet && ids.length < PROGRESS_FROM;
+		let settled = null;
+		let undoAsked = false;
+		let earlyToast = null;
+		if (early) {
+			earlyToast = toast(o.label || actionLabel(what, estimateCount(rows, expand), p), p.confirm ? {} : { action: t('InboxUndo'), onAction: () => {
+				if (settled) {
+					if (settled.undo.length) {
+						undoAction(settled);
+					}
+					return;
+				}
+				undoAsked = true;
+				toast(t('InboxUndoQueued'));
+			} });
+		}
+		let res = null;
+		try {
+			res = await sendAction(what, ids, p);
+		} finally {
+			if (track) {
+				pendingDone(track, !res || !res.count);
+			}
+		}
+		settled = res;
 		if (!res.count) {
+			// The toast « Moved » told too early: only the error stays
+			if (earlyToast) {
+				clearTimeout(earlyToast._ibxTimer);
+				earlyToast.remove();
+			}
 			restore();
 			if (!res.stopped) {
-				toast(res.error || t('InboxErrorServer', ''), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
+				toast(failureText(what, rows, p, res.error), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
 			}
 			return null;
 		}
@@ -3816,7 +3966,11 @@
 			refreshTree();
 		}
 		Dolibarr.executeHook(leaving ? 'inbox:mail:moved' : 'inbox:mail:flagged', { action: what, ids, folder: p.folder || 0, count: res.count });
-		if (!o.quiet) {
+		if (undoAsked) {
+			if (res.undo.length) {
+				undoAction(res);
+			}
+		} else if (!o.quiet && !early) {
 			const text = o.label || actionLabel(what, res.count, p);
 			if (res.undo.length) {
 				toast(text, { action: t('InboxUndo'), onAction: () => undoAction(res) });
@@ -3970,11 +4124,24 @@
 
 	async function undoAction(res) {
 		let failed = '';
+		// A mail moved back may come with a new row (server without the new identifier of the mail: the folder read
+		// again): the next steps (unread again, 1.90.0; keywords) follow it to its new row
+		const moved = {};
 		for (const u of res.undo) {
-			const r = await sendAction(u.action, u.ids, { on: u.on, add: u.add || [], remove: u.remove || [], folder: u.folder || 0 }, res.log);
+			const ids = (u.ids || []).map(id => moved[id] || id);
+			const r = await sendAction(u.action, ids, { on: u.on, add: u.add || [], remove: u.remove || [], folder: u.folder || 0 }, res.log);
 			if (r.error && !r.count) {
 				failed = r.error;
 			}
+			Object.keys(r.ids || {}).forEach(from => {
+				const to = +r.ids[from];
+				Object.keys(moved).forEach(k => {
+					if (moved[k] === +from) {
+						moved[k] = to;
+					}
+				});
+				moved[from] = to;
+			});
 		}
 		await loadList(true);
 		refreshTree();
@@ -4024,20 +4191,63 @@
 			showMulti();
 		}
 		renderBulkBar();
+		// Given back late (1.90.1): only to the list it left, the rest of the list as it is now (another action, a
+		// refresh), the selection only when the user did not choose something else meanwhile
+		const key = listKey();
+		const openAfter = S.openId;
 		return () => {
-			S.rows = before.rows;
-			S.selected = before.selected;
-			S.anchor = before.anchor;
-			S.total = before.total;
-			S.threadCache = before.cache;
+			refreshTree();
+			if (listKey() !== key) {
+				return;
+			}
+			const back = putBack(before.rows, S.rows, set);
+			S.total += back.length - S.rows.length;
+			S.rows = back;
+			for (const k in before.cache) {
+				if (S.threadCache[k]) {
+					S.threadCache[k] = putBack(before.cache[k], S.threadCache[k], set);
+				}
+			}
+			const untouched = S.openId === openAfter;
+			if (untouched) {
+				S.selected = new Set(Array.from(before.selected).filter(id => S.rows.some(r => r.id === id)));
+				S.anchor = before.anchor;
+			}
 			renderList();
 			renderListHead();
-			refreshTree();
-			if (before.open && S.selected.size <= 1) {
+			if (untouched && before.open && S.selected.size <= 1) {
 				openMail(before.open);
 			}
 			renderBulkBar();
 		};
+	}
+
+	/**
+	 * Mails given back to a list at their place of before, after the row before them that is still there
+	 * @param {object[]} old List before the action
+	 * @param {object[]} cur List now
+	 * @param {Set<number>} set Mails given back
+	 * @returns {object[]}
+	 */
+	function putBack(old, cur, set) {
+		const out = cur.slice();
+		const has = new Set(out.map(r => r.id));
+		old.forEach((r, i) => {
+			if (!set.has(r.id) || has.has(r.id)) {
+				return;
+			}
+			let at = 0;
+			for (let j = i - 1; j >= 0; j--) {
+				const k = out.findIndex(x => x.id === old[j].id);
+				if (k >= 0) {
+					at = k + 1;
+					break;
+				}
+			}
+			out.splice(at, 0, r);
+			has.add(r.id);
+		});
+		return out;
 	}
 
 	/** Flags and tags changed on the screen at once; the function given back puts them back */
@@ -4107,6 +4317,25 @@
 		if (subject) {
 			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + headTagsHtml(S.mail.id, { folder: S.mail.folder, tags: S.mail.tags });
 		}
+	}
+
+	/**
+	 * Error of an action refused: a move names the mail and the folder (the user may be elsewhere when it comes back)
+	 * @param {string} what Action
+	 * @param {object[]} rows Mails
+	 * @param {object} p Parameters of the action
+	 * @param {string} error Reason given by the server
+	 * @returns {string}
+	 */
+	function failureText(what, rows, p, error) {
+		const why = error || t('InboxErrorServer', '');
+		const e = what === 'move' ? S.folders.get(p.folder) : null;
+		if (!e) {
+			return why;
+		}
+		return rows.length === 1
+			? t('InboxMoveFailedOne', rows[0].subject || t('InboxNoSubject'), folderName(e.folder), why)
+			: t('InboxMoveFailedMany', rows.length, folderName(e.folder), why);
 	}
 
 	function actionLabel(what, n, p) {
@@ -4375,7 +4604,7 @@
 		const here = new Set(rows.map(r => r.folder));
 		const options = [];
 		S.accounts.forEach(a => a.folders.filter(f => f.selectable).forEach(f => options.push({ id: f.id, account: a, folder: f,
-			path: (a.label || a.email) + ' / ' + folderPath(f), ok: a.level === 'manage' && !(here.size === 1 && here.has(f.id)) })));
+			path: (a.label || a.email) + ' / ' + folderPath(f), ok: canHandle(a) && !(here.size === 1 && here.has(f.id)) })));
 		const dlg = dialog({
 			title: t('InboxMoveTo', ids.length),
 			body: '<input type="search" class="ibx-field ibx-js-movesearch" autocomplete="off" placeholder="' + th('InboxSearchFolder') + '" aria-label="' + th('InboxSearchFolder') + '">'
@@ -4399,7 +4628,7 @@
 			let first = true;
 			shown.forEach(o => {
 				if (o.account.id !== lastAcc && S.accounts.length > 1) {
-					html += '<div class="ibx-picklist__group" role="presentation">' + esc(accountName(o.account)) + (o.account.level !== 'manage' ? ' · ' + th('InboxReadOnly') : '') + '</div>';
+					html += '<div class="ibx-picklist__group" role="presentation">' + esc(accountName(o.account)) + (!canHandle(o.account) ? ' · ' + th('InboxReadOnly') : '') + '</div>';
 					lastAcc = o.account.id;
 				}
 				html += '<div class="ibx-picklist__item" role="option" data-id="' + o.id + '"' + (o.ok ? '' : ' aria-disabled="true"') + ' aria-selected="' + (o.ok && first) + '" style="--ibx-depth:' + (o.folder.depth || 0) + '">'
@@ -4833,7 +5062,7 @@
 			$('.ibx-banner__text', bar).innerHTML = th('InboxUnsubscribed', m.from.name || m.from.email);
 			btn.remove();
 		}
-		toast(t('InboxUnsubscribed', m.from.name || m.from.email), m.level === 'manage' ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
+		toast(t('InboxUnsubscribed', m.from.name || m.from.email), canHandle(m) ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
 	}
 
 	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
@@ -5364,20 +5593,22 @@
 	function resocDialog(box) {
 		const d = box._data;
 		const before = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
-		const email = String((box._mail && box._mail.from_email) || d.from || '');
+		// The address of the other side (1.92.2): the recipient of a mail written by us, none between us
+		const email = String(d.from !== undefined ? d.from : ((box._mail && box._mail.from_email) || ''));
 		let chosen = null;
 		const dlg = dialog({
 			title: t(before ? 'InboxResocTitle' : 'InboxResocTitleNone'),
 			body: (before ? '<p class="ibx-formrow__help" style="margin-top:0">' + th('InboxResocNow') + ' <b>' + esc(before.ref) + '</b></p>' : '')
 				+ '<input type="search" class="ibx-field ibx-js-resocq" autocomplete="off" placeholder="' + th('InboxResocSearch') + '" aria-label="' + th('InboxResocSearch') + '">'
 				+ '<div class="ibx-picklist ibx-js-resoclist" role="listbox" aria-label="' + th('InboxThirdparties') + '"></div>'
-				+ '<label class="ibx-check" style="margin-top:var(--ibx-s3)"><input type="checkbox" class="ibx-js-resocremember"> ' + (email ? th('InboxResocRemember', email) : th('InboxResocRememberAddress')) + '</label>'
+				// Nothing to remember for a mail between us (1.92.2)
+				+ (email || d.from === undefined ? '<label class="ibx-check" style="margin-top:var(--ibx-s3)"><input type="checkbox" class="ibx-js-resocremember"> ' + (email ? th('InboxResocRemember', email) : th('InboxResocRememberAddress')) + '</label>' : '')
 				+ '<p class="ibx-formrow__help">' + th('InboxResocHelp') + '</p>',
 			actions: [{ label: t('InboxResocDo'), primary: true, run: async dl => {
 				if (!chosen) {
 					return false;
 				}
-				const remember = $('.ibx-js-resocremember', dl).checked;
+				const remember = !!($('.ibx-js-resocremember', dl) || {}).checked;
 				await post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: chosen.id, remember: remember ? 1 : 0 });
 				box._open = '';
 				loadDolibar(box);
@@ -5584,7 +5815,8 @@
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			// Mail sent by a site for a requester (data sources, 1.72.0): who asked, through which source, and the piece
 			// the source offers to create
-			const canLead = !!I.lead && (d.create || []).some(c => c.type === 'societe');
+			// Never from a mail written by us (1.92.2): the lead reads the sender, so our own signature
+			const canLead = !!I.lead && (d.sender.side || 'sender') === 'sender' && (d.create || []).some(c => c.type === 'societe');
 			const rq = d.requester;
 			const rqRef = rq && rq.data && rq.data.ref ? rq.data.ref : '';
 			html += '<div class="ibx-dolibar__body">'
@@ -5596,7 +5828,8 @@
 					+ (rqRef ? '<span class="ibx-muted">' + esc(t('InboxRequesterRef', rqRef)) + '</span>' : '')
 					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
 					+ '</span></div>' : '')
-				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
+				// A mail written by us (1.92.2): the thirdparty is the one of its recipient
+				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
 				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
 				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
 					+ '<span class="ibx-dolibar__tools">'
@@ -6372,7 +6605,7 @@
 		if (!e || !e.folder.selectable) {
 			return t('InboxDropNotHere');
 		}
-		if (e.account.level !== 'manage') {
+		if (!canHandle(e.account)) {
 			return t('InboxReadOnlyOn', e.account.email);
 		}
 		const why = refusal('move', S.drag || []);
@@ -6497,7 +6730,7 @@
 				if (+row.dataset.account !== d.account.id) {
 					return { row, why: t('InboxFolderOtherBox') };
 				}
-				return d.account.level !== 'manage' ? { row, why: t('InboxReadOnlyOn', d.account.email) } : (d.folder.parent ? { row, into: 0 } : null);
+				return !canHandle(d.account) ? { row, why: t('InboxReadOnlyOn', d.account.email) } : (d.folder.parent ? { row, into: 0 } : null);
 			}
 			const e2 = S.folders.get(+row.dataset.folder);
 			if (!e2 || e2.folder.id === d.folder.id) {
@@ -6516,7 +6749,7 @@
 					return { row, why: t('InboxFolderIntoItself') };
 				}
 			}
-			if (d.account.level !== 'manage') {
+			if (!canHandle(d.account)) {
 				return { row, why: t('InboxReadOnlyOn', d.account.email) };
 			}
 			return e2.folder.id === d.folder.parent ? null : { row, into: e2.folder.id };
@@ -6646,7 +6879,7 @@
 			const row = e.target.closest('[data-folder]');
 			$$('.is-droptarget', tree).forEach(x => x !== row && x.classList.remove('is-droptarget'));
 			const entry = row ? S.folders.get(+row.dataset.folder) : null;
-			const why = !entry ? '' : (entry.account.level !== 'manage' ? t('InboxReadOnlyOn', entry.account.email) : (entry.folder.selectable ? '' : t('InboxFolderNotSelectable')));
+			const why = !entry ? '' : (!canHandle(entry.account) ? t('InboxReadOnlyOn', entry.account.email) : (entry.folder.selectable ? '' : t('InboxFolderNotSelectable')));
 			// Never the file opened by the browser when it misses a folder
 			e.preventDefault();
 			if (!entry || why) {
@@ -6671,7 +6904,7 @@
 			$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
 			const row = e.target.closest('[data-folder]');
 			const entry = row ? S.folders.get(+row.dataset.folder) : null;
-			if (entry && entry.account.level === 'manage' && entry.folder.selectable && e.dataTransfer.files.length) {
+			if (entry && canHandle(entry.account) && entry.folder.selectable && e.dataTransfer.files.length) {
 				importFiles(entry.account, entry.folder, Array.from(e.dataTransfer.files));
 			}
 		});
@@ -9111,6 +9344,8 @@
 		// Protected mailbox (1.89.0): read live, its folders are managed on the mail server (the actions below work on the
 		// index of inbox): greyed with the reason
 		const prot = e.account.protected && e.account.protect_level === 'content' ? t('InboxProtectFolderReason') : '';
+		// Import, empty, create, rename, move: « handle » (1.92.0); delete a folder: « manage »
+		const handle = prot || (canHandle(e.account) ? '' : t('InboxReadOnlyOn', e.account.email));
 		const manage = prot || (e.account.level === 'manage' ? '' : t('InboxReadOnlyOn', e.account.email));
 		const special = f.role || isInboxPath(f) ? t('InboxFolderSpecialReason') : '';
 		if (prot) {
@@ -9118,15 +9353,15 @@
 		}
 		items.push({ sep: true });
 		items.push({ icon: 'mark-read', label: t('InboxFolderMarkRead'), disabled: !!prot || !f.unread || !f.selectable, reason: prot || (f.unread ? '' : t('InboxFolderNothingUnread')), run: () => folderMarkRead(f) });
-		items.push({ icon: 'download', label: t('InboxImportMails'), disabled: !!manage || !f.selectable, reason: manage, run: () => pickImport(e.account, f) });
+		items.push({ icon: 'download', label: t('InboxImportMails'), disabled: !!handle || !f.selectable, reason: handle, run: () => pickImport(e.account, f) });
 		items.push({ icon: 'download-all', label: t('InboxExportFolder'), disabled: !!prot || !f.selectable || !f.total, reason: prot || (f.total ? '' : t('InboxFolderEmptyReason')), run: () => exportDialog(f) });
 		if (f.role === 'trash' || f.role === 'junk') {
-			items.push({ icon: 'delete', label: t(f.role === 'trash' ? 'InboxEmptyTrash' : 'InboxEmptyJunk'), danger: true, disabled: !!manage, reason: manage, run: () => folderEmpty(e.account, f) });
+			items.push({ icon: 'delete', label: t(f.role === 'trash' ? 'InboxEmptyTrash' : 'InboxEmptyJunk'), danger: true, disabled: !!handle, reason: handle, run: () => folderEmpty(e.account, f) });
 		}
 		items.push({ sep: true });
-		items.push({ icon: 'folder-plus', label: t('InboxFolderNewSub'), disabled: !!manage, reason: manage, run: () => folderCreate(e.account, f) });
-		items.push({ icon: 'rename', label: t('InboxFolderRename'), disabled: !!(manage || special), reason: manage || special, run: () => folderRename(f) });
-		items.push({ icon: 'folder-move', label: t('InboxFolderMove'), disabled: !!(manage || special), reason: manage || special, run: () => folderMoveDialog(e.account, f) });
+		items.push({ icon: 'folder-plus', label: t('InboxFolderNewSub'), disabled: !!handle, reason: handle, run: () => folderCreate(e.account, f) });
+		items.push({ icon: 'rename', label: t('InboxFolderRename'), disabled: !!(handle || special), reason: handle || special, run: () => folderRename(f) });
+		items.push({ icon: 'folder-move', label: t('InboxFolderMove'), disabled: !!(handle || special), reason: handle || special, run: () => folderMoveDialog(e.account, f) });
 		// My order of the folders (1.42.0): for the keyboard and the phone, as by dragging
 		if (movableFolder(f)) {
 			const up = brotherOf(f.id, -1);
@@ -9350,16 +9585,18 @@
 
 	function accountMenu(accountId, at) {
 		const a = S.accounts.find(x => x.id === accountId);
-		if (!a || !(a.level === 'manage' || S.admin)) {
+		if (!a || !(canHandle(a) || S.admin)) {
 			return;
 		}
 		const el = $('.ibx-tree__row--account[data-account="' + accountId + '"]', S.el);
+		// « handle » (1.92.0) creates folders; the look of the folders and the rules stay to « manage »
+		const lookWhy = a.level === 'manage' || S.admin ? '' : t('InboxReadOnlyOn', a.email);
 		const custom = a.folders.filter(f => f.color || f.icon).length;
 		const items = [
-			{ icon: 'folder-plus', label: t('InboxFolderNew'), disabled: a.level !== 'manage', reason: a.level !== 'manage' ? t('InboxReadOnlyOn', a.email) : '', run: () => folderCreate(a, null) },
+			{ icon: 'folder-plus', label: t('InboxFolderNew'), disabled: !canHandle(a), reason: canHandle(a) ? '' : t('InboxReadOnlyOn', a.email), run: () => folderCreate(a, null) },
 			{ sep: true },
-			{ icon: 'catalogue', label: t('InboxLookEdit'), run: () => lookDialog(a, null) },
-			{ icon: 'folders-show', label: t('InboxLookResetFolders', custom), disabled: !custom, reason: custom ? '' : t('InboxLookNoCustom'), run: async () => {
+			{ icon: 'catalogue', label: t('InboxLookEdit'), disabled: !!lookWhy, reason: lookWhy, run: () => lookDialog(a, null) },
+			{ icon: 'folders-show', label: t('InboxLookResetFolders', custom), disabled: !custom || !!lookWhy, reason: lookWhy || (custom ? '' : t('InboxLookNoCustom')), run: async () => {
 				try {
 					await post('folder', 'lookreset', { id: a.id });
 					toast(t('InboxLookResetDone'));
@@ -9522,7 +9759,7 @@
 		const picked = target.closest('[data-boxpick]') || target.closest('.ibx-boxpick[data-account]');
 		if (picked && S.el.contains(picked)) {
 			const pa = S.accounts.find(x => x.id === +(picked.dataset.boxpick || picked.dataset.account));
-			return pa && (pa.level === 'manage' || S.admin) ? at => accountMenu(pa.id, at) : null;
+			return pa && (canHandle(pa) || S.admin) ? at => accountMenu(pa.id, at) : null;
 		}
 		const vv = target.closest('[data-vview]');
 		if (vv && S.el.contains(vv)) {
@@ -9544,7 +9781,7 @@
 		const box = target.closest('.ibx-tree__row--account[data-account]');
 		if (box && S.el.contains(box)) {
 			const a = S.accounts.find(x => x.id === +box.dataset.account);
-			return a && (a.level === 'manage' || S.admin) ? at => accountMenu(a.id, at) : null;
+			return a && (canHandle(a) || S.admin) ? at => accountMenu(a.id, at) : null;
 		}
 		const tileEl = target.closest('[data-att]');
 		if (tileEl && S.el.contains(tileEl)) {
@@ -9866,8 +10103,9 @@
 				Dolibarr.executeHook('inbox:notif:state', st.notif);
 			}
 			let treeChanged = false;
+			const busy = pendingFolders();
 			(st.folders || []).forEach(([id, total, unread, fresh]) => {
-				const e = S.folders.get(id);
+				const e = busy.has(id) ? null : S.folders.get(id);
 				// The folder open: its new mails are shown in the list, not in the tree
 				const n = id === S.folderId ? 0 : (fresh || 0);
 				if (e && (e.folder.total !== total || e.folder.unread !== unread || (e.folder.new || 0) !== n)) {

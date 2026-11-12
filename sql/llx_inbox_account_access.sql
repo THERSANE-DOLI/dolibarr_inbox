@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Who can use a mailbox: one user or one group (the other one is 0), level read < send < manage.
+-- Who can use a mailbox: one user or one group (the other one is 0), level read < send < handle < manage (handle: 1.92.0).
 -- 0 instead of NULL so that the unique key really prevents duplicates.
 CREATE TABLE llx_inbox_account_access(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

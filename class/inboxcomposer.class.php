@@ -390,7 +390,7 @@ class InboxComposer
 				return $this->fail('not_found', 'Not a draft');
 			}
 			// Taking a draft back replaces it, then removes it: the level « send » on its mailbox (audit INBX-005)
-			if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 				dol_delete_dir_recursive($dir);
 				return $this->fail('no_send');
 			}
@@ -984,7 +984,7 @@ class InboxComposer
 		}
 		$account = $reader->account;
 		$access = new InboxAccess($this->db);
-		if (!in_array($access->getLevel($user, (int) $account->id), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($access->getLevel($user, (int) $account->id), InboxAccess::LEVEL_SEND)) {
 			return $this->fail('no_send');
 		}
 		$bad = array();
@@ -1801,7 +1801,7 @@ class InboxComposer
 		}
 		if ($user instanceof User) {
 			$access = new InboxAccess($this->db);
-			if (!in_array($access->getLevel($user, (int) $draft['account']), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			if (!InboxAccess::atLeast($access->getLevel($user, (int) $draft['account']), InboxAccess::LEVEL_SEND)) {
 				return;
 			}
 		}

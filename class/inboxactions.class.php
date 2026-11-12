@@ -125,7 +125,7 @@ class InboxActions
 			}
 			$mailIds = array_slice(array_values(array_unique($mailIds)), 0, self::MAX);
 		}
-		$rows = $this->rows($user, $mailIds, in_array($action, array('seen', 'flag'), true) ? InboxAccess::LEVEL_READ : InboxAccess::LEVEL_MANAGE);
+		$rows = $this->rows($user, $mailIds, in_array($action, array('seen', 'flag'), true) ? InboxAccess::LEVEL_READ : InboxAccess::LEVEL_HANDLE);
 		if ($rows === null) {
 			$out['error'] = $this->error;
 			return $out;
@@ -220,7 +220,7 @@ class InboxActions
 				return null;
 			}
 			if (!$this->system && !$access->check($user, $accountId, $level)) {
-				$this->error = $access->check($user, $accountId, InboxAccess::LEVEL_READ) ? 'InboxErrorNeedManage' : 'InboxMailNotFound';
+				$this->error = $access->check($user, $accountId, InboxAccess::LEVEL_READ) ? InboxAccess::needKey($level) : 'InboxMailNotFound';
 				return null;
 			}
 			$rows = $this->live()->actionRows($account, $live);
@@ -244,7 +244,7 @@ class InboxActions
 		foreach ($rows as $r) {
 			if (!$access->check($user, (int) $r->fk_account, $level)) {
 				// A mail of a mailbox without access is « not found »; with « read » only, the reason is said
-				$this->error = $access->check($user, (int) $r->fk_account, InboxAccess::LEVEL_READ) ? 'InboxErrorNeedManage' : 'InboxMailNotFound';
+				$this->error = $access->check($user, (int) $r->fk_account, InboxAccess::LEVEL_READ) ? InboxAccess::needKey($level) : 'InboxMailNotFound';
 				return null;
 			}
 		}
@@ -517,8 +517,8 @@ class InboxActions
 		if ((int) $target->fk_account !== (int) $first->fk_account) {
 			require_once __DIR__.'/inboxmover.class.php';
 			$access = new InboxAccess($this->db);
-			if (!$access->check($user, (int) $target->fk_account, InboxAccess::LEVEL_MANAGE)) {
-				$this->error = 'InboxErrorNeedManageTarget';
+			if (!$access->check($user, (int) $target->fk_account, InboxAccess::LEVEL_HANDLE)) {
+				$this->error = 'InboxErrorNeedHandleTarget';
 				return null;
 			}
 			$mover = new InboxMover($this->db);

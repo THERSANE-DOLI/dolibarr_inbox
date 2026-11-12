@@ -30,6 +30,9 @@
  *    30 days between the two mails. The correspondent is the other side: the sender of a mail received, the
  *    recipients of a mail sent; the addresses of the mailbox (account, identities) never count, else every mail
  *    sent would match every mail received (all written to the mailbox).
+ *    A mail sent by a data source (site form, 1.92.1) is from the site, for many requesters: its correspondent is
+ *    the requester read in its headers; without a requester known, it never joins by the subject, else every mail of
+ *    the form would be one conversation.
  * When a mail links two threads, they become one (the oldest key is kept). The key is opaque.
  */
 class InboxThreader
@@ -45,6 +48,9 @@ class InboxThreader
 
 	/** @var array<int,string[]> Addresses of each mailbox (account and identities), lower case */
 	protected $own = array();
+
+	/** @var string[]|null Trusted senders of the active data sources (addresses or domains) */
+	protected $sourceSenders = null;
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -119,6 +125,47 @@ class InboxThreader
 	}
 
 	/**
+	 * Trusted senders of the active data sources: their mails speak for a requester, not for themselves
+	 *
+	 * @return string[]
+	 */
+	protected function sourceSenders()
+	{
+		if ($this->sourceSenders === null) {
+			require_once __DIR__.'/inboxdatasource.class.php';
+			$list = array();
+			foreach ((new InboxDataSource($this->db))->active() as $s) {
+				$list = array_merge($list, $s['sender_list']);
+			}
+			$this->sourceSenders = array_values(array_unique($list));
+		}
+
+		return $this->sourceSenders;
+	}
+
+	/**
+	 * Correspondents of a row of the index for the fallback on the subject: the requester of a mail of a data source,
+	 * nobody for a mail of a source whose requester is unknown, else correspondents()
+	 *
+	 * @param object   $r   Row (from_email, to_text, cc_text, requester_email)
+	 * @param string[] $own Addresses of the mailbox
+	 * @return string[]
+	 */
+	protected function correspondentsOf($r, array $own)
+	{
+		$requester = strtolower(trim((string) ($r->requester_email ?? '')));
+		if ($requester !== '') {
+			return array($requester);
+		}
+		$senders = $this->sourceSenders();
+		if ($senders && InboxDataSource::senderIn(strtolower(trim((string) $r->from_email)), $senders)) {
+			return array();
+		}
+
+		return self::correspondents((string) $r->from_email, (string) $r->to_text, (string) $r->cc_text, $own);
+	}
+
+	/**
 	 * Key of the thread of mails of the index, and threads merged when a mail links them
 	 *
 	 * @param int   $accountId Mailbox
@@ -131,7 +178,7 @@ class InboxThreader
 		$accountId = (int) $accountId;
 		$done = 0;
 		foreach (array_chunk(array_map('intval', $mailIds), 200) as $chunk) {
-			$rows = $this->db->getRows("SELECT rowid, message_id, in_reply_to, refs, subject, from_email, to_text, cc_text, date_received, date_mail FROM ".$p."inbox_mail"
+			$rows = $this->db->getRows("SELECT rowid, message_id, in_reply_to, refs, subject, from_email, to_text, cc_text, requester_email, date_received, date_mail FROM ".$p."inbox_mail"
 				." WHERE rowid IN (".implode(',', $chunk).") ORDER BY COALESCE(date_received, date_mail) ASC LIMIT 1000");
 			foreach (is_array($rows) ? $rows : array() as $r) {
 				$this->assignOne($accountId, $r);
@@ -181,19 +228,19 @@ class InboxThreader
 			$norm = self::normalizeSubject($r->subject);
 			$date = $r->date_received ? $r->date_received : $r->date_mail;
 			$own = $this->ownAddresses($accountId);
-			$mine = self::correspondents((string) $r->from_email, (string) $r->to_text, (string) $r->cc_text, $own);
+			$mine = $this->correspondentsOf($r, $own);
 			if (mb_strlen($norm, 'UTF-8') >= 4 && $date && $mine) {
 				$ts = (int) $this->db->jdate($date);
 				$like = "%".$this->db->escapeforlike($norm)."%";
-				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, cc_text, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
+				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, cc_text, requester_email, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
 					." AND thread_key IS NOT NULL AND subject LIKE '".$this->db->escape($like)."'"
 					." AND COALESCE(date_received, date_mail) BETWEEN '".$this->db->idate($ts - self::SUBJECT_DAYS * 86400)."' AND '".$this->db->idate($ts + self::SUBJECT_DAYS * 86400)."' LIMIT 200");
 				foreach (is_array($cands) ? $cands : array() as $c) {
 					if (self::normalizeSubject($c->subject) !== $norm) {
 						continue;
 					}
-					// Same correspondent on the other side (the mailbox itself never counts)
-					if (array_intersect($mine, self::correspondents((string) $c->from_email, (string) $c->to_text, (string) $c->cc_text, $own))) {
+					// Same correspondent on the other side (the mailbox itself never counts, a source counts for its requester)
+					if (array_intersect($mine, $this->correspondentsOf($c, $own))) {
 						$keys[(string) $c->thread_key] = true;
 					}
 				}
@@ -241,6 +288,57 @@ class InboxThreader
 			if ($done >= self::BACKFILL) {
 				break;
 			}
+		}
+
+		return $done;
+	}
+
+	/**
+	 * Conversations to make again after a data source is saved (1.92.1): the threads holding a mail of a trusted sender
+	 * lose their key, backfill() gives them again with the rule of the sources (every mail of a form was one thread).
+	 * The links to Dolibarr stay on each mail; a mark (ignored, watched) stays on the conversation that keeps its key.
+	 *
+	 * @param int   $accountId Mailbox
+	 * @param float $deadline  Microtime limit for the keys given at once (the rest at the next synchronisation)
+	 * @return int Mails whose key was taken away
+	 */
+	public function rethreadSources($accountId, $deadline)
+	{
+		$this->sourceSenders = null;
+		$senders = $this->sourceSenders();
+		if (!$senders) {
+			return 0;
+		}
+		$p = $this->db->prefix();
+		$accountId = (int) $accountId;
+		$emails = array();
+		$rows = $this->db->getRows("SELECT DISTINCT from_email FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND from_email IS NOT NULL LIMIT 50000");
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$from = strtolower(trim((string) $r->from_email));
+			if (InboxDataSource::senderIn($from, $senders)) {
+				$emails[] = "'".$this->db->escape((string) $r->from_email)."'";
+			}
+		}
+		if (!$emails) {
+			return 0;
+		}
+		$keys = array();
+		foreach (array_chunk($emails, 200) as $chunk) {
+			$found = $this->db->getRows("SELECT DISTINCT thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND thread_key IS NOT NULL"
+				." AND from_email IN (".implode(',', $chunk).") LIMIT 20000");
+			foreach (is_array($found) ? $found : array() as $f) {
+				$keys["'".$this->db->escape((string) $f->thread_key)."'"] = true;
+			}
+		}
+		$done = 0;
+		foreach (array_chunk(array_keys($keys), 500) as $chunk) {
+			$res = $this->db->query("UPDATE ".$p."inbox_mail SET thread_key = NULL WHERE fk_account = ".$accountId." AND thread_key IN (".implode(',', $chunk).")");
+			if ($res) {
+				$done += (int) $this->db->affected_rows($res);
+			}
+		}
+		if ($done) {
+			$this->backfill($accountId, $deadline);
 		}
 
 		return $done;
