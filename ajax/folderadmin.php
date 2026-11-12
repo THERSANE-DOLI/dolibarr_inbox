@@ -59,7 +59,7 @@ switch ($action) {
 
 if ($res < 0) {
 	$key = (string) $admin->error;
-	$codes = array('InboxErrorFolderNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorFolderSpecial' => 403, 'InboxErrorFoldersNotSupported' => 422,
+	$codes = array('InboxErrorFolderNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorNeedHandle' => 403, 'InboxErrorFolderSpecial' => 403, 'InboxErrorFoldersNotSupported' => 422,
 		'InboxErrorFolderName' => 422, 'InboxErrorFolderExists' => 409, 'InboxErrorFolderIntoItself' => 422, 'InboxErrorConfirmFolderDelete' => 409, 'InboxErrorConfirmEmpty' => 409);
 	$message = preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key, $admin->count) : $langs->transnoentities('InboxActionServerError', $key);
 	inboxAjaxReply(array('error' => $message, 'code' => $key, 'count' => $admin->count), $codes[$key] ?? 502);

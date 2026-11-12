@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: access level « Handle », between « Read and send » and « Manage all » :   1.92.0
+  - « Handle » looks after the mails: tag, move (also to another mailbox handled), archive, trash and junk, delete
+    for good, empty the trash or the junk, ignore a conversation, create, rename and move folders, import mails.
+  - « Manage all » keeps the mailbox itself: deleting a folder, identities, templates, rules, blocked senders,
+    unsubscribe, accesses, journal.
+  - existing accesses unchanged: a person in « Read and send » stays there until raised.
+  - the checks « at least send » compare the ranks of the levels, so « Handle » sends too; error « this action needs
+    the level Handle » for the actions it opens.
+
 - NEW: access of a mailbox, what each level gives shown :   1.91.0
   - levels named so that each one holds the one before: « Read », « Read and send », « Manage all » (also in the
     messages that name them).

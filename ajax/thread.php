@@ -33,7 +33,7 @@ $marks = new InboxThreadMark($db);
 $res = $marks->set($user, (int) inboxAjaxParam('id', 'int'), (string) inboxAjaxParam('mode', 'aZ09'), (int) inboxAjaxParam('on', 'int') === 1);
 if ($res < 0) {
 	$key = (string) $marks->error;
-	$codes = array('InboxMailNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorThreadNotReady' => 409, 'Bad mode' => 400);
+	$codes = array('InboxMailNotFound' => 404, 'InboxErrorNeedManage' => 403, 'InboxErrorNeedHandle' => 403, 'InboxErrorThreadNotReady' => 409, 'Bad mode' => 400);
 	inboxAjaxReply(array('error' => preg_match('/^Inbox[A-Za-z]+$/', $key) ? $langs->transnoentities($key) : $key, 'code' => $key), $codes[$key] ?? 500);
 }
 inboxAjaxReply(array('changed' => $res, 'read' => $marks->count));

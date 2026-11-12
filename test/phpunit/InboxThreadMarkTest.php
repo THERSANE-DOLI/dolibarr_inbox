@@ -81,7 +81,7 @@ class InboxThreadMarkTest extends InboxImapTestCase
 		$m2 = $this->row($a, 'm2');
 		$this->assertSame(1, $marks->set($alice, (int) $m2->rowid, InboxThreadMark::WATCH, true), $marks->error);
 		$this->assertSame(-1, $marks->set($alice, (int) $m2->rowid, InboxThreadMark::IGNORE, true));
-		$this->assertSame('InboxErrorNeedManage', $marks->error);
+		$this->assertSame('InboxErrorNeedHandle', $marks->error);
 		$this->assertSame(-1, $marks->set($this->user('bob'), (int) $m2->rowid, InboxThreadMark::WATCH, true));
 		$this->assertSame('InboxMailNotFound', $marks->error);
 

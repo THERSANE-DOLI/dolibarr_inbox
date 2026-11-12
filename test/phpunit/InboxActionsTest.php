@@ -95,12 +95,50 @@ class InboxActionsTest extends InboxImapTestCase
 		foreach (array('move' => array('folder' => $this->folder($a, 'INBOX.ZzActB')), 'tag' => array('add' => array('ZzTag')), 'delete' => array(), 'archive' => array(), 'junk' => array()) as $what => $params) {
 			$res = $act->run($reader, $what, array($m2), $params);
 			$this->assertFalse($res['ok'], $what);
-			$this->assertSame('InboxErrorNeedManage', $res['error'], $what);
+			$this->assertSame('InboxErrorNeedHandle', $res['error'], $what);
 		}
 		$this->assertCount(1, $this->onServer('INBOX.ZzActA', 'm2'), 'nothing moved');
 		$stranger = $this->user('actstranger');
 		$res = $act->run($stranger, 'flag', array($m2), array('on' => false));
 		$this->assertSame('InboxMailNotFound', $res['error'], 'no access: the mail does not exist');
+	}
+
+	/**
+	 * 1.92.0: « send » answers but neither tags nor moves; « handle » tags, moves, deletes, also for good from the trash
+	 *
+	 * @return void
+	 */
+	public function testHandleLevel()
+	{
+		$a = $this->ready();
+		$sender = $this->user('actsender');
+		$handler = $this->user('acthandler');
+		$access = new InboxAccess($this->db);
+		$access->grant($this->admin, $a->id, $sender->id, 0, InboxAccess::LEVEL_SEND);
+		$access->grant($this->admin, $a->id, $handler->id, 0, InboxAccess::LEVEL_HANDLE);
+		InboxAccess::clearCache();
+		$this->assertTrue(InboxAccess::atLeast(InboxAccess::LEVEL_HANDLE, InboxAccess::LEVEL_SEND), 'handle holds send');
+		$this->assertFalse(InboxAccess::atLeast(InboxAccess::LEVEL_HANDLE, InboxAccess::LEVEL_MANAGE));
+		$this->assertTrue($access->check($handler, $a->id, InboxAccess::LEVEL_SEND), 'a handler may send');
+		$act = new InboxActions($this->db);
+		$m1 = (int) $this->row($a, 'm1')->rowid;
+		$b = $this->folder($a, 'INBOX.ZzActB');
+
+		foreach (array('tag' => array('add' => array('ZzTag')), 'move' => array('folder' => $b), 'delete' => array()) as $what => $params) {
+			$res = $act->run($sender, $what, array($m1), $params);
+			$this->assertSame('InboxErrorNeedHandle', $res['error'], 'send: '.$what);
+		}
+		$res = $act->run($handler, 'tag', array($m1), array('add' => array('ZzTag')));
+		$this->assertTrue($res['ok'], $res['error']);
+		$res = $act->run($handler, 'move', array($m1), array('folder' => $b));
+		$this->assertTrue($res['ok'], $res['error']);
+		$this->assertCount(1, $this->onServer('INBOX.ZzActB', 'm1'));
+		$res = $act->run($handler, 'delete', array($m1));
+		$this->assertTrue($res['ok'], $res['error']);
+		$trashed = (int) $this->row($a, 'm1')->rowid;
+		$res = $act->run($handler, 'delete', array($trashed), array('confirm' => 1));
+		$this->assertTrue($res['ok'], 'for good from the trash: '.$res['error']);
+		$this->assertNull($this->row($a, 'm1'), 'gone for good');
 	}
 
 	/**

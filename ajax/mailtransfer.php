@@ -61,8 +61,8 @@ switch ($action) {
 		// no break
 
 	case 'import':
-		if (!$transfer->open($user, $folderId, InboxAccess::LEVEL_MANAGE)) {
-			inboxAjaxReply(array('error' => $langs->transnoentities($transfer->error), 'code' => $transfer->error), $transfer->error === 'InboxErrorNeedManage' ? 403 : 404);
+		if (!$transfer->open($user, $folderId, InboxAccess::LEVEL_HANDLE)) {
+			inboxAjaxReply(array('error' => $langs->transnoentities($transfer->error), 'code' => $transfer->error), in_array($transfer->error, array('InboxErrorNeedHandle', 'InboxErrorNeedManage'), true) ? 403 : 404);
 		}
 		$list = inboxAjaxParam('mails', 'none');
 		$raws = array();

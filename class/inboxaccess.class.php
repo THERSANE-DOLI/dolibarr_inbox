@@ -41,10 +41,12 @@ class InboxAccess
 	const LEVEL_NONE = '';
 	const LEVEL_READ = 'read';
 	const LEVEL_SEND = 'send';
+	/** Handle the mails (1.92.0): tag, move, delete (also for good), create and rename folders; not the mailbox itself */
+	const LEVEL_HANDLE = 'handle';
 	const LEVEL_MANAGE = 'manage';
 
 	/** @var array<string,int> */
-	const RANKS = array(self::LEVEL_NONE => 0, self::LEVEL_READ => 1, self::LEVEL_SEND => 2, self::LEVEL_MANAGE => 3);
+	const RANKS = array(self::LEVEL_NONE => 0, self::LEVEL_READ => 1, self::LEVEL_SEND => 2, self::LEVEL_HANDLE => 3, self::LEVEL_MANAGE => 4);
 
 	/** @var DoliDB */
 	protected $db;
@@ -79,7 +81,26 @@ class InboxAccess
 	 */
 	public static function isLevel($level)
 	{
-		return in_array($level, array(self::LEVEL_READ, self::LEVEL_SEND, self::LEVEL_MANAGE), true);
+		return in_array($level, array(self::LEVEL_READ, self::LEVEL_SEND, self::LEVEL_HANDLE, self::LEVEL_MANAGE), true);
+	}
+
+	/**
+	 * @param string $level Level missing
+	 * @return string       Key of the error that names it
+	 */
+	public static function needKey($level)
+	{
+		return $level === self::LEVEL_HANDLE ? 'InboxErrorNeedHandle' : 'InboxErrorNeedManage';
+	}
+
+	/**
+	 * @param string $level Level held
+	 * @param string $min   Level needed
+	 * @return bool         The level held is at least the one needed (a level added later is placed by its rank)
+	 */
+	public static function atLeast($level, $min)
+	{
+		return self::rank((string) $level) >= self::rank($min) && self::rank($min) > 0;
 	}
 
 	/**

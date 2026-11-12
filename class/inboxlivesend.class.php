@@ -241,7 +241,7 @@ class InboxLiveSend
 		} elseif ($account->fetch((int) $e['account']) <= 0 || !$account->isActive() || !$account->isProtected()) {
 			$code = 'no_send';
 			$detail = 'Mailbox not active';
-		} elseif (!in_array((new InboxAccess($this->db))->getLevel($user, (int) $account->id), array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		} elseif (!InboxAccess::atLeast((new InboxAccess($this->db))->getLevel($user, (int) $account->id), InboxAccess::LEVEL_SEND)) {
 			$code = 'no_send';
 			$detail = 'No right to send from the mailbox';
 		} elseif (getDolGlobalString('MAIN_DISABLE_ALL_MAILS')) {
@@ -491,7 +491,7 @@ class InboxLiveSend
 		if (!$reader->load($user, (int) $id) || !$reader->isLive()) {
 			return $this->fail('not_found');
 		}
-		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			return $this->fail('no_send', 'No right to send from the mailbox');
 		}
 		if (getDolGlobalString('MAIN_DISABLE_ALL_MAILS')) {

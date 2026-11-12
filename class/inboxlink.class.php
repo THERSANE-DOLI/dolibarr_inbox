@@ -121,7 +121,7 @@ class InboxLink
 				return -1;
 			}
 			// Reading a copy is not enough to undo the work of others: its author, or the level « send » (audit INBX-006)
-			if ((int) $l->fk_user_creat !== (int) $user->id && !in_array($level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+			if ((int) $l->fk_user_creat !== (int) $user->id && !InboxAccess::atLeast($level, InboxAccess::LEVEL_SEND)) {
 				$this->error = 'InboxErrorLinkNotYours';
 				return -1;
 			}

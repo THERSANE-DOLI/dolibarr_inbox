@@ -170,7 +170,7 @@ switch ($action) {
 		// Remembered for the address: the mails of every mailbox of the entity follow, a choice of who may write from
 		// this mailbox, not of a reader (audit INBX-060)
 		$remember = (int) inboxAjaxParam('remember', 'int') === 1;
-		if ($remember && !in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if ($remember && !InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			inboxDolibarrFail('InboxErrorResocRemember');
 		}
 		$situation = new InboxSituation($db);
@@ -440,7 +440,7 @@ switch ($action) {
 		$reader = inboxDolibarrMail();
 		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
 		// mailbox (as INBX-006), never by a reader (audit INBX-068)
-		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			inboxAjaxNotFound();
 		}
 		$threads = new InboxThreadLink($db);
@@ -456,7 +456,7 @@ switch ($action) {
 		$reader = inboxDolibarrMail();
 		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
 		// mailbox (as INBX-006), never by a reader (audit INBX-068)
-		if (!in_array($reader->level, array(InboxAccess::LEVEL_SEND, InboxAccess::LEVEL_MANAGE), true)) {
+		if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
 			inboxAjaxNotFound();
 		}
 		$links = inboxAjaxParam('links', 'none');

@@ -144,12 +144,47 @@ class InboxFolderAdminTest extends InboxImapTestCase
 		InboxAccess::clearCache();
 		$aId = $this->folder($a, 'INBOX.ZzActA');
 		$this->assertSame(-1, $fa->rename($alice, $aId, 'ZzActX'));
-		$this->assertSame('InboxErrorNeedManage', $fa->error);
+		$this->assertSame('InboxErrorNeedHandle', $fa->error);
 		$this->assertSame(-1, $fa->create($alice, $a->id, 0, 'ZzActX'));
-		$this->assertSame('InboxErrorNeedManage', $fa->error);
+		$this->assertSame('InboxErrorNeedHandle', $fa->error);
 		$this->assertSame(3, $fa->markRead($alice, $aId), $fa->error);
 		$this->assertSame(-1, $fa->remove($bob, $aId, true));
 		$this->assertSame('InboxErrorFolderNotFound', $fa->error);
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_action_log WHERE fk_account = ".((int) $a->id));
+	}
+
+	/**
+	 * 1.92.0: level « handle » creates, renames, moves folders and empties the trash or the junk; removing a folder
+	 * stays to « manage »; « send » does none of them
+	 *
+	 * @return void
+	 */
+	public function testHandleLevel()
+	{
+		$a = $this->ready();
+		$fa = new InboxFolderAdmin($this->db);
+		$handler = $this->user('fahandler');
+		$sender = $this->user('fasender');
+		$access = new InboxAccess($this->db);
+		$access->grant($this->admin, $a->id, $handler->id, 0, InboxAccess::LEVEL_HANDLE);
+		$access->grant($this->admin, $a->id, $sender->id, 0, InboxAccess::LEVEL_SEND);
+		InboxAccess::clearCache();
+
+		$this->assertSame(-1, $fa->create($sender, $a->id, 0, 'ZzActS'));
+		$this->assertSame('InboxErrorNeedHandle', $fa->error);
+		$new = $fa->create($handler, $a->id, 0, 'ZzActH');
+		$this->assertGreaterThan(0, $new, $fa->error);
+		$this->assertSame(1, $fa->rename($handler, $new, 'ZzActH2'), $fa->error);
+		$this->assertSame(1, $fa->move($handler, $new, $this->folder($a, 'INBOX.ZzActA')), $fa->error);
+		$this->assertSame(-1, $fa->remove($handler, $new, true), 'removing a folder needs « manage »');
+		$this->assertSame('InboxErrorNeedManage', $fa->error);
+
+		$this->append('INBOX.Junk', 'j3');
+		$this->sync($a);
+		$junk = $this->folder($a, 'INBOX.Junk');
+		$this->assertSame(-1, $fa->emptyFolder($sender, $junk, true));
+		$this->assertSame('InboxErrorNeedHandle', $fa->error);
+		$this->assertGreaterThanOrEqual(1, $fa->emptyFolder($handler, $junk, true), $fa->error);
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_action_log WHERE fk_account = ".((int) $a->id));
 	}
 }

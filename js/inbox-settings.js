@@ -2457,7 +2457,7 @@
 			box.replaceChildren(errorBox(err, () => tabAccess(box, account)));
 			return;
 		}
-		const levels = ['read', 'send', 'manage'];
+		const levels = ['read', 'send', 'handle', 'manage'];
 		let html = '<p class="ibx-section__help">' + th('InboxAccessHelp') + '</p>'
 			+ accessLevelsTable(!data.accesses.length)
 			+ '<p class="ibx-section__help">' + th('InboxAccessAdminNone') + '</p>';
@@ -2568,8 +2568,9 @@
 	 */
 	function accessLevelsTable(open) {
 		// Level from which each capability is given (checked on the server: InboxActions::run, InboxAccess)
-		const caps = [['InboxAccessCapRead', 0], ['InboxAccessCapSeen', 0], ['InboxAccessCapSend', 1], ['InboxAccessCapSort', 2], ['InboxAccessCapAdmin', 2]];
-		const levels = ['read', 'send', 'manage'];
+		const caps = [['InboxAccessCapRead', 0], ['InboxAccessCapSeen', 0], ['InboxAccessCapSend', 1], ['InboxAccessCapSort', 2], ['InboxAccessCapTrash', 2],
+			['InboxAccessCapFolders', 2], ['InboxAccessCapAdmin', 3]];
+		const levels = ['read', 'send', 'handle', 'manage'];
 		return '<details class="ibx-levels"' + (open ? ' open' : '') + '><summary>' + ic('info') + ' ' + th('InboxAccessLevelsTitle') + '</summary>'
 			+ '<table class="ibx-table ibx-levels__table"><thead><tr><th scope="col"><span class="ibx-sr-only">' + th('InboxAccessLevelsWhat') + '</span></th>'
 			+ levels.map(l => '<th scope="col">' + esc(levelLabel(l)) + '</th>').join('') + '</tr></thead><tbody>'

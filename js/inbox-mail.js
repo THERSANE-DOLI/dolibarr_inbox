@@ -3732,6 +3732,12 @@
 		const e = r ? S.folders.get(r.folder) : null;
 		return e ? e.account : null;
 	}
+	/** Rank of the levels of access (1.92.0: « handle » between « send » and « manage ») */
+	const LEVEL_RANK = { read: 1, send: 2, handle: 3, manage: 4 };
+	/** A mailbox (or a mail, by its level) where the mails may be handled: tagged, moved, deleted, folders created */
+	function canHandle(x) {
+		return (LEVEL_RANK[x && x.level] || 0) >= LEVEL_RANK.handle;
+	}
 	/** Why an action is refused on these mails ('' = allowed); the server checks it again */
 	function refusal(what, ids) {
 		if (!MANAGING.has(what)) {
@@ -3739,7 +3745,7 @@
 		}
 		for (const id of ids) {
 			const a = accountOfRow(rowOf(id));
-			if (a && a.level !== 'manage') {
+			if (a && !canHandle(a)) {
 				return t('InboxReadOnlyOn', a.email);
 			}
 		}
@@ -4598,7 +4604,7 @@
 		const here = new Set(rows.map(r => r.folder));
 		const options = [];
 		S.accounts.forEach(a => a.folders.filter(f => f.selectable).forEach(f => options.push({ id: f.id, account: a, folder: f,
-			path: (a.label || a.email) + ' / ' + folderPath(f), ok: a.level === 'manage' && !(here.size === 1 && here.has(f.id)) })));
+			path: (a.label || a.email) + ' / ' + folderPath(f), ok: canHandle(a) && !(here.size === 1 && here.has(f.id)) })));
 		const dlg = dialog({
 			title: t('InboxMoveTo', ids.length),
 			body: '<input type="search" class="ibx-field ibx-js-movesearch" autocomplete="off" placeholder="' + th('InboxSearchFolder') + '" aria-label="' + th('InboxSearchFolder') + '">'
@@ -4622,7 +4628,7 @@
 			let first = true;
 			shown.forEach(o => {
 				if (o.account.id !== lastAcc && S.accounts.length > 1) {
-					html += '<div class="ibx-picklist__group" role="presentation">' + esc(accountName(o.account)) + (o.account.level !== 'manage' ? ' · ' + th('InboxReadOnly') : '') + '</div>';
+					html += '<div class="ibx-picklist__group" role="presentation">' + esc(accountName(o.account)) + (!canHandle(o.account) ? ' · ' + th('InboxReadOnly') : '') + '</div>';
 					lastAcc = o.account.id;
 				}
 				html += '<div class="ibx-picklist__item" role="option" data-id="' + o.id + '"' + (o.ok ? '' : ' aria-disabled="true"') + ' aria-selected="' + (o.ok && first) + '" style="--ibx-depth:' + (o.folder.depth || 0) + '">'
@@ -5056,7 +5062,7 @@
 			$('.ibx-banner__text', bar).innerHTML = th('InboxUnsubscribed', m.from.name || m.from.email);
 			btn.remove();
 		}
-		toast(t('InboxUnsubscribed', m.from.name || m.from.email), m.level === 'manage' ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
+		toast(t('InboxUnsubscribed', m.from.name || m.from.email), canHandle(m) ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
 	}
 
 	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
@@ -6595,7 +6601,7 @@
 		if (!e || !e.folder.selectable) {
 			return t('InboxDropNotHere');
 		}
-		if (e.account.level !== 'manage') {
+		if (!canHandle(e.account)) {
 			return t('InboxReadOnlyOn', e.account.email);
 		}
 		const why = refusal('move', S.drag || []);
@@ -6720,7 +6726,7 @@
 				if (+row.dataset.account !== d.account.id) {
 					return { row, why: t('InboxFolderOtherBox') };
 				}
-				return d.account.level !== 'manage' ? { row, why: t('InboxReadOnlyOn', d.account.email) } : (d.folder.parent ? { row, into: 0 } : null);
+				return !canHandle(d.account) ? { row, why: t('InboxReadOnlyOn', d.account.email) } : (d.folder.parent ? { row, into: 0 } : null);
 			}
 			const e2 = S.folders.get(+row.dataset.folder);
 			if (!e2 || e2.folder.id === d.folder.id) {
@@ -6739,7 +6745,7 @@
 					return { row, why: t('InboxFolderIntoItself') };
 				}
 			}
-			if (d.account.level !== 'manage') {
+			if (!canHandle(d.account)) {
 				return { row, why: t('InboxReadOnlyOn', d.account.email) };
 			}
 			return e2.folder.id === d.folder.parent ? null : { row, into: e2.folder.id };
@@ -6869,7 +6875,7 @@
 			const row = e.target.closest('[data-folder]');
 			$$('.is-droptarget', tree).forEach(x => x !== row && x.classList.remove('is-droptarget'));
 			const entry = row ? S.folders.get(+row.dataset.folder) : null;
-			const why = !entry ? '' : (entry.account.level !== 'manage' ? t('InboxReadOnlyOn', entry.account.email) : (entry.folder.selectable ? '' : t('InboxFolderNotSelectable')));
+			const why = !entry ? '' : (!canHandle(entry.account) ? t('InboxReadOnlyOn', entry.account.email) : (entry.folder.selectable ? '' : t('InboxFolderNotSelectable')));
 			// Never the file opened by the browser when it misses a folder
 			e.preventDefault();
 			if (!entry || why) {
@@ -6894,7 +6900,7 @@
 			$$('.is-droptarget', tree).forEach(x => x.classList.remove('is-droptarget'));
 			const row = e.target.closest('[data-folder]');
 			const entry = row ? S.folders.get(+row.dataset.folder) : null;
-			if (entry && entry.account.level === 'manage' && entry.folder.selectable && e.dataTransfer.files.length) {
+			if (entry && canHandle(entry.account) && entry.folder.selectable && e.dataTransfer.files.length) {
 				importFiles(entry.account, entry.folder, Array.from(e.dataTransfer.files));
 			}
 		});
@@ -9334,6 +9340,8 @@
 		// Protected mailbox (1.89.0): read live, its folders are managed on the mail server (the actions below work on the
 		// index of inbox): greyed with the reason
 		const prot = e.account.protected && e.account.protect_level === 'content' ? t('InboxProtectFolderReason') : '';
+		// Import, empty, create, rename, move: « handle » (1.92.0); delete a folder: « manage »
+		const handle = prot || (canHandle(e.account) ? '' : t('InboxReadOnlyOn', e.account.email));
 		const manage = prot || (e.account.level === 'manage' ? '' : t('InboxReadOnlyOn', e.account.email));
 		const special = f.role || isInboxPath(f) ? t('InboxFolderSpecialReason') : '';
 		if (prot) {
@@ -9341,15 +9349,15 @@
 		}
 		items.push({ sep: true });
 		items.push({ icon: 'mark-read', label: t('InboxFolderMarkRead'), disabled: !!prot || !f.unread || !f.selectable, reason: prot || (f.unread ? '' : t('InboxFolderNothingUnread')), run: () => folderMarkRead(f) });
-		items.push({ icon: 'download', label: t('InboxImportMails'), disabled: !!manage || !f.selectable, reason: manage, run: () => pickImport(e.account, f) });
+		items.push({ icon: 'download', label: t('InboxImportMails'), disabled: !!handle || !f.selectable, reason: handle, run: () => pickImport(e.account, f) });
 		items.push({ icon: 'download-all', label: t('InboxExportFolder'), disabled: !!prot || !f.selectable || !f.total, reason: prot || (f.total ? '' : t('InboxFolderEmptyReason')), run: () => exportDialog(f) });
 		if (f.role === 'trash' || f.role === 'junk') {
-			items.push({ icon: 'delete', label: t(f.role === 'trash' ? 'InboxEmptyTrash' : 'InboxEmptyJunk'), danger: true, disabled: !!manage, reason: manage, run: () => folderEmpty(e.account, f) });
+			items.push({ icon: 'delete', label: t(f.role === 'trash' ? 'InboxEmptyTrash' : 'InboxEmptyJunk'), danger: true, disabled: !!handle, reason: handle, run: () => folderEmpty(e.account, f) });
 		}
 		items.push({ sep: true });
-		items.push({ icon: 'folder-plus', label: t('InboxFolderNewSub'), disabled: !!manage, reason: manage, run: () => folderCreate(e.account, f) });
-		items.push({ icon: 'rename', label: t('InboxFolderRename'), disabled: !!(manage || special), reason: manage || special, run: () => folderRename(f) });
-		items.push({ icon: 'folder-move', label: t('InboxFolderMove'), disabled: !!(manage || special), reason: manage || special, run: () => folderMoveDialog(e.account, f) });
+		items.push({ icon: 'folder-plus', label: t('InboxFolderNewSub'), disabled: !!handle, reason: handle, run: () => folderCreate(e.account, f) });
+		items.push({ icon: 'rename', label: t('InboxFolderRename'), disabled: !!(handle || special), reason: handle || special, run: () => folderRename(f) });
+		items.push({ icon: 'folder-move', label: t('InboxFolderMove'), disabled: !!(handle || special), reason: handle || special, run: () => folderMoveDialog(e.account, f) });
 		// My order of the folders (1.42.0): for the keyboard and the phone, as by dragging
 		if (movableFolder(f)) {
 			const up = brotherOf(f.id, -1);
@@ -9573,16 +9581,18 @@
 
 	function accountMenu(accountId, at) {
 		const a = S.accounts.find(x => x.id === accountId);
-		if (!a || !(a.level === 'manage' || S.admin)) {
+		if (!a || !(canHandle(a) || S.admin)) {
 			return;
 		}
 		const el = $('.ibx-tree__row--account[data-account="' + accountId + '"]', S.el);
+		// « handle » (1.92.0) creates folders; the look of the folders and the rules stay to « manage »
+		const lookWhy = a.level === 'manage' || S.admin ? '' : t('InboxReadOnlyOn', a.email);
 		const custom = a.folders.filter(f => f.color || f.icon).length;
 		const items = [
-			{ icon: 'folder-plus', label: t('InboxFolderNew'), disabled: a.level !== 'manage', reason: a.level !== 'manage' ? t('InboxReadOnlyOn', a.email) : '', run: () => folderCreate(a, null) },
+			{ icon: 'folder-plus', label: t('InboxFolderNew'), disabled: !canHandle(a), reason: canHandle(a) ? '' : t('InboxReadOnlyOn', a.email), run: () => folderCreate(a, null) },
 			{ sep: true },
-			{ icon: 'catalogue', label: t('InboxLookEdit'), run: () => lookDialog(a, null) },
-			{ icon: 'folders-show', label: t('InboxLookResetFolders', custom), disabled: !custom, reason: custom ? '' : t('InboxLookNoCustom'), run: async () => {
+			{ icon: 'catalogue', label: t('InboxLookEdit'), disabled: !!lookWhy, reason: lookWhy, run: () => lookDialog(a, null) },
+			{ icon: 'folders-show', label: t('InboxLookResetFolders', custom), disabled: !custom || !!lookWhy, reason: lookWhy || (custom ? '' : t('InboxLookNoCustom')), run: async () => {
 				try {
 					await post('folder', 'lookreset', { id: a.id });
 					toast(t('InboxLookResetDone'));
@@ -9745,7 +9755,7 @@
 		const picked = target.closest('[data-boxpick]') || target.closest('.ibx-boxpick[data-account]');
 		if (picked && S.el.contains(picked)) {
 			const pa = S.accounts.find(x => x.id === +(picked.dataset.boxpick || picked.dataset.account));
-			return pa && (pa.level === 'manage' || S.admin) ? at => accountMenu(pa.id, at) : null;
+			return pa && (canHandle(pa) || S.admin) ? at => accountMenu(pa.id, at) : null;
 		}
 		const vv = target.closest('[data-vview]');
 		if (vv && S.el.contains(vv)) {
@@ -9767,7 +9777,7 @@
 		const box = target.closest('.ibx-tree__row--account[data-account]');
 		if (box && S.el.contains(box)) {
 			const a = S.accounts.find(x => x.id === +box.dataset.account);
-			return a && (a.level === 'manage' || S.admin) ? at => accountMenu(a.id, at) : null;
+			return a && (canHandle(a) || S.admin) ? at => accountMenu(a.id, at) : null;
 		}
 		const tileEl = target.closest('[data-att]');
 		if (tileEl && S.el.contains(tileEl)) {
