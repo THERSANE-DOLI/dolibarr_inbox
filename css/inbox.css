@@ -257,6 +257,8 @@
 	border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-sm); white-space: nowrap;
 }
 .ibx-badge--accent { color: var(--ibx-accent); background: var(--ibx-accent-soft); border-color: transparent; }
+.ibx-badge--warning { color: var(--ibx-text); background: var(--ibx-warning-soft); border-color: transparent; }
+.ibx-badge--warning .ibx-icon { color: var(--ibx-warning); }
 .ibx-badge--link { cursor: pointer; }
 .ibx-badge--link:hover { border-color: var(--ibx-accent); }
 .ibx-badge__remove { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 0.125rem; font-size: 0.6875rem; }
@@ -2460,6 +2462,9 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-requester__who { font-weight: 600; }
 
 /* Form of a data source (1.74.0): start (ready-made, from a mail), rows of pairs, analysis, glossary */
+.ibx-srctable__switch { width: 1%; }
+.ibx-srctable tr.is-off td:not(.ibx-srctable__switch):not(.ibx-table__actions) { color: var(--ibx-text-muted); }
+.ibx-srcstatus__hint { margin: 0; }
 .ibx-srcstart { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2) var(--ibx-s3); margin-bottom: var(--ibx-s3); }
 .ibx-srcfrom { display: grid; gap: var(--ibx-s2); margin-bottom: var(--ibx-s3); }
 .ibx-srcrows { display: grid; gap: var(--ibx-s1); margin-bottom: var(--ibx-s1); }

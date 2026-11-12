@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: data sources, active or not with a switch :   1.92.3
+  - the list shows a switch in front of each source, saved at once (back to its state with the error if refused);
+    the badge « Active » goes, a source turned off is greyed.
+  - « Without effect » beside a source active without trusted sender (it reads no mail).
+  - « Remove » moves to the « ⋯ » menu of the row, no longer beside « Edit ».
+  - in the form, « Active » is the first setting, a switch saved with the form, its hint says what the source does.
+  - « Start from » (ready-made source, mail of the site) only when the source is created.
+
 - FIX: mail written by the mailbox, the thirdparty of its recipient instead of the ones of our domain :   1.92.2
   - a mail sent by the mailbox (or by another address of our domains) looked for its thirdparty by its own address,
     then offered every thirdparty using our domain (« 5 thirdparties use the domain … : which one? »).

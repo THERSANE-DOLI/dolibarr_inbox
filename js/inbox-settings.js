@@ -4227,6 +4227,22 @@
 	 * Settings > Data sources (lot A2 level 1, 1.72.0): mails sent by a site or an application from its own address,
 	 * the requester in its headers; believed for its trusted senders only, authenticated. Admins of Dolibarr.
 	 */
+	/**
+	 * Row of the list of the data sources (1.92.3): its switch first (saved at once), « Edit », the rest in « ⋯ »;
+	 * « Without effect » only when active without trusted sender (the switch alone would say it works)
+	 */
+	function sourceRow(d) {
+		const senders = d.senders ? d.senders.split('\n').filter(Boolean) : [];
+		return '<tr data-src="' + d.id + '"' + (d.status ? '' : ' class="is-off"') + '>'
+			+ '<td class="ibx-srctable__switch"><button type="button" class="ibx-switch" role="switch" data-toggle="' + d.id + '" aria-checked="' + (d.status ? 'true' : 'false') + '" aria-label="' + esc(t('InboxSourceToggle', d.label)) + '"></button></td>'
+			+ '<td><b>' + esc(d.label) + '</b>' + (d.status && !senders.length ? ' <span class="ibx-badge ibx-badge--warning" title="' + th('InboxSourceNoSender') + '">' + ic('warning') + th('InboxSourceNoEffect') + '</span>' : '')
+			+ '<div class="ibx-muted">' + esc([d.header_email, d.header_data].concat((d.header_fields ? d.header_fields.split('\n') : []).map(l => l.split('=')[0].trim())).filter(Boolean).join(', ')) + '</div></td>'
+			+ '<td>' + (senders.length ? esc(senders.slice(0, 3).join(', ')) + (senders.length > 3 ? ' <span class="ibx-muted">+' + (senders.length - 3) + '</span>' : '') : '<span class="ibx-muted">' + th('InboxSourceNoSender') + '</span>') + '</td>'
+			+ '<td>' + th('InboxSourceType_' + (d.type || 'none')) + '</td>'
+			+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-edit="' + d.id + '">' + th('InboxEdit') + '</button> '
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-more="' + d.id + '" aria-label="' + esc(t('InboxMoreActions')) + '">' + ic('more') + '</button></td></tr>';
+	}
+
 	async function renderSources(main, parts) {
 		if (!isDolibarrAdmin()) {
 			I.go('#/settings/accounts');
@@ -4249,16 +4265,8 @@
 		if (!list.length) {
 			html += '<div class="ibx-empty" style="height:auto">' + ic('redirect', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSourcesNone') + '</div></div>';
 		} else {
-			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxSourceLabel') + '</th><th>' + th('InboxSourceSenders') + '</th><th>' + th('InboxSourceType') + '</th><th></th></tr></thead><tbody>'
-				+ list.map(d => {
-					const senders = d.senders ? d.senders.split('\n') : [];
-					return '<tr><td><b>' + esc(d.label) + '</b> ' + (d.status && senders.length ? '<span class="ibx-badge ibx-badge--accent">' + th('InboxSourceOn') + '</span>' : '<span class="ibx-badge">' + th('InboxSourceOff') + '</span>')
-						+ '<div class="ibx-muted">' + esc([d.header_email, d.header_data].concat((d.header_fields ? d.header_fields.split('\n') : []).map(l => l.split('=')[0].trim())).filter(Boolean).join(', ')) + '</div></td>'
-						+ '<td>' + (senders.length ? esc(senders.slice(0, 3).join(', ')) + (senders.length > 3 ? ' <span class="ibx-muted">+' + (senders.length - 3) + '</span>' : '') : '<span class="ibx-muted">' + th('InboxSourceNoSender') + '</span>') + '</td>'
-						+ '<td>' + th('InboxSourceType_' + (d.type || 'none')) + '</td>'
-						+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-edit="' + d.id + '">' + th('InboxEdit') + '</button> '
-						+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-del="' + d.id + '" title="' + th('InboxDelete') + '" aria-label="' + th('InboxDelete') + ' ' + esc(d.label) + '">' + ic('delete') + '</button></td></tr>';
-				}).join('')
+			html += '<table class="ibx-table ibx-srctable"><thead><tr><th><span class="ibx-sr-only">' + th('InboxSourceOn') + '</span></th><th>' + th('InboxSourceLabel') + '</th><th>' + th('InboxSourceSenders') + '</th><th>' + th('InboxSourceType') + '</th><th></th></tr></thead><tbody>'
+				+ list.map(sourceRow).join('')
 				+ '</tbody></table>';
 		}
 		html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-srcadd">' + ic('plus') + ' ' + th('InboxSourceAdd') + '</button></div>'
@@ -4281,20 +4289,52 @@
 				sourceDialog(main, r, list.find(d => d.id === +ed.dataset.edit));
 				return;
 			}
-			const del = e.target.closest('[data-del]');
-			if (!del) {
+			// The switch (1.92.3): shown at once, saved by the save of the form (the conversations are made again when
+			// it becomes active), back to its state with the error when refused; no message when saved
+			const sw = e.target.closest('[data-toggle]');
+			if (sw) {
+				if (sw.dataset.busy) {
+					return;
+				}
+				const d = list.find(x => x.id === +sw.dataset.toggle);
+				const on = sw.getAttribute('aria-checked') !== 'true';
+				const tr = sw.closest('tr');
+				sw.dataset.busy = '1';
+				sw.setAttribute('aria-checked', on ? 'true' : 'false');
+				tr.classList.toggle('is-off', !on);
+				try {
+					await post('source', 'save', { source_id: d.id, label: d.label, status: on ? 1 : 0, senders: d.senders, header_email: d.header_email,
+						header_data: d.header_data, header_fields: d.header_fields, mapping: d.mapping, type: d.type });
+				} catch (err) {
+					sw.setAttribute('aria-checked', on ? 'false' : 'true');
+					tr.classList.toggle('is-off', on);
+					delete sw.dataset.busy;
+					toast(err.message, { error: true });
+					return;
+				}
+				d.status = on ? 1 : 0;
+				tr.outerHTML = sourceRow(d);
+				$('[data-toggle="' + d.id + '"]', main).focus();
 				return;
 			}
-			const d = list.find(x => x.id === +del.dataset.del);
-			if (await confirmDialog({ title: t('InboxSourceDeleteTitle', d.label), text: t('InboxSourceDeleteText'), confirm: t('InboxDelete'), danger: true })) {
-				try {
-					await post('source', 'delete', { source_id: d.id });
-					toast(t('InboxSourceDeleted', d.label));
-					renderSources(main);
-				} catch (err) {
-					toast(err.message, { error: true });
-				}
+			const more = e.target.closest('[data-more]');
+			if (!more) {
+				return;
 			}
+			const d = list.find(x => x.id === +more.dataset.more);
+			I.menu(more, [
+				{ icon: 'delete', label: t('InboxDelete'), danger: true, run: async () => {
+					if (await confirmDialog({ title: t('InboxSourceDeleteTitle', d.label), text: t('InboxSourceDeleteText'), confirm: t('InboxDelete'), danger: true })) {
+						try {
+							await post('source', 'delete', { source_id: d.id });
+							toast(t('InboxSourceDeleted', d.label));
+							renderSources(main);
+						} catch (err) {
+							toast(err.message, { error: true });
+						}
+					}
+				} },
+			]);
 		};
 	}
 
@@ -4330,17 +4370,21 @@
 			+ (r.glossary || []).map(g => '<tr><td><b>' + esc(fieldLabel(g.code)) + '</b><div class="ibx-muted">' + th('InboxSourceGlossExample', t('InboxSourceFieldExample_' + g.code)) + '</div></td>'
 				+ '<td>' + th('InboxSourceFieldFills_' + g.code) + '</td><td><code>' + esc(g.names.join(', ')) + '</code></td></tr>').join('')
 			+ '</tbody></table></details>';
+		// Active first (1.92.3): a switch saved with the form (« Cancel » undoes it too), its hint says what it does
 		const body = '<form class="ibx-form" novalidate>'
-			+ '<div class="ibx-srcstart">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="f-status-label">' + th('InboxSourceOn') + '</span><div class="ibx-inline" style="gap:var(--ibx-s3)">'
+			+ '<button type="button" class="ibx-switch ibx-js-srcstatus" role="switch" aria-checked="' + (d.status ? 'true' : 'false') + '" aria-labelledby="f-status-label" aria-describedby="f-status-hint"></button>'
+			+ '<span class="ibx-formrow__help ibx-srcstatus__hint" id="f-status-hint" aria-live="polite"></span></div></div>'
+			// « Start from » (a ready-made source, a mail of the site) only to create: on a saved source it would overwrite it
+			+ (d.id ? '' : '<div class="ibx-srcstart">'
 			+ '<label class="ibx-inline">' + th('InboxSourceTemplate') + ' <select class="ibx-field ibx-js-srctpl"><option value="">' + th('InboxSourceTemplateNone') + '</option>'
 			+ Object.keys(r.templates || {}).map(k => '<option value="' + esc(k) + '">' + th('InboxSourceTemplate_' + k) + '</option>').join('') + '</select></label>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-srcfrommail" aria-expanded="false">' + ic('mail') + ' ' + th('InboxSourceFromMail') + '</button></div>'
 			+ '<div class="ibx-srcfrom" hidden><p class="ibx-formrow__help">' + th('InboxSourceFromMailHelp') + '</p>'
 			+ '<textarea class="ibx-field ibx-js-srcpaste" rows="6" spellcheck="false" aria-label="' + th('InboxSourceTestHeaders') + '"></textarea>'
 			+ '<div><button type="button" class="ibx-btn ibx-btn--sm ibx-js-srcanalyze">' + ic('search') + ' ' + th('InboxSourceAnalyze') + '</button></div></div>'
-			+ '<div class="ibx-srcan" aria-live="polite"></div>'
+			+ '<div class="ibx-srcan" aria-live="polite"></div>')
 			+ field('label', t('InboxSourceLabel'), d.label, { required: true, autocomplete: 'off', placeholder: t('InboxSourceLabelPlaceholder'), help: t('InboxSourceLabelHelp') })
-			+ '<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div><label class="ibx-check"><input type="checkbox" name="status"' + (d.status ? ' checked' : '') + '> ' + th('InboxSourceActive') + '</label></div></div>'
 			+ area('senders', t('InboxSourceSenders'), d.senders, t('InboxSourceSendersHelp'), 'noreply@monsite.fr\nboutique.example.com')
 			+ field('header_email', t('InboxSourceHeaderEmail'), d.header_email, { autocomplete: 'off', placeholder: 'X-Data-Form-Email', help: t('InboxSourceHeaderEmailHelp') })
 			+ field('header_data', t('InboxSourceHeaderData'), d.header_data, { autocomplete: 'off', placeholder: 'X-Data-Form', help: t('InboxSourceHeaderDataHelp') })
@@ -4359,6 +4403,7 @@
 		const values = dlg => {
 			const v = formValues($('form', dlg));
 			delete v.test_headers;
+			v.status = $('.ibx-js-srcstatus', dlg).getAttribute('aria-checked') === 'true' ? 1 : 0;
 			v.header_fields = serialize(dlg, 'header_fields');
 			v.mapping = serialize(dlg, 'mapping');
 			return v;
@@ -4473,6 +4518,18 @@
 				renderSources(main);
 			} }],
 			onOpen: dlg => {
+				const status = $('.ibx-js-srcstatus', dlg);
+				const senders = $('[name="senders"]', dlg);
+				const statusHint = () => {
+					const on = status.getAttribute('aria-checked') === 'true';
+					$('.ibx-srcstatus__hint', dlg).textContent = t(!on ? 'InboxSourceOffHint' : (senders.value.trim() ? 'InboxSourceOnHint' : 'InboxSourceNoEffectHint'));
+				};
+				status.addEventListener('click', () => {
+					status.setAttribute('aria-checked', status.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+					statusHint();
+				});
+				senders.addEventListener('input', statusHint);
+				statusHint();
 				// « ? » beside each setting: its entry in the glossary
 				Object.keys(HELP).forEach(name => {
 					const label = $('[data-field="' + name + '"] .ibx-formrow__label', dlg);
@@ -4512,21 +4569,24 @@
 						analyze(dlg, { headers: $('.ibx-js-srcpaste', dlg).value });
 					}
 				});
-				$('.ibx-js-srctpl', dlg).addEventListener('change', e => {
-					const tpl = (r.templates || {})[e.target.value];
-					if (!tpl) {
-						return;
-					}
-					const form = $('form', dlg);
-					$('[name="header_email"]', form).value = tpl.header_email || '';
-					$('[name="header_data"]', form).value = tpl.header_data || '';
-					$('[name="type"]', form).value = tpl.type || '';
-					if (!$('[name="label"]', form).value.trim()) {
-						$('[name="label"]', form).value = t('InboxSourceTemplate_' + e.target.value);
-					}
-					toast(t('InboxSourceTemplateApplied'));
-					$('[name="senders"]', form).focus();
-				});
+				const tplSelect = $('.ibx-js-srctpl', dlg);
+				if (tplSelect) {
+					tplSelect.addEventListener('change', e => {
+						const tpl = (r.templates || {})[e.target.value];
+						if (!tpl) {
+							return;
+						}
+						const form = $('form', dlg);
+						$('[name="header_email"]', form).value = tpl.header_email || '';
+						$('[name="header_data"]', form).value = tpl.header_data || '';
+						$('[name="type"]', form).value = tpl.type || '';
+						if (!$('[name="label"]', form).value.trim()) {
+							$('[name="label"]', form).value = t('InboxSourceTemplate_' + e.target.value);
+						}
+						toast(t('InboxSourceTemplateApplied'));
+						$('[name="senders"]', form).focus();
+					});
+				}
 				$('.ibx-js-srctest', dlg).addEventListener('click', async () => {
 					const out = $('.ibx-srctest__out', dlg);
 					let res;
