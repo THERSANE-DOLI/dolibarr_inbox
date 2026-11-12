@@ -202,6 +202,10 @@ class InboxSecurityFixes2Test extends InboxTestCase
 		$other = (object) array('action' => 'redirect', 'fk_account' => (int) $a->id, 'fk_account_to' => null, 'folder_from' => null, 'folder_to' => null);
 
 		$this->assertTrue(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX']), array($deleted)), 'back where it was');
+		// 1.90.3: the journal writes the folders as people read them (« INBOX / Trash »)
+		$journaled = (object) array('action' => 'delete', 'fk_account' => (int) $a->id, 'fk_account_to' => null, 'folder_from' => 'INBOX', 'folder_to' => 'INBOX / Trash');
+		$this->assertTrue(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX']), array($journaled)), 'back out of a subfolder written as people read it');
+		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX.Trash']), array($journaled)), 'elsewhere, written as people read it');
 		$this->assertFalse(InboxActionLog::undoes($this->db, 'delete', array($mail), array(), array($deleted)), 'a delete never undoes');
 		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX.Trash']), array($deleted)), 'elsewhere than where it was');
 		$this->assertFalse(InboxActionLog::undoes($this->db, 'move', array($mail), array('folder' => $folders['INBOX']), array($tagged)), 'a move behind a line of tags');

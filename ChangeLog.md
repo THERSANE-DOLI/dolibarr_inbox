@@ -1,6 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-- FIX: undo of a mail put in the trash or in junk, no more « Bad undo » :   1.90.2
+- FIX: undo of a move into or out of a subfolder, no more « Bad undo » :   1.90.3
+  - the journal writes the folders as people read them (« INBOX / Trash » for INBOX.Trash), the check of the undo
+    compared them with the path of the server: every undo touching a subfolder was refused (since 1.35.1).
+  - the path of the server is now compared in the form of the journal too.
+
+- FIX: undo of a mail put in the trash or in junk, the mail followed to its new row :   1.90.2
   - a mail moved back may get a new row (mail server that does not give its new identifier: the folder is read
     again); « unread again » (1.90.0) and the keywords now follow it to that row instead of the old one.
 

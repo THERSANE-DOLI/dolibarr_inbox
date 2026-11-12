@@ -194,12 +194,19 @@ class InboxActionLog
 		if (!is_object($target) || !is_array($mails) || count($mails) !== count(array_unique($ids))) {
 			return false;
 		}
+		// The journal keeps the folders as people read them (readable(): « INBOX / Trash » for INBOX.Trash): a path of
+		// the server is compared in that form too (1.90.3, an undo out of a subfolder was refused)
+		$same = function ($accountId, $path, $logged) use ($db) {
+			$path = (string) $path;
+			$logged = (string) $logged;
+			return $path === $logged || ($logged !== '' && self::readable($db, (int) $accountId, $path) === $logged);
+		};
 		foreach ($mails as $m) {
 			$back = false;
 			foreach ($lines as $l) {
 				$to = (int) $l->fk_account_to > 0 ? (int) $l->fk_account_to : (int) $l->fk_account;
-				if (in_array($l->action, $moves, true) && (int) $m->fk_account === $to && (string) $m->path === (string) $l->folder_to
-					&& (int) $target->fk_account === (int) $l->fk_account && (string) $target->path === (string) $l->folder_from) {
+				if (in_array($l->action, $moves, true) && (int) $m->fk_account === $to && $same($to, $m->path, $l->folder_to)
+					&& (int) $target->fk_account === (int) $l->fk_account && $same((int) $l->fk_account, $target->path, $l->folder_from)) {
 					$back = true;
 					break;
 				}
