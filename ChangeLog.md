@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: one « Undo » toast at a time :   1.90.4
+  - a new toast with « Undo » replaces the previous one instead of stacking under it: the one above looked like the
+    undo of the last action. The older actions can still be undone from the journal.
+
 - FIX: undo of a move into or out of a subfolder, no more « Bad undo » :   1.90.3
   - the journal writes the folders as people read them (« INBOX / Trash » for INBOX.Trash), the check of the undo
     compared them with the path of the server: every undo touching a subfolder was refused (since 1.35.1).
