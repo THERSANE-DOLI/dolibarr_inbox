@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: undo of a mail put in the trash or in junk, no more « Bad undo » :   1.90.2
+  - a mail moved back may get a new row (mail server that does not give its new identifier: the folder is read
+    again); « unread again » (1.90.0) and the keywords now follow it to that row instead of the old one.
+
 - FIX: a mail moved, at once on the screen until the server is done :   1.90.1
   - the mail no longer comes back in the list while the server moves it (refresh of the list, synchronisation,
     another tab): it stays out of the lists read meanwhile.

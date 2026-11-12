@@ -4118,11 +4118,24 @@
 
 	async function undoAction(res) {
 		let failed = '';
+		// A mail moved back may come with a new row (server without the new identifier of the mail: the folder read
+		// again): the next steps (unread again, 1.90.0; keywords) follow it to its new row
+		const moved = {};
 		for (const u of res.undo) {
-			const r = await sendAction(u.action, u.ids, { on: u.on, add: u.add || [], remove: u.remove || [], folder: u.folder || 0 }, res.log);
+			const ids = (u.ids || []).map(id => moved[id] || id);
+			const r = await sendAction(u.action, ids, { on: u.on, add: u.add || [], remove: u.remove || [], folder: u.folder || 0 }, res.log);
 			if (r.error && !r.count) {
 				failed = r.error;
 			}
+			Object.keys(r.ids || {}).forEach(from => {
+				const to = +r.ids[from];
+				Object.keys(moved).forEach(k => {
+					if (moved[k] === +from) {
+						moved[k] = to;
+					}
+				});
+				moved[from] = to;
+			});
 		}
 		await loadList(true);
 		refreshTree();
