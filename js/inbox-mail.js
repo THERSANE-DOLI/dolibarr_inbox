@@ -82,6 +82,9 @@
 		// Conversations unfolded in the list (key of the thread) and their mails
 		expanded: new Set(),
 		threadCache: {},
+		// Actions leaving a folder still running on the server (1.90.1): their mails stay out of the lists read
+		// meanwhile, the counts of their folders are not taken from the server
+		pending: new Set(),
 	};
 	try {
 		(JSON.parse(params.tree_collapsed || '[]') || []).forEach(k => S.collapsed.add(String(k)));
@@ -1148,6 +1151,8 @@
 			// An ordinary folder unfolded on its subfolders is drawn open
 			+ folderIcon(f, open, 'ibx-tree__icon')
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
+			// Mails on their way into it (1.90.1): the work goes on on the server
+			+ (pendingTargets().has(f.id) ? '<span class="ibx-spinner ibx-tree__busy" role="img" title="' + th('InboxProgressMove', folderName(f)) + '" aria-label="' + th('InboxProgressMove', folderName(f)) + '"></span>' : '')
 			+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
 			// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
 			+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
@@ -1399,13 +1404,13 @@
 					const again = S.rows.filter(r => r.thread && S.expanded.has(r.thread.key));
 					Promise.all(again.map(r => api('mail', 'thread', { id: r.id }).then(x => {
 						learnPeople(x.people);
-						S.threadCache[r.thread.key] = x.mails || [];
+						S.threadCache[r.thread.key] = pendingKeep(x.mails, true);
 					}).catch(() => {}))).then(() => renderList());
 				}
 			} else {
 				S.expanded.clear();
 				S.threadCache = {};
-				S.rows = res.rows;
+				S.rows = pendingKeep(res.rows);
 				S.next = res.next;
 			}
 			S.total = res.total;
@@ -1457,6 +1462,7 @@
 	 * (flags changed, mails gone, new mails on top); the rows loaded beyond it are kept. The view does not jump.
 	 */
 	function mergeRows(fresh, next) {
+		fresh = pendingKeep(fresh);
 		const oldIds = new Set(S.rows.map(r => r.id));
 		const freshIds = new Set(fresh.map(r => r.id));
 		S.newCount = fresh.filter(r => !oldIds.has(r.id)).length;
@@ -1684,7 +1690,7 @@
 			try {
 				const res = await api('mail', 'thread', { id: rowId });
 				learnPeople(res.people);
-				S.threadCache[key] = res.mails || [];
+				S.threadCache[key] = pendingKeep(res.mails, true);
 			} catch (err) {
 				S.expanded.delete(key);
 				toast(err.message, { error: true });
@@ -3755,9 +3761,116 @@
 		});
 	}
 
+	// ---------- Actions still running on the server (1.90.1) ----------
+	/**
+	 * Rows of a list read from the server without the mails of the actions still running: they left the screen, a
+	 * refresh (poll, synchronisation, another action) must not show them again before the server is done
+	 * @param {object[]} list Rows or mails
+	 * @param {boolean} mailsOnly Mails of a conversation: by id only (the thread key would take them all)
+	 * @returns {object[]}
+	 */
+	function pendingKeep(list, mailsOnly) {
+		list = list || [];
+		if (!S.pending.size) {
+			return list;
+		}
+		return list.filter(r => {
+			for (const a of S.pending) {
+				if (a.ids.has(r.id) || (!mailsOnly && r.thread && a.threads.has(r.thread.key) && a.from.has(r.folder))) {
+					return false;
+				}
+			}
+			return true;
+		});
+	}
+	/** Folders left or reached by an action running: their counts stay the ones of the screen */
+	function pendingFolders() {
+		const out = new Set();
+		S.pending.forEach(a => {
+			a.from.forEach(id => out.add(id));
+			a.to.forEach(id => out.add(id));
+		});
+		return out;
+	}
+	/** Folders reached by an action running (a spinner on them in the tree) */
+	function pendingTargets() {
+		const out = new Set();
+		S.pending.forEach(a => a.to.forEach(id => out.add(id)));
+		return out;
+	}
+	/** Folder where a leaving action puts the mail (null: none known, or removed for good) */
+	function targetOf(what, r, p) {
+		if (what === 'move') {
+			const e = S.folders.get(p.folder);
+			return e ? e.folder : null;
+		}
+		if (what === 'delete') {
+			return p.confirm ? null : roleFolderOf(r, 'trash');
+		}
+		return roleFolderOf(r, { archive: 'archive', junk: 'junk', notjunk: 'inbox' }[what] || '');
+	}
+	/** The page asks before being closed while an action runs (a move to another mailbox is driven from here) */
+	function leaveGuard(e) {
+		e.preventDefault();
+		e.returnValue = '';
+	}
+	/**
+	 * An action leaving a folder registered while it runs; the folders reached count its mails at once
+	 * @returns {object} Given to pendingDone
+	 */
+	function pendingAdd(what, rows, p, expand) {
+		const a = { ids: new Set(rows.map(r => r.id)), threads: new Set(), from: new Set(), to: new Set(), added: [] };
+		rows.forEach(r => {
+			a.from.add(r.folder);
+			const n = r.thread && expand.includes(r.id) ? Math.max(1, r.thread.count || 1) : 1;
+			if (n > 1) {
+				a.threads.add(r.thread.key);
+			}
+			const f = targetOf(what, r, p);
+			if (!f || f.id === r.folder) {
+				return;
+			}
+			a.to.add(f.id);
+			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user)
+			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
+			f.total = (f.total || 0) + n;
+			f.unread = (f.unread || 0) + unread;
+			a.added.push({ f, n, unread });
+		});
+		if (!S.pending.size) {
+			window.addEventListener('beforeunload', leaveGuard);
+		}
+		S.pending.add(a);
+		renderTree();
+		return a;
+	}
+	/** The server answered: the mails are no longer kept out, the tree takes the counts of the server again */
+	function pendingDone(a, failed) {
+		S.pending.delete(a);
+		if (!S.pending.size) {
+			window.removeEventListener('beforeunload', leaveGuard);
+		}
+		if (failed) {
+			a.added.forEach(x => {
+				x.f.total = Math.max(0, (x.f.total || 0) - x.n);
+				x.f.unread = Math.max(0, (x.f.unread || 0) - x.unread);
+			});
+		}
+		renderTree();
+	}
+	/** Mails of an action told in its toast before the server counts them (a folded conversation: its mails) */
+	function estimateCount(rows, expand) {
+		return rows.reduce((n, r) => n + (r.thread && expand.includes(r.id) ? Math.max(1, r.thread.count || 1) : 1), 0);
+	}
+	/** What the list shows (folder, view, search): an answer coming late only touches the list it was given for */
+	function listKey() {
+		return JSON.stringify([S.scope, S.folderId, S.q, S.scope === 'view' ? listQuery('') : '']);
+	}
+
 	/**
 	 * Run an action: at once on the screen, then on the server by batches; refused = back as before with the reason
-	 * and « Retry »; done = toast « Undo » 8 s
+	 * and « Retry »; done = toast « Undo » 8 s. A leaving action (1.90.1) tells its toast at once and keeps its mails
+	 * out of the list until the server answers; an error alone is told after
 	 * @param {string} what seen, flag, tag, move, archive, delete, junk, notjunk
 	 * @param {number[]} ids Mails
 	 * @param {object} p on, add, remove, folder, confirm
@@ -3785,16 +3898,47 @@
 			p.confirm = 1;
 		}
 		const leaving = LEAVING.has(what) && !(what === 'move' && rows.every(r => r.folder === p.folder));
-		const restore = leaving ? leaveRows(ids, o) : applyLocal(what, rows, p);
 		const expand = foldedThreads(ids);
+		const restore = leaving ? leaveRows(ids, o) : applyLocal(what, rows, p);
 		if (expand.length) {
 			p.expand = expand;
 		}
-		const res = await sendAction(what, ids, p);
+		const track = leaving ? pendingAdd(what, rows, p, expand) : null;
+		// Under 20 mails no progress is shown: the toast comes at once, its « Undo » waits for the server if needed
+		const early = leaving && !o.quiet && ids.length < PROGRESS_FROM;
+		let settled = null;
+		let undoAsked = false;
+		let earlyToast = null;
+		if (early) {
+			earlyToast = toast(o.label || actionLabel(what, estimateCount(rows, expand), p), p.confirm ? {} : { action: t('InboxUndo'), onAction: () => {
+				if (settled) {
+					if (settled.undo.length) {
+						undoAction(settled);
+					}
+					return;
+				}
+				undoAsked = true;
+				toast(t('InboxUndoQueued'));
+			} });
+		}
+		let res = null;
+		try {
+			res = await sendAction(what, ids, p);
+		} finally {
+			if (track) {
+				pendingDone(track, !res || !res.count);
+			}
+		}
+		settled = res;
 		if (!res.count) {
+			// The toast « Moved » told too early: only the error stays
+			if (earlyToast) {
+				clearTimeout(earlyToast._ibxTimer);
+				earlyToast.remove();
+			}
 			restore();
 			if (!res.stopped) {
-				toast(res.error || t('InboxErrorServer', ''), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
+				toast(failureText(what, rows, p, res.error), { error: true, action: t('InboxRetry'), onAction: () => runAction(what, ids, p, o) });
 			}
 			return null;
 		}
@@ -3816,7 +3960,11 @@
 			refreshTree();
 		}
 		Dolibarr.executeHook(leaving ? 'inbox:mail:moved' : 'inbox:mail:flagged', { action: what, ids, folder: p.folder || 0, count: res.count });
-		if (!o.quiet) {
+		if (undoAsked) {
+			if (res.undo.length) {
+				undoAction(res);
+			}
+		} else if (!o.quiet && !early) {
 			const text = o.label || actionLabel(what, res.count, p);
 			if (res.undo.length) {
 				toast(text, { action: t('InboxUndo'), onAction: () => undoAction(res) });
@@ -4024,20 +4172,63 @@
 			showMulti();
 		}
 		renderBulkBar();
+		// Given back late (1.90.1): only to the list it left, the rest of the list as it is now (another action, a
+		// refresh), the selection only when the user did not choose something else meanwhile
+		const key = listKey();
+		const openAfter = S.openId;
 		return () => {
-			S.rows = before.rows;
-			S.selected = before.selected;
-			S.anchor = before.anchor;
-			S.total = before.total;
-			S.threadCache = before.cache;
+			refreshTree();
+			if (listKey() !== key) {
+				return;
+			}
+			const back = putBack(before.rows, S.rows, set);
+			S.total += back.length - S.rows.length;
+			S.rows = back;
+			for (const k in before.cache) {
+				if (S.threadCache[k]) {
+					S.threadCache[k] = putBack(before.cache[k], S.threadCache[k], set);
+				}
+			}
+			const untouched = S.openId === openAfter;
+			if (untouched) {
+				S.selected = new Set(Array.from(before.selected).filter(id => S.rows.some(r => r.id === id)));
+				S.anchor = before.anchor;
+			}
 			renderList();
 			renderListHead();
-			refreshTree();
-			if (before.open && S.selected.size <= 1) {
+			if (untouched && before.open && S.selected.size <= 1) {
 				openMail(before.open);
 			}
 			renderBulkBar();
 		};
+	}
+
+	/**
+	 * Mails given back to a list at their place of before, after the row before them that is still there
+	 * @param {object[]} old List before the action
+	 * @param {object[]} cur List now
+	 * @param {Set<number>} set Mails given back
+	 * @returns {object[]}
+	 */
+	function putBack(old, cur, set) {
+		const out = cur.slice();
+		const has = new Set(out.map(r => r.id));
+		old.forEach((r, i) => {
+			if (!set.has(r.id) || has.has(r.id)) {
+				return;
+			}
+			let at = 0;
+			for (let j = i - 1; j >= 0; j--) {
+				const k = out.findIndex(x => x.id === old[j].id);
+				if (k >= 0) {
+					at = k + 1;
+					break;
+				}
+			}
+			out.splice(at, 0, r);
+			has.add(r.id);
+		});
+		return out;
 	}
 
 	/** Flags and tags changed on the screen at once; the function given back puts them back */
@@ -4107,6 +4298,25 @@
 		if (subject) {
 			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + headTagsHtml(S.mail.id, { folder: S.mail.folder, tags: S.mail.tags });
 		}
+	}
+
+	/**
+	 * Error of an action refused: a move names the mail and the folder (the user may be elsewhere when it comes back)
+	 * @param {string} what Action
+	 * @param {object[]} rows Mails
+	 * @param {object} p Parameters of the action
+	 * @param {string} error Reason given by the server
+	 * @returns {string}
+	 */
+	function failureText(what, rows, p, error) {
+		const why = error || t('InboxErrorServer', '');
+		const e = what === 'move' ? S.folders.get(p.folder) : null;
+		if (!e) {
+			return why;
+		}
+		return rows.length === 1
+			? t('InboxMoveFailedOne', rows[0].subject || t('InboxNoSubject'), folderName(e.folder), why)
+			: t('InboxMoveFailedMany', rows.length, folderName(e.folder), why);
 	}
 
 	function actionLabel(what, n, p) {
@@ -9866,8 +10076,9 @@
 				Dolibarr.executeHook('inbox:notif:state', st.notif);
 			}
 			let treeChanged = false;
+			const busy = pendingFolders();
 			(st.folders || []).forEach(([id, total, unread, fresh]) => {
-				const e = S.folders.get(id);
+				const e = busy.has(id) ? null : S.folders.get(id);
 				// The folder open: its new mails are shown in the list, not in the tree
 				const n = id === S.folderId ? 0 : (fresh || 0);
 				if (e && (e.folder.total !== total || e.folder.unread !== unread || (e.folder.new || 0) !== n)) {

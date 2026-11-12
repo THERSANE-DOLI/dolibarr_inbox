@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a mail moved, at once on the screen until the server is done :   1.90.1
+  - the mail no longer comes back in the list while the server moves it (refresh of the list, synchronisation,
+    another tab): it stays out of the lists read meanwhile.
+  - toast « Moved to … » with « Undo » as soon as the mail is dropped (under 20 mails); an undo asked before the end
+    is done once the server has finished.
+  - the folder reached counts the mail at once, with a small spinner while the server works; the counts of the
+    folders concerned are no longer taken from the server meanwhile.
+  - an error alone is told, naming the mail and the folder; the mail goes back to its place without replacing the
+    list shown now (another folder opened, another action done meanwhile).
+  - the page asks before being closed while a move runs.
+  - same behaviour for archive, delete and junk.
+
 - NEW: a mail put in the trash or in junk is marked read :   1.90.0
   - « Delete », « Junk » and a move by hand to the trash or to junk mark the mail read first: it no longer counts
     as unread there.
