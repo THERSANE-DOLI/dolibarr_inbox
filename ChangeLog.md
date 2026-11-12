@@ -1,5 +1,23 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: mail written by the mailbox, the thirdparty of its recipient instead of the ones of our domain :   1.92.2
+  - a mail sent by the mailbox (or by another address of our domains) looked for its thirdparty by its own address,
+    then offered every thirdparty using our domain (« 5 thirdparties use the domain … : which one? »).
+  - the panel Dolibarr now looks at the recipients outside of us (to, then cc), the first known in Dolibarr first,
+    under the label « Recipient »; the user of Dolibarr who wrote stays shown.
+  - our domains are never offered as a shared domain; a mail between us offers nothing.
+  - « Not the right thirdparty? » remembers the address of the recipient for such a mail, nothing for a mail between
+    us.
+  - « New customer » is no longer offered from such a mail (it would read our own signature).
+
+- FIX: mails of a site form, one conversation per requester instead of one for all :   1.92.1
+  - a form sends every request from the same address with the same subject: the fallback « same subject, same
+    correspondent » put them all in one conversation, with every answer to every customer.
+  - for a mail of a data source, the correspondent is now the requester read in its headers; without a requester
+    known, the mail never joins by the subject (only by its references: In-Reply-To, References).
+  - conversations made again when a data source is saved active, and once at the update: the mails already merged
+    are split (the links to Dolibarr stay on each mail).
+
 - NEW: access level « Handle », between « Read and send » and « Manage all » :   1.92.0
   - « Handle » looks after the mails: tag, move (also to another mailbox handled), archive, trash and junk, delete
     for good, empty the trash or the junk, ignore a conversation, create, rename and move folders, import mails.

@@ -5593,20 +5593,22 @@
 	function resocDialog(box) {
 		const d = box._data;
 		const before = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
-		const email = String((box._mail && box._mail.from_email) || d.from || '');
+		// The address of the other side (1.92.2): the recipient of a mail written by us, none between us
+		const email = String(d.from !== undefined ? d.from : ((box._mail && box._mail.from_email) || ''));
 		let chosen = null;
 		const dlg = dialog({
 			title: t(before ? 'InboxResocTitle' : 'InboxResocTitleNone'),
 			body: (before ? '<p class="ibx-formrow__help" style="margin-top:0">' + th('InboxResocNow') + ' <b>' + esc(before.ref) + '</b></p>' : '')
 				+ '<input type="search" class="ibx-field ibx-js-resocq" autocomplete="off" placeholder="' + th('InboxResocSearch') + '" aria-label="' + th('InboxResocSearch') + '">'
 				+ '<div class="ibx-picklist ibx-js-resoclist" role="listbox" aria-label="' + th('InboxThirdparties') + '"></div>'
-				+ '<label class="ibx-check" style="margin-top:var(--ibx-s3)"><input type="checkbox" class="ibx-js-resocremember"> ' + (email ? th('InboxResocRemember', email) : th('InboxResocRememberAddress')) + '</label>'
+				// Nothing to remember for a mail between us (1.92.2)
+				+ (email || d.from === undefined ? '<label class="ibx-check" style="margin-top:var(--ibx-s3)"><input type="checkbox" class="ibx-js-resocremember"> ' + (email ? th('InboxResocRemember', email) : th('InboxResocRememberAddress')) + '</label>' : '')
 				+ '<p class="ibx-formrow__help">' + th('InboxResocHelp') + '</p>',
 			actions: [{ label: t('InboxResocDo'), primary: true, run: async dl => {
 				if (!chosen) {
 					return false;
 				}
-				const remember = $('.ibx-js-resocremember', dl).checked;
+				const remember = !!($('.ibx-js-resocremember', dl) || {}).checked;
 				await post('dolibarr', 'resoc', { id: +box.dataset.mail, soc: chosen.id, remember: remember ? 1 : 0 });
 				box._open = '';
 				loadDolibar(box);
@@ -5813,7 +5815,8 @@
 			const suggest = cited.filter(c => c.match !== 'other' && !linkedKeys.has(c.type + ':' + c.id));
 			// Mail sent by a site for a requester (data sources, 1.72.0): who asked, through which source, and the piece
 			// the source offers to create
-			const canLead = !!I.lead && (d.create || []).some(c => c.type === 'societe');
+			// Never from a mail written by us (1.92.2): the lead reads the sender, so our own signature
+			const canLead = !!I.lead && (d.sender.side || 'sender') === 'sender' && (d.create || []).some(c => c.type === 'societe');
 			const rq = d.requester;
 			const rqRef = rq && rq.data && rq.data.ref ? rq.data.ref : '';
 			html += '<div class="ibx-dolibar__body">'
@@ -5825,7 +5828,8 @@
 					+ (rqRef ? '<span class="ibx-muted">' + esc(t('InboxRequesterRef', rqRef)) + '</span>' : '')
 					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
 					+ '</span></div>' : '')
-				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxSender') + '</span><span class="ibx-dolibar__items">'
+				// A mail written by us (1.92.2): the thirdparty is the one of its recipient
+				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
 				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
 				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
 					+ '<span class="ibx-dolibar__tools">'

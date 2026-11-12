@@ -118,6 +118,62 @@ function inboxDolibarrUsage($accountId)
 	return is_object($row) && InboxSituation::isUsage($row->usage_profile) ? (string) $row->usage_profile : 'auto';
 }
 
+/**
+ * The other side of a mail for its thirdparty (1.92.2): the requester of a data source, else the sender, else when
+ * the sender is one of us (the mailbox, one of its identities or a domain of our mailboxes) the first recipient (to,
+ * then cc) outside of us, preferably one known in Dolibarr; '' for a mail between us
+ *
+ * @param object $row Row of the index (from_email, to_text, cc_text, requester_email, fk_account)
+ * @return array{email:string,side:string} side: sender, recipient or internal
+ */
+function inboxDolibarrCounterpart($row)
+{
+	global $db;
+
+	$requester = strtolower(trim((string) ($row->requester_email ?? '')));
+	if ($requester !== '') {
+		return array('email' => $requester, 'side' => 'sender');
+	}
+	$p = $db->prefix();
+	$own = array();
+	$rows = $db->getRows("SELECT email FROM ".$p."inbox_account WHERE rowid = ".((int) $row->fk_account)
+		." UNION SELECT email FROM ".$p."inbox_identity WHERE fk_account = ".((int) $row->fk_account)." LIMIT 500");
+	foreach (is_array($rows) ? $rows : array() as $r) {
+		if ((string) $r->email !== '') {
+			$own[] = strtolower(trim((string) $r->email));
+		}
+	}
+	$domains = (new InboxCited($db))->ownDomains();
+	$isOurs = function ($email) use ($own, $domains) {
+		$at = strrpos($email, '@');
+		return in_array($email, $own, true) || ($at !== false && in_array(substr($email, $at + 1), $domains, true));
+	};
+	$from = strtolower(trim((string) $row->from_email));
+	if ($from !== '' && !$isOurs($from)) {
+		return array('email' => $from, 'side' => 'sender');
+	}
+	if ($from === '') {
+		return array('email' => '', 'side' => 'sender');
+	}
+	$m = array();
+	preg_match_all('/[^\s<>,;"\']+@[^\s<>,;"\']+/', (string) $row->to_text.', '.(string) $row->cc_text, $m);
+	$others = array_values(array_filter(array_unique(array_map('strtolower', $m[0])), function ($e) use ($isOurs) {
+		return !$isOurs($e);
+	}));
+	if (!$others) {
+		return array('email' => '', 'side' => 'internal');
+	}
+	$matcher = new InboxContactMatcher($db);
+	foreach (array_slice($others, 0, 5) as $email) {
+		$found = $matcher->match($email);
+		if ($found['fk_soc'] || $found['fk_socpeople']) {
+			return array('email' => $email, 'side' => 'recipient');
+		}
+	}
+
+	return array('email' => $others[0], 'side' => 'recipient');
+}
+
 switch ($action) {
 	case 'situation':
 		// Situation of the thirdparty of a mail by the usage of its mailbox (1.67.0), asked after the panel
@@ -174,7 +230,8 @@ switch ($action) {
 			inboxDolibarrFail('InboxErrorResocRemember');
 		}
 		$situation = new InboxSituation($db);
-		$n = $situation->setThirdparty($user, $reader->row, $socId, $remember);
+		// The address remembered is the one of the other side (1.92.2): the recipient of a mail written by us
+		$n = $situation->setThirdparty($user, $reader->row, $socId, $remember, inboxDolibarrCounterpart($reader->row)['email']);
 		if ($n < 0) {
 			inboxDolibarrFail($situation->error);
 		}
@@ -203,7 +260,10 @@ switch ($action) {
 		// Mail sent by a site for a requester (data sources, 1.72.0): the requester is the sender here
 		$sources = new InboxDataSource($db);
 		$requester = $sources->ofRow($row);
-		$email = strtolower($requester ? $requester['email'] : (string) $row->from_email);
+		// Mail written by us (1.92.2): its thirdparty is the one of its recipient, never one of our domain
+		$counterpart = $requester ? array('email' => strtolower((string) $requester['email']), 'side' => 'sender') : inboxDolibarrCounterpart($row);
+		$email = $counterpart['email'];
+		$sender['side'] = $counterpart['side'];
 		$socId = (int) $row->fk_soc;
 		$contactId = (int) $row->fk_socpeople;
 		$matcher = null;
@@ -249,8 +309,10 @@ switch ($action) {
 			}
 		}
 		$sender['manual'] = (int) ($row->soc_manual ?? 0);
-		if ($email !== '') {
-			$u = $db->getRow("SELECT rowid, firstname, lastname, login FROM ".$p."user WHERE LOWER(email) = '".$db->escape($email)."' AND statut = 1 AND entity IN (0, ".((int) $conf->entity).")");
+		// The user is the one who wrote, also when the thirdparty is the one of the recipient
+		$writer = $requester ? $email : strtolower(trim((string) $row->from_email));
+		if ($writer !== '') {
+			$u = $db->getRow("SELECT rowid, firstname, lastname, login FROM ".$p."user WHERE LOWER(email) = '".$db->escape($writer)."' AND statut = 1 AND entity IN (0, ".((int) $conf->entity).")");
 			if (is_object($u)) {
 				$sender['user'] = array('id' => (int) $u->rowid, 'name' => trim($u->firstname.' '.$u->lastname) ?: (string) $u->login);
 			}
@@ -278,7 +340,7 @@ switch ($action) {
 			$hookmanager = new HookManager($db);
 		}
 		$hookmanager->initHooks(array('inbox'));
-		$hookParams = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'message_id' => (string) $row->message_id, 'from' => $email,
+		$hookParams = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'message_id' => (string) $row->message_id, 'from' => $requester ? $email : strtolower((string) $row->from_email),
 			'subject' => (string) $row->subject, 'mailref' => (int) ($byRow[(int) $row->rowid] ?? 0));
 		$extraLinks = array();
 		$alerts = array();

@@ -287,4 +287,63 @@ class InboxDataSourceTest extends InboxTestCase
 
 		$this->db->query("DELETE FROM ".$p."societe WHERE rowid IN (".$socId.", ".$siteId.")");
 	}
+
+	/**
+	 * Conversations (1.92.1): the mails of a form, all from the site with the same subject, are one conversation per
+	 * requester, never one for all; the threads merged before are made again when the source is saved
+	 *
+	 * @return void
+	 */
+	public function testThreadsPerRequester()
+	{
+		$p = $this->db->prefix();
+		$this->source();
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$this->db->query("INSERT INTO ".$p."inbox_folder (fk_account, path, name, delimiter, role, status) VALUES (".((int) $box->id).", 'INBOX', 'INBOX', '.', 'inbox', 1)");
+		$folder = (int) $this->db->last_insert_id($p.'inbox_folder');
+		$auth = 'Authentication-Results: '.self::MX.'; dkim=pass header.d=forms.inbox-test.invalid; dmarc=pass header.from=forms.inbox-test.invalid';
+		$t = dol_now() - 3600;
+		$n = 0;
+		$add = function ($msgid, $from, $subject, $extra, $time, $replyTo = '') use ($box, $folder, &$n) {
+			$head = "From: <".$from.">\r\nTo: devis@inbox-test.invalid\r\nSubject: ".$subject."\r\nMessage-ID: <".$msgid.">\r\n"
+				.($replyTo !== '' ? "In-Reply-To: <".$replyTo.">\r\nReferences: <".$replyTo.">\r\n" : '').$extra;
+			$n++;
+			$mail = InboxHeaderParser::parse($head) + array('remote_id' => '1:'.$n, 'sort_key' => $n, 'date_received' => $time, 'size' => 10, 'snippet' => '',
+				'seen' => 0, 'answered' => 0, 'flagged' => 0, 'draft' => 0, 'keywords' => array(), 'source_header' => $head);
+			$this->assertSame(1, (new InboxMail($this->db))->addMany($box->id, $folder, array($mail)));
+		};
+		$subject = 'Message depuis le formulaire de contact';
+		$a = 'alice@client.inbox-test.invalid';
+		$b = 'bruno@other.inbox-test.invalid';
+		$add('form-a@forms.inbox-test.invalid', self::SITE, $subject, $auth."\r\nX-Data-Form-Email: ".$a."\r\n", $t);
+		$add('form-b@forms.inbox-test.invalid', self::SITE, $subject, $auth."\r\nX-Data-Form-Email: ".$b."\r\n", $t + 60);
+		// No requester readable: alone, never with the other mails of the form
+		$add('form-c@forms.inbox-test.invalid', self::SITE, $subject, $auth."\r\n", $t + 90);
+		// The requester writes again without reference: joins by the subject, on the requester
+		$add('re-b@other.inbox-test.invalid', $b, 'RE: '.$subject, '', $t + 120);
+		// The requester answers the mail of the form
+		$add('re-a@client.inbox-test.invalid', $a, 'Re: '.$subject, '', $t + 180, 'form-a@forms.inbox-test.invalid');
+		$key = function ($msgid) use ($p, $box) {
+			return (string) $this->db->getRow("SELECT thread_key FROM ".$p."inbox_mail WHERE fk_account = ".((int) $box->id)." AND message_id = '".$this->db->escape($msgid)."'")->thread_key;
+		};
+		$check = function ($when) use ($key) {
+			$ka = $key('form-a@forms.inbox-test.invalid');
+			$kb = $key('form-b@forms.inbox-test.invalid');
+			$kc = $key('form-c@forms.inbox-test.invalid');
+			$this->assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $ka, $when);
+			$this->assertNotSame($ka, $kb, $when.': two requesters, two conversations');
+			$this->assertNotSame($ka, $kc, $when.': no requester, alone');
+			$this->assertNotSame($kb, $kc, $when.': no requester, alone');
+			$this->assertSame($ka, $key('re-a@client.inbox-test.invalid'), $when.': the answer in the conversation of its mail');
+			return $kb;
+		};
+		$this->assertSame($check('new mails'), $key('re-b@other.inbox-test.invalid'), 'the requester joins by the subject');
+
+		// Indexed before the source (no requester, one thread for all): made again when the source is saved
+		$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = 'merged', requester_email = NULL, fk_source = NULL WHERE fk_account = ".((int) $box->id));
+		$this->assertSame(5, InboxDataSource::rethread($this->db, microtime(true) + 10));
+		$check('made again');
+		$this->assertSame(0, (int) $this->db->getRow("SELECT COUNT(rowid) AS n FROM ".$p."inbox_mail WHERE fk_account = ".((int) $box->id)." AND thread_key IS NULL")->n);
+	}
 }
+
