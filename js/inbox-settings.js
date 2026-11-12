@@ -2458,7 +2458,9 @@
 			return;
 		}
 		const levels = ['read', 'send', 'manage'];
-		let html = '<p class="ibx-section__help">' + th('InboxAccessHelp') + '</p>';
+		let html = '<p class="ibx-section__help">' + th('InboxAccessHelp') + '</p>'
+			+ accessLevelsTable(!data.accesses.length)
+			+ '<p class="ibx-section__help">' + th('InboxAccessAdminNone') + '</p>';
 		if (data.owner) {
 			html += '<div class="ibx-notice ibx-notice--info">' + ic('account') + '<div class="ibx-notice__text">' + th('InboxAccessOwner', data.owner.name) + '</div></div>';
 		}
@@ -2473,7 +2475,9 @@
 		}
 		html += '<form class="ibx-inline ibx-js-grant" style="margin-top:1rem"><input class="ibx-field ibx-field--medium" list="ibx-access-list" placeholder="' + th('InboxSearchUserOrGroup') + '" aria-label="' + th('InboxSearchUserOrGroup') + '" autocomplete="off"><datalist id="ibx-access-list"></datalist>'
 			+ '<select class="ibx-field ibx-field--medium" name="level" aria-label="' + th('InboxAccessLevel') + '">' + levels.map(l => '<option value="' + l + '">' + esc(levelLabel(l)) + '</option>').join('') + '</select>'
-			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('user-plus') + ' ' + th('InboxGiveAccess') + '</button></form>';
+			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('user-plus') + ' ' + th('InboxGiveAccess') + '</button></form>'
+			// What the level chosen gives, and what it does not (1.91.0)
+			+ '<p class="ibx-formrow__help ibx-js-levelhint" aria-live="polite">' + th('InboxAccessHint_read') + '</p>';
 		html += '<section class="ibx-section" style="margin-top:2rem"><h2 class="ibx-section__title">' + th('InboxJournal') + '</h2>' + journalHtml(log.log) + '</section>';
 		box.innerHTML = html;
 
@@ -2507,6 +2511,9 @@
 		}));
 		const grant = $('.ibx-js-grant', box);
 		const q = $('input', grant);
+		grant.level.addEventListener('change', () => {
+			$('.ibx-js-levelhint', box).textContent = t('InboxAccessHint_' + grant.level.value);
+		});
 		// Every result seen, by the name shown: choosing an entry of the list fires a new search on the full name,
 		// whose answer must not make the choice unknown
 		const seen = new Map();
@@ -2552,6 +2559,23 @@
 				toast(err.message, { error: true });
 			}
 		});
+	}
+
+	/**
+	 * What each level gives (1.91.0): the checks fill from one column to the next, each level holds the one before
+	 * @param {boolean} open Open (a mailbox nobody uses yet)
+	 * @returns {string}
+	 */
+	function accessLevelsTable(open) {
+		// Level from which each capability is given (checked on the server: InboxActions::run, InboxAccess)
+		const caps = [['InboxAccessCapRead', 0], ['InboxAccessCapSeen', 0], ['InboxAccessCapSend', 1], ['InboxAccessCapSort', 2], ['InboxAccessCapAdmin', 2]];
+		const levels = ['read', 'send', 'manage'];
+		return '<details class="ibx-levels"' + (open ? ' open' : '') + '><summary>' + ic('info') + ' ' + th('InboxAccessLevelsTitle') + '</summary>'
+			+ '<table class="ibx-table ibx-levels__table"><thead><tr><th scope="col"><span class="ibx-sr-only">' + th('InboxAccessLevelsWhat') + '</span></th>'
+			+ levels.map(l => '<th scope="col">' + esc(levelLabel(l)) + '</th>').join('') + '</tr></thead><tbody>'
+			+ caps.map(([key, from]) => '<tr><th scope="row">' + th(key) + '</th>'
+				+ levels.map((l, i) => '<td>' + (i >= from ? ic('check') + '<span class="ibx-sr-only">' + th('InboxAccessLevelsYes') + '</span>' : '<span class="ibx-sr-only">' + th('InboxAccessLevelsNo') + '</span>') + '</td>').join('') + '</tr>').join('')
+			+ '</tbody></table></details>';
 	}
 
 	function journalHtml(lines) {

@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: access of a mailbox, what each level gives shown :   1.91.0
+  - levels named so that each one holds the one before: « Read », « Read and send », « Manage all » (also in the
+    messages that name them).
+  - « What each level allows »: a table of checks per level, open while nobody uses the mailbox, folded after.
+  - under the level chosen to give an access: what the person will do, and what she will not.
+  - the help no longer says that « Read » tags: tagging needs « Manage all », as moving or deleting.
+
 - FIX: one « Undo » toast at a time :   1.90.4
   - a new toast with « Undo » replaces the previous one instead of stacking under it: the one above looked like the
     undo of the last action. The older actions can still be undone from the journal.

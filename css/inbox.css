@@ -2503,6 +2503,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bank__foot { display: flex; justify-content: flex-end; margin-top: var(--ibx-s2); }
 
 /* Shared domains (lot A7, 1.76.0) */
+/* Access: what each level gives (1.91.0) */
+.ibx-levels { margin-bottom: var(--ibx-s3); }
+.ibx-levels > summary { cursor: pointer; font-weight: 600; }
+.ibx-levels__table { margin-top: var(--ibx-s2); max-width: 46rem; }
+.ibx-levels__table th[scope="row"] { font-weight: 400; text-align: left; }
+.ibx-levels__table thead th:not(:first-child), .ibx-levels__table td { text-align: center; width: 9rem; }
+.ibx-levels__table td .ibx-icon { color: var(--ibx-accent); }
 .ibx-domwhy { margin-bottom: var(--ibx-s3); }
 .ibx-domwhy > summary { cursor: pointer; font-weight: 600; }
 .ibx-domwhy dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--ibx-s1) var(--ibx-s3); margin: var(--ibx-s2) 0 0; }
