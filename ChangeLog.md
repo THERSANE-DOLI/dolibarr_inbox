@@ -1,5 +1,23 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: name of a colleague as sender, head of a conversation, chip of a colleague :   1.102.13
+  - a user of Dolibarr as sender: his name on one line with the address under it on a phone (they were two columns,
+    the name on two lines), after it on a computer.
+  - head of a conversation: « 2 mails in the conversation · received on » and the mailbox read as one sentence.
+  - chip of the Dolibarr part (phone): a colleague is shown by his name, never « unknown to Dolibarr ».
+
+- FIX: encoded words left in subjects and names decoded :   1.102.12
+  - « l'expé=?UTF-8?Q?dition?= », « de =?UTF-8?Q?l=E2=80=99UE…?= »: the reader of the library leaves them after raw
+    UTF-8 or glued to a word (sent by some mailers after a forward); adjacent words joined before decoding, other
+    charsets converted. The mails already indexed are repaired once (subjects, names, recipients, references).
+  - a word longer than the screen in the subject of the reading breaks instead of going out of it.
+
+- FIX: back of the browser to the mail you were on, back arrow to the list :   1.102.11
+  - a jump from a mail to another one (« See the mail », the bell, after a sending, a bounce) is a step of the
+    history: the back of the browser or of the phone comes back to the mail you were on. The back arrow of the page
+    goes straight to the list, however many mails were jumped through (each step keeps its distance to the list).
+  - while the address is followed (back, forward, reload) it is no longer rewritten (each back made a new step).
+
 - FIX: the mail open kept in the address, back of the browser to the list :   1.102.10
   - #/mail/<folder>/<mail> (and #/mail/view/<view>/<mail>, #/mail/vview/<id>/<mail>): a reload opens the mail again,
     a mail moved or removed meanwhile says so and gives back its list. Only numbers in the address.

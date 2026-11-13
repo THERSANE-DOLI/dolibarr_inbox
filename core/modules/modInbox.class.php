@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.102.10';
+		$this->version = '1.102.13';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'inbox@inbox';
 
@@ -459,6 +459,36 @@ class modInbox extends DolibarrModules
 			dol_include_once('/inbox/class/inboxdatasource.class.php');
 			InboxDataSource::rethread($this->db, microtime(true) + 3);
 			$done = '1.92.1';
+		}
+		if (version_compare($done, '1.102.12', '<')) {
+			// 1.102.12: encoded words left in the subjects and names of the index (« l'expé=?UTF-8?Q?dition?= ») decoded;
+			// the same mails in the references (notes, links) too
+			dol_include_once('/inbox/class/inboxmimeparser.class.php');
+			foreach (array('inbox_mail' => array('subject', 'from_name', 'to_text', 'cc_text'), 'inbox_mailref' => array('subject')) as $table => $cols) {
+				$where = implode(' OR ', array_map(function ($c) {
+					return $c." LIKE '%=?%?=%'";
+				}, $cols));
+				$res = $this->db->query("SELECT rowid, ".implode(', ', $cols)." FROM ".$prefix.$table." WHERE ".$where);
+				$rows = array();
+				while ($res && ($o = $this->db->fetch_object($res))) {
+					$rows[] = $o;
+				}
+				foreach ($rows as $o) {
+					$set = array();
+					foreach ($cols as $c) {
+						if ($o->$c !== null && strpos((string) $o->$c, '=?') !== false) {
+							$value = InboxMimeParser::decodeWords((string) $o->$c);
+							if ($value !== (string) $o->$c) {
+								$set[] = $c." = '".$this->db->escape(InboxMimeParser::clean($value, $c === 'to_text' || $c === 'cc_text'))."'";
+							}
+						}
+					}
+					if ($set && !$this->db->query("UPDATE ".$prefix.$table." SET ".implode(', ', $set)." WHERE rowid = ".((int) $o->rowid))) {
+						return -1;
+					}
+				}
+			}
+			$done = '1.102.12';
 		}
 		dolibarr_set_const($this->db, 'INBOX_SCHEMA_VERSION', $done, 'chaine', 0, 'Data changes of inbox already done', $conf->entity);
 
