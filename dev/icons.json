@@ -59,6 +59,7 @@
 		"folder-plus": ["folder-plus", "outline"],
 		"rename": ["cursor-text", "outline"],
 		"edit": ["pencil", "outline"],
+		"refresh": ["refresh", "outline"],
 		"thread": ["messages", "outline"],
 		"minimize": ["minus", "outline"],
 		"maximize": ["arrows-maximize", "outline"],

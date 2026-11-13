@@ -559,7 +559,10 @@ switch ($action) {
 		dol_include_once('/inbox/class/inboxsync.class.php');
 		$folderId = (int) inboxAjaxParam('folder', 'int');
 		$folder = $folderId > 0 ? inboxListFolder($folderId, $readable) : null;
-		$cron = $db->getRow("SELECT datelastrun, status FROM ".$db->prefix()."cronjob WHERE classesname = '/inbox/class/inboxsync.class.php' AND methodename = 'cronRun'");
+		// « Refresh » clicked by the user (1.97.0): the folder synchronised again after 3 s instead of 15 s, never at
+		// each click
+		$minAge = (int) inboxAjaxParam('force', 'int') ? 3 : 15;
+		$cron =$db->getRow("SELECT datelastrun, status FROM ".$db->prefix()."cronjob WHERE classesname = '/inbox/class/inboxsync.class.php' AND methodename = 'cronRun'");
 		$cronAlive = is_object($cron) && (int) $cron->status === 1 && $cron->datelastrun && (int) $db->jdate($cron->datelastrun) > dol_now() - 180;
 		session_write_close();
 		$deadline = microtime(true) + 10;
@@ -571,15 +574,26 @@ switch ($action) {
 			}
 		};
 		$done = array();
+		// Why the folder was not synchronised: recent (done a moment ago), busy (a pass holds the mailbox, try again)
+		$skipped = '';
 		if ($folder) {
 			$row = $db->getRow("SELECT date_sync FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folder->rowid));
-			if (!is_object($row) || !$row->date_sync || (int) $db->jdate($row->date_sync) <= dol_now() - 15) {
+			if (!is_object($row) || !$row->date_sync || (int) $db->jdate($row->date_sync) <= dol_now() - $minAge) {
 				$account = new InboxAccount($db);
 				if ($account->fetch((int) $folder->fk_account) > 0 && $sync->run($account, microtime(true) + 8, array('folder_id' => (int) $folder->rowid)) === 1) {
 					$add();
 					$done[] = 'folder';
+				} else {
+					$skipped = 'busy';
 				}
+			} else {
+				$skipped = 'recent';
 			}
+		}
+		// « Refresh » clicked: the folder asked only, the answer at once; the passes on the mailboxes (protected ones,
+		// no scheduled job) wait for the next automatic call, else the click waited for them (up to 10 s more)
+		if ($minAge === 3) {
+			inboxAjaxReply(array('cron' => $cronAlive, 'done' => $done, 'stats' => $stats, 'more' => false, 'skipped' => $skipped));
 		}
 		$more = false;
 		// Protected for their password (1.89.0): the scheduled job cannot open them, the page of a user who unlocked them

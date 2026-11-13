@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: mails got now from the list :   1.97.0
+  - a « Get mails now » button (round arrow) in the head of the list, instead of waiting for the next automatic pass
+    (about 20 s): the folder open only (the Inbox of a mailbox clicked included), else, in a view (unified inbox,
+    unread...), the Inbox of each mailbox of the view; called by the tab clicked itself (under a second), the other
+    tabs of the browser updated after.
+  - a folder got again 3 s after its last synchronisation at least, never at each click.
+
+- FIX: unsubscribe refused by the site of the list, the mail or the page of the list offered :   1.96.1
+  - when the site of the list refuses the one-click request (an anti-bot wall answering HTTP 403 to any server), a
+    dialog offers instead of an error only: the unsubscribe mail to the address of the list (mailto), prepared,
+    checked and sent by the user, and the unsubscribe page of the sender opened in a new tab (a browser passes the
+    wall; the sender then sees the IP address and the browser, said in the dialog).
+
 - NEW: archived mails marked read :   1.96.0
   - My account > Reading: « Mark as read what I archive », a setting of its own beside the one of the trash and junk
     (on by default): an archived mail no longer counts among the unread mails of the archives.

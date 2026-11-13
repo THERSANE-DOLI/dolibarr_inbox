@@ -167,7 +167,7 @@ switch ($action) {
 		$key = $reader->unsubscribe($user, $raw);
 		if ($key !== '') {
 			$codes = array('InboxErrorNeedManage' => 403, 'InboxErrorUnsubscribeNone' => 422, 'InboxErrorUnsubscribeNoOneClick' => 422, 'InboxErrorUnsubscribeNotSigned' => 422);
-			inboxAjaxReply(array('error' => $langs->transnoentities($key, $reader->error), 'code' => $key), $codes[$key] ?? 502);
+			inboxAjaxReply(array('error' => $langs->transnoentities($key, $reader->error), 'code' => $key, 'page' => $reader->unsubscribePage), $codes[$key] ?? 502);
 		}
 		inboxAjaxReply(array('done' => 1));
 		// no break

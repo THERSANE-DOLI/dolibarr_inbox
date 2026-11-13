@@ -2663,3 +2663,9 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-cke-tools .ibx-tbtn:disabled { opacity: 0.4; cursor: default; }
 /* Panels of CKEditor put in a modal dialog (signature, template): placed by CKEditor from the dialog, never cut by it */
 .ibx-dialog[open]:has(.ibx-editor--cknative) { overflow: visible; }
+
+/* « Refresh » of the list (1.97.0): the icon turns while the mailboxes are synchronised; kept clickable-looking, a
+   second click is ignored */
+.ibx-js-refresh[aria-busy="true"] { cursor: progress; }
+.ibx-js-refresh[aria-busy="true"] .ibx-icon { animation: ibx-spin 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ibx-js-refresh[aria-busy="true"] .ibx-icon { animation: none; opacity: .5; } }
