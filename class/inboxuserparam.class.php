@@ -58,6 +58,8 @@ class InboxUserParam
 			'read_delay' => array('3', 'int:0:600'),
 			// A mail put in the trash or in junk by the user is marked read first (1.90.0)
 			'read_on_trash' => array('1', 'int:0:1'),
+			// An archived mail is marked read first (1.96.0), a setting of its own
+			'read_on_archive' => array('1', 'int:0:1'),
 			// Display (lot W3): table or cards for all the folders, as Thunderbird
 			'view' => array('cards', array('table', 'cards')),
 			'list_columns' => array('', 'json'),

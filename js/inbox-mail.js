@@ -3837,8 +3837,8 @@
 				return;
 			}
 			a.to.add(f.id);
-			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user)
-			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
+			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user); archive: own setting (1.96.0)
+			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') || (what === 'archive' && params.read_on_archive !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
 			f.total = (f.total || 0) + n;
 			f.unread = (f.unread || 0) + unread;
 			a.added.push({ f, n, unread });

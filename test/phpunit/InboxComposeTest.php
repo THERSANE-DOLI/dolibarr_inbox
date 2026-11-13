@@ -146,6 +146,11 @@ class InboxComposeTest extends InboxImapTestCase
 		$text = InboxMailBuilder::toText(InboxMailBuilder::cleanHtml('<p>Bonjour</p><div class="inbox-signature">-- <br><p>John</p></div>'));
 		$this->assertSame(1, substr_count($text, '-- '), 'a draft written before 1.53.5: one delimiter');
 		$this->assertStringContainsString("\n-- \n", $text);
+		// Signature changed for one mail (1.95.0): its mark kept (the draft keeps it in its text), the same delimiter
+		$clean = InboxMailBuilder::cleanHtml('<p>Bonjour</p><div class="inbox-signature-edited"><p>John BOTELLA</p></div>');
+		$this->assertStringContainsString('<div class="inbox-signature-edited">', $clean);
+		$this->assertStringContainsString("Bonjour\n\n-- \nJohn BOTELLA", InboxMailBuilder::toText($clean));
+		$this->assertStringNotContainsString('class=', InboxMailBuilder::cleanHtml('<div class="inbox-signature-edited other">x</div>'), 'only the exact marks of inbox');
 
 		// What the editor writes for the mail software (1.16.1): colours, alignment, tables with their borders in the cells
 		$clean = InboxMailBuilder::cleanHtml('<p style="text-align: center"><span style="color: #b42318; background-color: #fef08a">Urgent</span></p>'

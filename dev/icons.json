@@ -58,6 +58,7 @@
 		"folder-move": ["folder-symlink", "outline"],
 		"folder-plus": ["folder-plus", "outline"],
 		"rename": ["cursor-text", "outline"],
+		"edit": ["pencil", "outline"],
 		"thread": ["messages", "outline"],
 		"minimize": ["minus", "outline"],
 		"maximize": ["arrows-maximize", "outline"],

@@ -152,7 +152,10 @@ class InboxActions
 					});
 					break;
 				case 'archive':
-					$res = $this->archive($user, $list);
+					// Archived = read (1.96.0, setting read_on_archive of My account, apart from trash and junk)
+					$res = $this->readFirst($user, $list, true, function () use ($user, $list) {
+						return $this->archive($user, $list);
+					}, 'read_on_archive');
 					break;
 				case 'delete':
 					$res = $this->readFirst($user, $list, (string) $list[0]->role !== 'trash' && $this->roleFolder((int) $list[0]->fk_account, 'trash'), function () use ($user, $list, $params) {
@@ -312,19 +315,21 @@ class InboxActions
 	/**
 	 * A mail put in the trash or in junk by a user is marked read first (1.90.0, setting read_on_trash of My account):
 	 * it no longer counts as unread there. The undo gives the mails back to their folder, then unread again.
+	 * Same for an archived mail, with its own setting read_on_archive (1.96.0).
 	 *
-	 * @param User     $user User
-	 * @param object[] $list Rows of one folder
-	 * @param bool     $read Mark read before the action
-	 * @param callable $go   The action, returns its result (or null)
+	 * @param User     $user  User
+	 * @param object[] $list  Rows of one folder
+	 * @param bool     $read  Mark read before the action
+	 * @param callable $go    The action, returns its result (or null)
+	 * @param string   $param Setting of My account that allows it
 	 * @return array<string,mixed>|null
 	 */
-	protected function readFirst(User $user, array $list, $read, callable $go)
+	protected function readFirst(User $user, array $list, $read, callable $go, $param = 'read_on_trash')
 	{
 		// Setting of My account (on by default)
 		if ($read && !$this->system) {
 			require_once __DIR__.'/inboxuserparam.class.php';
-			$read = (int) (new InboxUserParam($this->db))->get($user, 'read_on_trash') === 1;
+			$read = (int) (new InboxUserParam($this->db))->get($user, $param) === 1;
 		}
 		// Unread, or unknown (mail of a protected mailbox, seen = -1: marked read, never made unread by the undo)
 		$unread = $read ? array_values(array_filter($list, function ($r) {

@@ -174,6 +174,21 @@ class InboxActionsTest extends InboxImapTestCase
 		$archive = $this->db->getRow("SELECT f.path FROM ".$this->db->prefix()."inbox_folder as f INNER JOIN ".$this->db->prefix()."inbox_mail as m ON m.fk_folder = f.rowid WHERE m.rowid = ".((int) $this->row($a, 'm1')->rowid));
 		$this->assertMatchesRegularExpression('/Archives.2025$/', (string) $archive->path, 'year of the mail, not of today');
 		$this->assertCount(1, $this->onServer((string) $archive->path, 'm1'));
+		// 1.96.0: archived = read (setting read_on_archive), unread again by the undo
+		$this->assertSame(1, (int) $this->row($a, 'm1')->seen, 'archived: read');
+		$this->assertSame('seen', end($res['undo'])['action'], 'unread again by the undo, after the move back');
+
+		// Setting of My account off (apart from read_on_trash): the mail leaves unread
+		dol_include_once('/inbox/class/inboxuserparam.class.php');
+		$up = new InboxUserParam($this->db);
+		$this->assertTrue((bool) $up->set($this->admin, 'read_on_archive', '0'));
+		try {
+			$res = $act->run($this->admin, 'archive', array((int) $this->row($a, 'm3')->rowid));
+			$this->assertTrue($res['ok'], $res['error']);
+			$this->assertSame(0, (int) $this->row($a, 'm3')->seen, 'setting off: still unread');
+		} finally {
+			$up->remove($this->admin, 'read_on_archive');
+		}
 
 		$m2 = (int) $this->row($a, 'm2')->rowid;
 		$res = $act->run($this->admin, 'delete', array($m2));

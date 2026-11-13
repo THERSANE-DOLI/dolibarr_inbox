@@ -1762,7 +1762,12 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__sig { position: relative; margin: 0 var(--ibx-s3) var(--ibx-s2); border: 1px dashed var(--ibx-border); border-radius: var(--ibx-radius); }
 .ibx-compose__sig iframe, .ibx-compose__quote iframe { display: block; width: 100%; height: 3rem; border: 0; background: #fff; border-radius: var(--ibx-radius); }
 .ibx-compose__quote iframe { height: 16rem; }
-.ibx-compose__sig .ibx-js-sigoff { position: absolute; top: var(--ibx-s1); right: var(--ibx-s1); background: var(--ibx-bg); }
+.ibx-compose__sigtools { position: absolute; top: var(--ibx-s1); right: var(--ibx-s1); display: flex; gap: var(--ibx-s1); }
+.ibx-compose__sigtools .ibx-btn { background: var(--ibx-bg); }
+/* Signature changed for this mail (1.95.0): in the text, framed and named as the one that follows the identity */
+.ibx-editor__content div.inbox-signature-edited { margin: var(--ibx-s2) 0 0; padding: var(--ibx-s2); border: 1px dashed var(--ibx-border-strong); border-radius: var(--ibx-radius); }
+.ibx-editor__content div.inbox-signature-edited::before { content: var(--ibx-sig-label, ""); display: block; margin-bottom: var(--ibx-s1); font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); }
+.ibx-compose__sigswap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-compose__body > .ibx-js-sigadd, .ibx-compose__body > .ibx-js-quoteon { align-self: flex-start; margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-compose__quote { margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-compose__quotebar { display: flex; gap: var(--ibx-s2); align-items: center; }
@@ -2633,3 +2638,28 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-check--block > input { margin-top: 0.2rem; flex: none; }
 .ibx-check--block > span { display: flex; flex-direction: column; gap: 0.125rem; }
 .ibx-check--block .ibx-formrow__help { margin: 0; }
+
+/* ===== CKEditor of Dolibarr as editor of the writing (1.94.0) ===== */
+/* Toolbar of inbox driving CKEditor: the editable is the same box as with Tiptap */
+.ibx-editor--ckeditor .ibx-editor__content { position: relative; }
+.ibx-editor--ckeditor .ibx-editor__content.cke_focus { outline: none; }
+.ibx-editor--ckeditor .ibx-editor__content[data-cke-editorplaceholder]::before { content: attr(data-cke-editorplaceholder); position: absolute; top: var(--ibx-s3); left: var(--ibx-s3); color: var(--ibx-text-faint); pointer-events: none; }
+.ibx-editor--ckeditor .ibx-editor__content td, .ibx-editor--ckeditor .ibx-editor__content th { position: static; }
+.ibx-editor--ckeditor .ibx-editor__content img { cursor: default; }
+.ibx-editor--ckeditor .cke_widget_wrapper:hover > .ibx-var, .ibx-editor--ckeditor .cke_widget_focused > .ibx-var, .ibx-editor--ckeditor .cke_widget_selected > .ibx-var { box-shadow: var(--ibx-focus); }
+.ibx-editor--ckeditor .cke_widget_wrapper { outline: none !important; }
+/* Toolbar and menu of CKEditor: the classic editor of Dolibarr, the bar of inbox keeps voice typing, AI, variables */
+.ibx-editor--cknative { padding: 0; }
+.ibx-editor--cknative .cke_chrome { border: 0; box-shadow: none; }
+.ibx-tools--native > :not([data-cmd="dictate"], [data-cmd="ai"], [data-cmd="variable"], .ibx-js-var) { display: none !important; }
+.ibx-tools--native:not(:has(> :is([data-cmd="dictate"], [data-cmd="ai"], [data-cmd="variable"], .ibx-js-var):not([hidden]))) { display: none; }
+/* Those tools as the last group of the toolbar of CKEditor: its size and its colours (the bar stays light) */
+.ibx-cke-tools:not(:has(:is([data-cmd="dictate"], [data-cmd="ai"], [data-cmd="variable"], .ibx-js-var):not([hidden]))) { display: none; }
+.ibx-cke-tools .ibx-tools--native { display: inline-flex; gap: 2px; min-height: 0; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+.ibx-cke-tools .ibx-tbtn { min-width: 28px; height: 28px; padding: 0 4px; color: #484848; border-radius: 2px; }
+.ibx-cke-tools .ibx-tbtn .ibx-icon { width: 16px; height: 16px; }
+.ibx-cke-tools .ibx-tbtn:hover { background: #e5e5e5; }
+.ibx-cke-tools .ibx-tbtn[aria-pressed="true"], .ibx-cke-tools .ibx-tbtn[aria-expanded="true"] { color: #000; background: #dedede; box-shadow: inset 0 0 0 1px #bcbcbc; }
+.ibx-cke-tools .ibx-tbtn:disabled { opacity: 0.4; cursor: default; }
+/* Panels of CKEditor put in a modal dialog (signature, template): placed by CKEditor from the dialog, never cut by it */
+.ibx-dialog[open]:has(.ibx-editor--cknative) { overflow: visible; }

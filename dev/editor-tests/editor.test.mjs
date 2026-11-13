@@ -229,3 +229,46 @@ test('the colour button changes a colour read from a style (owned by the editor,
 	assert.doesNotMatch(s, /#ff0000|rgb\(255,0,0\)/);
 	assert.match(s, /font-size:14px/);
 });
+
+// ---------- Signature changed for one mail (1.95.0) ----------
+
+test('a signature changed for one mail is a block of its own, kept through the editor', async () => {
+	const { ed } = await editorWith('<p>Bonjour</p><div class="inbox-signature-edited"><p>Jean</p><p>01 02 03 04 05</p></div>');
+	assert.ok(ed.hasSignature());
+	assert.match(ed.getHtml(), /<div class="inbox-signature-edited"><p>Jean<\/p><p>01 02 03 04 05<\/p><\/div>/);
+});
+
+test('an empty text is never filled with a signature block', async () => {
+	const { ed } = await editorWith('');
+	assert.equal(ed.hasSignature(), false);
+	assert.doesNotMatch(ed.getHtml(), /inbox-signature-edited/);
+});
+
+test('setSignature puts it at the end, then in place of the one there; removeSignature takes it out', async () => {
+	const { ed } = await editorWith('<p>Bonjour</p>');
+	ed.setSignature('<p>Signature A</p>');
+	assert.match(ed.getHtml(), /^<p>Bonjour<\/p><div class="inbox-signature-edited"><p>Signature A<\/p><\/div>$/);
+	ed.setSignature('Signature B');
+	const html = ed.getHtml();
+	assert.equal((html.match(/inbox-signature-edited/g) || []).length, 1, 'one signature');
+	assert.match(html, /Signature B/);
+	assert.doesNotMatch(html, /Signature A/);
+	ed.removeSignature();
+	assert.equal(ed.hasSignature(), false);
+	assert.match(ed.getHtml(), /^<p>Bonjour<\/p>$/);
+});
+
+test('a cell with a thick coloured bar on one side and a spacing on one side keeps them as written', async () => {
+	const { ed } = await editorWith('<table><tbody><tr><td style="padding-right:12px;border-right:3px solid #d31b11">Nom</td><td>Tel</td></tr></tbody></table>');
+	const s = styles(ed.getHtml());
+	assert.match(s, /border-right:3pxsolid(#d31b11|rgb\(211,27,17\))/);
+	assert.match(s, /padding-right:12px/);
+});
+
+test('a styled bold of a signature keeps its colour', async () => {
+	const { ed } = await editorWith('<p><b style="color:#d31b11">Perso Test</b></p>');
+	const html = ed.getHtml();
+	assert.match(html, /<strong[^>]*>Perso Test<\/strong>/);
+	assert.match(styles(html), /color:(#d31b11|rgb\(211,27,17\))/);
+	assert.doesNotMatch(styles(html), /font-weight/);
+});

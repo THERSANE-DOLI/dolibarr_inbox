@@ -106,6 +106,52 @@ function inboxUpdatePending($fresh = false)
 }
 
 /**
+ * The CKEditor of Dolibarr can be the editor of the writing (1.94.0): module FCKeditor on, with CKEditor as its editor
+ *
+ * @return bool
+ */
+function inboxCkeditorAvailable()
+{
+	if (!isModEnabled('fckeditor') || !in_array(getDolGlobalString('FCKEDITOR_EDITORNAME', 'ckeditor'), array('', 'ckeditor'), true)) {
+		return false;
+	}
+
+	return (defined('JS_CKEDITOR') && constant('JS_CKEDITOR')) || is_file(DOL_DOCUMENT_ROOT.'/includes/ckeditor/ckeditor/ckeditor.js');
+}
+
+/**
+ * Editor of the writing and, for CKEditor, where and how the page loads it (values of the JavaScript context)
+ *
+ * @return array<string,string|bool>
+ */
+function inboxEditorContextVars()
+{
+	global $conf, $langs;
+
+	if (!inboxCkeditorAvailable()) {
+		return array('INBOX_EDITOR' => 'tiptap');
+	}
+	// As main.inc.php loads it in the pages of Dolibarr: an external CKEditor 4 (JS_CKEDITOR), the configuration of the
+	// theme (its toolbars), the skin chosen in the setup of the module
+	$base = (defined('JS_CKEDITOR') && constant('JS_CKEDITOR')) ? (string) constant('JS_CKEDITOR') : DOL_URL_ROOT.'/includes/ckeditor/ckeditor/';
+	$themeConfig = '/theme/'.$conf->theme.'/ckeditor/config.js';
+	if (!is_file(DOL_DOCUMENT_ROOT.$themeConfig)) {
+		$themeConfig = '/theme/eldy/ckeditor/config.js';
+	}
+
+	return array(
+		// Given even when not chosen: Settings > General changes the editor without loading the page again
+		'INBOX_EDITOR' => getDolGlobalString('INBOX_EDITOR') === 'ckeditor' ? 'ckeditor' : 'tiptap',
+		'INBOX_CKEDITOR_BASEPATH' => $base,
+		'INBOX_CKEDITOR_STAMP' => (string) DOL_VERSION,
+		'INBOX_CKEDITOR_CONFIG' => DOL_URL_ROOT.$themeConfig.'?v='.urlencode((string) DOL_VERSION),
+		'INBOX_CKEDITOR_SKIN' => getDolGlobalString('FCKEDITOR_SKIN', 'moono-lisa'),
+		'INBOX_CKEDITOR_LANG' => strtolower(str_replace('_', '-', $langs->getDefaultLang())),
+		'INBOX_CKEDITOR_NATIVE' => (bool) getDolGlobalInt('INBOX_CKEDITOR_NATIVE'),
+	);
+}
+
+/**
  * Values of the JavaScript context of the application
  *
  * @param User $user User
