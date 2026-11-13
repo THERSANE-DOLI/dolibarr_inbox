@@ -1,5 +1,21 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: tags of a mailbox in global mode, read only, the global list no longer changed from a mailbox :   1.92.5
+  - an admin could change the global list from the Tags tab of a mailbox: the change looked local to the mailbox
+    while it applied to every mailbox in global mode.
+  - in global mode, the tab shows the tags without fields, for everyone; a notice offers « Create a list for this
+    mailbox only » and, for admins, « Change the global list » (Settings > General).
+  - the server refuses create, change, delete and reorder of tags sent with a mailbox in global mode, admins
+    included.
+  - switching the list (global or own) asks first: copy of the tags (or the own list kept from before), or back to
+    the global list with the keywords missing from it no longer shown as tags.
+
+- FIX: mail drawn higher and higher, endless scroll :   1.92.4
+  - some mail templates (Nextcloud notifications...) make the page of the mail at least as high as its frame: the frame
+    grew to the mail + 8 px, the mail followed, at every frame drawn.
+  - the height of the mail no longer depends on its frame, the margin under the mail is inside it.
+  - safety net: a frame growing without a pause stops being fitted after 30 growths.
+
 - FIX: data sources, active or not with a switch :   1.92.3
   - the list shows a switch in front of each source, saved at once (back to its state with the error if refused);
     the badge « Active » goes, a source turned off is greyed.

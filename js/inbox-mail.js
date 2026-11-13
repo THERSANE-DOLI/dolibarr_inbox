@@ -8041,10 +8041,23 @@
 			return;
 		}
 		doc.documentElement.style.zoom = (parseInt(params.mail_zoom, 10) || 100) + '%';
+		// Many mail templates (Foundation for Emails: Nextcloud...) set html{min-height:100%}: inside a frame fitted to
+		// its content, the document followed the frame, the frame followed the document + 8 px, forever (endless
+		// scroll). The height of the document is made free of the frame, the margin is inside the document.
+		if (!doc.getElementById('ibx-fit-style') && doc.head) {
+			const st = doc.createElement('style');
+			st.id = 'ibx-fit-style';
+			st.textContent = 'html,body{min-height:0!important;height:auto!important}html{padding-bottom:8px!important}';
+			doc.head.appendChild(st);
+		}
 		// Height of the content as drawn (zoom included): the box of the document, not its scrollHeight (never below
-		// the height of the frame, so a frame never got smaller, and without the zoom)
+		// the height of the frame, so a frame never got smaller, and without the zoom). A height equal to the frame is
+		// kept: a content still tied to the frame (100vh inside the mail) can no longer grow it step by step.
 		const fit = () => {
-			frame.style.height = Math.max(120, Math.ceil(doc.documentElement.getBoundingClientRect().height) + 8) + 'px';
+			const h = Math.max(120, Math.ceil(doc.documentElement.getBoundingClientRect().height));
+			if (h !== Math.round(parseFloat(frame.style.height) || 0)) {
+				frame.style.height = h + 'px';
+			}
 		};
 		fit();
 		// Called again at each change of zoom: the listeners are bound once per document
@@ -8053,7 +8066,23 @@
 		}
 		doc.ibxBound = true;
 		if (typeof ResizeObserver === 'function' && doc.body) {
-			const ro = new ResizeObserver(fit);
+			// Safety net: a frame growing at every frame drawn (content tied to the height of the frame) stops being
+			// followed after 30 growths without a pause of 1 s; pictures loading never come so close together
+			let grows = 0;
+			let calm = 0;
+			const ro = new ResizeObserver(() => {
+				const before = parseFloat(frame.style.height) || 0;
+				fit();
+				if ((parseFloat(frame.style.height) || 0) > before) {
+					clearTimeout(calm);
+					calm = setTimeout(() => {
+						grows = 0;
+					}, 1000);
+					if (++grows > 30) {
+						ro.disconnect();
+					}
+				}
+			});
 			ro.observe(doc.documentElement);
 			ro.observe(doc.body);
 		}

@@ -2974,14 +2974,20 @@
 			return;
 		}
 		const own = data.mode === 'own';
-		const editable = account ? (own || isAdmin()) : isAdmin();
+		// From a mailbox, only its own list is changed: the global list, shared by every mailbox in global mode, is
+		// read only here (admins included) and changed in Settings > General
+		const editable = account ? own : isAdmin();
 		let html = '';
 		if (account) {
 			html += '<p class="ibx-section__help">' + th('InboxTagsModeHelp') + '</p><div class="ibx-form" role="radiogroup" aria-label="' + th('InboxTagsMode') + '">'
 				+ '<label class="ibx-radio"><input type="radio" name="tags_mode" value="global"' + (own ? '' : ' checked') + '> ' + th('InboxTagsModeGlobal') + '</label>'
 				+ '<label class="ibx-radio"><input type="radio" name="tags_mode" value="own"' + (own ? ' checked' : '') + '> ' + th('InboxTagsModeOwn') + '</label></div>';
 			if (!own) {
-				html += '<div class="ibx-notice ibx-notice--info" style="margin-top:1rem">' + ic('info') + '<div class="ibx-notice__text">' + th(isAdmin() ? 'InboxTagsGlobalHereAdmin' : 'InboxTagsGlobalHere') + '</div></div>';
+				html += '<div class="ibx-notice ibx-notice--info" style="margin-top:1rem">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxTagsGlobalHere')
+					+ '<div class="ibx-tagsglobal__actions">'
+					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-makeown">' + ic('plus') + ' ' + th('InboxTagsMakeOwn') + '</button>'
+					+ (isAdmin() ? '<a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="#/settings/general/tags">' + ic('settings') + ' ' + th('InboxTagsEditGlobal') + '</a>' : '')
+					+ '</div></div></div>';
 			}
 		}
 		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
@@ -3050,14 +3056,33 @@
 			reload();
 		};
 		paintRisks();
-		$$('[name="tags_mode"]', box).forEach(r => r.addEventListener('change', async () => {
+		// Change of list confirmed first: going own copies the list (or takes the own one kept), going global leaves
+		// the tags of this mailbox for the shared list
+		const setMode = async mode => {
+			const toOwn = mode === 'own';
+			const ok = await confirmDialog({
+				title: t(toOwn ? 'InboxTagsToOwnTitle' : 'InboxTagsToGlobalTitle'),
+				text: t(toOwn ? (data.own_kept ? 'InboxTagsToOwnKeptText' : 'InboxTagsToOwnText') : 'InboxTagsToGlobalText'),
+				confirm: t(toOwn ? 'InboxTagsToOwnConfirm' : 'InboxTagsToGlobalConfirm'),
+			});
+			if (!ok) {
+				$$('[name="tags_mode"]', box).forEach(r => {
+					r.checked = r.value === data.mode;
+				});
+				return;
+			}
 			try {
-				await post('tag', 'mode', Object.assign({ mode: r.value }, params));
-				reload();
+				await post('tag', 'mode', Object.assign({ mode }, params));
 			} catch (err) {
 				toast(err.message, { error: true });
 			}
-		}));
+			reload();
+		};
+		$$('[name="tags_mode"]', box).forEach(r => r.addEventListener('change', () => setMode(r.value)));
+		const makeOwn = $('.ibx-js-makeown', box);
+		if (makeOwn) {
+			makeOwn.addEventListener('click', () => setMode('own'));
+		}
 		const saveRow = async row => {
 			const label = $('[data-f="label"]', row).value;
 			const color = $('[data-f="color"]', row).value;
