@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: recipients proposed ranked by context and exchanges :   1.99.0
+  - while typing a recipient, all the sources (contacts, thirdparties, users, correspondents of the mailboxes) are
+    ranked together instead of one after the other in alphabetical order: first the contacts of the thirdparty of the
+    mail answered and of the recipients already given (then those of the other thirdparties such a contact is linked
+    to), then the addresses written to often and lately, then those read from, then how well the words match.
+  - several words in any order (« jean dup », « dupont acme »), the name of the thirdparty searched too; a word found
+    only inside a name or in the domain counts little.
+  - a click in an empty field (Cc...) proposes the contacts of these thirdparties at once, without typing.
+
 - NEW: result of a tag seen while its colour is set :   1.98.0
   - list of the tags: while the colour or the border of a tag is set, the tag as it will show on the mails (its
     colour, black or white text, border) covers its name, then fades a few seconds after the focus left them; a click

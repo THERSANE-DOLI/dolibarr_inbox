@@ -2081,63 +2081,409 @@ class InboxComposer
 		}
 	}
 
+	/** Weights of the ranking of the recipients proposed (1.99.0) */
+	const RCPT_MATCH = 15;
+	const RCPT_CONTEXT = 100;
+	const RCPT_CONTEXT_LINKED = 50;
+	const RCPT_SENT = 14;
+	const RCPT_RECEIVED = 5;
+	/** Exchanges counted at most (log2: 31 mails), so that the context always comes first */
+	const RCPT_LOG_CAP = 5;
+	/** Days after which an exchange counts half */
+	const RCPT_HALF_DAYS = 180;
+
 	/**
-	 * Recipients proposed while typing: contacts, thirdparties and users of Dolibarr the user may see, then the
-	 * correspondents of the mailboxes the user reads (last exchange first)
+	 * Recipients proposed while typing (1.99.0): contacts, thirdparties and users of Dolibarr the user may see and the
+	 * correspondents of the mailboxes the user reads, ranked together. First the contacts of the thirdparty of the mail
+	 * answered or of the recipients already given (and of the other thirdparties such a contact is linked to), then the
+	 * addresses written to often and lately, then those read from, then how well the typed words match. Nothing typed:
+	 * only the contacts of these thirdparties, else nothing.
 	 *
-	 * @param User   $user User
-	 * @param string $q    Typed (2 characters at least)
+	 * @param User     $user  User
+	 * @param string   $q     Typed (2 characters at least, words in any order)
+	 * @param string   $token Writing (its mail answered gives the context), '' for none
+	 * @param string[] $given Addresses already in the fields (context, never proposed again)
 	 * @return array<int,array{email:string,name:string,detail:string,kind:string}>
 	 */
-	public function recipients(User $user, $q)
+	public function recipients(User $user, $q, $token = '', array $given = array())
+	{
+		$q = trim((string) $q);
+		$words = self::recipientWords($q);
+		if ($q !== '' && !$words) {
+			return array();
+		}
+		$given = array_values(array_unique(array_filter(array_map(function ($e) {
+			return strtolower(trim((string) $e));
+		}, $given), function ($e) {
+			return filter_var($e, FILTER_VALIDATE_EMAIL) !== false;
+		})));
+		$given = array_slice($given, 0, 50);
+		$ctx = $this->recipientContext($user, (string) $token, $given);
+		if (!$words && !$ctx['primary']) {
+			return array();
+		}
+		$cand = array();
+		$put = function ($email, $name, $detail, $kind, array $socs = array(), $contactId = 0) use (&$cand, $given) {
+			$email = strtolower(trim((string) $email));
+			if ($email === '' || in_array($email, $given, true) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+				return;
+			}
+			if (!isset($cand[$email])) {
+				$cand[$email] = array('email' => $email, 'name' => trim((string) $name), 'detail' => trim((string) $detail), 'kind' => $kind, 'socs' => array(), 'contacts' => array());
+			} elseif ($cand[$email]['kind'] === 'recent' && $kind !== 'recent') {
+				// The data of Dolibarr wins over the name read in the mails
+				$cand[$email]['kind'] = $kind;
+				$cand[$email]['name'] = trim((string) $name) !== '' ? trim((string) $name) : $cand[$email]['name'];
+				$cand[$email]['detail'] = trim((string) $detail);
+			}
+			foreach ($socs as $s) {
+				if ((int) $s > 0) {
+					$cand[$email]['socs'][(int) $s] = true;
+				}
+			}
+			if ((int) $contactId > 0) {
+				$cand[$email]['contacts'][(int) $contactId] = true;
+			}
+		};
+		$putContacts = function ($rows) use ($put) {
+			foreach ($rows as $r) {
+				$put($r->email, trim($r->firstname.' '.$r->lastname), (string) $r->nom, 'contact', array((int) $r->fk_soc), (int) $r->rowid);
+			}
+		};
+		$putThirdparties = function ($rows) use ($put) {
+			foreach ($rows as $r) {
+				$put($r->email, (string) $r->nom, '', 'thirdparty', array((int) $r->rowid));
+			}
+		};
+		$p = $this->db->prefix();
+		$socs = array_merge($ctx['primary'], $ctx['linked']);
+
+		// The contacts of the context first: never pushed out by the limits of the other sources
+		if ($socs) {
+			$in = implode(',', $socs);
+			$cond = "(c.fk_soc IN (".$in.") OR c.rowid IN (SELECT sc2.fk_socpeople FROM ".$p."societe_contacts as sc2 WHERE sc2.fk_soc IN (".$in.")))";
+			$putContacts($this->recipientContacts($user, $cond.($words ? ' AND '.$this->likeAll($words, array('c.email', 'c.lastname', 'c.firstname')) : ''), 30));
+			$cond = "s.rowid IN (".implode(',', $ctx['primary'] ?: array(0)).")";
+			$putThirdparties($this->recipientThirdparties($user, $cond.($words ? ' AND '.$this->likeAll($words, array('s.email', 's.nom')) : ''), 10));
+		}
+		$stats = array();
+		if ($words) {
+			$putContacts($this->recipientContacts($user, $this->likeAll($words, array('c.email', 'c.lastname', 'c.firstname', 's.nom')), 30, $words[0], array('c.email', 'c.lastname', 'c.firstname')));
+			$putThirdparties($this->recipientThirdparties($user, $this->likeAll($words, array('s.email', 's.nom')), 20, $words[0], array('s.email', 's.nom')));
+			$rows = $this->db->getRows("SELECT email, firstname, lastname FROM ".$p."user WHERE statut = 1 AND email <> '' AND fk_soc IS NULL AND entity IN (0, ".getEntity('user').")"
+				." AND ".$this->likeAll($words, array('email', 'lastname', 'firstname'))." ORDER BY lastname LIMIT 20");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$put($r->email, trim($r->firstname.' '.$r->lastname), '', 'user');
+			}
+			// The correspondents of the mailboxes, the most written to first
+			foreach ($this->recipientStats($user, $this->likeAll($words, array('a.email', 'a.name')), 40) as $email => $st) {
+				$stats[$email] = $st;
+				$put($email, $st['name'], '', 'recent');
+			}
+			// A correspondent known in Dolibarr: its name, its thirdparty
+			$known = array_keys(array_filter($cand, function ($c) {
+				return $c['kind'] === 'recent';
+			}));
+			if ($known) {
+				$list = "'".implode("','", array_map(array($this->db, 'escape'), $known))."'";
+				$putContacts($this->recipientContacts($user, "c.email IN (".$list.")", 50));
+				$putThirdparties($this->recipientThirdparties($user, "s.email IN (".$list.")", 50));
+			}
+		}
+		if (!$cand) {
+			return array();
+		}
+		// Other thirdparties of the contacts found (contacts linked to several thirdparties)
+		$contactIds = array();
+		foreach ($cand as $c) {
+			$contactIds = array_merge($contactIds, array_keys($c['contacts']));
+		}
+		if ($contactIds && $socs) {
+			$byContact = array();
+			$rows = $this->db->getRows("SELECT fk_socpeople, fk_soc FROM ".$p."societe_contacts WHERE fk_socpeople IN (".implode(',', array_map('intval', $contactIds)).") LIMIT 500");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$byContact[(int) $r->fk_socpeople][] = (int) $r->fk_soc;
+			}
+			foreach ($cand as $email => $c) {
+				foreach (array_keys($c['contacts']) as $id) {
+					foreach ($byContact[$id] ?? array() as $s) {
+						$cand[$email]['socs'][$s] = true;
+					}
+				}
+			}
+		}
+		$missing = array_values(array_diff(array_keys($cand), array_keys($stats)));
+		if ($missing) {
+			$stats += $this->recipientStats($user, "a.email IN ('".implode("','", array_map(array($this->db, 'escape'), $missing))."')", count($missing));
+		}
+		$now = dol_now();
+		foreach ($cand as $email => $c) {
+			$cand[$email]['score'] = self::recipientScore($c + ($stats[$email] ?? array()), $words, $ctx['primary'], $ctx['linked'], $now);
+		}
+		uasort($cand, function ($a, $b) {
+			return $b['score'] <=> $a['score'] ?: strcmp($a['name'] ?: $a['email'], $b['name'] ?: $b['email']);
+		});
+		$out = array();
+		foreach (array_slice($cand, 0, $words ? 10 : 6) as $c) {
+			$out[] = array('email' => $c['email'], 'name' => $c['name'], 'detail' => $c['detail'], 'kind' => $c['kind']);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param string $q Typed
+	 * @return string[] Words searched (4 at most), empty when less than 2 characters are typed
+	 */
+	public static function recipientWords($q)
 	{
 		$q = trim((string) $q);
 		if (mb_strlen($q, 'UTF-8') < 2) {
 			return array();
 		}
-		$p = $this->db->prefix();
-		$like = $this->db->escape($this->db->escapeforlike($q));
-		$out = array();
-		$add = function ($email, $name, $detail, $kind) use (&$out) {
-			$email = strtolower(trim((string) $email));
-			if ($email === '' || isset($out[$email]) || !filter_var($email, FILTER_VALIDATE_EMAIL) || count($out) >= 10) {
-				return;
-			}
-			$out[$email] = array('email' => $email, 'name' => trim((string) $name), 'detail' => trim((string) $detail), 'kind' => $kind);
-		};
-		if (isModEnabled('societe') && $user->hasRight('societe', 'lire')) {
-			$restrict = !$user->hasRight('societe', 'client', 'voir');
-			$join = $restrict ? " INNER JOIN ".$p."societe_commerciaux as sc ON sc.fk_soc = s.rowid AND sc.fk_user = ".((int) $user->id) : '';
-			if ($user->hasRight('societe', 'contact', 'lire')) {
-				$rows = $this->db->getRows("SELECT c.email, c.firstname, c.lastname, s.nom FROM ".$p."socpeople as c LEFT JOIN ".$p."societe as s ON s.rowid = c.fk_soc".$join
-					." WHERE c.entity IN (".getEntity('contact').") AND c.statut = 1 AND c.email <> '' AND (c.email LIKE '%".$like."%' OR c.lastname LIKE '%".$like."%' OR c.firstname LIKE '%".$like."%')"
-					." AND (c.priv = 0 OR c.fk_user_creat = ".((int) $user->id).") ORDER BY c.lastname LIMIT 10");
-				foreach (is_array($rows) ? $rows : array() as $r) {
-					$add($r->email, trim($r->firstname.' '.$r->lastname), (string) $r->nom, 'contact');
+
+		return array_slice(array_values(array_filter(preg_split('/[\s,;<>"()]+/u', $q), 'strlen')), 0, 4);
+	}
+
+	/**
+	 * Score of a proposal: context, then sendings, then mails received, then match of the words
+	 *
+	 * @param array<string,mixed> $c       Candidate: socs (ids as keys), name, email, detail, nb_sent, last_sent, nb_recv, last_recv
+	 * @param string[]            $words   Words typed
+	 * @param int[]               $primary Thirdparties of the mail answered and of the recipients given
+	 * @param int[]               $linked  Other thirdparties of their contacts
+	 * @param int                 $now     Now
+	 * @return float
+	 */
+	public static function recipientScore(array $c, array $words, array $primary, array $linked, $now)
+	{
+		$score = 0.0;
+		// Exchanges count fully when a word starts a name or the address, a quarter when found inside only
+		$weight = 1.0;
+		if ($words) {
+			$norm = function ($s) {
+				return strtolower(dol_string_unaccent((string) $s));
+			};
+			$at = strpos((string) $c['email'], '@');
+			$split = function ($s) {
+				return array_values(array_filter(preg_split('/[^a-z0-9]+/', $s), 'strlen'));
+			};
+			// Name, thirdparty and part before @ (also whole, « jdupont »); the domain gives a weak match only
+			$local = $norm(substr((string) $c['email'], 0, $at === false ? null : $at));
+			$tokens = array_merge($split($norm(($c['name'] ?? '').' '.($c['detail'] ?? '').' '.$local)), array($local));
+			$domain = $at === false ? '' : $norm(substr((string) $c['email'], $at + 1));
+			$match = 0;
+			foreach ($words as $w) {
+				$w = $norm($w);
+				$best = 0;
+				foreach ($tokens as $t) {
+					if ($t === $w) {
+						$best = 3;
+						break;
+					}
+					$best = max($best, strpos($t, $w) === 0 ? 2 : (strpos($t, $w) !== false ? 1 : 0));
 				}
+				if ($best === 0 && $domain !== '' && strpos($domain, $w) !== false) {
+					$best = strpos($domain, $w) === 0 ? 1 : 0.5;
+				}
+				$match += $best;
 			}
-			$rows = $this->db->getRows("SELECT s.email, s.nom FROM ".$p."societe as s".$join." WHERE s.entity IN (".getEntity('societe').") AND s.status = 1 AND s.email <> ''"
-				." AND (s.email LIKE '%".$like."%' OR s.nom LIKE '%".$like."%') ORDER BY s.nom LIMIT 10");
-			foreach (is_array($rows) ? $rows : array() as $r) {
-				$add($r->email, (string) $r->nom, '', 'thirdparty');
+			$match /= count($words);
+			$score += self::RCPT_MATCH * $match;
+			$weight = $match >= 2 ? 1.0 : 0.25;
+		}
+		$ctx = 0;
+		foreach (array_keys($c['socs'] ?? array()) as $s) {
+			$ctx = max($ctx, in_array((int) $s, $primary, true) ? self::RCPT_CONTEXT : (in_array((int) $s, $linked, true) ? self::RCPT_CONTEXT_LINKED : 0));
+		}
+		$score += $ctx;
+		$decay = function ($date) use ($now) {
+			return $date ? 1 / (1 + max(0, $now - (int) $date) / 86400 / self::RCPT_HALF_DAYS) : 0;
+		};
+		$count = function ($n) {
+			return min(self::RCPT_LOG_CAP, log(1 + max(0, (int) $n), 2));
+		};
+		$score += $weight * self::RCPT_SENT * $count($c['nb_sent'] ?? 0) * $decay($c['last_sent'] ?? 0);
+		$score += $weight * self::RCPT_RECEIVED * $count($c['nb_recv'] ?? 0) * $decay($c['last_recv'] ?? 0);
+
+		return $score;
+	}
+
+	/**
+	 * Thirdparties giving the context: the one of the mail answered (and of its contact), those of the recipients
+	 * already given; the other thirdparties their contacts are linked to count less
+	 *
+	 * @param User     $user  User
+	 * @param string   $token Writing, '' for none
+	 * @param string[] $given Addresses given (lower case)
+	 * @return array{primary:int[],linked:int[]}
+	 */
+	protected function recipientContext(User $user, $token, array $given)
+	{
+		$p = $this->db->prefix();
+		$primary = array();
+		$contacts = array();
+		if ($token !== '' && ($dir = $this->held($user, $token)) !== null) {
+			$state = self::readState($dir);
+			$mailId = (int) ($state['source']['mail'] ?? 0);
+			$row = $mailId ? $this->db->getRow("SELECT fk_soc, fk_socpeople FROM ".$p."inbox_mail WHERE rowid = ".$mailId) : null;
+			if (is_object($row)) {
+				$primary[] = (int) $row->fk_soc;
+				$contacts[] = (int) $row->fk_socpeople;
 			}
 		}
-		$rows = $this->db->getRows("SELECT email, firstname, lastname FROM ".$p."user WHERE statut = 1 AND email <> '' AND fk_soc IS NULL AND entity IN (0, ".getEntity('user').")"
-			." AND (email LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR firstname LIKE '%".$like."%') ORDER BY lastname LIMIT 10");
-		foreach (is_array($rows) ? $rows : array() as $r) {
-			$add($r->email, trim($r->firstname.' '.$r->lastname), '', 'user');
-		}
-		$access = new InboxAccess($this->db);
-		$readable = array_map('intval', array_keys($access->getAccounts($user, InboxAccess::LEVEL_READ)));
-		if ($readable && count($out) < 10) {
-			$rows = $this->db->getRows("SELECT a.email, MAX(a.name) as name, MAX(m.rowid) as last FROM ".$p."inbox_mail_address as a INNER JOIN ".$p."inbox_mail as m ON m.rowid = a.fk_mail"
-				." WHERE m.fk_account IN (".implode(',', $readable).") AND (a.email LIKE '%".$like."%' OR a.name LIKE '%".$like."%') GROUP BY a.email ORDER BY last DESC LIMIT 20");
+		if ($given && isModEnabled('societe')) {
+			$list = "'".implode("','", array_map(array($this->db, 'escape'), $given))."'";
+			$rows = $this->db->getRows("SELECT rowid, fk_soc FROM ".$p."socpeople WHERE entity IN (".getEntity('contact').") AND email IN (".$list.") LIMIT 100");
 			foreach (is_array($rows) ? $rows : array() as $r) {
-				$add($r->email, (string) $r->name, '', 'recent');
+				$contacts[] = (int) $r->rowid;
+				$primary[] = (int) $r->fk_soc;
+			}
+			$rows = $this->db->getRows("SELECT rowid FROM ".$p."societe WHERE entity IN (".getEntity('societe').") AND email IN (".$list.") LIMIT 50");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$primary[] = (int) $r->rowid;
+			}
+		}
+		$contacts = array_values(array_filter(array_unique($contacts)));
+		if ($contacts) {
+			$rows = $this->db->getRows("SELECT fk_soc FROM ".$p."socpeople WHERE rowid IN (".implode(',', $contacts).") LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$primary[] = (int) $r->fk_soc;
+			}
+		}
+		$primary = array_values(array_filter(array_unique($primary)));
+		$linked = array();
+		if ($contacts) {
+			$rows = $this->db->getRows("SELECT fk_soc FROM ".$p."societe_contacts WHERE fk_socpeople IN (".implode(',', $contacts).") LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if (!in_array((int) $r->fk_soc, $primary, true)) {
+					$linked[] = (int) $r->fk_soc;
+				}
 			}
 		}
 
-		return array_values($out);
+		return array('primary' => array_slice($primary, 0, 50), 'linked' => array_slice(array_values(array_filter(array_unique($linked))), 0, 50));
+	}
+
+	/**
+	 * Every word in one of the fields at least
+	 *
+	 * @param string[] $words  Words
+	 * @param string[] $fields Columns
+	 * @return string SQL condition
+	 */
+	protected function likeAll(array $words, array $fields)
+	{
+		$and = array();
+		foreach ($words as $w) {
+			$like = $this->db->escape($this->db->escapeforlike($w));
+			$and[] = '('.implode(' OR ', array_map(function ($f) use ($like) {
+				return $f." LIKE '%".$like."%'";
+			}, $fields)).')';
+		}
+
+		return '('.implode(' AND ', $and).')';
+	}
+
+	/**
+	 * @param string   $first  First word typed ('' for none)
+	 * @param string[] $fields Columns
+	 * @return string SQL expression: 0 when a field starts with the word (taken first under the limit), else 1
+	 */
+	protected function prefixFirst($first, array $fields)
+	{
+		if ($first === '') {
+			return '';
+		}
+		$like = $this->db->escape($this->db->escapeforlike($first));
+
+		return "CASE WHEN ".implode(' OR ', array_map(function ($f) use ($like) {
+			return $f." LIKE '".$like."%'";
+		}, $fields))." THEN 0 ELSE 1 END, ";
+	}
+
+	/**
+	 * Contacts with an address the user may see
+	 *
+	 * @param User     $user   User
+	 * @param string   $where  SQL condition (c: contact, s: thirdparty)
+	 * @param int      $limit  Limit
+	 * @param string   $first  First word typed: the fields starting with it first
+	 * @param string[] $fields Fields for $first
+	 * @return array<int,object>
+	 */
+	protected function recipientContacts(User $user, $where, $limit, $first = '', array $fields = array())
+	{
+		if (!isModEnabled('societe') || !$user->hasRight('societe', 'lire') || !$user->hasRight('societe', 'contact', 'lire')) {
+			return array();
+		}
+		$p = $this->db->prefix();
+		$join = !$user->hasRight('societe', 'client', 'voir') ? " INNER JOIN ".$p."societe_commerciaux as sc ON sc.fk_soc = s.rowid AND sc.fk_user = ".((int) $user->id) : '';
+		$rows = $this->db->getRows("SELECT c.rowid, c.email, c.firstname, c.lastname, c.fk_soc, s.nom FROM ".$p."socpeople as c LEFT JOIN ".$p."societe as s ON s.rowid = c.fk_soc".$join
+			." WHERE c.entity IN (".getEntity('contact').") AND c.statut = 1 AND c.email <> '' AND (c.priv = 0 OR c.fk_user_creat = ".((int) $user->id).") AND ".$where
+			." ORDER BY ".$this->prefixFirst($first, $fields)."c.lastname LIMIT ".((int) $limit));
+
+		return is_array($rows) ? $rows : array();
+	}
+
+	/**
+	 * Thirdparties with an address the user may see
+	 *
+	 * @param User     $user   User
+	 * @param string   $where  SQL condition (s: thirdparty)
+	 * @param int      $limit  Limit
+	 * @param string   $first  First word typed: the fields starting with it first
+	 * @param string[] $fields Fields for $first
+	 * @return array<int,object>
+	 */
+	protected function recipientThirdparties(User $user, $where, $limit, $first = '', array $fields = array())
+	{
+		if (!isModEnabled('societe') || !$user->hasRight('societe', 'lire')) {
+			return array();
+		}
+		$p = $this->db->prefix();
+		$join = !$user->hasRight('societe', 'client', 'voir') ? " INNER JOIN ".$p."societe_commerciaux as sc ON sc.fk_soc = s.rowid AND sc.fk_user = ".((int) $user->id) : '';
+		$rows = $this->db->getRows("SELECT s.rowid, s.email, s.nom FROM ".$p."societe as s".$join." WHERE s.entity IN (".getEntity('societe').") AND s.status = 1 AND s.email <> '' AND ".$where
+			." ORDER BY ".$this->prefixFirst($first, $fields)."s.nom LIMIT ".((int) $limit));
+
+		return is_array($rows) ? $rows : array();
+	}
+
+	/**
+	 * Exchanges with addresses in the mailboxes the user reads: mails sent to them (Sent folders), mails received
+	 * from them (out of the junk, trash and drafts)
+	 *
+	 * @param User   $user  User
+	 * @param string $where SQL condition (a: address)
+	 * @param int    $limit Limit
+	 * @return array<string,array{name:string,nb_sent:int,last_sent:int,nb_recv:int,last_recv:int}> By address (lower case)
+	 */
+	protected function recipientStats(User $user, $where, $limit)
+	{
+		$access = new InboxAccess($this->db);
+		$readable = array_map('intval', array_keys($access->getAccounts($user, InboxAccess::LEVEL_READ)));
+		if (!$readable) {
+			return array();
+		}
+		$p = $this->db->prefix();
+		$sent = "f.role = 'sent' AND a.type IN ('to', 'cc')";
+		$recv = "(f.role IS NULL OR f.role NOT IN ('sent', 'junk', 'trash', 'drafts')) AND a.type = 'from'";
+		$rows = $this->db->getRows("SELECT a.email, MAX(a.name) as name, SUM(CASE WHEN ".$sent." THEN 1 ELSE 0 END) as nb_sent, MAX(CASE WHEN ".$sent." THEN m.date_mail END) as last_sent,"
+			." SUM(CASE WHEN ".$recv." THEN 1 ELSE 0 END) as nb_recv, MAX(CASE WHEN ".$recv." THEN m.date_mail END) as last_recv"
+			." FROM ".$p."inbox_mail_address as a INNER JOIN ".$p."inbox_mail as m ON m.rowid = a.fk_mail INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
+			." WHERE m.fk_account IN (".implode(',', $readable).") AND a.type IN ('to', 'cc', 'from') AND ".$where
+			." GROUP BY a.email ORDER BY nb_sent DESC, last_sent DESC, nb_recv DESC LIMIT ".max(1, (int) $limit));
+		$out = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$email = strtolower(trim((string) $r->email));
+			if (isset($out[$email]) || (int) $r->nb_sent + (int) $r->nb_recv === 0) {
+				continue;
+			}
+			$out[$email] = array('name' => (string) $r->name, 'nb_sent' => (int) $r->nb_sent, 'last_sent' => (int) $this->db->jdate($r->last_sent),
+				'nb_recv' => (int) $r->nb_recv, 'last_recv' => (int) $this->db->jdate($r->last_recv));
+		}
+
+		return $out;
 	}
 
 	/**

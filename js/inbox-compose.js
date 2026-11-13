@@ -176,6 +176,21 @@
 			input.setAttribute('aria-expanded', 'true');
 			input.setAttribute('aria-activedescendant', active >= 0 ? w.id + '-' + kind + '-o' + active : '');
 		};
+		const ask = async q => {
+			const mine = ++qseq;
+			try {
+				// The context ranks the proposals (1.99.0): the writing (its mail answered) and the addresses given
+				const given = [w.to, w.cc, w.bcc].filter(Boolean).flatMap(f => f.list()).map(a => a.email).concat(items.map(a => a.email));
+				const res = await post('compose', 'recipients', { q, compose: w.token, given: Array.from(new Set(given)) });
+				if (mine === qseq && input.value.trim() === q && (q !== '' || document.activeElement === input)) {
+					found = res.items || [];
+					active = found.length && q !== '' ? 0 : -1;
+					showSug();
+				}
+			} catch (e) {
+				hide();
+			}
+		};
 		input.addEventListener('input', () => {
 			filled();
 			clearTimeout(timer);
@@ -184,23 +199,18 @@
 				commit();
 				return;
 			}
-			if (q.length < 2) {
+			if (q.length === 1) {
 				hide();
 				return;
 			}
-			timer = setTimeout(async () => {
-				const mine = ++qseq;
-				try {
-					const res = await post('compose', 'recipients', { q });
-					if (mine === qseq && input.value.trim() === q) {
-						found = res.items || [];
-						active = found.length ? 0 : -1;
-						showSug();
-					}
-				} catch (e) {
-					hide();
-				}
-			}, 200);
+			timer = setTimeout(() => ask(q), 200);
+		});
+		input.addEventListener('focus', () => {
+			// Empty field: the contacts of the thirdparty of the mail answered or of the recipients given, if any
+			if (!input.value.trim()) {
+				clearTimeout(timer);
+				timer = setTimeout(() => ask(''), 100);
+			}
 		});
 		input.addEventListener('keydown', e => {
 			if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && found.length) {
@@ -265,6 +275,7 @@
 				return items.slice();
 			},
 			add,
+			list: () => items.slice(),
 			count: () => items.length + (input.value.trim() ? 1 : 0),
 			clear: () => {
 				const old = items.splice(0, items.length);
