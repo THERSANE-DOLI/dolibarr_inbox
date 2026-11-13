@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: writing on a phone, formatting strip right above the keyboard :   1.102.16
+  - the bubble of a selection was set near it, where the menu of Android (translate, cut, copy) also goes and covered
+    it: it is now a strip of the whole width right above the keyboard, above the foot once the keyboard is closed.
+  - the whole toolbar sticks above the keyboard too (no strip over it then); the text scrolls above both, a selection
+    near the bottom is kept in view. The foot and the signature stay under the keyboard, seen again once it is closed.
+
 - FIX: writing on a phone, light foot and signature as one line :   1.102.15
   - the foot keeps send, attach and « More »; insert a piece, linked documents and templates open first in that
     menu, discard set apart at its end. Round buttons of 48 px, well apart.
