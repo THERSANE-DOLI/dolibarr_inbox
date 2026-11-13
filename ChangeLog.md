@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: mail drawn higher and higher, endless scroll :   1.92.4
+  - some mail templates (Nextcloud notifications...) make the page of the mail at least as high as its frame: the frame
+    grew to the mail + 8 px, the mail followed, at every frame drawn.
+  - the height of the mail no longer depends on its frame, the margin under the mail is inside it.
+  - safety net: a frame growing without a pause stops being fitted after 30 growths.
+
 - FIX: data sources, active or not with a switch :   1.92.3
   - the list shows a switch in front of each source, saved at once (back to its state with the error if refused);
     the badge « Active » goes, a source turned off is greyed.
