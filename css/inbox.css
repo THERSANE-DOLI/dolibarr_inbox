@@ -1765,7 +1765,10 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__tools [aria-pressed="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-compose__sep { width: 1px; height: 1.25rem; margin: 0 var(--ibx-s1); background: var(--ibx-border); }
 /* The text grows with what is written, the signature right under it (1.53.5, as the mail software) */
-.ibx-compose__editor { flex: none; min-height: 10rem; padding: 0; cursor: text; }
+/* The writing takes the free height of the window (1.101.1): on a phone the toolbar, moved under it, stays at the bottom
+   above the send bar instead of floating in the middle, and a tap anywhere in the empty area puts the caret */
+.ibx-compose__editor { flex: 1 0 auto; display: flex; flex-direction: column; min-height: 10rem; padding: 0; cursor: text; }
+.ibx-compose__editor > .ibx-editor__content { flex: 1 0 auto; }
 .ibx-editor__content { min-height: 10rem; padding: var(--ibx-s3); outline: none; font-size: var(--ibx-fs-body); line-height: 1.5; overflow-wrap: break-word; }
 .ibx-editor__content p { margin: 0 0 0.5em; }
 .ibx-editor__content ul, .ibx-editor__content ol { margin: 0 0 0.5em; padding-left: 1.5em; }
@@ -1794,6 +1797,9 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__att.is-bad { color: var(--ibx-danger); border-color: var(--ibx-danger); }
 .ibx-compose__drop { position: absolute; inset: 2.75rem 0 0; z-index: 4; display: flex; align-items: center; justify-content: center; gap: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); background: color-mix(in srgb, var(--ibx-bg) 85%, transparent); border: 2px dashed var(--ibx-accent); border-radius: var(--ibx-radius-lg); pointer-events: none; }
 .ibx-compose__foot { gap: var(--ibx-s1); }
+/* Discard set apart from « More » (1.101.1): a destructive action never next to a common one */
+.ibx-compose__foot .ibx-js-cdiscard { margin-left: var(--ibx-s3); }
+.ibx-compose__foot .ibx-js-cdiscard:hover { color: var(--ibx-danger); border-color: var(--ibx-danger); }
 .ibx-compose__foot label.ibx-btn { cursor: pointer; }
 .ibx-compose__foot label.ibx-btn:focus-within { outline: 2px solid var(--ibx-focus); outline-offset: 2px; }
 .ibx-compose__status { min-width: 0; margin-left: var(--ibx-s2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }

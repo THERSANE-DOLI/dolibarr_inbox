@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: writing area filling the window, toolbar at the bottom on a phone, discard set apart :   1.101.1
+  - the text area of a writing takes the free height of its window: on a phone the formatting toolbar, under it,
+    stays at the bottom above the send bar instead of floating in the middle of the screen with an empty area below;
+    a tap anywhere in the empty area puts the caret. Same on a computer when the window is enlarged.
+  - the button « Discard » stands apart from « More actions » and turns red on hover.
+
 - NEW: editor of the writing on a small screen :   1.101.0
   - Settings > General > Writing editor, « On a small screen » (phones and small tablets, under 1024 px): the Inbox
     editor (default), CKEditor with the toolbar of Inbox, or the same as on a computer. The native toolbar of
