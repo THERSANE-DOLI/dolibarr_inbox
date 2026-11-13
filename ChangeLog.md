@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: result of a tag seen while its colour is set :   1.98.0
+  - list of the tags: while the colour or the border of a tag is set, the tag as it will show on the mails (its
+    colour, black or white text, border) covers its name, then fades a few seconds after the focus left them; a click
+    on the name gives it back at once. The line « New tag » too.
+  - the drag handle and the key share one column, under the head « Key ».
+
 - NEW: mails got now from the list :   1.97.0
   - a « Get mails now » button (round arrow) in the head of the list, instead of waiting for the next automatic pass
     (about 20 s): the folder open only (the Inbox of a mailbox clicked included), else, in a view (unified inbox,
