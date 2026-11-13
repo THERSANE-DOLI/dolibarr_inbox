@@ -122,7 +122,10 @@ switch ($action) {
 		inboxAjaxReply(array('html' => $html));
 		break;
 	case 'recipients':
-		inboxAjaxReply(array('items' => $composer->recipients($user, (string) inboxAjaxParam('q', 'alphanohtml'))));
+		// Ranked with the context of the writing (1.99.0): its mail answered, the addresses already given
+		$given = inboxAjaxParam('given', 'none');
+		inboxAjaxReply(array('items' => $composer->recipients($user, (string) inboxAjaxParam('q', 'alphanohtml'), $token,
+			is_array($given) ? array_map('strval', $given) : array())));
 		break;
 	case 'upload':
 		if (empty($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name']) || (int) $_FILES['file']['error'] !== UPLOAD_ERR_OK) {

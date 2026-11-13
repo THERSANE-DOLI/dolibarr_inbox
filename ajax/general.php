@@ -70,6 +70,9 @@ function inboxGeneralSettings()
 		// with its own toolbar and menu (INBOX_CKEDITOR_NATIVE)
 		'INBOX_EDITOR' => array('right' => 'manager', 'default' => 'tiptap', 'check' => array('tiptap', 'ckeditor')),
 		'INBOX_CKEDITOR_NATIVE' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
+		// Editor on a small screen (1.101.0, width of the phone layout, chosen when the writing opens): the one of inbox,
+		// CKEditor with the toolbar of inbox, or the same as on a computer
+		'INBOX_EDITOR_SMALL' => array('right' => 'manager', 'default' => 'tiptap', 'check' => array('tiptap', 'ckeditor', 'same')),
 		// Voice typing (1.28.0): off by default; each user then agrees once per receiver of the voice
 		'INBOX_DICTATION_ENABLED' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 		// Security (lot F1 1.78.0): remote pictures of a quote (the tracking ones always go), « always show the

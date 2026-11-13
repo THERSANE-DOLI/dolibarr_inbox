@@ -215,6 +215,8 @@
 		}
 		const badge = $('.ibx-rail__badge', b);
 		badge.hidden = N.unread <= 0;
+		// Reading on a phone hides the top bar: the back arrow carries a dot instead (css)
+		document.documentElement.classList.toggle('ibx-has-notif', N.unread > 0);
 		badge.textContent = N.unread > 99 ? '99+' : String(N.unread);
 		const label = N.unread > 0 ? t('InboxNotificationsUnread', N.unread) : t('InboxNotifications');
 		b.setAttribute('aria-label', label);

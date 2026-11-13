@@ -460,6 +460,12 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-readhead { position: sticky; top: 0; z-index: 2; padding: var(--ibx-s3) var(--ibx-s4) var(--ibx-s2); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); }
 .ibx-readhead__top { display: flex; gap: var(--ibx-s3); align-items: flex-start; }
 .ibx-readhead__who { flex: 1; min-width: 0; }
+/* Short date of the head (UX fix series): a phone only, beside the name; the full date line hidden there */
+.ibx-readhead__when { display: none; }
+@media (max-width: 39.9375rem) {
+	.ibx-readhead__when { display: block; flex: none; margin-left: var(--ibx-s2); padding-top: 0.125rem; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); white-space: nowrap; }
+	.ibx-readhead__who > .ibx-readhead__date { display: none; }
+}
 .ibx-readhead__name { font-weight: 600; font-size: var(--ibx-fs-body); }
 .ibx-readhead__actions { display: flex; gap: var(--ibx-s1); flex-wrap: wrap; justify-content: flex-end; }
 .ibx-readhead__sep { width: var(--ibx-s3); }
@@ -650,6 +656,14 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	.ibx-mail[data-mobile="folders"] .ibx-pane--folders { display: flex; visibility: visible; position: static; width: auto; box-shadow: none; }
 	.ibx-mail[data-mobile="list"] .ibx-pane--list { display: flex; }
 	.ibx-mail[data-mobile="read"] .ibx-pane--read { display: flex; }
+	/* Reading a mail is a task screen (UX fix series): the top bar of the application (theme, bell, settings) only on
+	   the screens to move around (folders, list); the row « back, actions » becomes the first line */
+	.ibx-app:has(> .ibx-space--mail:not([hidden]) > .ibx-mailapp[data-mobile="read"]) { grid-template-rows: minmax(0, 1fr); }
+	.ibx-app:has(> .ibx-space--mail:not([hidden]) > .ibx-mailapp[data-mobile="read"]) > .ibx-rail { display: none; }
+	/* Unread notifications while the bell is hidden: a dot on the back arrow */
+	.ibx-has-notif .ibx-pane--read > .ibx-pane__head .ibx-js-back { position: relative; }
+	.ibx-has-notif .ibx-pane--read > .ibx-pane__head .ibx-js-back::after { content: ""; position: absolute; top: 0.5rem; right: 0.5rem; width: 0.5rem; height: 0.5rem;
+		border-radius: 50%; background: var(--ibx-danger, #c0392b); box-shadow: 0 0 0 2px var(--ibx-bg); }
 	.ibx-window { inset: 0 !important; width: auto !important; height: auto !important; border-radius: 0; resize: none; }
 	.ibx-wgrip { display: none; }
 	.ibx-btn, .ibx-tree__row { min-height: 2.75rem; }
@@ -964,6 +978,10 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 :root[data-ibx-theme="dark"] .ibx-avatar[style*="--ibx-avatar-h"] { color: hsl(var(--ibx-avatar-h) 55% 85%); background: hsl(var(--ibx-avatar-h) 30% 28%); }
 .ibx-readhead__email { font-weight: 400; color: var(--ibx-text-muted); }
 .ibx-readhead__to { flex-wrap: wrap; }
+@media (max-width: 39.9375rem) {
+	.ibx-readhead__to:not(.is-open) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+	.ibx-readhead__to:not(.is-open) > * { white-space: nowrap; }
+}
 .ibx-readbanners { display: flex; flex-direction: column; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s4) 0; }
 .ibx-readbanners .ibx-banner { margin: 0; }
 .ibx-pane--read .ibx-mailframe { display: block; padding: 0; min-height: 7.5rem; border-radius: var(--ibx-radius); }
@@ -1765,7 +1783,10 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__tools [aria-pressed="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-compose__sep { width: 1px; height: 1.25rem; margin: 0 var(--ibx-s1); background: var(--ibx-border); }
 /* The text grows with what is written, the signature right under it (1.53.5, as the mail software) */
-.ibx-compose__editor { flex: none; min-height: 10rem; padding: 0; cursor: text; }
+/* The writing takes the free height of the window (1.101.1): on a phone the toolbar, moved under it, stays at the bottom
+   above the send bar instead of floating in the middle, and a tap anywhere in the empty area puts the caret */
+.ibx-compose__editor { flex: 1 0 auto; display: flex; flex-direction: column; min-height: 10rem; padding: 0; cursor: text; }
+.ibx-compose__editor > .ibx-editor__content { flex: 1 0 auto; }
 .ibx-editor__content { min-height: 10rem; padding: var(--ibx-s3); outline: none; font-size: var(--ibx-fs-body); line-height: 1.5; overflow-wrap: break-word; }
 .ibx-editor__content p { margin: 0 0 0.5em; }
 .ibx-editor__content ul, .ibx-editor__content ol { margin: 0 0 0.5em; padding-left: 1.5em; }
@@ -1794,6 +1815,9 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__att.is-bad { color: var(--ibx-danger); border-color: var(--ibx-danger); }
 .ibx-compose__drop { position: absolute; inset: 2.75rem 0 0; z-index: 4; display: flex; align-items: center; justify-content: center; gap: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); background: color-mix(in srgb, var(--ibx-bg) 85%, transparent); border: 2px dashed var(--ibx-accent); border-radius: var(--ibx-radius-lg); pointer-events: none; }
 .ibx-compose__foot { gap: var(--ibx-s1); }
+/* Discard set apart from « More » (1.101.1): a destructive action never next to a common one */
+.ibx-compose__foot .ibx-js-cdiscard { margin-left: var(--ibx-s3); }
+.ibx-compose__foot .ibx-js-cdiscard:hover { color: var(--ibx-danger); border-color: var(--ibx-danger); }
 .ibx-compose__foot label.ibx-btn { cursor: pointer; }
 .ibx-compose__foot label.ibx-btn:focus-within { outline: 2px solid var(--ibx-focus); outline-offset: 2px; }
 .ibx-compose__status { min-width: 0; margin-left: var(--ibx-s2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
@@ -2252,6 +2276,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-attbar--answers .ibx-btn { height: 2rem; padding: 0 var(--ibx-s3); font-size: var(--ibx-fs-body); }
 @container (max-width: 44rem) { .ibx-attbar--answers .ibx-quickreply__label { display: inline; } }
 @container (max-width: 20rem) { .ibx-attbar--answers .ibx-quickreply__label { display: none; } }
+/* Narrow (1.101.2): « Reply to all » did not fit and « Forward » went out of the screen; three buttons of the same
+   width, the icon above its name in small, as a bottom navigation bar */
+@container (max-width: 30rem) {
+	.ibx-attbar--answers .ibx-quickreply { flex: 1; gap: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply .ibx-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 3rem; flex-direction: column; justify-content: center; gap: 0.125rem; padding: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply__label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-xs); }
+}
 /* Fingers: targets of 44 px */
 @media (pointer: coarse) { .ibx-attbar .ibx-btn { height: 2.75rem; min-width: 2.75rem; justify-content: center; } }
 @media print { .ibx-quickreply, .ibx-convo__foot { display: none; } }
@@ -2466,6 +2497,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-updatebar > span { min-width: 0; }
 .ibx-updatebar--warning { border-color: var(--ibx-warning); }
 .ibx-updatebar--warning > .ibx-icon { color: var(--ibx-warning); }
+/* Phone (1.102.0): the text took a column of a few letters beside the button; full width, the text above, the
+   buttons under it */
+@media (max-width: 39.9375rem) {
+	.ibx-updatebar { left: var(--ibx-s2); right: var(--ibx-s2); transform: none; width: auto; max-width: none; flex-wrap: wrap; }
+	.ibx-updatebar > span { flex: 1 1 calc(100% - 2.5rem); }
+	.ibx-updatebar > .ibx-btn--primary { margin-left: auto; }
+}
 
 
 /* Recognized domains (1.59.0): badge of the authenticated sender, bar of the link under the pointer (outside the mail) */
@@ -2685,3 +2723,71 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-js-refresh[aria-busy="true"] { cursor: progress; }
 .ibx-js-refresh[aria-busy="true"] .ibx-icon { animation: ibx-spin 0.9s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .ibx-js-refresh[aria-busy="true"] .ibx-icon { animation: none; opacity: .5; } }
+
+/* Narrow screens (1.100.0): the actions of the mail in the head row of the reading pane, beside the back arrow. That
+   row never scrolls; the bar of the head of the mail is hidden, so the sender, his address and the date get the whole
+   width. Round icon buttons without border, 44 px targets, delete set apart. Replies stay in the bar at the bottom of
+   the mail; on a phone the minor actions (read, starred, junk) go to the menu « More ». */
+.ibx-panebar { display: none; }
+@media (max-width: 63.9375rem) {
+	.ibx-pane--read > .ibx-pane__head { padding: var(--ibx-s1) var(--ibx-s2); min-height: 3.25rem; border-bottom: 1px solid var(--ibx-border); }
+	.ibx-panebar { display: flex; align-items: center; gap: 0.125rem; margin-left: auto; min-width: 0; }
+	.ibx-pane--read > .ibx-pane__body .ibx-readhead__actions { display: none; }
+	.ibx-panebar .ibx-act--reply { display: none; }
+	.ibx-pane--read > .ibx-pane__head .ibx-btn--icon { width: 2.75rem; height: 2.75rem; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--ibx-text); }
+	.ibx-pane--read > .ibx-pane__head .ibx-btn--icon .ibx-icon { width: 1.375rem; height: 1.375rem; }
+	.ibx-pane--read > .ibx-pane__head .ibx-btn--icon:hover { background: var(--ibx-bg-hover); }
+	.ibx-pane--read > .ibx-pane__head .ibx-btn--icon:active { background: var(--ibx-accent-soft); color: var(--ibx-accent); }
+	.ibx-pane--read > .ibx-pane__head .ibx-btn--icon:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+	.ibx-panebar [data-action="delete"] { margin-left: var(--ibx-s3); }
+	.ibx-readhead__email { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 39.9375rem) {
+	.ibx-panebar .ibx-act--minor { display: none; }
+}
+
+/* Phone (1.102.0): the Dolibarr part as chips under the head of the mail, its details in a bottom sheet. The body of
+   the mail comes back in the first screen; the sheet opens on the section of the chip touched. */
+.ibx-dolchips { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); margin-top: var(--ibx-s2); }
+.ibx-dolchips[hidden] { display: none; }
+.ibx-dolchip { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.25rem; max-width: 100%; padding: 0 0.75rem; font: inherit; font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text); background: var(--ibx-bg-sunken, var(--ibx-bg-hover)); border: 1px solid var(--ibx-border); border-radius: 999px; cursor: pointer; }
+.ibx-dolchip .ibx-icon { width: 1rem; height: 1rem; flex: none; color: var(--ibx-text-muted); }
+.ibx-dolchip.is-wide { min-width: 0; flex: 0 1 auto; }
+.ibx-dolchip__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-dolchip__dot { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 50%; background: var(--ibx-success, #2e7d32); }
+.ibx-dolchip__badge { min-width: 1.25rem; padding: 0 0.3rem; font-size: var(--ibx-fs-xs); line-height: 1.25rem; text-align: center; color: var(--ibx-accent); background: var(--ibx-accent-soft); border-radius: 999px; }
+.ibx-dolchip.is-accent { color: #fff; background: var(--ibx-accent); border-color: var(--ibx-accent); }
+.ibx-dolchip.is-accent .ibx-icon { color: #fff; }
+.ibx-dolchip.is-muted { color: var(--ibx-text-muted); font-weight: 500; }
+.ibx-dolchip:active { background: var(--ibx-accent-soft); }
+.ibx-dolchip:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-sheetback { display: none; }
+@media (max-width: 39.9375rem) {
+	.ibx-dolibar.is-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; display: flex; flex-direction: column; max-height: 85dvh; margin: 0; padding: 0;
+		border: 0; border-radius: 1rem 1rem 0 0; background: var(--ibx-bg); box-shadow: 0 -0.5rem 2rem rgba(0, 0, 0, .25); transform: translateY(105%); visibility: hidden;
+		padding-bottom: env(safe-area-inset-bottom); }
+	/* The slide only once the user opened it (1.102.1): a mail that opens has its sheet hidden at once */
+	.ibx-dolibar.is-sheet.is-anim { transition: transform 220ms ease, visibility 0s linear 220ms; }
+	.ibx-dolibar.is-sheet.is-open { transform: none; visibility: visible; transition: transform 220ms ease; }
+	.ibx-dolibar.is-sheet .ibx-dolsheet__head { position: relative; display: flex; align-items: center; gap: var(--ibx-s2); padding: 1rem var(--ibx-s2) var(--ibx-s2) var(--ibx-s4); touch-action: none; border-bottom: 1px solid var(--ibx-border); }
+	.ibx-dolibar.is-sheet .ibx-dolsheet__head .ibx-ellipsis { flex: 1; min-width: 0; }
+	.ibx-dolsheet__grip { position: absolute; top: 0.375rem; left: 50%; width: 2.5rem; height: 0.25rem; margin-left: -1.25rem; border-radius: 999px; background: var(--ibx-border-strong, var(--ibx-border)); }
+	.ibx-dolibar.is-sheet .ibx-js-dolsheetclose { width: 2.75rem; height: 2.75rem; margin-left: auto; border: 0; border-radius: 50%; background: transparent; }
+	.ibx-dolibar.is-sheet .ibx-dolibar__body { position: relative; overflow: auto; overscroll-behavior: contain; padding-bottom: var(--ibx-s3); }
+	.ibx-sheetback { display: block; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, .35); }
+	/* Images blocked: one line, « Always show » as its arrow only */
+	.ibx-js-imagesbar { flex-wrap: nowrap; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); }
+	.ibx-js-imagesbar .ibx-banner__text { flex: 1 1 0; font-size: var(--ibx-fs-xs); line-height: 1.3; }
+	.ibx-js-imagesbar .ibx-banner__lbl { display: none; }
+}
+
+/* Narrow screens (UX fix series): a mail alone scrolls as one page under the row « back, actions »: its head, the
+   chips, the banners, the Dolibarr part in place (tablet) and the body move up together; the bar of the answers and
+   attachments stays at the bottom. On a computer the head stays fixed and the body alone scrolls (rule above): on a
+   phone that left a slit of about 130 px to read the mail. */
+@media (max-width: 63.9375rem) {
+	.ibx-pane--read > .ibx-pane__body:has(> .ibx-reading:not(.ibx-convo)) { display: block; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+	.ibx-pane--read .ibx-reading:not(.ibx-convo) { min-height: 100%; }
+	.ibx-reading:not(.ibx-convo) > .ibx-readbody { flex: 1 0 auto; min-height: auto; overflow-x: auto; overflow-y: hidden; }
+	.ibx-reading:not(.ibx-convo) > .ibx-attbar { position: sticky; bottom: 0; box-shadow: 0 -2px 6px rgb(0 0 0 / .06); }
+}

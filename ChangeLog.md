@@ -1,5 +1,77 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a mail scrolls as one page on phones and tablets :   1.102.5
+  - its head, the chips, the subject, the banners, the Dolibarr part in place (tablet) and the body move up
+    together under the row « back, actions »; the bar of the answers and attachments stays at the bottom. Only the
+    body scrolled before, in a slit of about 130 px on a phone. A computer keeps the head fixed.
+
+- FIX: line of the recipients on one line on a phone :   1.102.4
+  - « To … · received on … » cut with « … » on one line; a tap opens it whole, a second one closes it (a tap on a
+    name still opens its card).
+
+- FIX: short date beside the name in the head of a mail on a phone :   1.102.3
+  - « 09:12 », « Yesterday 15:10 », « Wed 11:00 », then the day and month with the time, the year only when it is not
+    this one; the full date stays as tooltip and for screen readers. It took a line of its own.
+
+- FIX: top bar of the application hidden while a mail is read on phones and tablets :   1.102.2
+  - reading is a task screen: the bar (theme, bell, settings) shows on the folders and the list only, the row
+    « back, actions » becomes the first line. Unread notifications put a dot on the back arrow meanwhile.
+
+- FIX: Dolibarr sheet hidden at once when a mail opens on a phone :   1.102.1
+  - the part showed in place while it loaded, then slid down to hide; it is now a hidden sheet from the start, the
+    slide kept for the openings and closings asked by the user. A loading error stays shown in place.
+
+- NEW: the Dolibarr part as chips and a bottom sheet on a phone :   1.102.0
+  - under the head of the mail, before its subject: a chip for the thirdparty (green dot when known), « New
+    customer » when the sender is unknown, or the requester of a data source; a chip for the pieces and one for the
+    notes with their counts (« + » when there is none yet). The body of the mail comes back in the first screen.
+  - a chip opens the whole Dolibarr part in a sheet rising from the bottom, on its section; closed by its button, a
+    tap on the veil, Escape or a swipe down on its head, the focus back on the chip. Tablets and computers keep the
+    part in place; turning the screen paints it again the right way.
+  - images blocked: one line, « Always show » as its arrow; « received on » not written again when the only
+    recipient is the mailbox itself; the bar « update not finished » readable on a phone (its text was a column of a
+    few letters beside the button).
+
+- FIX: answer buttons at the bottom of a mail on a phone :   1.101.2
+  - « Reply to all » did not fit and « Forward » went out of the screen: under about 480 px the three buttons share
+    the width, the icon above its name in small, as a bottom navigation bar.
+
+- FIX: writing area filling the window, toolbar at the bottom on a phone, discard set apart :   1.101.1
+  - the text area of a writing takes the free height of its window: on a phone the formatting toolbar, under it,
+    stays at the bottom above the send bar instead of floating in the middle of the screen with an empty area below;
+    a tap anywhere in the empty area puts the caret. Same on a computer when the window is enlarged.
+  - the button « Discard » stands apart from « More actions » and turns red on hover.
+
+- NEW: editor of the writing on a small screen :   1.101.0
+  - Settings > General > Writing editor, « On a small screen » (phones and small tablets, under 1024 px): the Inbox
+    editor (default), CKEditor with the toolbar of Inbox, or the same as on a computer. The native toolbar of
+    CKEditor (five rows of buttons) no longer takes half of a phone screen.
+  - chosen when the writing opens, kept if the screen turns or the window is resized while typing (no lost selection
+    nor undo history); the docked writing window of a computer, narrow too, keeps the editor of the computer.
+
+- FIX: tooltips of the heads of the panes below the button on phones and tablets :   1.100.1
+  - the bubble of a button of a pane head (« ⋯ », « New mail », the actions of the mail read) opened above it and
+    went under the top bar of the application; on a narrow screen it now opens below, aligned on the right near the
+    edge.
+
+- NEW: actions of the mail at the top of the screen on phones and tablets :   1.100.0
+  - narrow screens: the buttons of the mail move to the row of the back arrow, which never scrolls, so they stay at
+    hand while reading; the sender, his address and the date get the whole width again (they were squeezed into a
+    narrow column, the date on five lines).
+  - phone: Tag, Archive and Delete stay as buttons, Delete set apart; Mark as unread, Star and Junk open first in the
+    menu « More actions ». Reply, Reply to all and Forward stay in the bar at the bottom of the mail only.
+  - round icon buttons without border, 44 px touch targets, a real back arrow; « Dolibarr on top / on the right »
+    is no longer offered on a narrow screen, where it has no effect.
+
+- NEW: recipients proposed ranked by context and exchanges :   1.99.0
+  - while typing a recipient, all the sources (contacts, thirdparties, users, correspondents of the mailboxes) are
+    ranked together instead of one after the other in alphabetical order: first the contacts of the thirdparty of the
+    mail answered and of the recipients already given (then those of the other thirdparties such a contact is linked
+    to), then the addresses written to often and lately, then those read from, then how well the words match.
+  - several words in any order (« jean dup », « dupont acme »), the name of the thirdparty searched too; a word found
+    only inside a name or in the domain counts little.
+  - a click in an empty field (Cc...) proposes the contacts of these thirdparties at once, without typing.
+
 - NEW: result of a tag seen while its colour is set :   1.98.0
   - list of the tags: while the colour or the border of a tag is set, the tag as it will show on the mails (its
     colour, black or white text, border) covers its name, then fades a few seconds after the focus left them; a click
