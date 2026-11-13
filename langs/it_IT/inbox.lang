@@ -623,6 +623,7 @@ InboxMarkUnread = Segna come non letto
 InboxMaximize = Ingrandisci
 InboxMinimize = Riduci
 InboxMoreActions = Altre azioni
+InboxMailActions = Azioni della mail
 InboxNameImitation = Il nome « %s » somiglia al nostro ma l'e-mail proviene da un indirizzo esterno (%s): attenzione a un'imitazione.
 InboxNewMails = %s nuova/e e-mail
 InboxNext = Successivo

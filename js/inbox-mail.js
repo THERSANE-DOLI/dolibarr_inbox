@@ -3199,6 +3199,7 @@
 		clearTimeout(S.readTimer);
 		S.openId = 0;
 		S.mail = null;
+		syncPaneBar(null);
 		const f = currentFolder();
 		const pane = readPane();
 		pane.innerHTML = '<div class="ibx-empty">' + ic('mail-opened', 'ibx-empty__icon')
@@ -3214,6 +3215,7 @@
 		clearTimeout(S.readTimer);
 		S.openId = 0;
 		S.mail = null;
+		syncPaneBar(null);
 		const n = S.selected.size;
 		// The actions with their names here, where there is room (the bar of the list keeps them short)
 		readPane().innerHTML = '<div class="ibx-empty ibx-multi">' + ic('multi', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxSelectedCount', n) + '</div>'
@@ -3239,6 +3241,7 @@
 		clearTimeout(S.readTimer);
 		S.openId = id;
 		S.mail = null;
+		syncPaneBar(null);
 		S.thread = null;
 		S.blocks = {};
 		S.mobile('read');
@@ -4313,6 +4316,7 @@
 			acts.innerHTML = actionButtons(S.mail);
 			bindActions(acts);
 		}
+		syncPaneBar(S.mail);
 		const subject = $('.ibx-readhead__subject', root);
 		if (subject) {
 			subject.innerHTML = esc(S.mail.subject || t('InboxNoSubject')) + ' ' + headTagsHtml(S.mail.id, { folder: S.mail.folder, tags: S.mail.tags });
@@ -7352,10 +7356,11 @@
 		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
 		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
-		const anchor = () => $('.ibx-js-more', mailRoot(m)) || S.el;
+		const shown = sel => $$(sel, S.el).find(b => b.offsetParent !== null);
+		const anchor = () => shown('.ibx-js-panebar .ibx-js-more') || $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
 			// Tags at hand (1.57.0): a button of the bar, its menu under it
-			const tagAnchor = () => $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
+			const tagAnchor = () => shown('.ibx-js-panebar .ibx-js-action[data-action="tag"]') || $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
 			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'junk', 'notjunk', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
 		// Recognized domains (1.59.0): with the right, the domain of the authenticated sender or of the links
@@ -7382,8 +7387,14 @@
 		});
 		return list;
 	}
+	// Phone (1.100.0): the bar of the mail keeps the core actions; replies are in the bar at the bottom of the mail, the
+	// minor ones go to the menu « More »
+	const ACT_REPLY = ['reply', 'replyall', 'forward'];
+	const ACT_MINOR = ['read', 'flag', 'junk', 'notjunk'];
+	const isSmallPhone = () => window.matchMedia('(max-width: 39.9375rem)').matches;
 	function actionButtons(m) {
 		return actions(m).filter(a => a.button).map(a => '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-action' + (a.id === 'read' ? ' ibx-js-toggleread' : '')
+			+ (ACT_REPLY.includes(a.id) ? ' ibx-act--reply' : (ACT_MINOR.includes(a.id) ? ' ibx-act--minor' : ''))
 			+ (a.danger ? ' ibx-btn--danger-hover' + (a.irreversible ? ' is-irreversible' : '') : '') + '" data-action="' + esc(a.id) + '"'
 			+ (a.disabled ? ' aria-disabled="true" title="' + esc(a.reason || a.label) + '"' : ' title="' + esc(a.label + (a.key ? ' (' + a.key + ')' : '')) + '"') + ' aria-label="' + esc(a.label) + '">' + ic(a.icon) + '</button>').join('')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-more" aria-haspopup="menu" aria-label="' + th('InboxMoreActions') + '">' + ic('more') + '</button>';
@@ -7621,6 +7632,7 @@
 				head.innerHTML = actionButtons(m);
 				bindActions(head);
 			}
+			syncPaneBar(m);
 			autoRead(m);
 			presenceSoon();
 			Dolibarr.executeHook('inbox:mail:open', { account: m.account, messageId: m.message_id, subject: m.subject, from: m.from });
@@ -7656,6 +7668,7 @@
 			+ dolibarSlot(m.id, false)
 			+ mailBodyHtml(m, { quick: true }) + '</article>';
 		bindActions(pane);
+		syncPaneBar(m);
 		bindQuickReply(pane);
 		bindMail(m, pane);
 		hydrateAvatars(pane);
@@ -7902,6 +7915,22 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-attdownload" title="' + th('InboxDownload') + '" aria-label="' + th('InboxDownload') + ' ' + esc(a.name) + '">' + ic('download') + '</button></div>';
 	}
 
+	/**
+	 * Actions of the mail in the head row of the reading pane, beside the back button (narrow screens, 1.100.0): that row
+	 * never scrolls, the buttons stay at hand; the bar of the head of the mail is hidden there by the CSS
+	 * @param {object|null} m Mail open, null: no mail
+	 */
+	function syncPaneBar(m) {
+		const bar = $('.ibx-js-panebar', S.el);
+		if (!bar) {
+			return;
+		}
+		bar.innerHTML = m ? actionButtons(m) : '';
+		if (m) {
+			bindActions(bar);
+		}
+	}
+
 	/** Buttons of the actions of the open mail (head of the reading pane or of the conversation) */
 	function bindActions(root) {
 		$$('.ibx-js-action', root).forEach(b => b.addEventListener('click', () => {
@@ -7914,8 +7943,13 @@
 		}));
 		const more = $('.ibx-js-more', root);
 		if (more) {
-			more.addEventListener('click', () => menu(more, actions(S.mail).filter(a => !a.button).map(a => a.sep ? a : ({ icon: a.icon, label: a.label, key: a.key, run: a.run, disabled: a.disabled, reason: a.reason }))
-				.filter((a, i, all) => !(a.sep && (i === 0 || all[i - 1].sep)))));
+			more.addEventListener('click', () => {
+				const all = actions(S.mail);
+				const minor = isSmallPhone() ? all.filter(a => a.button && ACT_MINOR.includes(a.id)) : [];
+				const items = minor.concat(minor.length ? [{ sep: true }] : [], all.filter(a => !a.button && !(a.id === 'dolibarpos' && isPhone())));
+				menu(more, items.map(a => a.sep ? a : ({ icon: a.icon, label: a.label, key: a.key, run: a.run, disabled: a.disabled, reason: a.reason }))
+					.filter((a, i, list) => !(a.sep && (i === 0 || i === list.length - 1 || list[i - 1].sep))));
+			});
 		}
 	}
 
@@ -10612,7 +10646,8 @@
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
 			+ '<div class="ibx-splitter" data-split="2" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '"></div>'
 			+ '<section class="ibx-pane ibx-pane--read" aria-label="' + th('InboxReadingPane') + '">'
-			+ '<div class="ibx-pane__head ibx-mobileonly"><button type="button" class="ibx-btn ibx-btn--icon ibx-js-back" data-to="list" aria-label="' + th('InboxBackToList') + '">' + ic('chevron-left') + '</button></div>'
+			+ '<div class="ibx-pane__head ibx-mobileonly"><button type="button" class="ibx-btn ibx-btn--icon ibx-js-back" data-to="list" aria-label="' + th('InboxBackToList') + '">' + ic('back') + '</button>'
+			+ '<div class="ibx-panebar ibx-js-panebar" role="toolbar" aria-label="' + th('InboxMailActions') + '"></div></div>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')
 			+ '</div>';

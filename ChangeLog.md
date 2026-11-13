@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: actions of the mail at the top of the screen on phones and tablets :   1.100.0
+  - narrow screens: the buttons of the mail move to the row of the back arrow, which never scrolls, so they stay at
+    hand while reading; the sender, his address and the date get the whole width again (they were squeezed into a
+    narrow column, the date on five lines).
+  - phone: Tag, Archive and Delete stay as buttons, Delete set apart; Mark as unread, Star and Junk open first in the
+    menu « More actions ». Reply, Reply to all and Forward stay in the bar at the bottom of the mail only.
+  - round icon buttons without border, 44 px touch targets, a real back arrow; « Dolibarr on top / on the right »
+    is no longer offered on a narrow screen, where it has no effect.
+
 - NEW: recipients proposed ranked by context and exchanges :   1.99.0
   - while typing a recipient, all the sources (contacts, thirdparties, users, correspondents of the mailboxes) are
     ranked together instead of one after the other in alphabetical order: first the contacts of the thirdparty of the
