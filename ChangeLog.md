@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Dolibarr sheet hidden at once when a mail opens on a phone :   1.102.1
+  - the part showed in place while it loaded, then slid down to hide; it is now a hidden sheet from the start, the
+    slide kept for the openings and closings asked by the user. A loading error stays shown in place.
+
 - NEW: the Dolibarr part as chips and a bottom sheet on a phone :   1.102.0
   - under the head of the mail, before its subject: a chip for the thirdparty (green dot when known), « New
     customer » when the sender is unknown, or the requester of a data source; a chip for the pieces and one for the

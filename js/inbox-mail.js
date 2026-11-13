@@ -5191,6 +5191,7 @@
 		box._sheetFrom = from || null;
 		box.setAttribute('role', 'dialog');
 		box.setAttribute('aria-modal', 'true');
+		box.classList.add('is-anim');
 		box.classList.add('is-open');
 		const body = $('.ibx-dolibar__body', box);
 		const row = $('[data-sec="' + sec + '"]', box);
@@ -5269,12 +5270,16 @@
 			box.innerHTML = '<div class="ibx-dolibar__head ibx-muted">' + ic('lock') + ' ' + th('InboxProtectReadingNote') + '</div>';
 			return;
 		}
+		// Phone: a sheet from the start, hidden while it loads (it never shows in place to slide away after)
+		box.classList.toggle('is-sheet', isSmallPhone());
 		box.innerHTML = '<div class="ibx-dolibar__head"><span class="ibx-skeleton" style="width:40%"></span></div>';
 		let res;
 		try {
 			res = await api('dolibarr', 'panel', { id: +box.dataset.mail, thread: +box.dataset.thread });
 		} catch (err) {
 			if (box.isConnected) {
+				// The error in place, a hidden sheet would keep it unseen
+				box.classList.remove('is-sheet');
 				box.innerHTML = '<div class="ibx-dolibar__head ibx-muted">' + ic('warning') + ' ' + esc(err.message) + ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-dolretry">' + th('InboxRetry') + '</button></div>';
 				$('.ibx-js-dolretry', box).addEventListener('click', () => loadDolibar(box));
 			}
