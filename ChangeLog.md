@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: archive notifications of the bell :   1.93.0
+  - an « Archive » button on each notification (on hover or focus, always on touch screens), and « Archive all » in
+    the head of the panel.
+  - an archived notification leaves the bell at once, read at the same time; « Undo » in the toast brings it back.
+  - archived notifications are kept until the purge (INBOX_NOTIFICATION_DAYS): a mailbox in error archived is not
+    told again for the same episode.
+
 - FIX: tags of a mailbox in global mode, read only, the global list no longer changed from a mailbox :   1.92.5
   - an admin could change the global list from the Tags tab of a mailbox: the change looked local to the mailbox
     while it applied to every mailbox in global mode.

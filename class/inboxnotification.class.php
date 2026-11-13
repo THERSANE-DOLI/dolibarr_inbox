@@ -138,7 +138,7 @@ class InboxNotification
 		global $conf;
 
 		$row = $this->db->getRow("SELECT SUM(CASE WHEN date_read IS NULL THEN 1 ELSE 0 END) as n, MAX(rowid) as last FROM ".$this->db->prefix()."inbox_notification"
-			." WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $user->id));
+			." WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $user->id)." AND date_archived IS NULL");
 
 		return array('unread' => is_object($row) ? (int) $row->n : 0, 'last' => is_object($row) ? (int) $row->last : 0);
 	}
@@ -160,7 +160,7 @@ class InboxNotification
 		$rows = $this->db->getRows("SELECT n.rowid, n.type, n.fk_mailref, n.fk_account, n.fk_user_actor, n.payload, n.url, n.date_creation, n.date_read,"
 			." u.firstname, u.lastname, u.login, a.label as account_label, a.email as account_email FROM ".$p."inbox_notification as n"
 			." LEFT JOIN ".$p."user as u ON u.rowid = n.fk_user_actor LEFT JOIN ".$p."inbox_account as a ON a.rowid = n.fk_account"
-			." WHERE n.entity = ".((int) $conf->entity)." AND n.fk_user = ".((int) $user->id).($before > 0 ? " AND n.rowid < ".((int) $before) : '')
+			." WHERE n.entity = ".((int) $conf->entity)." AND n.fk_user = ".((int) $user->id)." AND n.date_archived IS NULL".($before > 0 ? " AND n.rowid < ".((int) $before) : '')
 			." ORDER BY n.rowid DESC LIMIT ".($limit + 1));
 		$items = array();
 		// A notification about a mailbox the user cannot read any more: still listed, without its subject (audit INBX-018)
@@ -208,6 +208,53 @@ class InboxNotification
 		$ids = array_filter(array_map('intval', $ids));
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_notification SET date_read = '".$this->db->idate(dol_now())."' WHERE entity = ".((int) $conf->entity)
 			." AND fk_user = ".((int) $user->id)." AND date_read IS NULL".($ids ? " AND rowid IN (".implode(',', $ids).")" : ''));
+	}
+
+	/**
+	 * Archive notifications: out of the bell (read at the same time), kept until the purge
+	 *
+	 * @param User  $user User
+	 * @param int[] $ids  Lines, empty = all the ones in the bell
+	 * @return int[]      Lines archived now (for the undo)
+	 */
+	public function archive(User $user, array $ids = array())
+	{
+		global $conf;
+
+		$p = $this->db->prefix();
+		$ids = array_values(array_filter(array_map('intval', $ids)));
+		$where = " WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $user->id)." AND date_archived IS NULL".($ids ? " AND rowid IN (".implode(',', $ids).")" : '');
+		$rows = $this->db->getRows("SELECT rowid FROM ".$p."inbox_notification".$where." LIMIT 100000");
+		$done = array_map(function ($r) {
+			return (int) $r->rowid;
+		}, is_array($rows) ? $rows : array());
+		if (!$done) {
+			return array();
+		}
+		$now = "'".$this->db->idate(dol_now())."'";
+		$this->db->query("UPDATE ".$p."inbox_notification SET date_archived = ".$now.", date_read = COALESCE(date_read, ".$now.")"
+			." WHERE rowid IN (".implode(',', $done).")");
+
+		return $done;
+	}
+
+	/**
+	 * Back in the bell (undo of an archive), read
+	 *
+	 * @param User  $user User
+	 * @param int[] $ids  Lines
+	 * @return void
+	 */
+	public function unarchive(User $user, array $ids)
+	{
+		global $conf;
+
+		$ids = array_values(array_filter(array_map('intval', $ids)));
+		if (!$ids) {
+			return;
+		}
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_notification SET date_archived = NULL WHERE entity = ".((int) $conf->entity)
+			." AND fk_user = ".((int) $user->id)." AND rowid IN (".implode(',', $ids).")");
 	}
 
 	/**

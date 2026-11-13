@@ -26,7 +26,7 @@ dol_include_once('/inbox/class/inboxnotification.class.php');
 dol_include_once('/inbox/class/inboxprotect.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('read', 'open'), true));
+inboxAjaxStart(in_array($action, array('read', 'open', 'archive', 'unarchive'), true));
 $notify = new InboxNotification($db);
 // The bell, and the unread mails counted for the tab, the installed application and the top bar (lot W8 1.21.0)
 $counts = function () use ($notify, $user) {
@@ -47,6 +47,19 @@ switch ($action) {
 		// ids: these ones, none: all of them
 		$ids = inboxAjaxParam('ids', 'none');
 		$notify->markRead($user, array_map('intval', is_array($ids) ? $ids : array_filter(explode(',', (string) $ids))));
+		inboxAjaxReply($counts());
+		// no break
+
+	case 'archive':
+		// ids: these ones, none: all the ones in the bell; the lines archived given back for the undo
+		$ids = inboxAjaxParam('ids', 'none');
+		$done = $notify->archive($user, array_map('intval', is_array($ids) ? $ids : array_filter(explode(',', (string) $ids))));
+		inboxAjaxReply(array('archived' => $done) + $counts());
+		// no break
+
+	case 'unarchive':
+		$ids = inboxAjaxParam('ids', 'none');
+		$notify->unarchive($user, array_map('intval', is_array($ids) ? $ids : array_filter(explode(',', (string) $ids))));
 		inboxAjaxReply($counts());
 		// no break
 

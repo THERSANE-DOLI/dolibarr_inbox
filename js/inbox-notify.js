@@ -315,7 +315,9 @@
 			+ '<span class="ibx-notif__text"><span class="ibx-notif__what">' + (n.read ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(textOf(n)) + '</span>'
 			+ (n.subject ? '<span class="ibx-notif__subject ibx-ellipsis">' + esc(n.subject) + '</span>' : '')
 			+ '<span class="ibx-notif__meta ibx-muted">' + (n.account ? esc(n.account) + ' · ' : '') + '<time>' + esc(when(n.date)) + '</time></span></span>'
-			+ (n.read ? '' : '<span class="ibx-notif__dot" aria-hidden="true"></span>') + '</button></li>';
+			+ (n.read ? '' : '<span class="ibx-notif__dot" aria-hidden="true"></span>') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-notif__archive ibx-js-notifarchive" data-archive="' + n.id + '"'
+			+ ' title="' + th('InboxArchive') + '" aria-label="' + th('InboxArchive') + '">' + ic('archive') + '</button></li>';
 	}
 
 	function paintPanel() {
@@ -324,6 +326,7 @@
 		}
 		const list = $('.ibx-js-notiflist', N.panel);
 		$('.ibx-js-notifreadall', N.panel).disabled = N.unread <= 0;
+		$('.ibx-js-notifarchiveall', N.panel).disabled = !N.items.length;
 		if (!N.items.length) {
 			list.innerHTML = N.loading ? '<div class="ibx-notifpanel__empty"><span class="ibx-skeleton"></span><span class="ibx-skeleton" style="width:70%"></span></div>'
 				: '<div class="ibx-empty ibx-notifpanel__empty">' + ic('bell', 'ibx-empty__icon') + '<div>' + th('InboxNotifEmpty') + '</div></div>';
@@ -377,7 +380,8 @@
 	}
 
 	function outside(e) {
-		if (N.panel && !N.panel.contains(e.target) && !(bell() && bell().contains(e.target))) {
+		// A toast (« Undo » of an archive) is not outside: the panel stays to show the notification back
+		if (N.panel && !N.panel.contains(e.target) && !(bell() && bell().contains(e.target)) && !(e.target.closest && e.target.closest('#ibx-toasts'))) {
 			close(false);
 		}
 	}
@@ -392,6 +396,7 @@
 		p.setAttribute('aria-label', t('InboxNotifications'));
 		p.innerHTML = '<div class="ibx-notifpanel__head"><h2 class="ibx-notifpanel__title">' + th('InboxNotifications') + '</h2>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-notifreadall">' + ic('mark-read') + ' ' + th('InboxNotifReadAll') + '</button>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-notifarchiveall" title="' + th('InboxNotifArchiveAll') + '" aria-label="' + th('InboxNotifArchiveAll') + '">' + ic('archive') + '</button>'
 			+ '<a class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifsettings" href="#/settings/notifications" aria-label="' + th('InboxNotifSettings') + '" title="' + th('InboxNotifSettings') + '">' + ic('settings') + '</a>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifclose" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-notifpanel__body ibx-js-notiflist" aria-live="polite"></div>';
@@ -440,6 +445,49 @@
 		}
 	}
 
+	/**
+	 * Archive notifications (none given: all of the bell): out of the list at once, back with « Undo »
+	 * @param {number[]} ids
+	 */
+	async function archive(ids) {
+		const kept = N.items;
+		const focusNext = ids.length === 1 ? (() => {
+			const i = kept.findIndex(n => n.id === ids[0]);
+			return kept[i + 1] || kept[i - 1] || null;
+		})() : null;
+		N.items = ids.length ? kept.filter(n => !ids.includes(n.id)) : [];
+		paintPanel();
+		let res;
+		try {
+			res = await post('notification', 'archive', { ids });
+		} catch (err) {
+			N.items = kept;
+			paintPanel();
+			toast(err.message, { error: true });
+			return;
+		}
+		apply(res);
+		if (N.panel) {
+			const next = focusNext && $('[data-notif="' + focusNext.id + '"]', N.panel);
+			(next || $('.ibx-js-notifclose', N.panel)).focus();
+		}
+		const done = res.archived || [];
+		if (!done.length) {
+			return;
+		}
+		toast(done.length > 1 ? t('InboxNotifArchivedMany', done.length) : t('InboxNotifArchived'), { action: t('InboxUndo'), onAction: async () => {
+			try {
+				apply(await post('notification', 'unarchive', { ids: done }));
+			} catch (err) {
+				toast(err.message, { error: true });
+				return;
+			}
+			if (N.panel) {
+				load(false);
+			}
+		} });
+	}
+
 	async function onPanelClick(e) {
 		if (e.target.closest('.ibx-js-notifsettings')) {
 			close(false);
@@ -463,6 +511,11 @@
 			} catch (err) {
 				toast(err.message, { error: true });
 			}
+			return;
+		}
+		const one = e.target.closest('.ibx-js-notifarchive');
+		if (one || e.target.closest('.ibx-js-notifarchiveall')) {
+			archive(one ? [+one.dataset.archive] : []);
 			return;
 		}
 		const item = e.target.closest('[data-notif]');
