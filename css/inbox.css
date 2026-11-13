@@ -2610,9 +2610,22 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 }
 
 /* Fil of the mail (lot E2, 1.77.0): an answer sent, between the notes */
-.ibx-activity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s1) var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); margin: var(--ibx-s1) 0; font-size: var(--ibx-fs-sm); background: var(--ibx-bg-sunken); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius-sm); }
-.ibx-activity > .ibx-icon { flex: none; color: var(--ibx-accent); }
-.ibx-activity__text { flex: 1 1 12rem; min-width: 0; }
+/* No width asked by its content: the line is cut with « … » in a narrow column instead of widening the notes */
+.ibx-activity { min-width: 0; max-width: 100%; margin: var(--ibx-s1) 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-activity__sum { display: flex; align-items: center; gap: var(--ibx-s2); width: 100%; min-height: 2.25rem; padding: var(--ibx-s1) var(--ibx-s2); font: inherit; color: inherit; text-align: left;
+	background: transparent; border: 1px dashed var(--ibx-border); border-radius: var(--ibx-radius-sm); cursor: pointer; }
+.ibx-activity__sum:hover { background: var(--ibx-bg-hover); }
+.ibx-activity__sum:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+.ibx-activity__sum > .ibx-icon { flex: none; width: 1rem; height: 1rem; }
+.ibx-activity__line { flex: 1 1 0; width: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ibx-text); }
+.ibx-activity__when { flex: none; white-space: nowrap; }
+.ibx-activity__chev { flex: none; width: 0.875rem; height: 0.875rem; transition: transform 150ms ease; }
+.ibx-activity__sum[aria-expanded="true"] .ibx-activity__chev { transform: rotate(90deg); }
+.ibx-activity__more { padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s1); }
+.ibx-activity__dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.25rem var(--ibx-s3); margin: 0 0 var(--ibx-s2); }
+.ibx-activity__dl dt { color: var(--ibx-text-muted); }
+.ibx-activity__dl dd { margin: 0; color: var(--ibx-text); overflow-wrap: anywhere; }
+@media (pointer: coarse) { .ibx-activity__sum { min-height: 2.75rem; } .ibx-activity .ibx-js-activitysee { min-height: 2.75rem; } }
 .ibx-compose__conflict { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
 
 /* New customer from a mail (lot A1, 1.79.0): side panel on the left, over the folders and the list */
@@ -2812,4 +2825,9 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 		padding: 1rem var(--ibx-s2) var(--ibx-s2) var(--ibx-s4); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); touch-action: none; }
 	.ibx-attsheet__head .ibx-muted { flex: 1; min-width: 0; }
 	.ibx-attsheet__head .ibx-btn--icon { width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%; background: transparent; }
+}
+/* Narrow screens (UX fix series): one column in the Dolibarr part, the box to write a note too; its « column 2 »
+   made a hidden second column and the label « Notes » shrank to nothing under the first note */
+@media (max-width: 63.9375rem) {
+	.ibx-pane--read:not([data-dolibar="right"]) .ibx-dolibar__notes > .ibx-note__new { grid-column: 1; }
 }

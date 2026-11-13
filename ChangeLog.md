@@ -1,5 +1,25 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the mail open kept in the address, back of the browser to the list :   1.102.10
+  - #/mail/<folder>/<mail> (and #/mail/view/<view>/<mail>, #/mail/vview/<id>/<mail>): a reload opens the mail again,
+    a mail moved or removed meanwhile says so and gives back its list. Only numbers in the address.
+  - opening a mail from its list is a step of the history: the back of the browser, or of a phone, closes it and
+    shows the list; the back arrow of a phone is a real back. Going from a mail to another (keys, a click, the next
+    one after an archiving) changes the address only, without a step.
+
+- FIX: picture of the recipient on the cards of the sent mails and drafts :   1.102.9
+  - the first recipient instead of nothing (the sender would be the mailbox on every card); avatar.php to=1 reads it
+    from the row of the mail, with the rights of the user, never a brand logo.
+
+- FIX: an answer sent from the mailbox as one line in the notes :   1.102.8
+  - « Replied to Sophie Renaud · Yesterday 17:18 », discreet, cut with « … » in a narrow column; a click opens the
+    subject, the recipients, from where (Inbox and who, or another mail software), the full date and « See the mail ».
+    It was a block of several lines that widened the column of the notes.
+
+- FIX: label « Notes » hidden on phones and tablets :   1.102.7
+  - the box to write a note made a hidden second column in the Dolibarr part, the label shrank to nothing under the
+    first note.
+
 - FIX: attachments of a mail in a sheet on a phone :   1.102.6
   - the bar at the bottom keeps one line: the answers (the icon above its name, the same width) and a paper clip with
     the count of the files; the list of the files rises from the bottom as a sheet, as the Dolibarr part (save all,
