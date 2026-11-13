@@ -289,13 +289,42 @@
 	}
 	function paintSignature(w) {
 		const box = $('.ibx-js-sig', w.dlg);
-		const sig = identityOf(w).signature || '';
-		box.hidden = !sig.trim() || !w.signature;
-		$('.ibx-js-sigadd', w.dlg).hidden = !sig.trim() || w.signature;
+		const id = identityOf(w);
+		const sig = id.signature || '';
+		// A signature changed for this mail is in the text: the one of the identity is not added nor offered
+		const edited = !!(w.editor && w.editor.hasSignature && w.editor.hasSignature());
+		w.sigEditedShown = edited;
+		box.hidden = !sig.trim() || !w.signature || edited;
+		$('.ibx-js-sigadd', w.dlg).hidden = !sig.trim() || w.signature || edited;
 		if (!box.hidden) {
 			// No « -- » (1.53.5): only the text part of the mail writes it
 			$('iframe', box).srcdoc = srcdoc(sig, true);
 		}
+		// Identity changed since: the changed signature stays (never lost), the one of the new identity offered
+		const swap = $('.ibx-js-sigswap', w.dlg);
+		swap.hidden = !edited || w.sigEditedFor === id.id;
+		if (!swap.hidden) {
+			$('.ibx-js-sigswaptext', swap).textContent = t('InboxComposeSignatureNotFollowing');
+			$('.ibx-js-sigswapbtn', swap).textContent = sig.trim() ? t('InboxComposeSignatureReplaceBy', id.name || id.email) : t('InboxComposeSignatureRemoveEdited');
+		}
+	}
+	/** The signature of the identity put in the text, to change it for this mail only (1.95.0) */
+	function signatureEdit(w) {
+		const id = identityOf(w);
+		if (!(id.signature || '').trim() || !w.editor.setSignature) {
+			return;
+		}
+		w.editor.setSignature(id.signature);
+		w.signature = false;
+		w.sigEditedFor = id.id;
+		paintSignature(w);
+		w.changed();
+		toast(t('InboxComposeSignatureEdited'), { action: t('InboxUndo'), onAction: () => {
+			w.editor.removeSignature();
+			w.signature = true;
+			paintSignature(w);
+			w.changed();
+		} });
 	}
 	/**
 	 * Frame of the signature or of the quote at the height of its content (1.53.5): no scroll inside it, the writing
@@ -1692,8 +1721,30 @@
 		const win = w.dlg.getBoundingClientRect();
 		const top = box.top - win.top - bar.offsetHeight - 6;
 		bar.style.left = Math.max(4, Math.min((box.left + box.right) / 2 - win.left - bar.offsetWidth / 2, win.width - bar.offsetWidth - 4)) + 'px';
-		bar.style.top = (top < 40 ? Math.min(box.bottom - win.top + 6, win.height - bar.offsetHeight - 60) : top) + 'px';
+		bar.style.top = (top < bubbleMinTop(w, win) ? Math.min(box.bottom - win.top + 6, win.height - bar.offsetHeight - 60) : top) + 'px';
 		return true;
+	}
+
+	/**
+	 * Highest place of a bar over the text, from the top of the window: never over the toolbar nor what stands between
+	 * it and the text (variables, voice typing, AI), nor out of the part of the writing that scrolls
+	 */
+	function bubbleMinTop(w, win) {
+		const tops = [40];
+		const body = $('.ibx-compose__body', w.dlg);
+		const ed = $('.ibx-js-editor', w.dlg);
+		if (body) {
+			tops.push(body.getBoundingClientRect().top - win.top);
+		}
+		if (ed) {
+			tops.push(ed.getBoundingClientRect().top - win.top);
+		}
+		$$('.ibx-compose__tools, .ibx-js-vars, .ibx-js-dictbar, .ibx-js-ai', w.dlg).forEach(el => {
+			if (el.offsetParent !== null) {
+				tops.push(el.getBoundingClientRect().bottom - win.top);
+			}
+		});
+		return Math.max.apply(null, tops) + 4;
 	}
 
 	/** Small bar over the selected text: the formatting at hand, the menu of the browser (spelling) stays */
@@ -1749,8 +1800,8 @@
 		const win = w.dlg.getBoundingClientRect();
 		const top = box.top - win.top - bar.offsetHeight - 6;
 		bar.style.left = Math.max(4, Math.min((box.left + box.right) / 2 - win.left - bar.offsetWidth / 2, win.width - bar.offsetWidth - 4)) + 'px';
-		// Under the selection when there is no room above it (first line of the text)
-		bar.style.top = (top < 40 ? box.bottom - win.top + 6 : top) + 'px';
+		// Under the selection when above it would cover the toolbar (first lines of the text)
+		bar.style.top = (top < bubbleMinTop(w, win) ? box.bottom - win.top + 6 : top) + 'px';
 	}
 
 	function moreMenu(w, anchor) {
@@ -2249,7 +2300,11 @@
 			+ '<div class="ibx-compose__dictation ibx-js-dictbar" role="status" hidden></div>'
 			+ '<div class="ibx-compose__ai ibx-js-ai" role="region" aria-label="' + th('InboxAi') + '" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
-			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="allow-same-origin" title="' + th('InboxComposeSignature') + '"></iframe><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></div>'
+			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="allow-same-origin" title="' + th('InboxComposeSignature') + '"></iframe><span class="ibx-compose__sigtools">'
+				// Changed for this mail only (1.95.0): put in the text, the signature of the identity stays as it is
+				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigedit" title="' + th('InboxComposeSignatureEditHelp') + '" aria-label="' + th('InboxComposeSignatureEdit') + '">' + ic('edit') + '</button>'
+				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></span></div>'
+			+ '<div class="ibx-compose__warn ibx-compose__sigswap ibx-js-sigswap" role="status" hidden><span class="ibx-js-sigswaptext"></span><button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigswapbtn"></button></div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
 			+ (d.quote ? '<div class="ibx-compose__quote ibx-js-quote"><div class="ibx-compose__quotebar"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quotetoggle" aria-expanded="false">··· ' + th(w.mode === 'forward' ? 'InboxComposeShowForward' : 'InboxComposeShowQuote') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteoff">' + th(w.mode === 'forward' ? 'InboxComposeRemoveForward' : 'InboxComposeRemoveQuote') + '</button></div>'
@@ -2371,6 +2426,20 @@
 		});
 		$('.ibx-js-sigadd', dlg).addEventListener('click', () => {
 			w.signature = true;
+			paintSignature(w);
+			w.changed();
+		});
+		$('.ibx-js-sigedit', dlg).addEventListener('click', () => signatureEdit(w));
+		// Identity changed after the signature was changed: the one of the new identity in its place (Ctrl+Z), or none
+		$('.ibx-js-sigswapbtn', dlg).addEventListener('click', () => {
+			const id = identityOf(w);
+			if ((id.signature || '').trim()) {
+				w.editor.setSignature(id.signature);
+				w.sigEditedFor = id.id;
+			} else {
+				w.editor.removeSignature();
+				w.signature = true;
+			}
 			paintSignature(w);
 			w.changed();
 		});
@@ -2617,14 +2686,26 @@
 			q.hidden = true;
 			$('.ibx-js-quoteon', dlg).hidden = false;
 		}
+		// Name of a signature changed for this mail, over it in the text (css of the editor of inbox)
+		$('.ibx-js-editor', dlg).style.setProperty('--ibx-sig-label', JSON.stringify(t('InboxComposeSignatureEditedLabel')));
 		try {
-			w.editor = await I.editors.create($('.ibx-js-editor', dlg), { html: d.html || '', placeholder: t('InboxComposePlaceholder'), label: t('InboxComposeBody'), varToText: true });
+			w.editor = await I.editors.create($('.ibx-js-editor', dlg), { html: d.html || '', placeholder: t('InboxComposePlaceholder'), label: t('InboxComposeBody'), varToText: true,
+				nativeTools: $('.ibx-compose__tools', dlg), signatureLabel: t('InboxComposeSignatureEditedLabel') });
 		} catch (e) {
 			status(w, t('InboxComposeEditorFailed'), true);
 			w.editor = { getHtml: () => '', isEmpty: () => true, destroy() {}, focus() {}, exec() {}, isActive: () => false, on() {} };
 		}
+		// CKEditor with its own toolbar and menu (1.94.0): the bar of inbox keeps voice typing and the AI only
+		if (w.editor.getCapabilities && w.editor.getCapabilities().nativeToolbar) {
+			$('.ibx-compose__tools', dlg).classList.add('ibx-tools--native');
+		}
 		paintColorButtons(w);
 		paintTableButton(w);
+		// A draft whose signature was changed for it: kept in its text, for the identity it was written with
+		if (w.editor.hasSignature && w.editor.hasSignature()) {
+			w.sigEditedFor = identityOf(w).id;
+		}
+		paintSignature(w);
 		// A draft with variables of a template: they follow the recipient again (piece: the newest linked one)
 		if (w.editor.variables && w.editor.variables().length) {
 			const linked = d.linked || [];
@@ -2677,6 +2758,10 @@
 		w.editor.on('change', ev => {
 			paintColorButtons(w);
 			paintTableButton(w);
+			// The changed signature removed from the text by hand: the one of the identity offered again
+			if (w.editor.hasSignature && w.sigEditedShown !== w.editor.hasSignature()) {
+				paintSignature(w);
+			}
 			const al = $('[data-cmd="align"] .ibx-tbtn__icon', dlg);
 			const now = ['center', 'right'].find(v => w.editor.isActive('align', v)) || 'left';
 			if (al && al.dataset.align !== now) {

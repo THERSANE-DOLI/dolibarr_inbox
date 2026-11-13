@@ -149,7 +149,7 @@
 	I.registerSpace(space);
 
 	/** Sections of Settings > General (1.32.0): id of the route, icon, title; in the menu, on the phone, on the titles */
-	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['avatars', 'user-circle', 'InboxAvatars'],
+	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['editor', 'fmt-bold', 'InboxEditorSection'], ['avatars', 'user-circle', 'InboxAvatars'],
 		['ai', 'magic', 'InboxAiSection'], ['dictation', 'mic', 'InboxDictationSection'], ['search', 'search', 'InboxSectionSearch'], ['tags', 'tag', 'InboxGlobalTags']];
 	/** Sections of Settings > My account (1.32.0); the 4th value: shown only for some users, hidden until there */
 	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true], ['order', 'folders', 'InboxBoxOrderSection', true],
@@ -1902,7 +1902,7 @@
 		const tools = $('.ibx-js-sigtools', d);
 		let editor;
 		try {
-			editor = await I.editors.create(box, { html: ta.value, label: t('InboxIdentitySignature') });
+			editor = await I.editors.create(box, { html: ta.value, label: t('InboxIdentitySignature'), nativeTools: tools });
 		} catch (err) {
 			// No editor: the HTML source, as before
 			tools.hidden = true;
@@ -1910,6 +1910,10 @@
 			ta.hidden = false;
 			toast(t('InboxComposeEditorFailed'), { error: true });
 			return null;
+		}
+		// CKEditor with its own toolbar (1.94.0): the bar of inbox keeps the variables only
+		if (editor.getCapabilities().nativeToolbar) {
+			tools.classList.add('ibx-tools--native');
 		}
 		let source = false;
 		let varKeys = [];
@@ -1952,7 +1956,7 @@
 			} else if (cmd === 'image') {
 				urlDialog(t('InboxSignatureImage'), t('InboxSignatureImageUrl'), '', v => {
 					if (v) {
-						editor.raw().chain().focus().setImage({ src: v, alt: '' }).run();
+						editor.insertImage(v);
 					}
 				}, true);
 			} else if (cmd !== 'variable') {
@@ -2005,7 +2009,7 @@
 				return;
 			}
 			// Written as __KEY__, plain text, as Dolibarr and the other modules write their signatures
-			varPicker(pickBtn, varKeys, varValues, k => editor.raw().chain().focus().insertContent('__' + k + '__').run());
+			varPicker(pickBtn, varKeys, varValues, k => editor.insertText('__' + k + '__'));
 		});
 		return { sync, destroy: () => editor.destroy() };
 	}
@@ -2403,10 +2407,13 @@
 			$('.ibx-js-boxes', dlg).hidden = rb.value !== 'boxes' || !rb.checked;
 		}));
 		try {
-			editor = await I.editors.create($('.ibx-js-tpleditor', dlg), { html: tp.html, placeholder: t('InboxTemplateBodyPlaceholder'), label: t('InboxTemplateBody') });
+			editor = await I.editors.create($('.ibx-js-tpleditor', dlg), { html: tp.html, placeholder: t('InboxTemplateBodyPlaceholder'), label: t('InboxTemplateBody'), nativeTools: $('.ibx-tpledit__tools', dlg) });
 		} catch (err) {
 			toast(t('InboxComposeEditorFailed'), { error: true });
 			return;
+		}
+		if (editor.getCapabilities().nativeToolbar) {
+			$('.ibx-tpledit__tools', dlg).classList.add('ibx-tools--native');
 		}
 		$('.ibx-tpledit__tools', dlg).addEventListener('click', e => {
 			const b = e.target.closest('[data-cmd]');
@@ -3377,6 +3384,72 @@
 		load();
 	}
 
+	/**
+	 * Section « Writing editor » of Settings > General (1.94.0): the editor of inbox or the CKEditor of Dolibarr, and for
+	 * CKEditor the toolbar and menu of inbox or its own ones
+	 * @param {object} s     Settings
+	 * @param {object} info  {ckeditor: 1 when the module FCKeditor is on, module_label: its name in the setup}
+	 * @param {string} head  Title of the section
+	 * @returns {string}
+	 */
+	function editorSection(s, info, head) {
+		const editor = info.ckeditor && s.INBOX_EDITOR === 'ckeditor' ? 'ckeditor' : 'tiptap';
+		const radios = (name, current, options) => '<div class="ibx-inline" role="radiogroup" aria-labelledby="' + name + '-label">'
+			+ options.map(o => '<label class="ibx-radio"><input type="radio" name="' + name + '" value="' + o[0] + '"' + (o[0] === current ? ' checked' : '') + (o[2] ? ' disabled' : '') + '> ' + th(o[1]) + '</label>').join(' ') + '</div>';
+		return '<section class="ibx-section" data-section="editor">' + head
+			+ (info.ckeditor ? '' : '<div class="ibx-notice">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxEditorNoCkeditor', info.module_label) + '</div></div>')
+			+ '<div class="ibx-form ibx-js-editorset">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-editor-label">' + th('InboxEditorEngine') + '</span><div>'
+			+ radios('g-editor', editor, [['tiptap', 'InboxEditor_tiptap'], ['ckeditor', 'InboxEditor_ckeditor', !info.ckeditor]])
+			+ '<div class="ibx-formrow__help">' + th('InboxEditorHelp') + '</div></div></div>'
+			+ '<div class="ibx-formrow ibx-js-ckbar"' + (editor === 'ckeditor' ? '' : ' hidden') + '><span class="ibx-formrow__label" id="g-ckbar-label">' + th('InboxCkeditorBar') + '</span><div>'
+			+ radios('g-ckbar', s.INBOX_CKEDITOR_NATIVE === '1' ? '1' : '0', [['0', 'InboxCkeditorBar_inbox'], ['1', 'InboxCkeditorBar_native']])
+			+ '<div class="ibx-formrow__help">' + th('InboxCkeditorBarHelp') + '</div></div></div>'
+			+ '</div></section>';
+	}
+	/** The choices of the editor saved at once; the writings opened next use them (no page to load again) */
+	function bindEditorSection(main, s, info) {
+		const box = $('.ibx-js-editorset', main);
+		if (!box) {
+			return;
+		}
+		const locked = s.locked || [];
+		$$('[name="g-editor"]', box).forEach(rb => {
+			rb.disabled = rb.disabled || locked.includes('INBOX_EDITOR');
+		});
+		$$('[name="g-ckbar"]', box).forEach(rb => {
+			rb.disabled = locked.includes('INBOX_CKEDITOR_NATIVE');
+		});
+		const save = async (name, value, ctxValue, back) => {
+			try {
+				await post('general', 'set', { name, value });
+			} catch (err) {
+				back();
+				toast(err.message, { error: true });
+				return;
+			}
+			s[name] = value;
+			if (I.editors) {
+				I.editors.choose(name, ctxValue);
+			}
+			toast(t('InboxEditorSaved'));
+		};
+		$$('[name="g-editor"]', box).forEach(rb => rb.addEventListener('change', () => {
+			const before = s.INBOX_EDITOR === 'ckeditor' && info.ckeditor ? 'ckeditor' : 'tiptap';
+			$('.ibx-js-ckbar', box).hidden = rb.value !== 'ckeditor';
+			save('INBOX_EDITOR', rb.value, rb.value, () => {
+				$('[name="g-editor"][value="' + before + '"]', box).checked = true;
+				$('.ibx-js-ckbar', box).hidden = before !== 'ckeditor';
+			});
+		}));
+		$$('[name="g-ckbar"]', box).forEach(rb => rb.addEventListener('change', () => {
+			const before = s.INBOX_CKEDITOR_NATIVE === '1' ? '1' : '0';
+			save('INBOX_CKEDITOR_NATIVE', rb.value, rb.value === '1', () => {
+				$('[name="g-ckbar"][value="' + before + '"]', box).checked = true;
+			});
+		}));
+	}
+
 	/** Fields of the general settings (General, Security): a value saved when changed, a switch at once */
 	/**
 	 * @param {HTMLElement} main   Screen
@@ -3798,11 +3871,13 @@
 		main.innerHTML = skeleton();
 		let s;
 		let aiModule = 0;
+		let editorInfo = { ckeditor: 0, module_label: '' };
 		try {
 			const g = await api('general', 'get');
 			s = g.settings;
 			s.locked = g.locked || [];
 			aiModule = g.ai_module;
+			editorInfo = g.editor || editorInfo;
 		} catch (err) {
 			main.replaceChildren(errorBox(err, () => renderGeneral(main, parts)));
 			return;
@@ -3841,6 +3916,8 @@
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_SEND_AUTOCOPY" aria-checked="' + (s.INBOX_SEND_AUTOCOPY === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxSendAutocopy') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxSendAutocopyHelp') + '</div></div></div>'
 			+ '</div></section>'
+			// Editor of the writing (1.94.0): the one of inbox, or the CKEditor of Dolibarr (module FCKeditor on)
+			+ editorSection(s, editorInfo, title('editor'))
 			+ '<section class="ibx-section" data-section="avatars">' + title('avatars') + '<p class="ibx-section__help">' + th('InboxAvatarsHelp') + '</p><div class="ibx-form">'
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
@@ -3926,6 +4003,7 @@
 		$$('[name="g-greys"]', look).forEach(rb => rb.addEventListener('change', () => saveLook('INBOX_GREYS', greysValue())));
 		// Saved field by field, at once (as the switches), with a toast
 		bindGeneralFields(main, s.locked);
+		bindEditorSection(main, s, editorInfo);
 		tabTags($('.ibx-js-tags', main), null);
 		renderWhisperSettings($('.ibx-js-whisper', main));
 		const searchDone = renderSearchSettings($('.ibx-js-searchsettings', main));
@@ -5180,8 +5258,12 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-read_delay">' + th('InboxReadDelay') + '</label><div class="ibx-inline"><input class="ibx-field ibx-field--narrow" type="number" min="0" max="600" inputmode="numeric" data-param="read_delay" id="me-read_delay" value="' + esc(p.read_delay) + '"> ' + th('InboxSeconds') + '</div></div>'
 			// Trash and junk marked read (1.90.0): also with « at once », a mail can leave the list without being opened
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxReadOnTrash') + '</span><div>'
-			+ '<button type="button" class="ibx-switch ibx-js-readtrash" role="switch" aria-checked="' + (p.read_on_trash === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxReadOnTrash') + '"></button>'
+			+ '<button type="button" class="ibx-switch ibx-js-readswitch" data-readparam="read_on_trash" role="switch" aria-checked="' + (p.read_on_trash === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxReadOnTrash') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxReadOnTrashHelp') + '</div></div></div>'
+			// Archived marked read (1.96.0): a setting of its own
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxReadOnArchive') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-readswitch" data-readparam="read_on_archive" role="switch" aria-checked="' + (p.read_on_archive === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxReadOnArchive') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxReadOnArchiveHelp') + '</div></div></div>'
 			// Read receipts asked (lot W8 1.22.0): never sent without a click
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-mdn_mode">' + th('InboxMdnMode') + '</label><div>' + opt('mdn_mode', ['ask', 'never'], p.mdn_mode) + '<div class="ibx-formrow__help">' + th('InboxMdnModeHelp') + '</div></div></div>'
 			+ '</div></section>';
@@ -5280,20 +5362,19 @@
 				}
 			});
 		}
-		const readTrash = $('.ibx-js-readtrash', main);
-		readTrash.addEventListener('click', async () => {
-			const on = readTrash.getAttribute('aria-checked') !== 'true';
+		$$('.ibx-js-readswitch', main).forEach(sw => sw.addEventListener('click', async () => {
+			const on = sw.getAttribute('aria-checked') !== 'true';
 			// Shown at once, put back if the server refuses
-			readTrash.setAttribute('aria-checked', on ? 'true' : 'false');
+			sw.setAttribute('aria-checked', on ? 'true' : 'false');
 			try {
-				const r = await post('userparam', 'set', { id: 0, param: 'read_on_trash', value: on ? '1' : '0' });
+				const r = await post('userparam', 'set', { id: 0, param: sw.dataset.readparam, value: on ? '1' : '0' });
 				Dolibarr.executeHook('inbox:params:changed', r.params);
 				toast(t('InboxSaved'));
 			} catch (err) {
-				readTrash.setAttribute('aria-checked', on ? 'false' : 'true');
+				sw.setAttribute('aria-checked', on ? 'false' : 'true');
 				toast(err.message, { error: true });
 			}
-		});
+		}));
 		$$('[data-param]', main).forEach(f => {
 			const evt = f.type === 'range' ? 'change' : 'change';
 			if (f.type === 'range') {

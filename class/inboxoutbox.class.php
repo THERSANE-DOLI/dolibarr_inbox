@@ -459,7 +459,7 @@ class InboxOutbox
 			libxml_clear_errors();
 			libxml_use_internal_errors($previous);
 			$xp = new DOMXPath($doc);
-			$marked = $xp->query('//*[contains(concat(" ", normalize-space(@class), " "), " inbox-quote ") or contains(concat(" ", normalize-space(@class), " "), " inbox-signature ")]');
+			$marked = $xp->query('//*[contains(concat(" ", normalize-space(@class), " "), " inbox-quote ") or contains(concat(" ", normalize-space(@class), " "), " inbox-signature ") or contains(concat(" ", normalize-space(@class), " "), " inbox-signature-edited ")]');
 			foreach (iterator_to_array($marked) as $n) {
 				if ($n->parentNode) {
 					$n->parentNode->removeChild($n);

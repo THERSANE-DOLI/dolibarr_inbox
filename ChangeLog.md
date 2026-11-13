@@ -1,5 +1,47 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: mails got now from the list :   1.97.0
+  - a « Get mails now » button (round arrow) in the head of the list, instead of waiting for the next automatic pass
+    (about 20 s): the folder open only (the Inbox of a mailbox clicked included), else, in a view (unified inbox,
+    unread...), the Inbox of each mailbox of the view; called by the tab clicked itself (under a second), the other
+    tabs of the browser updated after.
+  - a folder got again 3 s after its last synchronisation at least, never at each click.
+
+- FIX: unsubscribe refused by the site of the list, the mail or the page of the list offered :   1.96.1
+  - when the site of the list refuses the one-click request (an anti-bot wall answering HTTP 403 to any server), a
+    dialog offers instead of an error only: the unsubscribe mail to the address of the list (mailto), prepared,
+    checked and sent by the user, and the unsubscribe page of the sender opened in a new tab (a browser passes the
+    wall; the sender then sees the IP address and the browser, said in the dialog).
+
+- NEW: archived mails marked read :   1.96.0
+  - My account > Reading: « Mark as read what I archive », a setting of its own beside the one of the trash and junk
+    (on by default): an archived mail no longer counts among the unread mails of the archives.
+  - « Undo » in the toast gives the mail back to its folder, unread again.
+
+- NEW: signature changed for one mail :   1.95.0
+  - a pencil beside the ✕ of the signature in the writing: the signature goes into the text, framed and named
+    « Signature changed for this mail », to change a phone number, remove a line...; the signature of the identity
+    stays as it is. « Undo » in the toast brings back the signature that follows the identity.
+  - the identity changed after: the changed signature stays (never lost), a bar offers to replace it by the one of
+    the new identity (Ctrl+Z takes it back), or to remove it when the new identity has none.
+  - kept in the drafts as changed, sent once, with the « -- » delimiter of the text part; same with the Inbox editor
+    and CKEditor (both modes).
+  - Inbox editor: the cells keep a border on one side with its own width and colour (the bar of a signature) and a
+    spacing on one side only as written, and a bold or an italic its own style (colour), instead of the grid of the
+    editor.
+
+- NEW: the CKEditor of Dolibarr as writing editor :   1.94.0
+  - Settings > General > Writing editor: the Inbox editor (default) or the CKEditor of Dolibarr, offered when the
+    module « WYSIWYG editor » is on with CKEditor; for the writing, the signatures and the templates.
+  - CKEditor with the toolbar, menus and bubbles of Inbox (default): tables and their properties, pictures and their
+    sizes, colours, links, variables of the templates as chips, AI and voice typing as with the Inbox editor.
+  - option « Toolbar and context menu: those of CKEditor »: the classic CKEditor of Dolibarr, its panels and dialogs
+    shown above the dialogs of Inbox; voice typing, AI and the variables are buttons of its toolbar (last group).
+  - the choice applies to the writings opened next, without loading the page again; when CKEditor cannot start, the
+    writing opens with the Inbox editor.
+  - the bars over a selection or a picture go under it when above they would cover the toolbar (text on the first
+    lines), whatever the editor.
+
 - NEW: archive notifications of the bell :   1.93.0
   - an « Archive » button on each notification (on hover or focus, always on touch screens), and « Archive all » in
     the head of the panel.

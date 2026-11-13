@@ -23,6 +23,7 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once __DIR__.'/../lib/inboxapp.lib.php';
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart($action === 'set');
@@ -65,6 +66,10 @@ function inboxGeneralSettings()
 		// AI in the writing (1.27.0): off by default; the mail answered may go with a request (allowed by default)
 		'INBOX_AI_ENABLED' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 		'INBOX_AI_WITH_MAIL' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
+		// Editor of the writing (1.94.0): the one of inbox, or the CKEditor of Dolibarr driven by the toolbar of inbox or
+		// with its own toolbar and menu (INBOX_CKEDITOR_NATIVE)
+		'INBOX_EDITOR' => array('right' => 'manager', 'default' => 'tiptap', 'check' => array('tiptap', 'ckeditor')),
+		'INBOX_CKEDITOR_NATIVE' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 		// Voice typing (1.28.0): off by default; each user then agrees once per receiver of the voice
 		'INBOX_DICTATION_ENABLED' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 		// Security (lot F1 1.78.0): remote pictures of a quote (the tracking ones always go), « always show the
@@ -149,7 +154,10 @@ switch ($action) {
 		$locked = array_keys(array_filter($settings, function ($def) {
 			return !inboxGeneralAllowed($def);
 		}));
-		inboxAjaxReply(array('settings' => $out, 'ai_module' => isModEnabled('ai') ? 1 : 0, 'locked' => $locked));
+		// The CKEditor of Dolibarr can be chosen (module FCKeditor on), the name of that module in the setup of Dolibarr
+		$langs->load('admin');
+		$editor = array('ckeditor' => inboxCkeditorAvailable() ? 1 : 0, 'module_label' => $langs->transnoentities('Module2000Name'));
+		inboxAjaxReply(array('settings' => $out, 'ai_module' => isModEnabled('ai') ? 1 : 0, 'locked' => $locked, 'editor' => $editor));
 		// no break
 
 	case 'set':

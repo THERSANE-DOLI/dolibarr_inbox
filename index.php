@@ -81,6 +81,8 @@ $asset = function ($path) use ($version) {
 };
 // Editor of the writing (lot W6): loaded only when a writing opens
 $vars['INBOX_EDITOR_URL'] = $asset('/js/vendor/tiptap/tiptap.min.js');
+// Or the CKEditor of Dolibarr (1.94.0, Settings > General)
+$vars = array_merge($vars, inboxEditorContextVars());
 // QR code reader when the browser has none (import of the mailboxes, 1.24.0): loaded at the first image
 $vars['INBOX_JSQR_URL'] = $asset('/js/vendor/jsqr/jsQR.js');
 $title = $langs->trans('InboxAppName').($vars['INBOX_COMPANY'] !== '' ? ' '.$vars['INBOX_COMPANY'] : '');

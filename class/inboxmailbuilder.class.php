@@ -237,8 +237,9 @@ class InboxMailBuilder
 				if ($name === 'data-inbox-var') {
 					$keep = $keepVars && $tag === 'span' && preg_match('/^[A-Z0-9_]{1,64}$/', $value);
 				} elseif ($name === 'class') {
-					// Only the marks of inbox (a draft reopened finds its quote and signature again)
-					$keep = in_array($value, array('inbox-quote', 'inbox-signature'), true);
+					// Only the marks of inbox (a draft reopened finds its quote and signature again; a signature changed for one
+					// mail, 1.95.0, stays in its text)
+					$keep = in_array($value, array('inbox-quote', 'inbox-signature', 'inbox-signature-edited'), true);
 				} elseif ($keep && $name === 'href') {
 					// A web address in full, a mail, a phone number (no other scheme hidden after it, audit INBX-038)
 					$keep = (bool) preg_match('#^(https?://|mailto:|tel:[^:]{1,64}$|\#)#i', $value);
@@ -302,7 +303,7 @@ class InboxMailBuilder
 		}, (string) $html);
 		// The signature delimiter of the text mails (RFC 3676 4.3: « -- » and a space alone on its line), written by a
 		// mark that the cleaning of the trailing spaces leaves
-		$html = preg_replace('#<div\b[^>]*class="inbox-signature"[^>]*>(\s*--\s*(<br\s*/?>)?)?#i', "\nINBOXSIGDELIM\n", $html);
+		$html = preg_replace('#<div\b[^>]*class="inbox-signature(?:-edited)?"[^>]*>(\s*--\s*(<br\s*/?>)?)?#i', "\nINBOXSIGDELIM\n", $html);
 		$html = preg_replace('#<li\b[^>]*>#i', "\n- ", $html);
 		$html = preg_replace('#<(p|div|h\d|tr|blockquote|ul|ol|pre|table)\b[^>]*>#i', "\n", $html);
 		// Quotes: each line of a blockquote starts with « > »

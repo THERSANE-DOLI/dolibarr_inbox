@@ -59,6 +59,9 @@ class InboxReader
 	/** @var string Level of the user on the mailbox */
 	public $level = '';
 
+	/** @var string Unsubscribe page of the list (https, signed header) when its site refused the one-click POST */
+	public $unsubscribePage = '';
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -731,6 +734,9 @@ class InboxReader
 			dol_syslog(__METHOD__.' '.$code.' '.($res['curl_error_msg'] ?? '').' '.dol_trunc((string) ($res['content'] ?? ''), 200), LOG_WARNING);
 			// No text of the network said (it would tell what answers inside): the code only (audit INBX-009)
 			$this->error = $code > 0 ? 'HTTP '.$code : 'no answer';
+			// An anti-bot wall refuses any server but lets a browser in: the page may be opened by the user himself,
+			// in a new tab and when he chooses it (checked above: https, header signed by DKIM)
+			$this->unsubscribePage = $info['https'];
 			return 'InboxErrorUnsubscribeFailed';
 		}
 		InboxActionLog::add($this->db, $user, (int) $this->row->fk_account, 'unsubscribe', array($this->row), (string) $this->row->folder_path, '', 0,

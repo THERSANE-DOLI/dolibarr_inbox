@@ -3837,8 +3837,8 @@
 				return;
 			}
 			a.to.add(f.id);
-			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user)
-			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
+			// Trash and junk: the mail is marked read on the way (1.90.0, setting of the user); archive: own setting (1.96.0)
+			const unread = seenOf(r) || ((f.role === 'trash' || f.role === 'junk') && params.read_on_trash !== '0') || (what === 'archive' && params.read_on_archive !== '0') ? 0 : (r.thread && n > 1 ? (r.thread.unread || 0) : 1);
 			f.total = (f.total || 0) + n;
 			f.unread = (f.unread || 0) + unread;
 			a.added.push({ f, n, unread });
@@ -5054,6 +5054,27 @@
 			await post('mail', 'unsubscribe', { id: m.id });
 		} catch (err) {
 			btn.removeAttribute('aria-disabled');
+			// The site of the list refused the POST (often an anti-bot wall answering 403 to any server, a browser
+			// passes): the mail of the list (RFC 2369 mailto) prepared and sent by the user, or its page opened by
+			// the user in a new tab (the sender then sees his IP and browser, said in the text)
+			const page = err.code === 'InboxErrorUnsubscribeFailed' ? String((err.data && err.data.page) || '') : '';
+			const byMail = err.code === 'InboxErrorUnsubscribeFailed' && m.unsubscribe.mailto && I.compose;
+			if (byMail || /^https:\/\//i.test(page)) {
+				const actions = [];
+				if (/^https:\/\//i.test(page)) {
+					actions.push({ label: t('InboxUnsubscribeOpenPage'), primary: !byMail, run: () => {
+						window.open(page, '_blank', 'noopener,noreferrer');
+					} });
+				}
+				if (byMail) {
+					actions.push({ label: t('InboxUnsubscribePrepare'), primary: true, run: () => {
+						I.compose({ mode: 'unsubscribe', mail: m.id });
+					} });
+				}
+				const key = byMail && actions.length > 1 ? 'InboxUnsubscribeFallbackText' : (byMail ? 'InboxUnsubscribeFallbackMailText' : 'InboxUnsubscribeFallbackPageText');
+				dialog({ title: t('InboxUnsubscribeTitle'), body: '<p>' + th(key, err.message) + '</p>', actions });
+				return;
+			}
 			toast(err.message, { error: true });
 			return;
 		}
@@ -10043,6 +10064,70 @@
 			I.channel.post({ type: 'sync-request', folder: folderId || 0, now: !!now });
 		}
 	}
+	/**
+	 * « Refresh » of the list (1.97.0): the folder open only, else (a view) the Inbox of each mailbox of the view,
+	 * synchronised now by this tab, the button turning until they are done; protected mailboxes read live are only
+	 * listed again
+	 */
+	async function refreshNow() {
+		const btn = S.el && $('.ibx-js-refresh', S.el);
+		if (!btn || btn.getAttribute('aria-busy') === 'true') {
+			return;
+		}
+		btn.setAttribute('aria-busy', 'true');
+		const started = Date.now();
+		const live = e => e.account.protected && e.account.protect_level === 'content';
+		const ids = [];
+		const add = id => {
+			const e = S.folders.get(id);
+			if (e && !live(e) && !ids.includes(id)) {
+				ids.push(id);
+			}
+		};
+		if (S.scope === 'folder' && S.folderId) {
+			// A folder open (the Inbox of a mailbox clicked included): this folder only
+			add(S.folderId);
+		} else {
+			// A view over the mailboxes (unified inbox, unread, followed...): the Inbox of each of its mailboxes, never
+			// all their folders (too long for a click; the others follow at the automatic passes)
+			const only = S.vview && S.vAccounts.length ? S.vAccounts.map(Number) : null;
+			S.accounts.filter(a => !only || only.includes(a.id)).forEach(a => {
+				const f = boxInbox(a);
+				if (f) {
+					add(f.id);
+				}
+			});
+		}
+		// Called by this tab itself, never through the leader tab: the leader may be busy with an automatic pass (up to
+		// 10 s) or slowed down by the browser in the background, the click waited for it (10 to 16 s measured for a
+		// folder synchronised in 0.2 s). The lock per mailbox of the server keeps one pass at a time; a pass of the
+		// leader on the same mailbox makes the folder skipped, asked again a moment later (3 tries)
+		let changed = false;
+		for (const folder of ids) {
+			for (let i = 0; i < 3; i++) {
+				try {
+					const r = await post('list', 'pump', { folder, force: 1 });
+					changed = changed || !!(r.stats && (r.stats.new || r.stats.changed || r.stats.deleted));
+					if (r.skipped !== 'busy') {
+						break;
+					}
+				} catch (err) {
+					break;
+				}
+				await new Promise(resolve => setTimeout(resolve, 1000));
+			}
+		}
+		if (changed) {
+			I.channel.post({ type: 'synced' });
+		}
+		await poll();
+		// Views over several mailboxes and folders read live: no stamp of the folder to follow, listed again
+		if (S.q === '' && (S.scope !== 'folder' || (S.folderId && live(S.folders.get(S.folderId) || { account: {} })))) {
+			await loadList(true);
+		}
+		// Seen turning at least a moment, else the click looks lost
+		setTimeout(() => btn.removeAttribute('aria-busy'), Math.max(0, 600 - (Date.now() - started)));
+	}
 	function pumpSoon(ms) {
 		clearTimeout(relay.timer);
 		relay.timer = setTimeout(pump, ms);
@@ -10504,6 +10589,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-back ibx-mobileonly" data-to="folders" aria-label="' + th('InboxFolders') + '">' + ic('chevron-left') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--toggle ibx-js-togglefolders ibx-desktoponly" aria-pressed="false">' + ic('folders-hide') + '</button>'
 			+ '<span class="ibx-pane__title ibx-ellipsis ibx-js-listtitle" role="heading" aria-level="1"></span><span class="ibx-spacer"></span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-refresh" title="' + th('InboxRefreshMails') + '" aria-label="' + th('InboxRefreshMails') + '">' + ic('refresh') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
 			// Search field opening into a panel (lot W7 1.19.0)
@@ -10656,6 +10742,7 @@
 			renderList();
 			renderListHead();
 		});
+		$('.ibx-js-refresh', el).addEventListener('click', () => refreshNow());
 		$('.ibx-js-listmenu', el).addEventListener('click', e => {
 			const cur = params.list_sort || 'date:desc';
 			const opt = (v, k) => ({ label: t(k), checked: cur === v, run: () => setSort(v) });
