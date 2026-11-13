@@ -1248,6 +1248,8 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 /* ---------- Tags and colour blindness (settings, tab Tags) ---------- */
 .ibx-tagrisk { display: inline-flex; vertical-align: middle; margin-left: var(--ibx-s2); color: var(--ibx-warning); }
 .ibx-tagrisk[hidden] { display: none; }
+/* Mailbox in global mode: the ways out of the read-only global list (own list, or Settings > General) */
+.ibx-tagsglobal__actions { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); margin-top: var(--ibx-s2); }
 .ibx-notice__list { margin: var(--ibx-s1) 0 var(--ibx-s2); padding-left: 1.25rem; }
 .ibx-palettes { display: grid; gap: var(--ibx-s3); }
 .ibx-palette {

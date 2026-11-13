@@ -37,6 +37,11 @@ if ($accountId > 0) {
 }
 // List changed: the own list of the mailbox, or the global one
 $listId = ($account && $account->tags_mode === 'own') ? (int) $account->id : 0;
+// A mailbox in global mode never changes the global list, admins included: from a mailbox, a change looked local
+// while it applied to every mailbox. The global list is changed in Settings > General only (call without mailbox).
+if ($account && $listId === 0 && in_array($action, array('create', 'update', 'delete', 'reorder'), true)) {
+	inboxAjaxError($langs->transnoentities('InboxTagsGlobalNotHere'), 403);
+}
 
 /**
  * @param InboxTag          $tags    Helper
@@ -46,7 +51,9 @@ $listId = ($account && $account->tags_mode === 'own') ? (int) $account->id : 0;
 function inboxTagReply(InboxTag $tags, $account)
 {
 	if ($account) {
-		return array('mode' => $account->tags_mode, 'tags' => $tags->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), 'global' => $tags->listTags(0));
+		// own_kept: an own list left when the mailbox went back to global, taken again if it goes own again
+		return array('mode' => $account->tags_mode, 'tags' => $tags->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), 'global' => $tags->listTags(0),
+			'own_kept' => $account->tags_mode !== 'own' && count($tags->listTags((int) $account->id)) > 0);
 	}
 
 	return array('mode' => 'global', 'tags' => $tags->listTags(0));
@@ -58,10 +65,6 @@ switch ($action) {
 		// no break
 
 	case 'create':
-		if ($account && $account->tags_mode !== 'own') {
-			// The global list is changed in Settings > General, not from a mailbox
-			inboxAjaxNeedAdmin();
-		}
 		$result = $tags->create($user, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), $listId, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'));
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($tags->error), 422);
@@ -76,9 +79,6 @@ switch ($action) {
 		if (!in_array($tagId, $known, true)) {
 			inboxAjaxNotFound();
 		}
-		if ($account && $listId === 0) {
-			inboxAjaxNeedAdmin();
-		}
 		$result = $action === 'update'
 			? $tags->update($user, $tagId, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), inboxAjaxParam('status', 'int') ? 1 : 0, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'))
 			: $tags->delete($tagId);
@@ -89,9 +89,6 @@ switch ($action) {
 		// no break
 
 	case 'reorder':
-		if ($account && $listId === 0) {
-			inboxAjaxNeedAdmin();
-		}
 		$ids = inboxAjaxParam('ids', 'none');
 		$tags->reorder($listId, array_map('intval', is_array($ids) ? $ids : array()));
 		inboxAjaxReply(inboxTagReply($tags, $account));
