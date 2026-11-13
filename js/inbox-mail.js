@@ -5258,6 +5258,72 @@
 			});
 		}
 	}
+	/**
+	 * A part of the page shown as a sheet rising from the bottom (phone): over a veil, closed by the veil, Escape, its
+	 * close button or a swipe down on its head, the focus back on the button that opened it
+	 * @param {HTMLElement} el        Part
+	 * @param {HTMLElement} from      Button that opened it
+	 * @param {string}      headSel   Its head (swipe)
+	 * @param {string}      closeSel  Its close button (focused)
+	 */
+	function openSheet(el, from, headSel, closeSel) {
+		$$('.ibx-sheetback', S.el).forEach(v => v.remove());
+		const veil = document.createElement('div');
+		veil.className = 'ibx-sheetback';
+		veil.addEventListener('click', () => closeSheet(el));
+		el.before(veil);
+		el._sheetFrom = from || null;
+		el.setAttribute('role', 'dialog');
+		el.setAttribute('aria-modal', 'true');
+		el.classList.add('is-sheet', 'is-anim', 'is-open');
+		const close = $(closeSel, el);
+		if (close) {
+			close.focus({ preventScroll: true });
+		}
+		if (el._sheetBound) {
+			return;
+		}
+		el._sheetBound = true;
+		el.addEventListener('keydown', e => {
+			if (e.key === 'Escape' && el.classList.contains('is-open')) {
+				e.stopPropagation();
+				closeSheet(el);
+			}
+		});
+		el.addEventListener('pointerdown', e => {
+			if (!e.target.closest(headSel) || e.target.closest('button') || !el.classList.contains('is-open')) {
+				return;
+			}
+			const y0 = e.clientY;
+			let dy = 0;
+			el.style.transition = 'none';
+			const move = ev => {
+				dy = Math.max(0, ev.clientY - y0);
+				el.style.transform = 'translateY(' + dy + 'px)';
+			};
+			const up = () => {
+				window.removeEventListener('pointermove', move);
+				window.removeEventListener('pointerup', up);
+				el.style.transition = '';
+				el.style.transform = '';
+				if (dy > 80) {
+					closeSheet(el);
+				}
+			};
+			window.addEventListener('pointermove', move);
+			window.addEventListener('pointerup', up);
+		});
+	}
+	function closeSheet(el) {
+		el.classList.remove('is-open');
+		el.removeAttribute('role');
+		el.removeAttribute('aria-modal');
+		$$('.ibx-sheetback', S.el).forEach(v => v.remove());
+		if (el._sheetFrom && el._sheetFrom.isConnected) {
+			el._sheetFrom.focus({ preventScroll: true });
+		}
+		el._sheetFrom = null;
+	}
 	function closeDolSheet(box) {
 		box.classList.remove('is-open');
 		box.removeAttribute('role');
@@ -7974,8 +8040,11 @@
 				+ ' sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" loading="eager" src="' + bodyUrl(m, m.body.images) + '"></iframe>')
 			+ '</div>'
 			// Foot of the reading, stuck at the bottom (1.26.0): the answer at hand, then the attachments on the same line
-			+ ((files || quick) ? '<section class="ibx-attbar' + (opts.inline ? ' ibx-attbar--inline' : '') + (files ? '' : ' ibx-attbar--answers') + '" aria-label="' + th(files ? 'InboxAttachments' : 'InboxQuickReply') + '"><div class="ibx-attbar__head">'
+			+ ((files || quick) ? '<section class="ibx-attbar' + (opts.inline ? ' ibx-attbar--inline' : '') + (files ? ' ibx-attbar--files' : ' ibx-attbar--answers') + '" aria-label="' + th(files ? 'InboxAttachments' : 'InboxQuickReply') + '"><div class="ibx-attbar__head">'
 				+ quick
+				// Phone (UX fix series): a paper clip with the count opens the list as a sheet rising from the bottom
+				+ (files ? '<button type="button" class="ibx-btn ibx-attbar__clip ibx-js-attsheet" aria-haspopup="dialog" title="' + th('InboxAttachmentsCount', files) + '" aria-label="' + th('InboxAttachmentsCount', files) + '">'
+					+ ic('attachment') + '<span class="ibx-attbar__count" aria-hidden="true">' + files + '</span></button>' : '')
 				+ (files ? '<button type="button" class="ibx-attbar__toggle ibx-js-atttoggle" aria-expanded="' + open + '">' + ic(open ? 'chevron-down' : 'chevron-right') + ic('attachment')
 				+ '<b>' + th('InboxAttachmentsCount', files) + '</b> <span class="ibx-muted">' + esc(size(total)) + '</span>'
 				+ '<span class="ibx-attbar__names ibx-ellipsis ibx-muted">' + esc(att.map(a => a.name).join(', ')) + '</span></button>'
@@ -7984,7 +8053,12 @@
 				// Its name hides on a narrow pane: kept as title and accessible name
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-saveall" title="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '" aria-label="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '">'
 				+ ic('download-all') + '<span class="ibx-attbar__savelabel">' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '</span></button>' : '') + '</div>'
-				+ (files ? '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>' + att.map((a, i) => tile(a, i)).join('') + '</div>' : '') + '</section>' : '');
+				+ (files ? '<div class="ibx-attachments"' + (open ? '' : ' hidden') + '>'
+					+ '<div class="ibx-attsheet__head ibx-js-attsheethead"><span class="ibx-dolsheet__grip" aria-hidden="true"></span>' + ic('attachment')
+					+ '<b>' + th('InboxAttachmentsCount', files) + '</b> <span class="ibx-muted">' + esc(size(total)) + '</span>'
+					+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-attsaveall" title="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '" aria-label="' + th(files > 1 ? 'InboxSaveAllZip' : 'InboxSave') + '">' + ic('download-all') + '</button>'
+					+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-attsheetclose" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
+					+ att.map((a, i) => tile(a, i)).join('') + '</div>' : '') + '</section>' : '');
 	}
 
 	/**
@@ -8187,6 +8261,10 @@
 				saveParam('attachments_open', open ? '1' : '0');
 			});
 			$('.ibx-js-saveall', pane).addEventListener('click', () => saveAll(m));
+			const list = $('.ibx-attachments', pane);
+			$('.ibx-js-attsaveall', pane).addEventListener('click', () => saveAll(m));
+			$('.ibx-js-attsheetclose', pane).addEventListener('click', () => closeSheet(list));
+			$('.ibx-js-attsheet', pane).addEventListener('click', e => openSheet(list, e.currentTarget, '.ibx-js-attsheethead', '.ibx-js-attsheetclose'));
 			$('.ibx-attachments', pane).addEventListener('click', e => {
 				const tileEl = e.target.closest('[data-att]');
 				if (!tileEl) {

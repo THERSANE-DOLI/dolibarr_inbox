@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: attachments of a mail in a sheet on a phone :   1.102.6
+  - the bar at the bottom keeps one line: the answers (the icon above its name, the same width) and a paper clip with
+    the count of the files; the list of the files rises from the bottom as a sheet, as the Dolibarr part (save all,
+    close, a tap on the veil, Escape or a swipe down). Unfolded in the page, it took about 180 px of the reading.
+
 - FIX: a mail scrolls as one page on phones and tablets :   1.102.5
   - its head, the chips, the subject, the banners, the Dolibarr part in place (tablet) and the body move up
     together under the row « back, actions »; the bar of the answers and attachments stays at the bottom. Only the
