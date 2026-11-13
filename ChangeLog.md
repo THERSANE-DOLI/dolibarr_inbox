@@ -1,5 +1,22 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a mail scrolls as one page on phones and tablets :   1.102.5
+  - its head, the chips, the subject, the banners, the Dolibarr part in place (tablet) and the body move up
+    together under the row « back, actions »; the bar of the answers and attachments stays at the bottom. Only the
+    body scrolled before, in a slit of about 130 px on a phone. A computer keeps the head fixed.
+
+- FIX: line of the recipients on one line on a phone :   1.102.4
+  - « To … · received on … » cut with « … » on one line; a tap opens it whole, a second one closes it (a tap on a
+    name still opens its card).
+
+- FIX: short date beside the name in the head of a mail on a phone :   1.102.3
+  - « 09:12 », « Yesterday 15:10 », « Wed 11:00 », then the day and month with the time, the year only when it is not
+    this one; the full date stays as tooltip and for screen readers. It took a line of its own.
+
+- FIX: top bar of the application hidden while a mail is read on phones and tablets :   1.102.2
+  - reading is a task screen: the bar (theme, bell, settings) shows on the folders and the list only, the row
+    « back, actions » becomes the first line. Unread notifications put a dot on the back arrow meanwhile.
+
 - FIX: Dolibarr sheet hidden at once when a mail opens on a phone :   1.102.1
   - the part showed in place while it loaded, then slid down to hide; it is now a hidden sheet from the start, the
     slide kept for the openings and closings asked by the user. A loading error stays shown in place.

@@ -186,6 +186,24 @@
 		}
 		return d.toLocaleDateString(locale(), d.getFullYear() === now.getFullYear() ? { day: '2-digit', month: '2-digit' } : { day: '2-digit', month: '2-digit', year: '2-digit' });
 	}
+	/**
+	 * Date of the head of a mail on a phone (UX fix series): as the list for the last days (time, « yesterday », weekday),
+	 * then day and month with the time, the year only when it is not this one
+	 */
+	function headDate(ts) {
+		if (!ts) {
+			return '';
+		}
+		const d = new Date(ts * 1000);
+		const now = new Date();
+		const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+		if (Math.round((day(now) - day(d)) / 86400000) < 7) {
+			return shortDate(ts);
+		}
+		return d.getFullYear() === now.getFullYear()
+			? d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' }) + ' ' + d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+			: d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
+	}
 	function longDate(ts) {
 		return ts ? new Date(ts * 1000).toLocaleString(locale(), { dateStyle: 'full', timeStyle: 'short' }) : '';
 	}
@@ -3698,7 +3716,10 @@
 			+ (mine ? esc(t('InboxMe')) + ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>'
 				: esc(fromName || m.from.email || t('InboxNoSender')) + (fromName ? ' <span class="ibx-readhead__email">&lt;' + esc(m.from.email) + '&gt;</span>' : '')
 					+ (m.trusted && m.trusted.state === 'ok' ? ' ' + trustedBadge(m.trusted) : '')) + '</div>'
-			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
+			+ '<div class="ibx-readhead__line ibx-readhead__date"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
+			// Phone: the short date on the line of the name, the full one said to screen readers and as a tooltip
+			+ (m.date ? '<time class="ibx-readhead__when" datetime="' + esc(new Date(m.date * 1000).toISOString()) + '" title="' + esc(longDate(m.date)) + '">'
+				+ '<span aria-hidden="true">' + esc(headDate(m.date)) + '</span><span class="ibx-sr-only">' + esc(longDate(m.date)) + '</span></time>' : '')
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
 			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box && !sameBox ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			// Protected mailbox (1.89.0): never assigned (nothing kept in Dolibarr)
@@ -10918,6 +10939,14 @@
 				zoomMail(e.deltaY < 0 ? 10 : -10);
 			}
 		}, { passive: false });
+		// Phone (UX fix series): the line of the recipients is cut on one line; a tap opens it whole, again closes it
+		// (a tap on a name keeps opening its card)
+		$('.ibx-pane--read .ibx-pane__body', el).addEventListener('click', e => {
+			const line = e.target.closest('.ibx-readhead__to');
+			if (line && isSmallPhone() && !e.target.closest('.ibx-addr, a, button')) {
+				line.classList.toggle('is-open');
+			}
+		});
 		S.mobile = to => {
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
