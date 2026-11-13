@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: answer buttons at the bottom of a mail on a phone :   1.101.2
+  - « Reply to all » did not fit and « Forward » went out of the screen: under about 480 px the three buttons share
+    the width, the icon above its name in small, as a bottom navigation bar.
+
 - FIX: writing area filling the window, toolbar at the bottom on a phone, discard set apart :   1.101.1
   - the text area of a writing takes the free height of its window: on a phone the formatting toolbar, under it,
     stays at the bottom above the send bar instead of floating in the middle of the screen with an empty area below;

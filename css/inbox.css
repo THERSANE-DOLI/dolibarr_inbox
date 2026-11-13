@@ -2258,6 +2258,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-attbar--answers .ibx-btn { height: 2rem; padding: 0 var(--ibx-s3); font-size: var(--ibx-fs-body); }
 @container (max-width: 44rem) { .ibx-attbar--answers .ibx-quickreply__label { display: inline; } }
 @container (max-width: 20rem) { .ibx-attbar--answers .ibx-quickreply__label { display: none; } }
+/* Narrow (1.101.2): « Reply to all » did not fit and « Forward » went out of the screen; three buttons of the same
+   width, the icon above its name in small, as a bottom navigation bar */
+@container (max-width: 30rem) {
+	.ibx-attbar--answers .ibx-quickreply { flex: 1; gap: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply .ibx-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 3rem; flex-direction: column; justify-content: center; gap: 0.125rem; padding: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply__label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-xs); }
+}
 /* Fingers: targets of 44 px */
 @media (pointer: coarse) { .ibx-attbar .ibx-btn { height: 2.75rem; min-width: 2.75rem; justify-content: center; } }
 @media print { .ibx-quickreply, .ibx-convo__foot { display: none; } }
