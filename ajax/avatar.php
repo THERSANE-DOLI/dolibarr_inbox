@@ -23,6 +23,7 @@
  * Asked by the row of the mail, never by the address (no address in an URL). reading=1: head of the reading pane,
  * BIMI allowed when this mail passed DMARC (read in the raw mail kept in the cache) and its sender is known: domain
  * recognized, or thirdparty linked to the address (1.88.6: a lookalike domain may publish the logo of another company).
+ * to=1 (sent mails and drafts): the picture of the first recipient of this mail instead, never a brand logo.
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -59,8 +60,18 @@ if (GETPOSTINT('reading') === 1 && (string) $reader->row->message_id !== '') {
 		$bimi = $host !== '' && (new InboxTrustedDomain($db))->find($host) !== null;
 	}
 }
+$email = (string) $reader->row->from_email;
+if (GETPOSTINT('to') === 1) {
+	// First address of the recipients of this very mail (its row, read with the rights of the user above)
+	$email = preg_match('/[^\s<>,;"\']+@[^\s<>,;"\']+/', (string) $reader->row->to_text, $m) ? strtolower($m[0]) : '';
+	$bimi = false;
+	if ($email === '') {
+		http_response_code(204);
+		exit;
+	}
+}
 $avatar = new InboxAvatar($db);
-$pic = $avatar->get((string) $reader->row->from_email, (int) $reader->row->fk_soc, $bimi);
+$pic = $avatar->get($email, (int) $reader->row->fk_soc, $bimi);
 header('Cache-Control: private, max-age=3600');
 header('X-Content-Type-Options: nosniff');
 if (!$pic) {

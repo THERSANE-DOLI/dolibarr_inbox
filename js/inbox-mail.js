@@ -286,7 +286,7 @@
 					const img = new Image();
 					img.onload = () => resolve(img.src);
 					img.onerror = () => resolve('');
-					img.src = I.ctx('INBOX_AJAX_URL', '') + 'avatar.php?id=' + el.dataset.avatar + (el.dataset.reading ? '&reading=1' : '');
+					img.src = I.ctx('INBOX_AJAX_URL', '') + 'avatar.php?id=' + el.dataset.avatar + (el.dataset.reading ? '&reading=1' : '') + (el.dataset.to ? '&to=1' : '');
 				});
 				avatarCache.set(key, p);
 			}
@@ -1718,6 +1718,19 @@
 	}
 
 	/** Row of Sent or Drafts: its correspondent is the recipient, no picture of the sender (that is us) */
+	/**
+	 * Picture of the first recipient on the card of a sent mail or a draft (UX fix series): the sender would be the
+	 * mailbox itself on every card; its initials until the picture comes (avatar.php to=1)
+	 */
+	function recipientAvatar(row) {
+		const first = String(row.to || '').split(',')[0];
+		const email = (first.match(/[^\s<>,;"']+@[^\s<>,;"']+/) || [''])[0];
+		if (!email) {
+			return '';
+		}
+		const name = first.replace(/<[^>]*>/, '').replace(/^["'\s]+|["'\s]+$/g, '');
+		return avatar(name, email, 'ibx-avatar--xs', row.id).replace('data-avatar=', 'data-to="1" data-avatar=');
+	}
 	function sentLike(row) {
 		const e = S.folders.get(row.folder);
 		return !!e && (e.folder.role === 'sent' || e.folder.role === 'drafts');
@@ -1986,7 +1999,7 @@
 				}
 				const sel = S.selected.has(r.id);
 				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
-					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? '' : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
+					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? recipientAvatar(r) : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
 					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? answeredMark() : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
@@ -3217,6 +3230,7 @@
 		clearTimeout(S.readTimer);
 		S.openId = 0;
 		S.mail = null;
+		routeList();
 		syncPaneBar(null);
 		const f = currentFolder();
 		const pane = readPane();
@@ -3233,6 +3247,7 @@
 		clearTimeout(S.readTimer);
 		S.openId = 0;
 		S.mail = null;
+		routeList();
 		syncPaneBar(null);
 		const n = S.selected.size;
 		// The actions with their names here, where there is room (the bar of the list keeps them short)
@@ -3255,9 +3270,46 @@
 		}
 	}
 
+	// ---------- The mail open in the address (UX fix series) ----------
+	// #/mail/<folder>/<mail>, #/mail/view/<view>/<mail>, #/mail/vview/<id>/<mail>: a reload opens the mail again; the
+	// back of the browser (and of a phone) goes from a mail to its list. Only numbers in the address.
+	/** Address of the list shown (folder, unified view or virtual view) */
+	function listHash() {
+		if (S.vview) {
+			return '#/mail/vview/' + S.vview;
+		}
+		if (S.scope === 'view' && S.view) {
+			return '#/mail/view/' + S.view;
+		}
+		return '#/mail/' + (S.folderId || '');
+	}
+	/** Mail named by the address, 0 without one */
+	function mailInHash() {
+		const parts = location.hash.replace(/^#\/mail\/?/, '').split('/').filter(Boolean);
+		return +((parts[0] === 'view' || parts[0] === 'vview') ? parts[2] : parts[1]) || 0;
+	}
+	/** A mail opened: from the list, a step of the history (back = the list); from another mail, the address only */
+	function routeMail(id) {
+		const target = listHash() + '/' + id;
+		if (location.hash === target) {
+			return;
+		}
+		if (mailInHash()) {
+			history.replaceState(history.state, '', target);
+		} else {
+			history.pushState({ ibxMail: id }, '', target);
+		}
+	}
+	/** No mail open any more: the address of the list (never a step of the history) */
+	function routeList() {
+		if (mailInHash()) {
+			history.replaceState(null, '', listHash());
+		}
+	}
 	async function openMail(id, single) {
 		clearTimeout(S.readTimer);
 		S.openId = id;
+		routeMail(id);
 		S.mail = null;
 		syncPaneBar(null);
 		S.thread = null;
@@ -3282,6 +3334,7 @@
 				return;
 			}
 			if (err.status === 410 || err.status === 404) {
+				routeList();
 				pane.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + esc(err.message) + '</div></div>';
 				S.rows = S.rows.filter(r => r.id !== id);
 				S.selected.delete(id);
@@ -6179,13 +6232,28 @@
 				const prev = items[i - 1] && items[i - 1].kind === 'note' ? items[i - 1].n : null;
 				return noteHtml(it.n, it.n.mine, prev);
 			}
+			// An answer sent from the mailbox (UX fix series): one discreet line (what, to whom, when), the details on a click
 			const a = it.a;
-			const who = a.mine ? t('InboxMe') : (a.author_name || t('InboxActivityOtherSoftware'));
-			const what = t(a.reply ? (a.author_name ? 'InboxActivityReplied' : 'InboxActivityRepliedElsewhere') : (a.author_name ? 'InboxActivityWrote' : 'InboxActivityWroteElsewhere'), who);
-			return '<div class="ibx-activity" role="note">' + ic(a.reply ? 'reply' : 'sent') + '<span class="ibx-activity__text"><b>' + esc(what) + '</b>'
-				+ (a.subject ? ' <span class="ibx-muted">« ' + esc(a.subject) + ' »</span>' : '') + (a.to ? ' <span class="ibx-muted">' + esc(t('InboxActivityTo', a.to)) + '</span>' : '') + '</span>'
-				+ '<time class="ibx-muted" datetime="' + new Date(a.date * 1000).toISOString() + '" title="' + esc(longDate(a.date)) + '">' + esc(longDate(a.date)) + '</time>'
-				+ '<button type="button" class="ibx-linkbtn ibx-js-activitysee" data-folder="' + a.folder + '" data-mail="' + a.mail + '">' + th('InboxActivitySee') + '</button></div>';
+			const by = a.mine ? t('InboxMe') : (a.author_name || '');
+			const first = String(a.to || '').split(',')[0].trim();
+			const more = String(a.to || '').split(',').filter(x => x.trim()).length - 1;
+			const toName = (first.replace(/<[^>]*>/, '').replace(/^["'\s]+|["'\s]+$/g, '') || first.replace(/[<>]/g, '')) + (more > 0 ? ' +' + more : '');
+			const line = toName
+				? (by ? t(a.reply ? 'InboxActivityRepliedByTo' : 'InboxActivityWroteByTo', by, toName) : t(a.reply ? 'InboxActivityRepliedTo' : 'InboxActivitySentTo', toName))
+				: (by ? t(a.reply ? 'InboxActivityReplied' : 'InboxActivityWrote', by) : t(a.reply ? 'InboxActivityRepliedShort' : 'InboxActivitySentShort'));
+			const id = 'ibx-act-' + a.mail + '-' + i;
+			const row = (label, value) => '<dt>' + th(label) + '</dt><dd>' + value + '</dd>';
+			return '<div class="ibx-activity" role="note">'
+				+ '<button type="button" class="ibx-activity__sum ibx-js-activitytoggle" aria-expanded="false" aria-controls="' + id + '">' + ic(a.reply ? 'reply' : 'sent')
+				+ '<span class="ibx-activity__line">' + esc(line) + '</span>'
+				+ '<time class="ibx-activity__when" datetime="' + new Date(a.date * 1000).toISOString() + '">' + esc(headDate(a.date)) + '</time>'
+				+ ic('chevron-right', 'ibx-activity__chev') + '</button>'
+				+ '<div class="ibx-activity__more" id="' + id + '" hidden><dl class="ibx-activity__dl">'
+				+ (a.subject ? row('InboxActivitySubject', esc(a.subject)) : '')
+				+ (a.to ? row('InboxActivityToLabel', esc(a.to)) : '')
+				+ row('InboxActivityFrom', esc(by ? t('InboxActivityFromInbox', by) : t('InboxActivityFromElsewhere')))
+				+ row('InboxActivityOn', esc(longDate(a.date))) + '</dl>'
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-activitysee" data-folder="' + a.folder + '" data-mail="' + a.mail + '">' + ic('mail') + ' ' + th('InboxActivitySeeMail') + '</button></div></div>';
 		}).join('');
 	}
 	/**
@@ -6264,6 +6332,16 @@
 	}
 	async function dolibarClick(box, e) {
 		const mailId = +box.dataset.mail;
+		const actToggle = e.target.closest('.ibx-js-activitytoggle');
+		if (actToggle) {
+			const open = actToggle.getAttribute('aria-expanded') !== 'true';
+			actToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+			const more = document.getElementById(actToggle.getAttribute('aria-controls'));
+			if (more) {
+				more.hidden = !open;
+			}
+			return;
+		}
 		if (e.target.closest('.ibx-js-dolsheetclose')) {
 			closeDolSheet(box);
 			return;
@@ -11028,7 +11106,14 @@
 		S.mobile = to => {
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
-		$$('.ibx-js-back', el).forEach(b => b.addEventListener('click', () => S.mobile(b.dataset.to)));
+		$$('.ibx-js-back', el).forEach(b => b.addEventListener('click', () => {
+			// From a mail opened from its list: the back of the browser (the router closes the mail), the history stays right
+			if (b.dataset.to === 'list' && mailInHash() && history.state && history.state.ibxMail) {
+				history.back();
+				return;
+			}
+			S.mobile(b.dataset.to);
+		}));
 		$('.ibx-js-togglefolders', el).addEventListener('click', toggleFolders);
 		$('.ibx-js-view', el).addEventListener('click', () => {
 			saveParam('view', params.view === 'table' ? 'cards' : 'table');
@@ -11139,7 +11224,7 @@
 		}
 		S.goto = null;
 		if (S.folderId !== g.folder || S.scope !== 'folder' || S.q !== '') {
-			await openFolder(g.folder);
+			await openFolder(g.folder, true);
 		}
 		if (S.rows.some(r => r.id === g.mail)) {
 			select(g.mail);
@@ -11151,6 +11236,15 @@
 			openMail(g.mail, true);
 		}
 		return true;
+	}
+	/** A mail of the list shown selected, else opened alone (beyond the first page, in a folded conversation) */
+	function openInList(id) {
+		if (S.rows.some(r => r.id === id)) {
+			select(id);
+			scrollWithin($('.ibx-pane--list .ibx-pane__body', S.el), $('[data-mail="' + id + '"]', S.el));
+		} else {
+			openMail(id, true);
+		}
 	}
 	Dolibarr.on('inbox:mail:goto', g => {
 		S.goto = { folder: +g.folder, mail: +g.mail };
@@ -11181,20 +11275,35 @@
 			const wantedView = route.parts[0] === 'view' ? String(route.parts[1] || '') : '';
 			const wantedVview = route.parts[0] === 'vview' ? +(route.parts[1] || 0) : 0;
 			const wanted = wantedView || wantedVview ? 0 : +(route.parts[0] || 0);
-			// #/mail/<folder>/<mail>: a mail opened from another page (tab « Mails » of a card of Dolibarr)
-			if (wanted && +(route.parts[1] || 0)) {
-				S.goto = { folder: wanted, mail: +route.parts[1] };
-				history.replaceState(null, '', '#/mail/' + wanted);
+			// The mail of the address (UX fix series): #/mail/<folder>/<mail> (also from another page, tab « Mails » of
+			// a card of Dolibarr), #/mail/view/<view>/<mail>, #/mail/vview/<id>/<mail>
+			const wantedMail = +(route.parts[wantedView || wantedVview ? 2 : 1] || 0);
+			if (wanted && wantedMail) {
+				S.goto = { folder: wanted, mail: wantedMail };
 				if (S.el === el) {
-					runGoto();
+					if (S.openId !== wantedMail) {
+						runGoto();
+					}
 					return;
 				}
 			}
 			if (S.el === el) {
+				// Back of the browser from a mail: its list again (on a phone, the list screen)
+				if (!wantedMail && S.openId) {
+					S.selected.clear();
+					paintSelection();
+					showNothing();
+					S.mobile('list');
+				}
 				if (wantedView && (S.scope !== 'view' || S.view !== wantedView)) {
-					openView(wantedView, true);
+					await openView(wantedView, true);
+				} else if (wantedVview && S.vview !== wantedVview) {
+					await openVview(wantedVview, true);
 				} else if (wanted && wanted !== S.folderId && S.folders.has(wanted)) {
 					openFolder(wanted, true);
+				}
+				if ((wantedView || wantedVview) && wantedMail && S.openId !== wantedMail) {
+					openInList(wantedMail);
 				}
 				return;
 			}
@@ -11229,7 +11338,7 @@
 					S.vviews = r.views || [];
 					renderTree();
 					if (S.vviews.some(v => v.id === wantedVview)) {
-						openVview(wantedVview, true);
+						openVview(wantedVview, true).then(() => wantedMail && openInList(wantedMail));
 					} else if (start) {
 						openFolder(start);
 					}
@@ -11237,7 +11346,10 @@
 			} else if (wantedView && VIEWS.some(([k]) => k === wantedView)) {
 				// A unified view as start (its address kept); the first folder known for the actions of the page
 				S.folderId = start;
-				openView(wantedView, true);
+				await openView(wantedView, true);
+				if (wantedMail) {
+					openInList(wantedMail);
+				}
 			} else if (start) {
 				openFolder(start, !!wanted);
 			} else {
