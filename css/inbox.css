@@ -1270,6 +1270,22 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-palette__tags { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); }
 /* Row of a new tag, under the list: each field under its column */
 .ibx-tagadd td { border-bottom: 0; padding-top: var(--ibx-s3); }
+/* Drag handle and key in one cell (1.98.0) */
+.ibx-tagkey { white-space: nowrap; }
+.ibx-tagkey .ibx-draghandle { margin-right: var(--ibx-s2); vertical-align: middle; }
+/* Result of the tag over its name while its colour or border is set (js/inbox-settings.js previewOn): the field stays
+   under it, a click goes through to it */
+.ibx-tagprev-wrap { position: relative; display: block; }
+.ibx-tagprev {
+	position: absolute; inset: 0; display: flex; align-items: center; padding: 0 var(--ibx-s2); pointer-events: none;
+	background: var(--ibx-bg); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius);
+	transition: opacity .3s;
+}
+.ibx-tagprev[hidden] { display: none; }
+.ibx-tagprev.is-leaving { opacity: 0; }
+.ibx-tagprev.is-off .ibx-tag { opacity: .55; }
+.ibx-tagprev .ibx-tag { display: inline-block; max-width: 100%; line-height: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ibx-tagprev { transition: none; } }
 .ibx-tagadd .ibx-table__actions { white-space: nowrap; }
 
 /* ===== Colour and icon of a folder or a mailbox (1.8.0, analyse-interface §4 bis) ===== */

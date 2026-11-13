@@ -2997,11 +2997,11 @@
 					+ '</div></div></div>';
 			}
 		}
-		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th></th><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
+		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" data-tag="' + tg.id + '">'
-				+ '<td>' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
-				+ '<td>' + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
-				+ '<td>' + (editable ? '<input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '">' : C.badge(tg)) + '</td>'
+				// Drag handle and key in one cell, under the head « Key », to save a column
+				+ '<td class="ibx-tagkey">' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
+				+ '<td>' + (editable ? '<span class="ibx-tagprev-wrap"><input class="ibx-field" data-f="label" value="' + esc(tg.label) + '" aria-label="' + th('InboxTagLabel') + '"><span class="ibx-tagprev" aria-hidden="true" hidden></span></span>' : C.badge(tg)) + '</td>'
 				+ '<td><code class="ibx-tagkeyword">' + esc(tg.keyword) + '</code></td>'
 				+ '<td>' + (editable ? '<input type="color" class="ibx-color" data-f="color" value="' + esc(tg.color || '#888888') + '" aria-label="' + th('InboxTagColor') + '">' : '') + '<span class="ibx-tagrisk" data-risk hidden title="' + th('InboxTagsCvdRow') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxTagsCvdRow') + '</span></span></td>'
 				+ '<td>' + (editable ? borderSelect(tg.border, 'data-f="border"') : th('InboxTagBorder_' + (tg.border || 'none'))) + '</td>'
@@ -3013,8 +3013,8 @@
 		// New tag: a last row, each field under its column (a form cannot wrap a row: the fields join it by form="")
 		const formId = 'ibx-addtag-' + (account ? account.id : 0);
 		if (editable) {
-			html += '<tfoot><tr class="ibx-tagadd"><td></td><td></td>'
-				+ '<td><input class="ibx-field" name="label" form="' + formId + '" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"></td>'
+			html += '<tfoot><tr class="ibx-tagadd"><td></td>'
+				+ '<td><span class="ibx-tagprev-wrap"><input class="ibx-field" name="label" form="' + formId + '" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"><span class="ibx-tagprev" aria-hidden="true" hidden></span></span></td>'
 				+ '<td></td>'
 				+ '<td><input type="color" class="ibx-color" name="color" form="' + formId + '" value="#0072b2" aria-label="' + th('InboxTagColor') + '"></td>'
 				+ '<td>' + borderSelect('none', 'name="border" form="' + formId + '"') + '</td><td></td>'
@@ -3102,6 +3102,49 @@
 				toast(err.message, { error: true });
 			}
 		};
+		// Result of the tag shown over its name while its colour or border is set (no column of its own), gone a
+		// moment after the focus left them
+		const previewOn = row => {
+			const over = $('.ibx-tagprev', row);
+			const lab = $('[data-f="label"], [name="label"]', row);
+			const col = $('[data-f="color"], [name="color"]', row);
+			const bor = $('[data-f="border"], [name="border"]', row);
+			if (!over || !lab || !col || !bor) {
+				return;
+			}
+			let timer = 0;
+			const show = () => {
+				clearTimeout(timer);
+				const sw = $('[data-f="status"]', row);
+				over.innerHTML = C.badge({ label: lab.value.trim() || lab.placeholder, color: col.value, border: bor.value });
+				over.classList.toggle('is-off', !!sw && sw.getAttribute('aria-checked') !== 'true');
+				over.classList.remove('is-leaving');
+				over.hidden = false;
+			};
+			const hide = () => {
+				clearTimeout(timer);
+				over.hidden = true;
+				over.classList.remove('is-leaving');
+			};
+			[col, bor].forEach(el => {
+				el.addEventListener('focus', show);
+				el.addEventListener(el === col ? 'input' : 'change', show);
+				el.addEventListener('blur', e => {
+					if (e.relatedTarget === col || e.relatedTarget === bor) {
+						return;
+					}
+					clearTimeout(timer);
+					timer = setTimeout(() => {
+						over.classList.add('is-leaving');
+						timer = setTimeout(hide, 300);
+					}, 2500);
+				});
+			});
+			lab.addEventListener('focus', hide);
+		};
+		if (editable) {
+			$$('[data-tag], .ibx-tagadd', box).forEach(previewOn);
+		}
 		$$('[data-tag]', box).forEach(row => {
 			if (!editable) {
 				return;
