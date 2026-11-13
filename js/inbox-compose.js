@@ -1810,6 +1810,21 @@
 			+ (ai && !ai.hidden ? btn('ai', 'magic', t('InboxAi')) : '')
 			+ btn('bubblemore', 'more', t('InboxMoreActions'));
 	}
+	/** Bottom of what is seen of the page: Chrome on Android leaves the page under the keyboard (visual viewport) */
+	function visibleBottom() {
+		const vv = window.visualViewport;
+		return vv ? vv.offsetTop + vv.height : window.innerHeight;
+	}
+	/**
+	 * Phone: how much of the writing the keyboard covers (--ibx-kb), for the whole toolbar set above it and the text
+	 * scrolled above it; the foot and the signature stay under the keyboard, seen again once it is closed
+	 */
+	function keyboardInset(w) {
+		const body = $('.ibx-compose__body', w.dlg);
+		const phone = window.matchMedia('(max-width: 39.9375rem)').matches;
+		const over = phone && body ? Math.max(0, Math.round(body.getBoundingClientRect().bottom - visibleBottom())) : 0;
+		w.dlg.style.setProperty('--ibx-kb', over + 'px');
+	}
 	/** Small bar over the selected text: the formatting at hand, the menu of the browser (spelling) stays */
 	function bubble(w) {
 		let bar = w.bubble;
@@ -1828,7 +1843,8 @@
 		if (!waiting) {
 			w.bubbleHold = false;
 		}
-		if (!show || waiting) {
+		// Phone: the whole toolbar shown already holds all of it, no strip over it
+		if (!show || waiting || (phone && w.dlg.classList.contains('is-fulltools'))) {
 			if (bar) {
 				bar.hidden = true;
 			}
@@ -1897,15 +1913,19 @@
 		const top = box.top - win.top - bar.offsetHeight - 6;
 		bar.style.left = Math.max(4, Math.min((box.left + box.right) / 2 - win.left - bar.offsetWidth / 2, win.width - bar.offsetWidth - 4)) + 'px';
 		if (phone) {
-			// Under the selection (the menu of the phone is above it), above it only near the foot of the window
-			const below = box.bottom - win.top + 12;
+			// A strip right above the keyboard, or above the foot once the keyboard is closed (and above the whole
+			// toolbar when it is shown): the menu of the phone stays near the selection, never under ours
 			const foot = $('.ibx-compose__foot', w.dlg);
 			const tools = w.dlg.classList.contains('is-fulltools') ? $('.ibx-compose__tools', w.dlg) : null;
-			const floor = Math.min(foot ? foot.getBoundingClientRect().top : win.bottom, tools ? tools.getBoundingClientRect().top : win.bottom);
-			const limit = floor - win.top - bar.offsetHeight - 8;
-			const editor = $('.ibx-compose__editor', w.dlg);
-			const ceiling = editor ? editor.getBoundingClientRect().top - win.top + 4 : 4;
-			bar.style.top = (below <= limit ? below : Math.max(ceiling, Math.min(top, limit))) + 'px';
+			const dock = Math.min(foot ? foot.getBoundingClientRect().top : win.bottom, visibleBottom(), tools ? tools.getBoundingClientRect().top : Infinity);
+			const barTop = dock - bar.offsetHeight;
+			bar.style.left = '0px';
+			bar.style.top = (barTop - win.top) + 'px';
+			// The selection kept in view above the strip
+			const body = $('.ibx-compose__body', w.dlg);
+			if (body && box.bottom > barTop - 8) {
+				body.scrollTop += Math.ceil(box.bottom - barTop + 8);
+			}
 			return;
 		}
 		// Under the selection when above it would cover the toolbar (first lines of the text)
@@ -2882,6 +2902,23 @@
 		['mouseup', 'keyup'].forEach(ev => edBox.addEventListener(ev, () => setTimeout(() => bubble(w), 0)));
 		w.editor.on('blur', () => setTimeout(() => bubble(w), 150));
 		$('.ibx-compose__body', dlg).addEventListener('scroll', () => bubble(w), { passive: true });
+		// The keyboard of a phone opened, closed or the page panned: the strip and the whole toolbar follow it
+		if (window.visualViewport) {
+			const vv = window.visualViewport;
+			const follow = () => {
+				if (w.closed) {
+					vv.removeEventListener('resize', follow);
+					vv.removeEventListener('scroll', follow);
+					return;
+				}
+				keyboardInset(w);
+				if (w.bubble && !w.bubble.hidden) {
+					bubble(w);
+				}
+			};
+			vv.addEventListener('resize', follow);
+			vv.addEventListener('scroll', follow);
+		}
 		// A click in the empty space of the writing (under the signature): the cursor at the end of the text
 		$('.ibx-compose__body', dlg).addEventListener('mousedown', e => {
 			if (e.target === e.currentTarget) {
