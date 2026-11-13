@@ -310,6 +310,7 @@
 		if (!box.hidden) {
 			// No « -- » (1.53.5): only the text part of the mail writes it
 			$('iframe', box).srcdoc = srcdoc(sig, true);
+			$('.ibx-js-signame', box).textContent = t('InboxComposeSignatureOf', id.name || id.email);
 		}
 		// Identity changed since: the changed signature stays (never lost), the one of the new identity offered
 		const swap = $('.ibx-js-sigswap', w.dlg);
@@ -1092,7 +1093,7 @@
 
 	function linkDialog(w) {
 		const current = w.editor.linkAt ? w.editor.linkAt() : '';
-		dialog({
+		const d = dialog({
 			title: t('InboxFmtLink'),
 			body: '<label class="ibx-formrow__label" for="ibx-link-url">' + th('InboxComposeLinkUrl') + '</label><input id="ibx-link-url" class="ibx-field" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" value="' + esc(current) + '">',
 			actions: (current ? [{ label: t('InboxFmtUnlink'), run: () => w.editor.exec('unlink') }] : []).concat([{ label: t('InboxSave'), primary: true, run: d => {
@@ -1105,6 +1106,17 @@
 			} }]),
 			onOpen: d => $('#ibx-link-url', d).focus(),
 		});
+		// From the bubble of a phone: once closed, the text gets the focus back and the bubble comes back at its level
+		if (w.bubbleHold) {
+			const level = w.bubbleLevel;
+			d.addEventListener('close', () => {
+				w.editor.focus();
+				setTimeout(() => {
+					w.bubbleLevel = level;
+					bubble(w);
+				}, 50);
+			});
+		}
 	}
 
 	/**
@@ -1235,11 +1247,25 @@
 			}
 		};
 		const apply = (value, custom) => {
+			// From the bubble of a phone: the text gets the focus back first (selection kept), so the bubble seen again by
+			// the change of the text stays at its level
+			// (the focus of the editor may come a frame later: the level is set again once it is there)
+			const hold = w.bubbleHold;
+			const level = w.bubbleLevel;
+			if (hold) {
+				w.editor.focus();
+			}
 			w.editor.exec(kind, value);
 			if (value) {
 				rememberColor(kind, value, custom);
 			}
 			paintColorButtons(w);
+			if (hold) {
+				setTimeout(() => {
+					w.bubbleLevel = level;
+					bubble(w);
+				}, 50);
+			}
 		};
 		anchor.setAttribute('aria-expanded', 'true');
 		document.addEventListener('pointerdown', off, true);
@@ -1758,6 +1784,32 @@
 		return Math.max.apply(null, tops) + 4;
 	}
 
+	/** The whole toolbar of a phone shown (or hidden): one scrolling row above the foot, for the rest of this writing */
+	function fullTools(w, on) {
+		const show = on === undefined ? !w.dlg.classList.contains('is-fulltools') : on;
+		w.dlg.classList.toggle('is-fulltools', show);
+		if (w.bubble) {
+			w.bubble.hidden = true;
+		}
+	}
+	/**
+	 * Bubble of a phone (UX fix series): first « Formatting », the AI, « More »; « Formatting » turns it into a short bar
+	 * (close, bold, italic, underline, colours, link) and its close comes back. Cut, copy and paste stay to the menu of
+	 * the phone (a page may not read the clipboard), the bubble is set under the selection, never over that menu.
+	 */
+	function phoneBubbleHtml(w) {
+		const btn = (cmd, icon, label, pressed) => '<button type="button" class="ibx-tbtn ibx-tbtn--phone" data-cmd="' + cmd + '"' + (pressed ? ' aria-pressed="false"' : '')
+			+ ' aria-label="' + esc(label) + '" title="' + esc(label) + '">' + ic(icon) + '</button>';
+		if (w.bubbleLevel === 2) {
+			return btn('fmtback', 'close', t('InboxFmtBack'))
+				+ btn('bold', 'fmt-bold', t('InboxFmtBold'), true) + btn('italic', 'fmt-italic', t('InboxFmtItalic'), true) + btn('underline', 'fmt-underline', t('InboxFmtUnderline'), true)
+				+ btn('color', 'fmt-color', t('InboxFmtColor')) + btn('background', 'fmt-bg', t('InboxFmtBackground')) + btn('link', 'link', t('InboxFmtLink'));
+		}
+		const ai = $('.ibx-compose__tools [data-cmd="ai"]', w.dlg);
+		return '<button type="button" class="ibx-tbtn ibx-tbtn--phone ibx-tbtn--label" data-cmd="fmt">' + ic('fmt-toggle') + '<span>' + esc(t('InboxFmtToolbar')) + '</span></button>'
+			+ (ai && !ai.hidden ? btn('ai', 'magic', t('InboxAi')) : '')
+			+ btn('bubblemore', 'more', t('InboxMoreActions'));
+	}
 	/** Small bar over the selected text: the formatting at hand, the menu of the browser (spelling) stays */
 	function bubble(w) {
 		let bar = w.bubble;
@@ -1770,9 +1822,19 @@
 			return;
 		}
 		const show = !w.sourceMode && !w.closed && ed.hasSelection && ed.hasSelection() && w.dlg.contains(document.activeElement) && document.activeElement.closest('.ibx-compose__editor');
-		if (!show) {
+		const phone = window.matchMedia('(max-width: 39.9375rem)').matches;
+		// A colour menu, the link dialog or the menu opened from the bubble: it waits, its level kept
+		const waiting = w.bubbleHold && (!!document.querySelector('.ibx-colorpick, .ibx-menu') || [...document.querySelectorAll('dialog[open]')].some(d => d !== w.dlg));
+		if (!waiting) {
+			w.bubbleHold = false;
+		}
+		if (!show || waiting) {
 			if (bar) {
 				bar.hidden = true;
+			}
+			// A new selection starts again on the first level
+			if (!waiting) {
+				w.bubbleLevel = 1;
 			}
 			return;
 		}
@@ -1793,9 +1855,24 @@
 					return;
 				}
 				const cmd = b.dataset.cmd;
-				if (cmd === 'color' || cmd === 'background') {
+				if (cmd === 'fmt' || cmd === 'fmtback') {
+					w.bubbleLevel = cmd === 'fmt' ? 2 : 1;
+					bubble(w);
+				} else if (cmd === 'ai') {
+					aiToggle(w, true);
+				} else if (cmd === 'bubblemore') {
+					w.bubbleHold = phone;
+					popMenu(b, [
+						{ label: t('InboxFmtLink'), icon: 'link', run: () => linkDialog(w) },
+						{ label: t('InboxFmtClear'), icon: 'fmt-clear', run: () => ed.exec('clearFormat') },
+						{ sep: true },
+						{ label: t('InboxFmtFullBar'), icon: 'fmt-toggle', run: () => fullTools(w, true) },
+					]);
+				} else if (cmd === 'color' || cmd === 'background') {
+					w.bubbleHold = window.matchMedia('(max-width: 39.9375rem)').matches;
 					colorMenu(w, b, cmd);
 				} else if (cmd === 'link') {
+					w.bubbleHold = window.matchMedia('(max-width: 39.9375rem)').matches;
 					linkDialog(w);
 				} else {
 					ed.exec(cmd);
@@ -1804,27 +1881,66 @@
 			});
 			w.dlg.appendChild(bar);
 			w.bubble = bar;
+			bar._desktop = bar.innerHTML;
 		}
+		// Phone: its own two levels; a computer: the row of always (painted again when the width is crossed)
+		const html = phone ? phoneBubbleHtml(w) : bar._desktop;
+		if (bar._shown !== html) {
+			bar.innerHTML = html;
+			bar._shown = html;
+		}
+		bar.classList.toggle('ibx-bubble--phone', phone);
 		$$('[aria-pressed]', bar).forEach(b => b.setAttribute('aria-pressed', String(ed.isActive(b.dataset.cmd))));
 		bar.hidden = false;
 		const box = ed.selectionBox();
 		const win = w.dlg.getBoundingClientRect();
 		const top = box.top - win.top - bar.offsetHeight - 6;
 		bar.style.left = Math.max(4, Math.min((box.left + box.right) / 2 - win.left - bar.offsetWidth / 2, win.width - bar.offsetWidth - 4)) + 'px';
+		if (phone) {
+			// Under the selection (the menu of the phone is above it), above it only near the foot of the window
+			const below = box.bottom - win.top + 12;
+			const foot = $('.ibx-compose__foot', w.dlg);
+			const tools = w.dlg.classList.contains('is-fulltools') ? $('.ibx-compose__tools', w.dlg) : null;
+			const floor = Math.min(foot ? foot.getBoundingClientRect().top : win.bottom, tools ? tools.getBoundingClientRect().top : win.bottom);
+			const limit = floor - win.top - bar.offsetHeight - 8;
+			const editor = $('.ibx-compose__editor', w.dlg);
+			const ceiling = editor ? editor.getBoundingClientRect().top - win.top + 4 : 4;
+			bar.style.top = (below <= limit ? below : Math.max(ceiling, Math.min(top, limit))) + 'px';
+			return;
+		}
 		// Under the selection when above it would cover the toolbar (first lines of the text)
 		bar.style.top = (top < bubbleMinTop(w, win) ? box.bottom - win.top + 6 : top) + 'px';
 	}
 
 	function moreMenu(w, anchor) {
-		popMenu(anchor, [
+		// Phone (UX fix series): the foot keeps send, attach and this menu; the other tools of the foot open first here
+		const phone = window.matchMedia('(max-width: 39.9375rem)').matches;
+		const shown = cmd => {
+			const b = $('.ibx-compose__tools [data-cmd="' + cmd + '"]', w.dlg);
+			return b && !b.hidden && !w.sourceMode ? b : null;
+		};
+		// The native CKEditor (« same as on a computer ») keeps its own toolbar: no whole toolbar of Inbox to show
+		const native = $('.ibx-compose__tools', w.dlg).classList.contains('ibx-tools--native');
+		const tools = phone ? [
+			...(native ? [] : [{ label: t('InboxFmtFullBar'), icon: 'fmt-toggle', checked: w.dlg.classList.contains('is-fulltools'), run: () => fullTools(w) }]),
+			...(shown('ai') ? [{ label: t('InboxAi'), icon: 'magic', run: () => aiToggle(w, true) }] : []),
+			...(shown('dictate') ? [{ label: t('InboxDictate'), icon: 'mic', run: () => dictateToggle(w) }] : []),
+			{ sep: true },
+			{ label: t('InboxPieceInsert'), icon: 'piece', run: () => pieceDialog(w) },
+			...($('.ibx-js-docs', w.dlg) ? [{ label: t('InboxComposeAttachDocs'), icon: 'document', run: () => documentsDialog(w) }] : []),
+			{ label: t('InboxTemplates'), icon: 'template', run: () => templateMenu(w, anchor) },
+			{ sep: true },
+		] : [];
+		popMenu(anchor, tools.concat([
 			{ label: t('InboxComposeReceipt'), icon: 'receipt', checked: w.receipt, run: () => {
 				w.receipt = !w.receipt;
 				w.changed();
 			} },
 			{ label: t('InboxComposeSaveNow'), icon: 'drafts', run: () => save(w, true) },
 			{ label: t('InboxTemplateSaveAs'), icon: 'template', run: () => saveAsTemplate(w) },
+			...(phone ? [{ sep: true }] : []),
 			{ label: t('InboxComposeDiscard'), icon: 'delete', danger: true, run: () => discard(w) },
-		]);
+		]));
 	}
 
 	// ---------- Templates (lot W6 1.18.0): those of the mailbox, those of the linked pieces ----------
@@ -2305,13 +2421,18 @@
 			+ rcpt('to', 'InboxTo', 'InboxComposeShortTo', false) + rcpt('cc', 'InboxComposeCcLabel', 'InboxComposeCc', !d.cc.length) + rcpt('bcc', 'InboxComposeBccLabel', 'InboxComposeBcc', !d.bcc.length)
 			+ '<div class="ibx-cfield ibx-cfield--subject"' + (d.subject ? ' data-filled' : '') + '><span class="ibx-cfield__lead"></span>' + label(w.id + '-subject', 'InboxSubject', 'InboxSubject') + '<input class="ibx-cfield__input ibx-js-subject" aria-label="' + th('InboxSubject') + '" id="' + w.id + '-subject" type="text" autocomplete="off" maxlength="998" value="' + esc(d.subject) + '"></div>'
 			+ '<div class="ibx-compose__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '" aria-controls="' + w.id + '-editor">'
+			// Phone (UX fix series): the whole toolbar shown on demand, closed by this button
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-compose__toolsclose ibx-js-toolsclose" aria-label="' + th('InboxFmtFullBarClose') + '">' + ic('close') + '</button>'
 			+ TOOLS.map(toolButton).join('')
 			+ '</div>'
 			+ '<div class="ibx-compose__vars ibx-js-vars" role="group" hidden></div>'
 			+ '<div class="ibx-compose__dictation ibx-js-dictbar" role="status" hidden></div>'
 			+ '<div class="ibx-compose__ai ibx-js-ai" role="region" aria-label="' + th('InboxAi') + '" hidden></div>'
 			+ '<div class="ibx-compose__editor ibx-js-editor" id="' + w.id + '-editor"></div>'
-			+ '<div class="ibx-compose__sig ibx-js-sig" hidden><iframe sandbox="allow-same-origin" title="' + th('InboxComposeSignature') + '"></iframe><span class="ibx-compose__sigtools">'
+			+ '<div class="ibx-compose__sig ibx-js-sig" hidden>'
+				// Phone (UX fix series): one line, the preview of the signature on a tap
+				+ '<button type="button" class="ibx-compose__sigline ibx-js-sigline" aria-expanded="false">' + ic('signature') + '<span class="ibx-js-signame"></span></button>'
+				+ '<iframe sandbox="allow-same-origin" title="' + th('InboxComposeSignature') + '"></iframe><span class="ibx-compose__sigtools">'
 				// Changed for this mail only (1.95.0): put in the text, the signature of the identity stays as it is
 				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigedit" title="' + th('InboxComposeSignatureEditHelp') + '" aria-label="' + th('InboxComposeSignatureEdit') + '">' + ic('edit') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sigoff" title="' + th('InboxComposeSignatureOff') + '" aria-label="' + th('InboxComposeSignatureOff') + '">' + ic('close') + '</button></span></div>'
@@ -2396,6 +2517,7 @@
 				}
 			}
 		});
+		$('.ibx-js-toolsclose', dlg).addEventListener('click', () => fullTools(w, false));
 		$('.ibx-compose__tools', dlg).addEventListener('click', e => {
 			const b = e.target.closest('[data-cmd]');
 			if (!b || (w.sourceMode && b.dataset.cmd !== 'source')) {
@@ -2533,6 +2655,16 @@
 		$('.ibx-js-sendlater', dlg).addEventListener('click', e => laterMenu(w, e.currentTarget));
 		$('.ibx-js-cdiscard', dlg).addEventListener('click', () => discard(w));
 		$('.ibx-js-cmore', dlg).addEventListener('click', e => moreMenu(w, e.currentTarget));
+		$('.ibx-js-sigline', dlg).addEventListener('click', e => {
+			const box = $('.ibx-js-sig', dlg);
+			const open = !box.classList.contains('is-open');
+			box.classList.toggle('is-open', open);
+			e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
+			if (open) {
+				const f = $('iframe', box);
+				f.srcdoc = f.srcdoc;
+			}
+		});
 		$('.ibx-js-templates', dlg).addEventListener('click', e => templateMenu(w, e.currentTarget));
 		$('.ibx-js-insertpiece', dlg).addEventListener('click', () => pieceDialog(w));
 		const docs = $('.ibx-js-docs', dlg);
@@ -2779,7 +2911,7 @@
 				al.dataset.align = now;
 				al.innerHTML = ic('fmt-align-' + now);
 			}
-			if ((w.bubble && !w.bubble.hidden) || (w.imgBubble && !w.imgBubble.hidden)) {
+			if ((w.bubble && !w.bubble.hidden) || (w.imgBubble && !w.imgBubble.hidden) || window.matchMedia('(max-width: 39.9375rem)').matches) {
 				bubble(w);
 			}
 			$$('.ibx-compose__tools [aria-pressed]:not([data-cmd="source"]):not(.ibx-splitbtn__main)', dlg).forEach(b => b.setAttribute('aria-pressed', String(w.editor.isActive(b.dataset.cmd))));
