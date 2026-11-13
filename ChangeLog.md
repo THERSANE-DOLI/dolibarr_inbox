@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: writing on a phone, light foot and signature as one line :   1.102.15
+  - the foot keeps send, attach and « More »; insert a piece, linked documents and templates open first in that
+    menu, discard set apart at its end. Round buttons of 48 px, well apart.
+  - the signature as one line « Signature: name », its preview on a tap.
+
+- FIX: writing on a phone, formatting on demand and a bubble on a selection :   1.102.14
+  - no permanent toolbar, the text takes the room. The whole toolbar on demand (menu « More » or the bubble), one
+    scrolling row with a close button; the native CKEditor keeps its own toolbar.
+  - a selection (finger or mouse) shows a bubble under it: « Formatting », the AI, « More » (link, clear the
+    formatting, whole toolbar); « Formatting » turns it into a short bar (close, bold, italic, underline, colours,
+    link) which stays after a colour, a background or a link. Never over the foot nor the whole toolbar.
+  - the AI and voice typing in the menu « More » (not in the source mode, where they would write in the hidden text).
+
 - FIX: name of a colleague as sender, head of a conversation, chip of a colleague :   1.102.13
   - a user of Dolibarr as sender: his name on one line with the address under it on a phone (they were two columns,
     the name on two lines), after it on a computer.
