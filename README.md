@@ -58,6 +58,12 @@ Dolibarr: `includes/ckeditor/ckeditor/` or the external CKEditor 4 of `JS_CKEDIT
 - Those of CKEditor (`INBOX_CKEDITOR_NATIVE`): the classic CKEditor of Dolibarr, toolbar `dolibarr_mailings` and its
   context menu; voice typing, AI and the variables of Inbox are the last group of that toolbar.
 
+Small screens (`INBOX_EDITOR_SMALL`, Settings > General > Writing editor > « On a small screen », 1.101.0): under
+the width of the phone layout (64rem, 1024 px) a writing opens with the Inbox editor (default), CKEditor driven by the
+toolbar of Inbox (never its own rows of buttons, whatever `INBOX_CKEDITOR_NATIVE` says), or the same editor as on a
+computer (`same`). Decided when the writing opens: turning the screen or resizing the window while typing keeps the
+editor. The width of the writing window itself is not used (the window docked on a computer is narrow too).
+
 When CKEditor cannot start (files missing, blocked by the browser), the writing opens with the Inbox editor. Another
 module can register its own editor: event `inbox:editor:register`, interface described at the top of
 `js/inbox-editor.js`.

@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: editor of the writing on a small screen :   1.101.0
+  - Settings > General > Writing editor, « On a small screen » (phones and small tablets, under 1024 px): the Inbox
+    editor (default), CKEditor with the toolbar of Inbox, or the same as on a computer. The native toolbar of
+    CKEditor (five rows of buttons) no longer takes half of a phone screen.
+  - chosen when the writing opens, kept if the screen turns or the window is resized while typing (no lost selection
+    nor undo history); the docked writing window of a computer, narrow too, keeps the editor of the computer.
+
 - FIX: tooltips of the heads of the panes below the button on phones and tablets :   1.100.1
   - the bubble of a button of a pane head (« ⋯ », « New mail », the actions of the mail read) opened above it and
     went under the top bar of the application; on a narrow screen it now opens below, aligned on the right near the

@@ -47,6 +47,8 @@
 	function choose(key, value) {
 		choice[key] = value;
 	}
+	// CKEditor asked with the toolbar of inbox whatever INBOX_CKEDITOR_NATIVE says (small screen), read by its factory
+	let inboxBarOnly = false;
 
 	/** Declarations of a style attribute as written: [[property, value]] (a ; inside quotes or brackets kept) */
 	const declarations = css => {
@@ -1065,8 +1067,9 @@
 	 *   variables, the bubbles of inbox are not shown.
 	 */
 	register('ckeditor', async function () {
+		// Read before the wait: a second writing opened meanwhile has its own choice
+		const native = !inboxBarOnly && !!setting('INBOX_CKEDITOR_NATIVE', false);
 		const CK = await loadCkeditor();
-		const native = !!setting('INBOX_CKEDITOR_NATIVE', false);
 		let editor = null;
 		let host = null;
 		let saved = null;
@@ -1976,10 +1979,14 @@
 	 * @returns {Promise<object>}
 	 */
 	async function create(el, o) {
-		const name = setting('INBOX_EDITOR', 'tiptap');
+		const pick = pickEditor();
+		const name = pick.name;
 		const factory = factories[name] || factories.tiptap;
 		try {
-			const ed = await factory();
+			inboxBarOnly = pick.inboxBar;
+			const pending = factory();
+			inboxBarOnly = false;
+			const ed = await pending;
 			return await ed.create(el, o);
 		} catch (err) {
 			if (factory === factories.tiptap) {
@@ -1992,6 +1999,26 @@
 			const ed = await factories.tiptap();
 			return ed.create(el, o);
 		}
+	}
+
+	/**
+	 * Editor of a writing that opens (1.101.0): on a small screen (the phone layout of the application, under 64rem),
+	 * the choice « On a small screen » of Settings > General; decided once, the editor stays if the screen turns or the
+	 * window is resized (changing it while typing would lose the selection and the undo history). The width of the
+	 * writing window itself is not used: the window docked on a computer is narrow too.
+	 * @returns {{name: string, inboxBar: boolean}}
+	 */
+	function pickEditor() {
+		const desktop = setting('INBOX_EDITOR', 'tiptap');
+		if (!window.matchMedia('(max-width: 63.9375rem)').matches) {
+			return { name: desktop, inboxBar: false };
+		}
+		const small = setting('INBOX_EDITOR_SMALL', 'tiptap');
+		if (small === 'same') {
+			return { name: desktop, inboxBar: false };
+		}
+		// CKEditor on a small screen: driven by the toolbar of inbox, never its own five rows of buttons
+		return small === 'ckeditor' ? { name: 'ckeditor', inboxBar: true } : { name: 'tiptap', inboxBar: false };
 	}
 
 	I.editors = { register, create, choose, names: () => Object.keys(factories) };

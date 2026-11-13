@@ -3448,6 +3448,11 @@
 			+ '<div class="ibx-formrow ibx-js-ckbar"' + (editor === 'ckeditor' ? '' : ' hidden') + '><span class="ibx-formrow__label" id="g-ckbar-label">' + th('InboxCkeditorBar') + '</span><div>'
 			+ radios('g-ckbar', s.INBOX_CKEDITOR_NATIVE === '1' ? '1' : '0', [['0', 'InboxCkeditorBar_inbox'], ['1', 'InboxCkeditorBar_native']])
 			+ '<div class="ibx-formrow__help">' + th('InboxCkeditorBarHelp') + '</div></div></div>'
+			// Small screens (1.101.0): CKEditor offered only when available
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="g-small-label">' + th('InboxEditorSmall') + '</span><div>'
+			+ radios('g-small', ['ckeditor', 'same'].includes(s.INBOX_EDITOR_SMALL) && info.ckeditor ? s.INBOX_EDITOR_SMALL : 'tiptap',
+				[['tiptap', 'InboxEditorSmall_tiptap'], ['ckeditor', 'InboxEditorSmall_ckeditor', !info.ckeditor], ['same', 'InboxEditorSmall_same']])
+			+ '<div class="ibx-formrow__help">' + th('InboxEditorSmallHelp') + '</div></div></div>'
 			+ '</div></section>';
 	}
 	/** The choices of the editor saved at once; the writings opened next use them (no page to load again) */
@@ -3462,6 +3467,9 @@
 		});
 		$$('[name="g-ckbar"]', box).forEach(rb => {
 			rb.disabled = locked.includes('INBOX_CKEDITOR_NATIVE');
+		});
+		$$('[name="g-small"]', box).forEach(rb => {
+			rb.disabled = rb.disabled || locked.includes('INBOX_EDITOR_SMALL');
 		});
 		const save = async (name, value, ctxValue, back) => {
 			try {
@@ -3483,6 +3491,12 @@
 			save('INBOX_EDITOR', rb.value, rb.value, () => {
 				$('[name="g-editor"][value="' + before + '"]', box).checked = true;
 				$('.ibx-js-ckbar', box).hidden = before !== 'ckeditor';
+			});
+		}));
+		$$('[name="g-small"]', box).forEach(rb => rb.addEventListener('change', () => {
+			const before = ['ckeditor', 'same'].includes(s.INBOX_EDITOR_SMALL) ? s.INBOX_EDITOR_SMALL : 'tiptap';
+			save('INBOX_EDITOR_SMALL', rb.value, rb.value, () => {
+				$('[name="g-small"][value="' + before + '"]', box).checked = true;
 			});
 		}));
 		$$('[name="g-ckbar"]', box).forEach(rb => rb.addEventListener('change', () => {

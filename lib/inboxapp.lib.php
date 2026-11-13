@@ -129,7 +129,7 @@ function inboxEditorContextVars()
 	global $conf, $langs;
 
 	if (!inboxCkeditorAvailable()) {
-		return array('INBOX_EDITOR' => 'tiptap');
+		return array('INBOX_EDITOR' => 'tiptap', 'INBOX_EDITOR_SMALL' => 'tiptap');
 	}
 	// As main.inc.php loads it in the pages of Dolibarr: an external CKEditor 4 (JS_CKEDITOR), the configuration of the
 	// theme (its toolbars), the skin chosen in the setup of the module
@@ -148,6 +148,7 @@ function inboxEditorContextVars()
 		'INBOX_CKEDITOR_SKIN' => getDolGlobalString('FCKEDITOR_SKIN', 'moono-lisa'),
 		'INBOX_CKEDITOR_LANG' => strtolower(str_replace('_', '-', $langs->getDefaultLang())),
 		'INBOX_CKEDITOR_NATIVE' => (bool) getDolGlobalInt('INBOX_CKEDITOR_NATIVE'),
+		'INBOX_EDITOR_SMALL' => in_array(getDolGlobalString('INBOX_EDITOR_SMALL'), array('ckeditor', 'same'), true) ? getDolGlobalString('INBOX_EDITOR_SMALL') : 'tiptap',
 	);
 }
 
