@@ -629,6 +629,7 @@ InboxMaximize = Maximize
 InboxMinimize = Minimize
 InboxMoreActions = More actions
 InboxMailActions = Actions of the mail
+InboxDolibarrSheetClose = Close the Dolibarr sheet
 InboxNameImitation = The name « %s » looks like ours but the mail comes from an outside address (%s): beware of an imitation.
 InboxNewMails = %s new mail(s)
 InboxNext = Next

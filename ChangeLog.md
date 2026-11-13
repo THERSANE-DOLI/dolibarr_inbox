@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the Dolibarr part as chips and a bottom sheet on a phone :   1.102.0
+  - under the head of the mail, before its subject: a chip for the thirdparty (green dot when known), « New
+    customer » when the sender is unknown, or the requester of a data source; a chip for the pieces and one for the
+    notes with their counts (« + » when there is none yet). The body of the mail comes back in the first screen.
+  - a chip opens the whole Dolibarr part in a sheet rising from the bottom, on its section; closed by its button, a
+    tap on the veil, Escape or a swipe down on its head, the focus back on the chip. Tablets and computers keep the
+    part in place; turning the screen paints it again the right way.
+  - images blocked: one line, « Always show » as its arrow; « received on » not written again when the only
+    recipient is the mailbox itself; the bar « update not finished » readable on a phone (its text was a column of a
+    few letters beside the button).
+
 - FIX: answer buttons at the bottom of a mail on a phone :   1.101.2
   - « Reply to all » did not fit and « Forward » went out of the screen: under about 480 px the three buttons share
     the width, the icon above its name in small, as a bottom navigation bar.

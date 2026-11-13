@@ -3244,6 +3244,7 @@
 		syncPaneBar(null);
 		S.thread = null;
 		S.blocks = {};
+		$$('.ibx-sheetback', S.el).forEach(x => x.remove());
 		S.mobile('read');
 		const pane = readPane();
 		const row = S.rows.find(r => r.id === id);
@@ -3681,6 +3682,9 @@
 		// In a conversation the mailbox is written once, in the head of the conversation
 		const box = inThread ? '' : (e ? e.account.email : (m.mailbox || ''));
 		const recipients = (m.to || []).concat(m.cc || []);
+		// The mailbox written once (1.102.0): its address alone as recipient already says where the mail came
+		const sameBox = recipients.length === 1 && !!box && String(recipients[0].email || '').toLowerCase() === box.toLowerCase()
+			&& !nameOf(recipients[0]) && !personOf(recipients[0].email, m.people);
 		const toLine = recipients.length ? th('InboxForShort') + ' ' + recipients.slice(0, 6).map(a => addressHtml(a, m.people)).join(', ') + (recipients.length > 6 ? ' ' + th('InboxAndMore', recipients.length - 6) : '') : '';
 		// A mail sent by the mailbox: « Me » with the address of the mailbox in small
 		const mine = m.id && isMine({ folder: m.folder, role: m.folder_role, from: m.from });
@@ -3696,10 +3700,11 @@
 					+ (m.trusted && m.trusted.state === 'ok' ? ' ' + trustedBadge(m.trusted) : '')) + '</div>'
 			+ '<div class="ibx-readhead__line"><span title="' + esc(longDate(m.date)) + '">' + esc(longDate(m.date)) + '</span></div></div>'
 			+ (partial ? '' : '<div class="ibx-readhead__actions">' + actionButtons(m) + '</div>') + '</div>'
-			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
+			+ '<div class="ibx-readhead__line ibx-readhead__to">' + toLine + (box && !sameBox ? (toLine ? ' · ' : '') + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
 			// Protected mailbox (1.89.0): never assigned (nothing kept in Dolibarr)
 			+ (partial || inThread || m.live ? '' : assignLine([m.id], m.assignees || [], m.has_message_id !== false))
 			+ (partial ? '' : blockedLine(m))
+			+ (partial ? '' : dolChipsSlot())
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
 
@@ -5125,6 +5130,132 @@
 			});
 		}
 	}
+	// ---------- Phone (1.102.0): the Dolibarr part as chips under the head, details in a bottom sheet ----------
+	/** Slot of the chips in the head of a mail or of a conversation (filled by the panel once loaded) */
+	function dolChipsSlot() {
+		return '<div class="ibx-dolchips ibx-js-dolchips" role="group" aria-label="' + th('InboxDolibarr') + '" hidden></div>';
+	}
+	/**
+	 * Chips of the panel: the thirdparty (green dot: known), or « New customer » when the sender is unknown; the
+	 * requester of a data source; the pieces and the notes with their counts. Each one opens the sheet on its section.
+	 * @param {HTMLElement} box   Panel
+	 * @param {boolean}     sheet Phone
+	 * @param {object}      x     {soc, canLead, canWrite, rq, pieces, notes}
+	 */
+	function dolChips(box, sheet, x) {
+		const reading = box.closest('.ibx-reading');
+		const slot = reading && $('.ibx-js-dolchips', reading);
+		if (!slot) {
+			return;
+		}
+		if (!sheet) {
+			slot.hidden = true;
+			slot.innerHTML = '';
+			return;
+		}
+		const chip = (sec, icon, label, opts) => '<button type="button" class="ibx-dolchip' + (opts && opts.cls ? ' ' + opts.cls : '') + '" data-sec="' + sec + '"'
+			+ (opts && opts.aria ? ' aria-label="' + esc(opts.aria) + '"' : '') + '>' + ic(icon) + (label ? '<span class="ibx-dolchip__label">' + esc(label) + '</span>' : '')
+			+ (opts && opts.badge !== undefined ? '<span class="ibx-dolchip__badge">' + esc(String(opts.badge)) + '</span>' : '') + (opts && opts.dot ? '<span class="ibx-dolchip__dot" aria-hidden="true"></span>' : '') + '</button>';
+		let html = '';
+		if (x.rq) {
+			html += chip('sender', 'redirect', x.rq.name || x.rq.email || '', { cls: 'is-wide' });
+		} else if (x.soc) {
+			html += chip('sender', 'company', x.soc.ref || '', { cls: 'is-wide', dot: true });
+		} else if (x.canLead) {
+			html += chip('sender', 'user-plus', t('InboxLeadOpen'), { cls: 'is-wide is-accent' });
+		} else {
+			html += chip('sender', 'contact-card', t('InboxSenderUnknown'), { cls: 'is-wide is-muted' });
+		}
+		if (x.pieces || x.canWrite) {
+			html += chip('pieces', 'piece', '', { badge: x.pieces || '+', aria: x.pieces ? t('InboxPiecesCount', x.pieces) : t('InboxPiecesLinked') });
+		}
+		if (x.notes || x.canWrite) {
+			html += chip('notes', 'note', '', { badge: x.notes || '+', aria: x.notes ? t('InboxNotesCount', x.notes) : t('InboxNotes') });
+		}
+		slot.innerHTML = html;
+		slot.hidden = false;
+		$$('.ibx-dolchip', slot).forEach(b => b.addEventListener('click', () => openDolSheet(box, b.dataset.sec, b)));
+	}
+	/**
+	 * The sheet open on a section, over a veil; closed by the veil, Escape, its button or a swipe down on its head
+	 * @param {HTMLElement}      box  Panel
+	 * @param {string}           sec  Section (sender, pieces, notes)
+	 * @param {HTMLElement|null} from Chip to focus again once closed
+	 */
+	function openDolSheet(box, sec, from) {
+		$$('.ibx-sheetback', S.el).forEach(v => v.remove());
+		const veil = document.createElement('div');
+		veil.className = 'ibx-sheetback';
+		veil.addEventListener('click', () => closeDolSheet(box));
+		box.before(veil);
+		box._sheetFrom = from || null;
+		box.setAttribute('role', 'dialog');
+		box.setAttribute('aria-modal', 'true');
+		box.classList.add('is-open');
+		const body = $('.ibx-dolibar__body', box);
+		const row = $('[data-sec="' + sec + '"]', box);
+		if (body && row) {
+			body.scrollTop = Math.max(0, row.offsetTop - body.offsetTop - 8);
+		}
+		const close = $('.ibx-js-dolsheetclose', box);
+		if (close) {
+			close.focus({ preventScroll: true });
+		}
+		if (!box._sheetKeys) {
+			box._sheetKeys = true;
+			box.addEventListener('keydown', e => {
+				if (e.key === 'Escape' && box.classList.contains('is-open')) {
+					e.stopPropagation();
+					closeDolSheet(box);
+				}
+			});
+			// Swipe down on the head: follows the finger, closes past 80 px
+			box.addEventListener('pointerdown', e => {
+				const head = e.target.closest('.ibx-js-dolsheethead');
+				if (!head || e.target.closest('button') || !box.classList.contains('is-open')) {
+					return;
+				}
+				const y0 = e.clientY;
+				let dy = 0;
+				box.style.transition = 'none';
+				const move = ev => {
+					dy = Math.max(0, ev.clientY - y0);
+					box.style.transform = 'translateY(' + dy + 'px)';
+				};
+				const up = () => {
+					window.removeEventListener('pointermove', move);
+					window.removeEventListener('pointerup', up);
+					box.style.transition = '';
+					box.style.transform = '';
+					if (dy > 80) {
+						closeDolSheet(box);
+					}
+				};
+				window.addEventListener('pointermove', move);
+				window.addEventListener('pointerup', up);
+			});
+		}
+	}
+	function closeDolSheet(box) {
+		box.classList.remove('is-open');
+		box.removeAttribute('role');
+		box.removeAttribute('aria-modal');
+		$$('.ibx-sheetback', S.el).forEach(v => v.remove());
+		if (box._sheetFrom && box._sheetFrom.isConnected) {
+			box._sheetFrom.focus({ preventScroll: true });
+		}
+		box._sheetFrom = null;
+	}
+	// The phone width crossed (turned, resized): the panels painted again, as a sheet or in place
+	window.matchMedia('(max-width: 39.9375rem)').addEventListener('change', () => {
+		if (S.el) {
+			$$('.ibx-js-dolibar', S.el).forEach(b => {
+				if (b._data) {
+					paintDolibar(b);
+				}
+			});
+		}
+	});
 	function setDolibarPosition(pos) {
 		saveParam('dolibar_position', pos);
 		placeDolibar();
@@ -5793,7 +5924,9 @@
 	}
 	function paintDolibar(box) {
 		const d = box._data;
-		const folded = params.dolibar_folded === '1';
+		// Phone (1.102.0): a bottom sheet opened by the chips of the head, so always built whole
+		const sheet = isSmallPhone();
+		const folded = !sheet && params.dolibar_folded === '1';
 		const soc = d.sender.soc && d.sender.soc.readable ? d.sender.soc : null;
 		const socId = soc ? soc.id : 0;
 		const summary = [soc ? soc.ref : '', d.links.length + d.extra.length ? t('InboxPiecesCount', d.links.length + d.extra.length) : '', d.notes.length ? t('InboxNotesCount', d.notes.length) : '']
@@ -5801,7 +5934,10 @@
 		showDolAlerts(box, d.alerts);
 		let html = '';
 		const right = dolibarRight();
-		html += '<button type="button" class="ibx-dolibar__head ibx-js-doltoggle" aria-expanded="' + !folded + '" title="' + th(folded ? 'InboxDolibarrUnfold' : 'InboxDolibarrFold') + '">'
+		html += sheet ? '<div class="ibx-dolibar__head ibx-dolsheet__head ibx-js-dolsheethead"><span class="ibx-dolsheet__grip" aria-hidden="true"></span>' + ic('dolibarr')
+			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '')
+			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-dolsheetclose" aria-label="' + th('InboxDolibarrSheetClose') + '">' + ic('close') + '</button></div>'
+			: '<button type="button" class="ibx-dolibar__head ibx-js-doltoggle" aria-expanded="' + !folded + '" title="' + th(folded ? 'InboxDolibarrUnfold' : 'InboxDolibarrFold') + '">'
 			+ ic(right ? (folded ? 'chevron-left' : 'chevron-right') : (folded ? 'chevron-right' : 'chevron-down')) + ic('dolibarr')
 			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '') + '</button>';
 		if (!folded) {
@@ -5854,7 +5990,7 @@
 					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
 					+ '</span></div>' : '')
 				// A mail written by us (1.92.2): the thirdparty is the one of its recipient
-				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
+				+ '<div class="ibx-dolibar__row" data-sec="sender"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
 				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
 				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
 					+ '<span class="ibx-dolibar__tools">'
@@ -5867,7 +6003,7 @@
 					+ '<a class="ibx-btn ibx-btn--sm ibx-btn--primary" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + ic('user-plus') + ' ' + esc(t('InboxLeadPendingCreate', x.name)) + '</a>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-btn--ghost ibx-js-leaddismiss" data-soc="' + x.soc + '" aria-label="' + th('InboxLeadPendingDismiss') + '" title="' + th('InboxLeadPendingDismiss') + '">' + ic('close') + '</button>'
 					+ '</span></span></div>').join('')
-				+ '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
+				+ '<div class="ibx-dolibar__row" data-sec="pieces"><span class="ibx-dolibar__label">' + th('InboxPiecesLinked') + '</span><span class="ibx-dolibar__items">'
 				+ (pieces.length ? pieces.join('') : '<span class="ibx-muted">' + th('InboxNoPiece') + '</span>')
 				+ (canWrite ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-linkpiece" aria-haspopup="dialog">' + ic('plus') + ' ' + th('InboxLinkPiece') + '</button>'
 					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '')
@@ -5884,13 +6020,19 @@
 					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
-				+ '<div class="ibx-dolibar__row ibx-dolibar__notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
+				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)
 				+ '</div>'
 				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
 				+ '</div></div>';
 		}
+		const wasOpen = box.classList.contains('is-open');
 		box.innerHTML = html;
+		box.classList.toggle('is-sheet', sheet);
+		if (!sheet && wasOpen) {
+			closeDolSheet(box);
+		}
+		dolChips(box, sheet, { soc, canLead: !!I.lead && (d.sender.side || 'sender') === 'sender' && (d.create || []).some(c => c.type === 'societe'), canWrite: !!d.level, rq: d.requester, pieces: d.links.length + d.extra.length, notes: d.notes.length });
 		placeSocCard(box);
 		hydrateUserPhotos(box);
 		I.mount(box);
@@ -6030,6 +6172,10 @@
 	}
 	async function dolibarClick(box, e) {
 		const mailId = +box.dataset.mail;
+		if (e.target.closest('.ibx-js-dolsheetclose')) {
+			closeDolSheet(box);
+			return;
+		}
 		if (socCardClick(box, e)) {
 			return;
 		}
@@ -7532,7 +7678,7 @@
 		pane.innerHTML = '<article class="ibx-reading ibx-convo" aria-label="' + esc(row.subject || t('InboxNoSubject')) + '">'
 			+ '<header class="ibx-readhead ibx-convo__head"><div class="ibx-readhead__top"><div class="ibx-readhead__who"><h2 class="ibx-readhead__subject">' + esc(last.subject || row.subject || t('InboxNoSubject'))
 			+ ' ' + headTagsHtml(row.id, row) + '</h2><div class="ibx-readhead__line">' + th('InboxThreadCount', mails.length) + (box ? ' · ' + th('InboxReceivedOn') + ' <b>' + esc(box) + '</b>' : '') + '</div>'
-			+ assignLine([row.id], row.assignees || [], row.has_mid !== 0) + '</div>'
+			+ assignLine([row.id], row.assignees || [], row.has_mid !== 0) + dolChipsSlot() + '</div>'
 			+ '<div class="ibx-readhead__actions ibx-js-convoactions"></div></div></header>'
 			+ dolibarSlot(id, true)
 			// The mails of the thread: a box of their own, the one that scrolls when the column Dolibarr is on the right
@@ -7790,7 +7936,7 @@
 				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '') + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-showimages">' + th('InboxShowImages') + '</button>'
 				// « Always » refused by the administrator (setting 1.78.0): the pictures of each mail on a click only
-				+ (m.auth && m.auth.fail || m.body.always === 'never' ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu">' + th('InboxAlwaysShowImages') + ' ' + ic('chevron-down') + '</button>') + '</div>';
+				+ (m.auth && m.auth.fail || m.body.always === 'never' ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu" aria-label="' + th('InboxAlwaysShowImages') + '"><span class="ibx-banner__lbl">' + th('InboxAlwaysShowImages') + '</span> ' + ic('chevron-down') + '</button>') + '</div>';
 		}
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
