@@ -2279,9 +2279,10 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 /* Narrow (1.101.2): « Reply to all » did not fit and « Forward » went out of the screen; three buttons of the same
    width, the icon above its name in small, as a bottom navigation bar */
 @container (max-width: 30rem) {
-	.ibx-attbar--answers .ibx-quickreply { flex: 1; gap: var(--ibx-s1); }
-	.ibx-attbar--answers .ibx-quickreply .ibx-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 3rem; flex-direction: column; justify-content: center; gap: 0.125rem; padding: var(--ibx-s1); }
-	.ibx-attbar--answers .ibx-quickreply__label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-xs); }
+	.ibx-attbar--answers .ibx-quickreply, .ibx-attbar--files .ibx-quickreply { flex: 1; gap: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply .ibx-btn, .ibx-attbar--files .ibx-quickreply .ibx-btn { flex: 1 1 0; min-width: 0; height: auto; min-height: 3rem; flex-direction: column; justify-content: center; gap: 0.125rem; padding: var(--ibx-s1); }
+	.ibx-attbar--answers .ibx-quickreply__label, .ibx-attbar--files .ibx-quickreply__label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ibx-fs-xs); }
+	.ibx-attbar--files .ibx-attbar__clip { align-self: stretch; height: auto; min-height: 3rem; }
 }
 /* Fingers: targets of 44 px */
 @media (pointer: coarse) { .ibx-attbar .ibx-btn { height: 2.75rem; min-width: 2.75rem; justify-content: center; } }
@@ -2762,6 +2763,8 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-dolchip:active { background: var(--ibx-accent-soft); }
 .ibx-dolchip:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
 .ibx-sheetback { display: none; }
+/* Attachments (UX fix series): the paper clip and the head of the sheet are for a phone only */
+.ibx-attbar__clip, .ibx-attsheet__head { display: none; }
 @media (max-width: 39.9375rem) {
 	.ibx-dolibar.is-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; display: flex; flex-direction: column; max-height: 85dvh; margin: 0; padding: 0;
 		border: 0; border-radius: 1rem 1rem 0 0; background: var(--ibx-bg); box-shadow: 0 -0.5rem 2rem rgba(0, 0, 0, .25); transform: translateY(105%); visibility: hidden;
@@ -2790,4 +2793,23 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 	.ibx-pane--read .ibx-reading:not(.ibx-convo) { min-height: 100%; }
 	.ibx-reading:not(.ibx-convo) > .ibx-readbody { flex: 1 0 auto; min-height: auto; overflow-x: auto; overflow-y: hidden; }
 	.ibx-reading:not(.ibx-convo) > .ibx-attbar { position: sticky; bottom: 0; box-shadow: 0 -2px 6px rgb(0 0 0 / .06); }
+}
+/* Phone (UX fix series): one line at the bottom, the answers and a paper clip with the count; the list of the files
+   rises from the bottom as a sheet (as the Dolibarr part), never unfolded in the page */
+@media (max-width: 39.9375rem) {
+	.ibx-attbar--files .ibx-attbar__head { flex-wrap: nowrap; }
+	.ibx-attbar--files .ibx-attbar__head > .ibx-quickreply { flex: 1 1 auto; min-width: 0; }
+	.ibx-attbar--files .ibx-js-atttoggle, .ibx-attbar--files .ibx-js-saveall, .ibx-attbar--files .ibx-js-attscan { display: none; }
+	.ibx-attbar__clip { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 3rem; margin-left: var(--ibx-s2); }
+	.ibx-attbar__count { position: absolute; top: 0.125rem; right: 0.125rem; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem; font-size: 0.6875rem; font-weight: 700;
+		line-height: 1.125rem; text-align: center; color: var(--ibx-on-accent, #fff); background: var(--ibx-accent); border-radius: 999px; }
+	.ibx-attbar > .ibx-attachments { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; display: block; max-height: 80dvh; overflow: auto; overscroll-behavior: contain;
+		margin: 0; padding: 0 var(--ibx-s3) calc(var(--ibx-s3) + env(safe-area-inset-bottom)); background: var(--ibx-bg); border-radius: 1rem 1rem 0 0;
+		box-shadow: 0 -0.5rem 2rem rgba(0, 0, 0, .25); transform: translateY(105%); visibility: hidden; }
+	.ibx-attbar > .ibx-attachments.is-anim { transition: transform 220ms ease, visibility 0s linear 220ms; }
+	.ibx-attbar > .ibx-attachments.is-open { transform: none; visibility: visible; transition: transform 220ms ease; }
+	.ibx-attsheet__head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: var(--ibx-s2); margin: 0 calc(-1 * var(--ibx-s3)) var(--ibx-s2);
+		padding: 1rem var(--ibx-s2) var(--ibx-s2) var(--ibx-s4); background: var(--ibx-bg); border-bottom: 1px solid var(--ibx-border); touch-action: none; }
+	.ibx-attsheet__head .ibx-muted { flex: 1; min-width: 0; }
+	.ibx-attsheet__head .ibx-btn--icon { width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%; background: transparent; }
 }
