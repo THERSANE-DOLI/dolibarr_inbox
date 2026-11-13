@@ -851,7 +851,10 @@
 			const r = el.getBoundingClientRect();
 			// Actions of the mail read: always below, a bubble beside would cover the next icons; near the right
 			// edge it is aligned on the right of the button (never out of the window)
-			const below = !!el.closest('.ibx-readhead__actions');
+			// Narrow screens (1.100.1): the heads of the panes are under the top bar of the application, a bubble above
+			// would go under it; the bar of the actions of the mail (row of the back arrow) too
+			const below = !!el.closest('.ibx-readhead__actions, .ibx-panebar')
+				|| (window.matchMedia('(max-width: 63.9375rem)').matches && !!el.closest('.ibx-pane__head'));
 			let side = below || r.top < 56 ? 'ibx-tooltip--bottom' : 'ibx-tooltip--top';
 			if (!below && r.right > window.innerWidth - 110) {
 				side = 'ibx-tooltip--left';

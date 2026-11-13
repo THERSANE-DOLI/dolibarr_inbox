@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: tooltips of the heads of the panes below the button on phones and tablets :   1.100.1
+  - the bubble of a button of a pane head (« ⋯ », « New mail », the actions of the mail read) opened above it and
+    went under the top bar of the application; on a narrow screen it now opens below, aligned on the right near the
+    edge.
+
 - NEW: actions of the mail at the top of the screen on phones and tablets :   1.100.0
   - narrow screens: the buttons of the mail move to the row of the back arrow, which never scrolls, so they stay at
     hand while reading; the sender, his address and the date get the whole width again (they were squeezed into a
