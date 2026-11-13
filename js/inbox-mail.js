@@ -3288,20 +3288,32 @@
 		const parts = location.hash.replace(/^#\/mail\/?/, '').split('/').filter(Boolean);
 		return +((parts[0] === 'view' || parts[0] === 'vview') ? parts[2] : parts[1]) || 0;
 	}
-	/** A mail opened: from the list, a step of the history (back = the list); from another mail, the address only */
+	/**
+	 * A mail opened. The back of the browser goes where the user was, the back arrow of the page to the list:
+	 * - from the list, or a jump from a mail to another one (« See the mail », the bell, a bounce...): a step of the
+	 *   history, which counts how many mails away from the list it is (depth, for the back arrow);
+	 * - the next mail by the keys, another card of the list: the address only (no step per mail glanced at);
+	 * - while the address itself is followed (back, forward, reload): left as it is.
+	 */
 	function routeMail(id) {
 		const target = listHash() + '/' + id;
-		if (location.hash === target) {
+		const jump = S.jump;
+		S.jump = false;
+		if (S.routing || location.hash === target) {
 			return;
 		}
-		if (mailInHash()) {
-			history.replaceState(history.state, '', target);
+		const depth = mailInHash() ? (history.state && history.state.ibxDepth) || 0 : 0;
+		if (jump || !mailInHash()) {
+			history.pushState({ ibxMail: id, ibxDepth: depth + 1 }, '', target);
 		} else {
-			history.pushState({ ibxMail: id }, '', target);
+			history.replaceState(Object.assign({}, history.state, { ibxMail: id }), '', target);
 		}
 	}
-	/** No mail open any more: the address of the list (never a step of the history) */
+	/** No mail open any more: the address of the list (never a step); not while a jump or the address is followed */
 	function routeList() {
+		if (S.routing || S.jump) {
+			return;
+		}
 		if (mailInHash()) {
 			history.replaceState(null, '', listHash());
 		}
@@ -5235,6 +5247,9 @@
 			html += chip('sender', 'redirect', x.rq.name || x.rq.email || '', { cls: 'is-wide' });
 		} else if (x.soc) {
 			html += chip('sender', 'company', x.soc.ref || '', { cls: 'is-wide', dot: true });
+		} else if (x.user) {
+			// A colleague (a user of Dolibarr), never « unknown »
+			html += chip('sender', 'account', x.user.name || '', { cls: 'is-wide' });
 		} else if (x.canLead) {
 			html += chip('sender', 'user-plus', t('InboxLeadOpen'), { cls: 'is-wide is-accent' });
 		} else {
@@ -6177,7 +6192,7 @@
 		if (!sheet && wasOpen) {
 			closeDolSheet(box);
 		}
-		dolChips(box, sheet, { soc, canLead: !!I.lead && (d.sender.side || 'sender') === 'sender' && (d.create || []).some(c => c.type === 'societe'), canWrite: !!d.level, rq: d.requester, pieces: d.links.length + d.extra.length, notes: d.notes.length });
+		dolChips(box, sheet, { soc, canLead: !!I.lead && (d.sender.side || 'sender') === 'sender' && (d.create || []).some(c => c.type === 'societe'), canWrite: !!d.level, rq: d.requester, user: d.sender.user, pieces: d.links.length + d.extra.length, notes: d.notes.length });
 		placeSocCard(box);
 		hydrateUserPhotos(box);
 		I.mount(box);
@@ -11107,10 +11122,17 @@
 			$('.ibx-mailapp', el).dataset.mobile = to;
 		};
 		$$('.ibx-js-back', el).forEach(b => b.addEventListener('click', () => {
-			// From a mail opened from its list: the back of the browser (the router closes the mail), the history stays right
-			if (b.dataset.to === 'list' && mailInHash() && history.state && history.state.ibxMail) {
-				history.back();
+			// The list, as many steps back as mails opened since it (the router closes the mail): the history stays right
+			const depth = history.state && history.state.ibxDepth;
+			if (b.dataset.to === 'list' && mailInHash() && depth > 0) {
+				history.go(-depth);
 				return;
+			}
+			if (b.dataset.to === 'list' && mailInHash()) {
+				// Reached by an address (a reload, a link): no step to go back to, the list in place
+				S.selected.clear();
+				paintSelection();
+				showNothing();
 			}
 			S.mobile(b.dataset.to);
 		}));
@@ -11223,9 +11245,17 @@
 			return false;
 		}
 		S.goto = null;
-		if (S.folderId !== g.folder || S.scope !== 'folder' || S.q !== '') {
-			await openFolder(g.folder, true);
+		try {
+			if (S.folderId !== g.folder || S.scope !== 'folder' || S.q !== '') {
+				await openFolder(g.folder, true);
+			}
+			gotoMail(g);
+		} finally {
+			S.jump = false;
 		}
+		return true;
+	}
+	function gotoMail(g) {
 		if (S.rows.some(r => r.id === g.mail)) {
 			select(g.mail);
 			scrollWithin($('.ibx-pane--list .ibx-pane__body', S.el), $('[data-mail="' + g.mail + '"]', S.el));
@@ -11235,7 +11265,6 @@
 			paintSelection();
 			openMail(g.mail, true);
 		}
-		return true;
 	}
 	/** A mail of the list shown selected, else opened alone (beyond the first page, in a folded conversation) */
 	function openInList(id) {
@@ -11247,6 +11276,8 @@
 		}
 	}
 	Dolibarr.on('inbox:mail:goto', g => {
+		// A jump asked by the user: a step of the history (the back of the browser comes back to the mail he was on)
+		S.jump = true;
 		S.goto = { folder: +g.folder, mail: +g.mail };
 		if (S.el && !S.folders.has(S.goto.folder)) {
 			// A folder not in the tree yet (created since): the tree again
@@ -11282,7 +11313,12 @@
 				S.goto = { folder: wanted, mail: wantedMail };
 				if (S.el === el) {
 					if (S.openId !== wantedMail) {
-						runGoto();
+						S.routing = true;
+						try {
+							await runGoto();
+						} finally {
+							S.routing = false;
+						}
 					}
 					return;
 				}
@@ -11303,7 +11339,9 @@
 					openFolder(wanted, true);
 				}
 				if ((wantedView || wantedVview) && wantedMail && S.openId !== wantedMail) {
+					S.routing = true;
 					openInList(wantedMail);
+					S.routing = false;
 				}
 				return;
 			}
@@ -11329,7 +11367,10 @@
 				const first = S.accounts[0].folders.find(f => f.role === 'inbox') || S.accounts[0].folders.find(f => f.selectable);
 				start = first ? first.id : 0;
 			}
-			if (S.goto && await runGoto()) {
+			S.routing = !!S.goto;
+			const gone = S.goto && await runGoto();
+			S.routing = false;
+			if (gone) {
 				// Opened from a notification of the bell
 			} else if (wantedVview) {
 				// A virtual view as start: once the views are known
@@ -11348,7 +11389,9 @@
 				S.folderId = start;
 				await openView(wantedView, true);
 				if (wantedMail) {
+					S.routing = true;
 					openInList(wantedMail);
+					S.routing = false;
 				}
 			} else if (start) {
 				openFolder(start, !!wanted);

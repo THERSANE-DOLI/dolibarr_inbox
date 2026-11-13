@@ -470,7 +470,8 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-readhead__actions { display: flex; gap: var(--ibx-s1); flex-wrap: wrap; justify-content: flex-end; }
 .ibx-readhead__sep { width: var(--ibx-s3); }
 .ibx-readhead__line { display: flex; gap: var(--ibx-s2); color: var(--ibx-text-muted); margin-top: 0.125rem; }
-.ibx-readhead__subject { margin: var(--ibx-s2) 0 0; font-size: var(--ibx-fs-xl); font-weight: 600; line-height: 1.25; display: flex; gap: var(--ibx-s2); align-items: center; flex-wrap: wrap; }
+/* A word longer than the screen (a reference, an address) breaks instead of going out of it (UX fix series) */
+.ibx-readhead__subject { overflow-wrap: anywhere; margin: var(--ibx-s2) 0 0; font-size: var(--ibx-fs-xl); font-weight: 600; line-height: 1.25; display: flex; gap: var(--ibx-s2); align-items: center; flex-wrap: wrap; }
 .ibx-readbody { padding: var(--ibx-s3) var(--ibx-s4) var(--ibx-s6); }
 .ibx-mailframe { width: 100%; border: 0; background: #fff; color: #222; font-size: var(--ibx-fs-body); padding: var(--ibx-s4) 0; line-height: 1.5; }
 .ibx-mailframe blockquote { margin: var(--ibx-s3) 0; padding-left: var(--ibx-s3); border-left: 3px solid #c8d3d8; color: #444; }
@@ -1065,6 +1066,12 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-convo__body { border-top: 0; }
 .ibx-menu .ibx-menu__hint { padding: var(--ibx-s1) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); }
 .ibx-readhead__name.ibx-addr { cursor: default; }
+/* A user of Dolibarr as sender (UX fix series): a block as any sender, not the inline-flex of the small chips of names
+   (the name wrapped on two lines beside its address on a phone) */
+.ibx-readhead__name.ibx-addr--user { display: block; }
+/* Head of a conversation: its count and its mailbox flow as one text (flex put « received on » and the address in two
+   columns) */
+.ibx-convo__head .ibx-readhead__who > .ibx-readhead__line { display: block; }
 /* Picture of a correspondent over its initials */
 .ibx-avatar.has-picture { color: transparent !important; background-size: cover; background-position: center; background-color: var(--ibx-bg) !important; box-shadow: inset 0 0 0 1px var(--ibx-border); }
 /* Name of the card with the picture of the correspondent, centred on the line */

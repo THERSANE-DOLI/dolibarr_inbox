@@ -313,6 +313,24 @@ class InboxReadingTest extends InboxTestCase
 	 *
 	 * @return void
 	 */
+	/**
+	 * Encoded words left by the reader of the library in a subject or a name (UX fix series): decoded, adjacent words
+	 * joined (a character cut between two words), other charsets converted, a text only looking like one kept
+	 *
+	 * @return void
+	 */
+	public function testEncodedWordsLeft()
+	{
+		$this->assertSame('Fwd: Évolution de l’UE à compter du 1er juillet : préparez-vous dès maintenant',
+			InboxMimeParser::decodeWords('Fwd: Évolution de =?UTF-8?Q?l=E2=80=99UE_=C3=A0_compter_du_1er_juillet_=3A_pr=C3=A9parez-vous?= dès maintenant'));
+		$this->assertSame("Certificats liés à l'expédition EXP25 / 0022", InboxMimeParser::decodeWords("Certificats liés à l'e=?UTF-8?Q?xp=C3=A9dition_EXP25?= / 0022"));
+		$this->assertSame('été', InboxMimeParser::decodeWords('=?UTF-8?Q?=C3?= =?UTF-8?Q?=A9t=C3=A9?='));
+		$this->assertSame('Été à suivre', InboxMimeParser::decodeWords('=?UTF-8?B?w4l0w6k=?= =?UTF-8?B?IMOgIA==?=suivre'));
+		$this->assertSame('café crème', InboxMimeParser::decodeWords('=?ISO-8859-1?Q?caf=E9?= cr=?utf-8?q?=C3=A8me?='));
+		$this->assertSame('Un sujet =? pas encodé ?=', InboxMimeParser::decodeWords('Un sujet =? pas encodé ?='));
+		$this->assertSame('=?UTF-8?Q?=FF?=', InboxMimeParser::decodeWords('=?UTF-8?Q?=FF?='));
+	}
+
 	public function testEmojiIndexed()
 	{
 		$fake = new stdClass();

@@ -69,7 +69,7 @@ class InboxMimeParser
 		$message = new InboxMessage();
 		$message->source = 'eml';
 		$message->messageId = trim(self::headerString($header, 'message_id'), " <>\t");
-		$message->subject = self::clean(self::headerString($header, 'subject'));
+		$message->subject = self::clean(self::decodeWords(self::headerString($header, 'subject')));
 		$message->inReplyTo = trim(self::headerString($header, 'in_reply_to'), " <>\t");
 		$from = self::addresses($header, 'from');
 		if (!empty($from)) {
@@ -226,11 +226,52 @@ class InboxMimeParser
 		$list = is_object($value) && method_exists($value, 'toArray') ? $value->toArray() : (is_array($value) ? $value : array());
 		foreach ($list as $address) {
 			if (is_object($address) && !empty($address->mail)) {
-				$out[] = array('email' => strtolower(trim((string) $address->mail)), 'name' => self::clean((string) ($address->personal ?? '')));
+				$out[] = array('email' => strtolower(trim((string) $address->mail)), 'name' => self::clean(self::decodeWords((string) ($address->personal ?? ''))));
 			}
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Encoded words of RFC 2047 left in a header value already decoded (« l'expé=?UTF-8?Q?dition_EXP25?= »): the reader
+	 * of the library leaves them when they follow raw UTF-8 or are glued to a word, which some mailers send after a
+	 * forward. Adjacent words are joined before decoding (a character may be cut between two of them); a word that does
+	 * not give valid UTF-8 is kept as it was.
+	 *
+	 * @param string $text Value
+	 * @return string
+	 */
+	public static function decodeWords($text)
+	{
+		$text = (string) $text;
+		if (strpos($text, '=?') === false) {
+			return $text;
+		}
+		$word = '=\?([A-Za-z0-9_.:\-]+)(?:\*[A-Za-z\-]+)?\?([QqBb])\?([^?\s]*)\?=';
+		$out = preg_replace_callback('/(?:' . $word . ')(?:\s*' . $word . ')*/', function ($run) use ($word) {
+			preg_match_all('/' . $word . '/', $run[0], $parts, PREG_SET_ORDER);
+			$bytes = '';
+			$charset = strtoupper($parts[0][1]);
+			foreach ($parts as $p) {
+				$bytes .= strtoupper($p[2]) === 'B' ? (string) base64_decode($p[3]) : quoted_printable_decode(str_replace('_', ' ', $p[3]));
+			}
+			if ($charset !== 'UTF-8' && $charset !== 'UTF8') {
+				try {
+					$converted = mb_convert_encoding($bytes, 'UTF-8', $charset);
+				} catch (Throwable $e) {
+					$converted = false;
+				}
+				if ($converted === false) {
+					return $run[0];
+				}
+				$bytes = $converted;
+			}
+
+			return mb_check_encoding($bytes, 'UTF-8') ? $bytes : $run[0];
+		}, $text);
+
+		return is_string($out) ? $out : $text;
 	}
 
 	/**
