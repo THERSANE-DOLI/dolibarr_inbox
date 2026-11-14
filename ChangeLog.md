@@ -1,5 +1,24 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: servers of a new mailbox found from its address (lot H1) :   1.103.0
+  - the address typed, the server of Dolibarr looks for the servers in the order of Thunderbird: a mailbox of the
+    same domain already in inbox, the configuration file published by the domain (autoconfig), its Autodiscover
+    service (the address only, never a password), the providers recognized by the domain or its receiving server
+    (Google, Microsoft 365, OVHcloud...), the database of Thunderbird, the DNS records (SRV), the usual names.
+  - the form of a new mailbox: the address and the login first, the servers folded with their summary; the result
+    says where it comes from and what was looked for; servers typed by hand are never replaced (« Use these
+    settings » offered). The connection test checks what was found.
+  - Google and Microsoft: the OAuth service set up in Dolibarr chosen, else what to do (needed for Microsoft 365).
+  - the database of Thunderbird (Mozilla) gets the domain name only: off by default (Settings > General > New
+    mailboxes, listed in the outside services), else offered by a click when nothing is found.
+
+- FIX: dates, numbers and sizes in the language of Dolibarr, English texts, option of Dolibarr named :   1.102.18
+  - dates, times and numbers shown in the language of Dolibarr everywhere (some followed the browser); sizes of files
+    in the units of the language (o/Ko/Mo in French, B/KB/MB in English).
+  - English texts say « email » for a message (« mail » stays for the mail server and the mailbox).
+  - sending disabled: the option of Dolibarr cited by its own label, in every language.
+  - panel of the notifications: a long « Mark all as read » (German) goes on two lines, the buttons stay in the panel.
+
 - FIX: protected mailbox at the login, « locked » instead of « mailbox not found » :   1.102.17
   - the first list of a new session (PWA) came before the silent unlock of a protected mailbox and was refused as
     « mailbox not found », only a retry button; it is now told as locked (unlock button) and the list is loaded

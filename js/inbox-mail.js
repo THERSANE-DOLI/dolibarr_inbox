@@ -164,7 +164,7 @@
 	}
 
 	// ---------- Formats ----------
-	const locale = () => (I.ctx('MAIN_LANG_DEFAULT', 'en_US') || 'en_US').replace('_', '-');
+	const locale = I.locale;
 	/** Date of a list: time today, « yesterday 17:02 », weekday within 7 days, else short date */
 	function shortDate(ts) {
 		if (!ts) {
@@ -230,18 +230,7 @@
 		}
 		return String(d.getFullYear());
 	}
-	function size(bytes) {
-		if (bytes < 1024) {
-			return bytes + ' o';
-		}
-		if (bytes < 1048576) {
-			return Math.round(bytes / 1024) + ' Ko';
-		}
-		if (bytes < 1073741824) {
-			return (bytes / 1048576).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' Mo';
-		}
-		return (bytes / 1073741824).toLocaleString(locale(), { maximumFractionDigits: 1 }) + ' Go';
-	}
+	const size = I.size;
 	/** Size of a folder in the panel (option of the panel): its mails indexed, « ≈ » when not all are */
 	function folderSize(f) {
 		if (params.folder_sizes !== '1' || f.bytes === undefined) {

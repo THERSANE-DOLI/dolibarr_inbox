@@ -262,7 +262,7 @@ class InboxNotifyTest extends InboxTestCase
 		$langs->loadLangs(array('main', 'inbox@inbox'));
 		$items = $notify->listFor($alice, 10)['items'];
 		$byId = array_column($items, null, 'id');
-		$this->assertSame('T bob assigned a mail to you', InboxNotification::textOf($byId[$recent], $langs));
+		$this->assertSame('T bob assigned an email to you', InboxNotification::textOf($byId[$recent], $langs));
 		$this->assertSame($langs->transnoentities('InboxNotifBoxError'), InboxNotification::textOf(array('type' => 'box_error', 'actor' => null, 'text' => ''), $langs));
 	}
 }

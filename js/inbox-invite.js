@@ -26,7 +26,7 @@
 
 	const I = Dolibarr.tools.inbox;
 	const { esc, t, th, ic, post, toast, $, $$ } = I;
-	const locale = () => (I.ctx('MAIN_LANG_DEFAULT', 'en_US') || 'en_US').replace('_', '-');
+	const locale = I.locale;
 	const PARTSTATS = ['ACCEPTED', 'TENTATIVE', 'DECLINED'];
 
 	function fmtDay(ts, utc) {

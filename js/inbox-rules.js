@@ -32,7 +32,7 @@
 	const RULE_ACTIONS = ['move', 'copy', 'tag', 'read', 'flag', 'delete', 'redirect'];
 	const RULE_NO_VALUE = ['read', 'flag', 'delete'];
 	const rulesCache = {};
-	const locale = () => (I.ctx('MAIN_LANG_DEFAULT', 'en_US') || 'en_US').replace('_', '-');
+	const locale = I.locale;
 
 	/** Name of a folder for a person: its path without INBOX, levels separated by « / » */
 	function rulePathName(path, folders) {

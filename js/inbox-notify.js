@@ -270,8 +270,8 @@
 	function when(ts) {
 		const d = new Date(ts * 1000);
 		const today = new Date();
-		const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-		return d.toDateString() === today.toDateString() ? time : d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + time;
+		const time = d.toLocaleTimeString(I.locale(), { hour: '2-digit', minute: '2-digit' });
+		return d.toDateString() === today.toDateString() ? time : d.toLocaleDateString(I.locale(), { day: 'numeric', month: 'short' }) + ' ' + time;
 	}
 
 	function initials(name) {

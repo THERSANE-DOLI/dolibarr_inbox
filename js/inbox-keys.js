@@ -294,7 +294,7 @@
 		(res.notices || []).forEach(n => {
 			dialog({
 				title: t('InboxProtectNotSentTitle'),
-				body: '<p>' + th('InboxProtectNotSentText', n.mailbox, new Date(n.date * 1000).toLocaleString()) + '</p>',
+				body: '<p>' + th('InboxProtectNotSentText', n.mailbox, new Date(n.date * 1000).toLocaleString(I.locale())) + '</p>',
 				actions: n.folder ? [{ label: t('InboxProtectSeeDrafts'), primary: true, run: () => I.go('#/mail/' + n.folder) }] : [],
 			});
 		});
@@ -324,7 +324,7 @@
 				}
 			} else if (d.mine) {
 				const days = Math.floor(late / 86400);
-				offer(d, t('InboxProtectLateText', d.subject || t('InboxNoSubject'), new Date(due * 1000).toLocaleString(), days > 0 ? t('InboxProtectLateDays', days) : t('InboxProtectLateHours', Math.max(1, Math.round(late / 3600)))));
+				offer(d, t('InboxProtectLateText', d.subject || t('InboxNoSubject'), new Date(due * 1000).toLocaleString(I.locale()), days > 0 ? t('InboxProtectLateDays', days) : t('InboxProtectLateHours', Math.max(1, Math.round(late / 3600)))));
 			}
 		});
 	}

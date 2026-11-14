@@ -67,9 +67,7 @@
 		['#027a48', 'InboxColorGreen'], ['#175cd3', 'InboxColorBlue'], ['#6941c6', 'InboxColorPurple']];
 	const BACKGROUNDS = [['#fef08a', 'InboxColorYellow'], ['#bbf7d0', 'InboxColorGreen'], ['#bfdbfe', 'InboxColorBlue'], ['#fecdd3', 'InboxColorPink'], ['#e5e7eb', 'InboxColorGrey']];
 
-	function size(n) {
-		return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.0', '') + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' ko';
-	}
+	const size = I.size;
 	function addressText(a) {
 		return a.name ? a.name + ' <' + a.email + '>' : a.email;
 	}
@@ -617,7 +615,7 @@
 			finish(w);
 			if (res.live && res.scheduled) {
 				// Protected mailbox (1.89.0): the mail waits in Drafts on the mail server with its date
-				toast(t('InboxProtectScheduledDone', new Date(res.send_at * 1000).toLocaleString()));
+				toast(t('InboxProtectScheduledDone', new Date(res.send_at * 1000).toLocaleString(I.locale())));
 			} else if (res.queued) {
 				sendBar(res);
 			} else {
@@ -642,7 +640,7 @@
 	/** « Paul answered at 10:42 »: see his answer, or send anyway (never blocking) */
 	function paintConflict(w, c, opts) {
 		const box = $('.ibx-js-conflict', w.dlg);
-		const when = c.date ? new Date(c.date * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+		const when = c.date ? new Date(c.date * 1000).toLocaleTimeString(I.locale(), { hour: '2-digit', minute: '2-digit' }) : '';
 		const who = c.author_name ? t(c.queued ? 'InboxComposeConflictQueued' : 'InboxComposeConflict', c.author_name, when) : t('InboxComposeConflictOther', when);
 		box.innerHTML = ic('warning') + '<span>' + esc(who) + '</span>'
 			+ (c.mail ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-conflictsee">' + th('InboxComposeConflictSee') + '</button>' : '')
@@ -851,7 +849,7 @@
 			b.el.innerHTML = ic('warning') + '<span class="ibx-sendbar__text">' + esc(b.error) + '</span>' + subject
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxOutboxReopen') + '</button>';
 		} else if (b.scheduled) {
-			b.el.innerHTML = ic('send-later') + '<span class="ibx-sendbar__text">' + esc(t('InboxSendScheduled', new Date(b.at).toLocaleString())) + '</span>' + subject
+			b.el.innerHTML = ic('send-later') + '<span class="ibx-sendbar__text">' + esc(t('InboxSendScheduled', new Date(b.at).toLocaleString(I.locale()))) + '</span>' + subject
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-barundo">' + th('InboxSendUnschedule') + '</button>';
 		} else {
 			const left = Math.max(0, Math.ceil((b.at - Date.now()) / 1000));
@@ -992,7 +990,7 @@
 			return;
 		}
 		const row = it => '<tr data-id="' + it.id + '"><td><b class="ibx-ellipsis">' + esc(it.subject || t('InboxNoSubject')) + '</b><div class="ibx-muted ibx-ellipsis">' + esc(it.to) + '</div></td>'
-			+ '<td>' + (it.status < 0 ? '<span class="ibx-text-danger">' + ic('warning') + ' ' + esc(t('InboxOutboxFailed')) + '</span><div class="ibx-muted">' + esc(it.error) + '</div>' : esc(new Date(it.send_at * 1000).toLocaleString())) + '</td>'
+			+ '<td>' + (it.status < 0 ? '<span class="ibx-text-danger">' + ic('warning') + ' ' + esc(t('InboxOutboxFailed')) + '</span><div class="ibx-muted">' + esc(it.error) + '</div>' : esc(new Date(it.send_at * 1000).toLocaleString(I.locale()))) + '</td>'
 			+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm" data-act="edit">' + th('InboxOutboxReopen') + '</button> '
 			+ (it.status === 0 ? '<button type="button" class="ibx-btn ibx-btn--sm" data-act="now">' + th('InboxSendNow') + '</button>' : '') + '</td></tr>';
 		const dlg = dialog({
@@ -2213,7 +2211,7 @@
 			list.innerHTML = res.pieces.length ? res.pieces.map((p, i) => '<div class="ibx-picklist__item ibx-pieceins__item" role="option" tabindex="-1" aria-selected="false" data-i="' + i + '">'
 				+ ic(p.icon) + '<span class="ibx-pieceins__ref"><b>' + esc(p.ref) + '</b> <span class="ibx-muted">' + esc(p.kind) + '</span></span>'
 				+ '<span class="ibx-ellipsis ibx-pieceins__soc">' + esc(p.soc) + '</span>'
-				+ '<span class="ibx-muted">' + (p.date ? esc(new Date(p.date * 1000).toLocaleDateString()) : '') + '</span>'
+				+ '<span class="ibx-muted">' + (p.date ? esc(new Date(p.date * 1000).toLocaleDateString(I.locale())) : '') + '</span>'
 				+ '<span class="ibx-pieceins__amount">' + esc(p.total) + '</span></div>').join('') : '<div class="ibx-empty">' + th('InboxPieceNone') + '</div>';
 			list._pieces = res.pieces;
 		};

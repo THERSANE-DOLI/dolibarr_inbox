@@ -35,6 +35,19 @@
 			return fallback;
 		}
 	};
+	/** Locale of the language of Dolibarr (fr-FR, en-US...): dates and numbers, never the language of the browser */
+	const locale = () => (ctx('MAIN_LANG_DEFAULT', 'en_US') || 'en_US').replace('_', '-');
+	/** Size of a file in the units of the language (o/Ko/Mo/Go in French, B/KB/MB/GB in English...) */
+	const size = bytes => {
+		const units = t('InboxSizeUnits');
+		const u = (units && units !== 'InboxSizeUnits' ? units : 'B|KB|MB|GB|TB').split('|');
+		let n = +bytes || 0, i = 0;
+		while (n >= 1024 && i < u.length - 1) {
+			n /= 1024;
+			i++;
+		}
+		return (i < 2 ? Math.max(i ? 1 : 0, Math.round(n)).toLocaleString(locale()) : n.toLocaleString(locale(), { maximumFractionDigits: 1 })) + '\u00a0' + u[i];
+	};
 	/** Rights of the user, from the flat keys of the context */
 	const rights = () => ({ webmail: !!ctx('INBOX_RIGHT_WEBMAIL', false), account_admin: !!ctx('INBOX_RIGHT_ACCOUNT_ADMIN', false), dolibarr_admin: !!ctx('INBOX_RIGHT_DOLIBARR_ADMIN', false), trusted_domain: !!ctx('INBOX_RIGHT_TRUSTED_DOMAIN', false), blocked_sender: !!ctx('INBOX_RIGHT_BLOCKED_SENDER', false) });
 	const $ = (sel, root) => (root || document).querySelector(sel);
@@ -667,7 +680,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
+		ctx, ctxJson, locale, size, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,

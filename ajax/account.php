@@ -28,7 +28,7 @@ dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators', 'carriers'), true);
+$write = in_array($action, array('save', 'test', 'discover', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators', 'carriers'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -249,6 +249,23 @@ switch ($action) {
 		$saved = $id > 0 && inboxAjaxParam('save', 'int');
 		$result = $saved ? $tester->runAndSave($account, $user) : $tester->run($account);
 		inboxAjaxReply(array('test' => $result));
+		// no break
+
+	case 'discover':
+		// Servers of a new mailbox found from its address (lot H1): a proposal for the form, nothing saved; the ISPDB of
+		// Thunderbird asked when set, or once by the click of the user (ispdb=1)
+		inboxAjaxNeedAdmin();
+		$email = (string) inboxAjaxParam('email', 'email');
+		if (!isValidEmail($email)) {
+			inboxAjaxError($langs->transnoentities('InboxAutoconfigBadEmail'), 422, array('email' => $langs->transnoentities('InboxAutoconfigBadEmail')));
+		}
+		dol_include_once('/inbox/class/inboxautoconfig.class.php');
+		$finder = new InboxAutoconfig($db);
+		if (inboxAjaxParam('ispdb', 'int')) {
+			$finder->ispdb = true;
+		}
+		@set_time_limit(60);
+		inboxAjaxReply(array('discover' => $finder->discover($email)));
 		// no break
 
 	case 'status':
