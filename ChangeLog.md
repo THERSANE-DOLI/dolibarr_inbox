@@ -9,6 +9,7 @@
   - an invitation an agenda module of this Dolibarr sent itself (hook inboxInviteEvent) says « Already in your
     agenda »: never added twice, the answer recorded in Dolibarr without email.
   - the choice of the agenda panel closed by hand with no email open is kept again (setting not declared before).
+  - a page of a module opened from an email: the blocks of the modules read again when its window closes.
 
 - NEW: actions of other modules in a window of inbox, with the subject and the correspondents of the email :   1.108.0
   - an action of a module (hook inboxMailActions) may open its page in a window of inbox instead of a new tab, and

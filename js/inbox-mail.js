@@ -9817,6 +9817,10 @@
 			w.opener.frame.focus();
 			return;
 		}
+		// A page of a module opened from a mail (1.109.0): what it changed shows in the blocks of the modules
+		if (w.module && w.mailId && w.box && w.box.isConnected && +w.box.dataset.mail === w.mailId && w.box._data) {
+			loadPanels(w.box);
+		}
 		const tileEl = !w.source && !w.module && S.mail && S.mail.id === w.mail.id ? $('[data-att="' + w.index + '"] .ibx-js-attopen', readPane()) : null;
 		if (tileEl) {
 			tileEl.focus();
