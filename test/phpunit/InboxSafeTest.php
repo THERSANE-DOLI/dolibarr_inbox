@@ -25,6 +25,9 @@ use PHPUnit\Framework\TestCase;
 
 dol_include_once('/inbox/class/inboxsafe.class.php');
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
+dol_include_once('/inbox/class/inboxagenda.class.php');
+dol_include_once('/inbox/class/inboxlead.class.php');
+dol_include_once('/inbox/class/inboxcreate.class.php');
 
 /**
  * No database: pure functions
@@ -226,6 +229,67 @@ class InboxSafeTest extends TestCase
 		$this->assertSame("a<br>\nb", InboxSafe::textToHtml("a\r\nb"));
 		$this->assertSame('L&#039;Atelier &quot;Bois&quot;', InboxSafe::textToHtml('L\'Atelier "Bois"'));
 		$this->assertSame('ab', InboxSafe::textToHtml("a\x01\u{202E}b"));
+	}
+
+	/**
+	 * An address between angle brackets is not a tag: kept (organizer of an invitation, report of a failed sending)
+	 *
+	 * @return void
+	 */
+	public function testLineKeepsAddresses()
+	{
+		$this->assertSame("Paul Martin \u{2039}paul@ex.fr\u{203A}", InboxSafe::line('Paul Martin <paul@ex.fr>'));
+		$this->assertSame("Paul \u{2039}paul@ex.fr\u{203A}", InboxSafe::line('Paul &lt;paul@ex.fr&gt;'));
+		// Not an address: a tag with an @ in an attribute stays a tag
+		$this->assertSame('x', InboxSafe::line('<img src=x onerror="a@b">x'));
+		$this->assertSame('x', InboxSafe::line('<a href="mailto:a@b.c">x</a>'));
+	}
+
+	/**
+	 * Lot S2: the values written in Dolibarr go through the one door
+	 *
+	 * @return void
+	 */
+	public function testWritePoints()
+	{
+		// Agenda (invitation, report of a failed sending, sending recorded on a piece)
+		$this->assertSame("Re: Devis 'urgent'", InboxAgenda::field('Re: Devis "urgent" <script>alert(1)</script>'));
+		$this->assertSame('Utilisez &lt;b&gt;', InboxAgenda::note('Utilisez <b>'), 'escaped, not removed');
+
+		// Quick creation of a thirdparty: values of the panel, then extrafields by their type
+		$this->assertSame('Paul', InboxLead::cleanValue('name', '&lt;script&gt;alert(1)&lt;/script&gt;Paul'));
+		$this->assertSame("L'Atelier 'Bois'", InboxLead::cleanValue('name', 'L\'Atelier "Bois"'));
+		$this->assertSame('', InboxLead::cleanValue('email', '<img src=x onerror=alert(1)>'));
+		$this->assertSame("o'neil@a.fr", InboxLead::cleanValue('email', 'O"Neil@A.fr'), 'double quote as an apostrophe, as everywhere');
+		$def = function ($type, $param = array(), $size = '') {
+			return array('type' => $type, 'size' => $size, 'param' => $param);
+		};
+		$this->assertSame('Abc', InboxLead::extrafieldValue($def('varchar', array(), '3'), 'Abcdef'));
+		$this->assertSame('&lt;b&gt;x', InboxLead::extrafieldValue($def('html'), '<b>x'), 'HTML field: escaped');
+		$this->assertSame(12, InboxLead::extrafieldValue($def('int'), '12'));
+		$this->assertNull(InboxLead::extrafieldValue($def('int'), '12; DROP'));
+		$this->assertSame(1.5, InboxLead::extrafieldValue($def('price'), '1,5'));
+		$this->assertSame('b', InboxLead::extrafieldValue($def('select', array('options' => array('a' => 'A', 'b' => 'B'))), 'b'));
+		$this->assertNull(InboxLead::extrafieldValue($def('select', array('options' => array('a' => 'A'))), '<img src=x>'), 'not a key of the list');
+		$this->assertNull(InboxLead::extrafieldValue($def('sellist'), '1'), 'lists of the database: never from the panel');
+		$this->assertNull(InboxLead::extrafieldValue($def('varchar'), ''));
+
+		// « Create ▾ »: values of a mail in the address of a page of the core
+		$row = (object) array('from_email' => 'jane@client.inbox-test.invalid', 'from_name' => 'Jane "x" <b>Martin</b>', 'subject' => 'Devis <img src=x onerror=alert(1)>',
+			'requester_email' => '', 'requester_name' => '', 'source_data' => '');
+		$creator = new InboxCreate($GLOBALS['db']);
+		$url = urldecode($creator->createUrl('contact', $row, array('soc' => 0)));
+		$this->assertStringNotContainsString('<', $url);
+		$this->assertStringNotContainsString('"', $url);
+		$this->assertStringContainsString("lastname='x' Martin", $url);
+		$this->assertStringContainsString('label=Devis', urldecode($creator->createUrl('action', $row, array('soc' => 0))));
+		$row->requester_email = 'r@client.inbox-test.invalid';
+		$row->requester_name = 'R';
+		$row->source_data = json_encode(array('company' => '&lt;svg onload=alert(1)&gt;ACME', 'town' => 'Lyon"/onfocus=x'));
+		$url = urldecode($creator->createUrl('societe', $row, array('soc' => 0)));
+		$this->assertStringContainsString('name=ACME', $url);
+		$this->assertStringContainsString("town=Lyon'/onfocus=x", $url);
+		$this->assertStringNotContainsString('svg', $url);
 	}
 
 	/**

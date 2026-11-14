@@ -1,5 +1,17 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: values of a mail written in Dolibarr through the one door (lot S2) :   1.105.0
+  - quote of an answer or a forward: HTML Purifier before the filter of the sending; a text mail quoted keeps a
+    « <b> » written in it (shown, no longer removed).
+  - quick creation of a thirdparty and its contact: values cleaned by the one door, extrafields by their type (an
+    HTML extrafield gets the text escaped, a list one of its keys only, the lists of the database nothing).
+  - « Create ▾ »: values of the mail (sender, subject, data of a site) cleaned before they go in the address of the
+    page of creation of Dolibarr, not only by the filter of that page.
+  - agenda (invitation, failed sending, sending recorded on a piece): titles and notes through the one door; an
+    address between angle brackets stays (‹paul@ex.fr›), a « <b> » of a note is shown instead of removed.
+  - data of a site (X-Data-Form, X-Quotation-Data), number of a signature put on a contact, file of a mail put in
+    the documents of a piece (no bidi override character in its name): through the one door.
+
 - NEW: one door for what comes from a mail, DOMPurify and HTML Purifier (lot S1) :   1.104.0
   - InboxSafe: the HTML body for the reading frame (as before), the HTML body that leaves it (HTML Purifier, strict
     list: no style block, no class, no id, no script scheme), plain values for the fields of Dolibarr (no tag, tags

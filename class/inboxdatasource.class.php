@@ -22,6 +22,7 @@
  *          tool) from its own address, the real requester written in structured headers
  */
 
+require_once __DIR__.'/inboxsafe.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 
 /**
@@ -747,9 +748,8 @@ class InboxDataSource
 	 */
 	protected static function clean($value)
 	{
-		$value = (string) preg_replace('/[\x00-\x1f\x7f]+/u', ' ', strip_tags(html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-
-		return trim(mb_substr(trim((string) preg_replace('/\s+/u', ' ', $value)), 0, 255, 'UTF-8'));
+		// The one door (lot S2): tags written in entities removed too, no double quote, no bidi override
+		return InboxSafe::line($value, 255);
 	}
 
 	/**

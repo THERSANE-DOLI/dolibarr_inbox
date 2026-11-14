@@ -23,7 +23,13 @@
  * The screens of the agenda trust what the pages of Dolibarr filtered on input: comm/action/card.php shows the
  * note as HTML (dol_string_onlythesehtmltags keeps img and its attributes) and prints the title and the place raw
  * in its form (value="...") and in its card. Everything inbox writes there comes from a mail or from a text typed
- * by a user, never filtered by GETPOST: it goes through here (audit INBX-030, INBX-046, INBX-047, INBX-048).
+ * by a user, never filtered by GETPOST: it goes through here (audit INBX-030, INBX-046, INBX-047, INBX-048), that is
+ * now the one door InboxSafe (lot S2).
+ */
+require_once __DIR__.'/inboxsafe.class.php';
+
+/**
+ * Values of the agenda
  */
 class InboxAgenda
 {
@@ -36,9 +42,7 @@ class InboxAgenda
 	 */
 	public static function note($text, $max = 60000)
 	{
-		$text = dol_trunc(self::controls((string) $text, true), $max, 'right', 'UTF-8', 1);
-
-		return dol_nl2br(dol_escape_htmltag($text, 0, 1));
+		return InboxSafe::textToHtml($text, $max);
 	}
 
 	/**
@@ -50,25 +54,6 @@ class InboxAgenda
 	 */
 	public static function field($text, $max = 250)
 	{
-		// An entity would come back as a character on a screen that decodes it: decoded first, then neutralised
-		$text = html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-		$text = trim((string) preg_replace('/\s+/u', ' ', self::controls($text, false)));
-		$text = strtr($text, array('<' => "\u{2039}", '>' => "\u{203A}", '"' => "'", '`' => "'"));
-
-		return dol_trunc($text, $max, 'right', 'UTF-8', 1);
-	}
-
-	/**
-	 * Control characters removed (lines kept on demand)
-	 *
-	 * @param string $text  Text
-	 * @param bool   $lines Keep the line breaks
-	 * @return string
-	 */
-	protected static function controls($text, $lines)
-	{
-		$text = str_replace("\r\n", "\n", $text);
-
-		return (string) preg_replace($lines ? '/[\x00-\x08\x0B-\x1F\x7F]/u' : '/[\x00-\x1F\x7F]/u', $lines ? '' : ' ', $text);
+		return InboxSafe::line($text, $max);
 	}
 }

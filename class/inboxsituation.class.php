@@ -21,6 +21,7 @@
  * \brief   Usage of a mailbox and situation of the thirdparty of a mail (1.67.0, analyses/analyse-usage-boite.md)
  */
 
+require_once __DIR__.'/inboxsafe.class.php';
 require_once __DIR__.'/inboxelements.class.php';
 require_once __DIR__.'/inboxaccountlog.class.php';
 require_once __DIR__.'/inboxcontactmatcher.class.php';
@@ -767,7 +768,8 @@ class InboxSituation
 			return null;
 		}
 		$before = (string) $c->$field;
-		$c->$field = dol_trunc(trim((string) $number), 30, 'right', 'UTF-8', 1);
+		// A number read in a mail: the one door (lot S2), as any value of a mail written in Dolibarr
+		$c->$field = InboxSafe::line((string) $number, 30);
 		if ($c->update((int) $c->id, $user) <= 0) {
 			$this->error = $c->error ?: implode(', ', (array) $c->errors);
 			return null;

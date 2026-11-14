@@ -312,6 +312,8 @@ class InboxSafe
 		for ($i = 0; $i < 5; $i++) {
 			$before = $text;
 			$text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+			// An address between angle brackets (« Paul <paul@x.fr> ») is not a tag: kept as ‹paul@x.fr›
+			$text = (string) preg_replace('/<([^<>\s"\'=\/]+@[^<>\s"\'=\/]+)>/u', "\u{2039}\$1\u{203A}", $text);
 			// What a script or a style holds is not text of the value
 			$text = strip_tags((string) preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#is', ' ', $text));
 			if ($text === $before) {

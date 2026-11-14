@@ -23,6 +23,7 @@
 
 // dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+require_once __DIR__.'/inboxsafe.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxidentity.class.php';
@@ -1230,9 +1231,12 @@ class InboxComposer
 			// Pictures of the mail (cid:) are not sent again in an answer: their text stays
 			$body = preg_replace('#<img\b[^>]*src=["\']?cid:[^>]*>#i', '', $body);
 			$body = self::quoteRemote($body, $mode, $removed);
-			$body = InboxMailBuilder::cleanHtml(preg_replace('#^.*<body\b[^>]*>|</body>.*$#is', '', $body));
+			// The one door (lot S2): the quote leaves the reading frame for the editor, HTML Purifier first, then the
+			// filter of the sending (marks of inbox, borders of the tables)
+			$body = InboxMailBuilder::cleanHtml(InboxSafe::html($body));
 		} else {
-			$body = '<div style="white-space:pre-wrap">'.dol_escape_htmltag($message->bodyText).'</div>';
+			// htmlspecialchars: dol_escape_htmltag would remove a « <b> » written in the text instead of showing it
+			$body = '<div style="white-space:pre-wrap">'.htmlspecialchars(InboxMimeParser::clean($message->bodyText, true), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'</div>';
 		}
 		$who = trim($message->fromName) !== '' ? $message->fromName.' <'.$message->fromEmail.'>' : $message->fromEmail;
 		$date = $message->date ? dol_print_date($message->date, 'dayhour', 'tzuserrel', $langs) : '';

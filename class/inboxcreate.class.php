@@ -27,6 +27,7 @@ require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
+require_once __DIR__.'/inboxsafe.class.php';
 
 /**
  * « Create ▾ » opens the page of creation of Dolibarr, filled from the mail (decided 2026-11-07: all the fields,
@@ -252,6 +253,13 @@ class InboxCreate
 			}
 		}
 
+		// Values of a mail in the address of a page of the core: the one door (lot S2), not only the filter of that page
+		foreach ($q as $k => $v) {
+			if (!is_int($v)) {
+				$q[$k] = $k === 'email' ? InboxSafe::line($v, 128) : InboxSafe::line($v, 255);
+			}
+		}
+
 		return DOL_URL_ROOT.self::TYPES[$type]['url'].($q ? '&'.http_build_query($q) : '');
 	}
 
@@ -444,7 +452,8 @@ class InboxCreate
 			$this->error = 'InboxErrorCannotAttach';
 			return '';
 		}
-		$name = dol_sanitizeFileName((string) $name) ?: 'file';
+		// The one door first (no tag, no control nor bidi override character: « facture\u{202E}fdp.exe »), then Dolibarr
+		$name = dol_sanitizeFileName(InboxSafe::line((string) $name, 200)) ?: 'file';
 		// An executable file of a mail (.php, .phtml...) gets .noexe, as an upload of Dolibarr (dol_move_uploaded_file)
 		if (isAFileWithExecutableContent($name) && !getDolGlobalString('MAIN_DOCUMENT_IS_OUTSIDE_WEBROOT_SO_NOEXE_NOT_REQUIRED')) {
 			$name .= '.noexe';
