@@ -3226,12 +3226,63 @@
 		return $('.ibx-pane--read .ibx-pane__body', S.el);
 	}
 
+	// ---------- Agenda panel (1.107.0): what it needs from the mail space ----------
+	/** A mail is open (id) or none (0): the agenda shows itself or hides by its rule (js/inbox-agenda.js) */
+	function agendaMail(id) {
+		if (I.agenda && I.agenda.mailChanged) {
+			I.agenda.mailChanged(id);
+		}
+	}
+	/**
+	 * The mail open, for the agenda and the modules plugged into it: identifiers and short texts only, never its body.
+	 * What the Dolibarr panel recognized (thirdparty, contact, pieces) once it is loaded.
+	 * @returns {object|null}
+	 */
+	I.mailContext = () => {
+		const m = S.mail;
+		if (!m || !S.openId) {
+			return null;
+		}
+		const box = $('.ibx-js-dolibar', readPane());
+		const d = box && box._data ? box._data : null;
+		const sender = d && d.sender ? d.sender : {};
+		const links = d && Array.isArray(d.links) ? d.links.filter(l => l && l.readable !== false && +l.id > 0) : [];
+		const project = links.find(l => l.type === 'project');
+		return {
+			id: m.id,
+			account: m.account,
+			folder: m.folder,
+			messageId: m.message_id || '',
+			subject: m.subject || '',
+			from: m.from ? { name: m.from.name || '', email: m.from.email || '' } : null,
+			thirdparty: sender.soc && sender.soc.readable !== false && +sender.soc.id > 0 ? { id: +sender.soc.id, name: sender.soc.label || sender.soc.ref || '' } : null,
+			contact: sender.contact && sender.contact.readable !== false && +sender.contact.id > 0 ? { id: +sender.contact.id, name: sender.contact.label || sender.contact.ref || '' } : null,
+			user: sender.user ? { id: +sender.user.id, name: sender.user.name || '' } : null,
+			project: project ? { id: +project.id, ref: project.ref || '' } : null,
+			elements: links.filter(l => !['societe', 'contact', 'project'].includes(l.type)).map(l => ({ type: l.type, id: +l.id, ref: l.ref || '' })),
+		};
+	};
+	/**
+	 * A page of this site in a window of inbox, outside of a mail (the agenda panel): closed, onClose is called
+	 * @param {object} o {key, url, title, onClose}
+	 * @returns {boolean} Opened (false: not an address of this site)
+	 */
+	I.openPageWindow = o => {
+		const url = sameOriginUrl(o.url);
+		if (!url) {
+			return false;
+		}
+		openModuleWindow({ mailId: 0, box: null, panel: 'page:' + (o.key || 'page'), url, title: String(o.title || '').slice(0, 200), onClose: o.onClose });
+		return true;
+	};
+
 	function showNothing() {
 		clearTimeout(S.readTimer);
 		S.openId = 0;
 		S.mail = null;
 		routeList();
 		syncPaneBar(null);
+		agendaMail(0);
 		const f = currentFolder();
 		const pane = readPane();
 		pane.innerHTML = '<div class="ibx-empty">' + ic('mail-opened', 'ibx-empty__icon')
@@ -3246,6 +3297,7 @@
 	function showMulti() {
 		clearTimeout(S.readTimer);
 		S.openId = 0;
+		agendaMail(0);
 		S.mail = null;
 		routeList();
 		syncPaneBar(null);
@@ -3321,6 +3373,7 @@
 	async function openMail(id, single) {
 		clearTimeout(S.readTimer);
 		S.openId = id;
+		agendaMail(id);
 		routeMail(id);
 		S.mail = null;
 		syncPaneBar(null);
@@ -9175,7 +9228,7 @@
 		const key = o.opener ? o.opener.key + ':child' : 'module:' + o.mailId + ':' + o.panel;
 		const existing = windows.find(w => w.key === key);
 		if (existing) {
-			if (o.opener && existing.frame.getAttribute('src') !== o.url) {
+			if ((o.opener || !o.mailId) && existing.frame.getAttribute('src') !== o.url) {
 				existing.frame.src = o.url;
 			}
 			restore(existing);
@@ -9203,7 +9256,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wclose" title="' + th('InboxCloseWindow') + '" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-window__body"><iframe class="ibx-window__frame" title="' + esc(o.title) + '" src="' + esc(o.url) + '"></iframe></div>';
-		const w = { key, dlg, module: true, title: o.title, mailId: o.mailId, box: o.box, panel: o.panel, kind, opener: o.opener || null, child: null };
+		const w = { key, dlg, module: true, title: o.title, mailId: o.mailId, box: o.box, panel: o.panel, kind, opener: o.opener || null, child: null, onClose: o.onClose || null };
 		w.frame = $('iframe', dlg);
 		if (o.modal) {
 			w.backdrop = document.createElement('div');
@@ -9278,6 +9331,13 @@
 			return;
 		}
 		if (d.action !== 'done') {
+			return;
+		}
+		if (!w.mailId) {
+			closeWindow(w);
+			if (d.message) {
+				toast(String(d.message).slice(0, 200));
+			}
 			return;
 		}
 		const ids = [w.mailId];
@@ -9493,6 +9553,13 @@
 			w.backdrop.remove();
 		}
 		windows.splice(at, 1);
+		if (w.onClose) {
+			try {
+				w.onClose();
+			} catch (e) {
+				// The page of the window is gone anyway
+			}
+		}
 		if (w.opener) {
 			w.opener.child = null;
 			front(w.opener);
@@ -10733,7 +10800,13 @@
 			newMail();
 			return;
 		}
-		if (key === 'F9') {
+		if (key === 'F9' && e.shiftKey) {
+			// Agenda panel (1.107.0)
+			if (I.agenda && I.agenda.enabled()) {
+				e.preventDefault();
+				I.agenda.toggle('key');
+			}
+		} else if (key === 'F9') {
 			e.preventDefault();
 			toggleFolders();
 		} else if (key === 'ArrowDown' || key === 'ArrowUp') {
@@ -10851,7 +10924,7 @@
 		const rows = [
 			['C', 'InboxNewMail'], ['R', 'InboxReply'], ['Maj+R', 'InboxReplyAll'], ['Ctrl+L', 'InboxForward'], ['Ctrl+Entrée', 'InboxComposeSend'],
 			['↑ ↓', 'InboxKeyNav'], ['N', 'InboxKeyNextUnread'], ['M', 'InboxKeyRead'], ['S', 'InboxFlag'], [t('InboxKeySpace'), 'InboxKeyAssign'], ['W', 'InboxWatchThread'], ['K', 'InboxIgnoreThread'], ['Maj+N', 'InboxKeyBell'], ['A', 'InboxArchive'], ['Maj+M', 'InboxMoveToMenu'], ['J / Maj+J', 'InboxKeyJunk'],
-			['Suppr', 'InboxDelete'], ['1 … 9', 'InboxKeyTags'], ['0', 'InboxRemoveAllTags'], ['Ctrl+Maj+K', 'InboxKeySearch'], ['F9', 'InboxKeyFolders'],
+			['Suppr', 'InboxDelete'], ['1 … 9', 'InboxKeyTags'], ['0', 'InboxRemoveAllTags'], ['Ctrl+Maj+K', 'InboxKeySearch'], ['F9', 'InboxKeyFolders'], ['Maj+F9', 'InboxKeyAgenda'],
 			['Pg. suiv. / Pg. préc.', 'InboxKeyScroll'], ['Ctrl + / - / 0', 'InboxKeyTextSize'], ['Ctrl+U', 'InboxViewSource'], ['Ctrl+A', 'InboxKeySelectAll'], [t('InboxKeyCtrlSpace'), 'InboxKeyToggleSelect'], ['?', 'InboxKeyHelp'], ['Échap', 'InboxKeyEscape'],
 		];
 		dialog({
@@ -10896,12 +10969,19 @@
 		if (!w.w2) {
 			app.style.removeProperty('--ibx-w2');
 		}
+		if (w.w3) {
+			app.style.setProperty('--ibx-w3', w.w3 + 'px');
+		} else {
+			app.style.removeProperty('--ibx-w3');
+		}
 	}
 	function bindSplitters() {
 		$$('.ibx-splitter', S.el).forEach(sp => {
-			const which = sp.dataset.split === '1' ? 'w1' : 'w2';
-			const pane = which === 'w1' ? $('.ibx-pane--folders', S.el) : $('.ibx-pane--list', S.el);
-			const min = which === 'w1' ? 180 : 320;
+			const which = 'w' + sp.dataset.split;
+			const pane = $(which === 'w1' ? '.ibx-pane--folders' : (which === 'w2' ? '.ibx-pane--list' : '.ibx-pane--agenda'), S.el);
+			const min = which === 'w1' ? 180 : (which === 'w2' ? 320 : 240);
+			// The agenda is on the right of its splitter: it grows when the splitter goes left
+			const dir = which === 'w3' ? -1 : 1;
 			sp.addEventListener('pointerdown', e => {
 				e.preventDefault();
 				sp.setPointerCapture(e.pointerId);
@@ -10910,7 +10990,7 @@
 				const base = pane.getBoundingClientRect().width;
 				const app = $('.ibx-mailapp', S.el);
 				const move = ev => {
-					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(window.innerWidth * 0.6, base + ev.clientX - start)) + 'px');
+					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(window.innerWidth * (which === 'w3' ? 0.4 : 0.6), base + dir * (ev.clientX - start))) + 'px');
 				};
 				const up = () => {
 					sp.classList.remove('is-dragging');
@@ -10947,7 +11027,7 @@
 				e.preventDefault();
 				const app = $('.ibx-mailapp', S.el);
 				const cur = pane.getBoundingClientRect().width;
-				app.style.setProperty('--ibx-' + which, Math.max(min, cur + (e.key === 'ArrowRight' ? 24 : -24)) + 'px');
+				app.style.setProperty('--ibx-' + which, Math.max(min, cur + dir * (e.key === 'ArrowRight' ? 24 : -24)) + 'px');
 			});
 		});
 	}
@@ -10993,6 +11073,9 @@
 			+ '<div class="ibx-pane__head ibx-mobileonly"><button type="button" class="ibx-btn ibx-btn--icon ibx-js-back" data-to="list" aria-label="' + th('InboxBackToList') + '">' + ic('back') + '</button>'
 			+ '<div class="ibx-panebar ibx-js-panebar" role="toolbar" aria-label="' + th('InboxMailActions') + '"></div></div>'
 			+ '<div class="ibx-pane__body" tabindex="-1"></div></section>'
+			// Agenda panel (1.107.0, js/inbox-agenda.js): its splitter and its column, filled by that script
+			+ '<div class="ibx-splitter ibx-splitter--agenda" data-split="3" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '" hidden></div>'
+			+ '<aside class="ibx-pane ibx-pane--agenda ibx-js-agenda" aria-label="' + th('InboxAgendaPanel') + '" hidden></aside>'
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')
 			+ '</div>';
 	}

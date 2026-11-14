@@ -123,6 +123,75 @@ public function inboxSituationIndicators($parameters, &$object, &$action, $hookm
 Level `alert`, `attention` or `normal` (only the first two show on the closed card, `short` is that text); the
 address stays inside Dolibarr; values of other modules are never shown for an indicator the user cannot read.
 
+## Agenda panel
+
+On the right of the mails, the events of the user: late ones to do, today, the next 7 days. Shown by itself when no
+mail is open, opened by hand (button of the rail, Shift+F9) beside a mail, pinned to stay. It reads the native agenda
+of Dolibarr only (`llx_actioncomm`, the user owner or attendee who did not decline), without the automatic events
+(type `systemauto`) nor the records of mails (`AC_EMAIL`, `AC_EMAIL_IN`, `AC_FAX`, `AC_INBOX_BOUNCE`). Right
+« read his events » of the Agenda module; « create his events » for the case « done ».
+
+inbox knows no agenda module: your module plugs itself here, inbox stays the same with or without it. inbox keeps
+the frame (column, splitter, pin, close, rail button, when it shows); you take what is inside.
+
+**Your pages instead of the ones of Dolibarr, without JavaScript**: hook `inboxAgendaProvider`, context `inbox`.
+Addresses of this site only (a path starting with `/`); inbox fills the markers and opens the page in a window of
+inbox, then reads the panel again when the window closes. Give them only when the user has your rights.
+
+```php
+public function inboxAgendaProvider($parameters, &$object, &$action, $hookmanager)
+{
+	if (!$parameters['user']->hasRight('mymodule', 'read')) {
+		return 0;
+	}
+	$base = dol_buildpath('/mymodule/calendar.php', 1);
+	$this->results['provider'] = array('label' => 'My agenda', 'source' => 'mymodule', 'urls' => array(
+		'create' => $base.'?action=create&socid={socid}&contactids={contactids}&projectid={projectid}&elements={elements}',
+		'open' => $base.'?event={id}',
+		'openAll' => $base,
+	));
+	return 0;
+}
+```
+
+Markers: `{id}` (the event), `{socid}`, `{contactids}`, `{projectid}` (recognized on the mail open, empty without one),
+`{elements}` (pieces linked to the conversation, `type:id` separated by commas, types as Dolibarr names them:
+`propal:12,facture:34`), `{start}` (empty for now). Your page may close its window with
+`parent.postMessage({source: 'inbox-panel', action: 'close'}, location.origin)`.
+
+**Events of your own** (data not in `llx_actioncomm`): hook `inboxAgendaEvents`, context `inbox`. Mode `declare`:
+`$this->results['declare'] = 1` shows the panel even without the Agenda module. Mode `list` (`user`, `from`, `to`,
+and the native `events` and `late`): add yours in `$this->results['events']` and `['late']`; return 1 to replace the
+native ones. Fields: `id`, `source` (your module), `label`, `start`, `end` (timestamps), `allday`, `percent` (-1
+without progress), `location`, `color` (`#rrggbb`), `thirdparty` (`id`, `name`), `url` (of this site), `messageId`,
+`answer` (1 accepted, 2 maybe). Anything else is dropped; inbox never ticks an event of a module (its clicks go to
+your JS hooks).
+
+**JS hooks** (your script loaded by `module_parts['inboxjs']`). Each one gets a context object; change it with
+`Dolibarr.on(name, ctx => {...})`, or with `Dolibarr.onAwait(name, async ctx => {...; return ctx;})` when you need to
+wait. A listener that throws is written in the console and inbox goes on as without it.
+
+| Hook | When | Context | Your module may |
+|---|---|---|---|
+| `inbox:agenda:render` | before each drawing of the content | `el`, `user` (`id`, `timezone`), `range` (`from`, `to`, `days`), `mail`, `events`, `late`, `handled` | draw in `el` itself and set `handled = true`; or change `events` / `late` and let inbox draw |
+| `inbox:agenda:action` | each click of the panel, before inbox | `action` (`create`, `open`, `openAll`, `done`, `undone`, `openMail`, or the key of your button), `event`, `mail`, `handled` | do it your way and set `handled = true` |
+| `inbox:agenda:toolbar` | drawing of the head | `buttons` (`key`, `label`, `icon`, `rank`, `pressed`), `mail` | add, remove or order buttons; yours come back through `inbox:agenda:action` |
+| `inbox:agenda:shown` / `inbox:agenda:hidden` | panel shown or hidden | `pinned`, `reason` (`auto`, `button`, `key`, `api`) | follow its state |
+
+`mail` is the mail open or `null`: `id`, `account`, `folder`, `messageId`, `subject`, `from`, and what the Dolibarr
+panel recognized once loaded: `thirdparty`, `contact`, `user`, `project`, `elements` (`type`, `id`, `ref`). Never its
+body. API: `Dolibarr.tools.inbox.agenda.refresh()`, `.open()`, `.close()`, `.isVisible()`.
+
+```js
+// Creation of events in your module, with the thirdparty of the mail open
+Dolibarr.on('inbox:agenda:action', ctx => {
+	if (ctx.action === 'create') {
+		myModule.openEventForm({ socid: ctx.mail && ctx.mail.thirdparty ? ctx.mail.thirdparty.id : 0 });
+		ctx.handled = true;
+	}
+});
+```
+
 ## Mails sent by a site: data sources
 
 A quote form, a shop or an application sends its notifications from its own address: Settings > Data sources (admins
