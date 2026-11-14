@@ -51,6 +51,12 @@ class InboxUpdatePendingTest extends InboxTestCase
 			$this->assertSame(array('from' => '1.0.0', 'to' => $m[1]), inboxUpdatePending(true));
 			$set($m[1]);
 			$this->assertNull(inboxUpdatePending(true), 'activated with these files');
+			// Same X.Y, older Z: a fix only replaces files, nothing to activate again
+			$parts = explode('.', $m[1]);
+			$set($parts[0].'.'.$parts[1].'.0');
+			$this->assertNull(inboxUpdatePending(true), 'older Z of the same X.Y: nothing said');
+			$set($parts[0].'.'.max(0, (int) $parts[1] - 1).'.99');
+			$this->assertNotNull(inboxUpdatePending(true), 'older Y: activation needed');
 			$set('99.0.0');
 			$this->assertNull(inboxUpdatePending(true), 'files older: nothing said');
 			$set('unknown');

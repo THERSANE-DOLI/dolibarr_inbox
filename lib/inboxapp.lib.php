@@ -78,8 +78,9 @@ function inboxCanSend(User $user)
 
 /**
  * Inbox updated but not activated again since (1.85.0): Dolibarr writes the version of each activation in the note of
- * the constant MAIN_MODULE_INBOX (lastactivationversion); a newer version of the files means the new tables, columns
- * and rights are not there yet. Never guessed: an activation without version (very old) says nothing.
+ * the constant MAIN_MODULE_INBOX (lastactivationversion); a newer X.Y of the files means the new tables, columns
+ * and rights are not there yet (a Z, fix, never needs it). Never guessed: an activation without version (very old)
+ * says nothing.
  *
  * @param bool $fresh Read again (tests), else once per request
  * @return array{from:string,to:string}|null null when nothing is pending
@@ -98,7 +99,11 @@ function inboxUpdatePending($fresh = false)
 	$row = $db->getRow("SELECT note FROM ".$db->prefix()."const WHERE ".$db->decrypt('name')." = 'MAIN_MODULE_INBOX' AND entity IN (0, ".((int) $conf->entity).") ORDER BY entity DESC");
 	$note = is_object($row) && $row->note ? json_decode((string) $row->note, true) : null;
 	$active = is_array($note) && !empty($note['lastactivationversion']) ? (string) $note['lastactivationversion'] : '';
-	if ($file !== '' && preg_match('/^\d+(\.\d+)*$/', $active) && version_compare($file, $active, '>')) {
+	// X.Y only: a new Y (or X) is what needs the module activated again; a Z only replaces files
+	$xy = function ($v) {
+		return implode('.', array_slice(array_pad(explode('.', $v), 2, '0'), 0, 2));
+	};
+	if ($file !== '' && preg_match('/^\d+(\.\d+)*$/', $active) && version_compare($xy($file), $xy($active), '>')) {
 		$pending = array('from' => $active, 'to' => $file);
 	}
 
