@@ -2,23 +2,23 @@
 
 - FIX: long name of an attachment keeps its extension :   1.106.4
   - a name longer than 150 characters was cut with its extension (the file was put in the documents without its
-    type); the base is cut now, the extension kept (audit INBX-091).
+    type); the base is cut now, the extension kept.
 
 - FIX: quick creation of a customer, values cut to the length of their column :   1.106.3
   - a long value of a site or of a signature (name of a contact over 50 characters) made the creation fail with the
-    error of the database shown as it was; each value is cut to the length of its column (audit INBX-090).
+    error of the database shown as it was; each value is cut to the length of its column.
 
 - FIX: sender read again when a semicolon is in its quoted name :   1.106.2
   - « "Service ; Compta" <x@y> »: the reader of the mails cut the list of addresses on the semicolon, the mail came
     « without sender » and the checks made on the address (blocked senders, known senders, banners) did not run.
     A reader of our own takes over when the library misses an address of the header (From, Reply-To, To, Cc), with
-    quoted names, escapes, comments and groups (audit INBX-089).
+    quoted names, escapes, comments and groups.
 
 - FIX: proposal of the AI shown through the one door too :   1.106.1
   - the preview of a proposal of the AI (that may have read the mail) goes through Dolibarr.tools.inbox.safeHtml
     as well, not only through the filter of the server (audit 2026-11-14).
 
-- NEW: editor and cards of objects through the one door in the page (lot S3) :   1.106.0
+- NEW: editor and cards of objects through the one door in the page :   1.106.0
   - editor of the writing (Tiptap, CKEditor, or the one of another module): the HTML given at its opening (quote,
     draft reopened, template), inserted (AI, piece, signature) or put in place of a range goes through
     Dolibarr.tools.inbox.safeHtml; a rich paste too (a mail shown, a page, Word).
@@ -27,7 +27,7 @@
   - Sanitizer API of Chromium: configuration accepted (data attributes declared), checked in Chrome 156.
   - README: rules of the one door.
 
-- NEW: values of a mail written in Dolibarr through the one door (lot S2) :   1.105.0
+- NEW: values of a mail written in Dolibarr through the one door :   1.105.0
   - quote of an answer or a forward: HTML Purifier before the filter of the sending; a text mail quoted keeps a
     « <b> » written in it (shown, no longer removed).
   - quick creation of a thirdparty and its contact: values cleaned by the one door, extrafields by their type (an
@@ -39,7 +39,7 @@
   - data of a site (X-Data-Form, X-Quotation-Data), number of a signature put on a contact, file of a mail put in
     the documents of a piece (no bidi override character in its name): through the one door.
 
-- NEW: one door for what comes from a mail, DOMPurify and HTML Purifier (lot S1) :   1.104.0
+- NEW: one door for what comes from a mail, DOMPurify and HTML Purifier :   1.104.0
   - InboxSafe: the HTML body for the reading frame (as before), the HTML body that leaves it (HTML Purifier, strict
     list: no style block, no class, no id, no script scheme), plain values for the fields of Dolibarr (no tag, tags
     written in entities included, no double quote, no control nor bidi override character), plain text escaped for
@@ -50,7 +50,7 @@
     scripts in dev/, marks « TODO core: » for the day inbox moves to the core.
   - tests: corpus of attacks on both sides (PHPUnit, jsdom); tests of the editor run again (matchMedia of jsdom).
 
-- NEW: servers of a new mailbox found from its address (lot H1) :   1.103.0
+- NEW: servers of a new mailbox found from its address :   1.103.0
   - the address typed, the server of Dolibarr looks for the servers in the order of Thunderbird: a mailbox of the
     same domain already in inbox, the configuration file published by the domain (autoconfig), its Autodiscover
     service (the address only, never a password), the providers recognized by the domain or its receiving server
@@ -642,7 +642,7 @@
   documents of the piece: no signature, no quoted or forwarded mail, the attachments listed by name and size; the
   mail stays in the mailbox, linked to the piece :   1.83.1
 
-- NEW: insert a piece of Dolibarr in a writing (lot A5) :   1.83.0
+- NEW: insert a piece of Dolibarr in a writing :   1.83.0
   - « Insert a piece » in the bar of the writing: proposals, orders and invoices of the thirdparties of the
     recipients and of the pieces linked to the mail answered (« All thirdparties » to widen), searched by reference
     or thirdparty, the readable ones only.
@@ -652,7 +652,7 @@
     online, only when Dolibarr offers them. Written in the language of the thirdparty, as its PDF.
   - the piece joins « Record the sending on », ticked: the sending noted on it and the mail sent linked to it.
 
-- NEW: the files of a writing open in the viewer, to check them before sending (lot A5) :   1.82.0
+- NEW: the files of a writing open in the viewer, to check them before sending :   1.82.0
   - a click on the name of an attachment of a writing (file sent, document of a piece, attachment of a forward)
     opens it in the viewer of inbox, the writing seen behind: the very file that leaves with the mail, read in the
     folder of the writing (not a copy of the draft). Same answers and protections as the attachments of a mail
@@ -707,7 +707,7 @@
 - FIX: a mail whose body part says « Content-Disposition: inline » was shown empty, its body listed as a file
   « piece-jointe » (the IMAP library takes any part with a disposition for an attachment) :   1.79.1
 
-- NEW: new customer from a mail (lot A1, level 1) :   1.79.0
+- NEW: new customer from a mail (level 1) :   1.79.0
   - on a mail of an unknown sender, « New customer » in the Dolibarr band opens a side panel on the left, the mail
     left readable on the right. Values read in the mail, each with its source and its line of the mail lit on hover,
     the other values offered: data source headers, attached vCard, display name (« Swap first and last name »),
@@ -725,18 +725,18 @@
   - modules: hook inboxLeadExtract (values and fields) and the browser event inbox:lead:render (a block of the
     module in the panel), see README.
 
-- NEW: remote pictures of a quote and security settings (lot F1) :   1.78.0
+- NEW: remote pictures of a quote and security settings :   1.78.0
   - the quote of an answer or a forward no longer carries the tracking pictures of the mail quoted (1 x 1 pictures,
     known tracking addresses): kept, the reader of the answer told the first sender that it was answered, and the
     copy in the Sent folder told it again to whoever showed its pictures. « 2 trackers taken out of the quote » is
-    said under it. The preview of the quote in the writing already blocked every remote picture (audit INBX-021).
+    said under it. The preview of the quote in the writing already blocked every remote picture.
   - Settings > Security, new page (the trusted authentication servers and the size scanned by the
     antivirus move there): remote pictures of the quote (keep, take out of the answers, of the answers and forwards;
     a picture taken out leaves its alternative text), « always show the pictures » (for a sender or a domain, a
     sender only, never), unsubscribe (one click or by mail, by mail only, off), alert on bank details (on by
     default, a warning says what is lost when off). Each choice says what it protects from.
 
-- NEW: fil of a mail, the answers sent beside the internal notes (lot E2) :   1.77.0
+- NEW: fil of a mail, the answers sent beside the internal notes :   1.77.0
   - the block of the notes in the panel becomes a fil by date: the notes and the mails sent from the mailbox in the
     conversation (tied by In-Reply-To, References or the conversation, never by the subject): « Paul answered »
     when inbox sent it (journal of the mailbox), « Answer sent from the mailbox (other software) » otherwise; « See »
@@ -745,7 +745,7 @@
     even still cancellable, or Sent folder read again), nothing is sent and the writing says « Paul answered this mail
     at 10:42 » with « See the answer » and « Send anyway ».
 
-- NEW: shared domains, public mail services and disposable addresses (lot A7) :   1.76.0
+- NEW: shared domains, public mail services and disposable addresses :   1.76.0
   - list shipped in data/domains/ (public.txt: 162 public mail services and access providers kept by hand;
     disposable.txt: 10 181 domains copied from a CC0 list on 2026-11-10, refreshed before a version by
     dev/update-domains.php), read in its files (a domain looked for as a line of the text, the text kept for the
@@ -765,7 +765,7 @@
     passes 200 ms.
   - hook inboxSharedDomains: the other modules give their domains (origin « other module »). README.
 
-- NEW: bank details in a mail, a lesson rather than a verdict (lot A6) :   1.75.0
+- NEW: bank details in a mail, a lesson rather than a verdict :   1.75.0
   - a mail that talks of bank details (an IBAN with a right key, words of a change in 5 languages, an attachment
     named RIB / IBAN) gets a banner above its body: red when the sender is not authenticated or imitates a known one,
     orange otherwise, never green. An IBAN of the card at the foot of an invoice says nothing.
@@ -1296,7 +1296,7 @@
     sending level on the mailbox and the right of the AI module (24); 30 requests per hour and per user; each request
     written in the journal of the actions, without its text.
   - tests of the editor in Node with jsdom (dev/editor-tests), the editor gives its Tiptap instance (raw()).
-- NEW: gaps of the writing (lot W6) closed :   1.26.0
+- NEW: gaps of the writing closed :   1.26.0
   - a mail forwarded gets the keyword $Forwarded on the server (read by the other mail software), shown in the list.
   - copy in Sent: automatic, by inbox or by the sending server (some servers file it themselves: no second copy).
   - templates of Dolibarr « for every type » offered in the writing, with or without a linked piece.
@@ -1595,7 +1595,7 @@
     Thunderbird (global list or own list of a mailbox); settings of each user.
   - inbox application in full page (index.php): own styles and icons (Tabler), JavaScript context of Dolibarr
     (backportdolcontext on Dolibarr 23), session expired handled without losing what was typed, installable.
-  - reading by Message-ID (lot 0) on the mailboxes of inbox; other modules plug in through the hooks
+  - reading by Message-ID on the mailboxes of inbox; other modules plug in through the hooks
     inboxResolveAccount, inboxAccountImportSources and inboxConnectors (inbox no longer reads another module).
   - setup page: master user of the mail server, timeouts, journal of the readings; tests PHPUnit of the module.
 - NEW: cache emptied from the setup page :   1.1.0
