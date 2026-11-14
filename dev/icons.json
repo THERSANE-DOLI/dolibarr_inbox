@@ -226,6 +226,7 @@
 		"cron": ["clock-cog", "outline"],
 		"key": ["key", "outline"],
 		"keep": ["history", "outline"],
+		"pin": ["pinned", "outline"],
 		"plug": ["plug-connected", "outline"],
 		"phone": ["phone", "outline"],
 		"map-pin": ["map-pin", "outline"],

@@ -2900,3 +2900,55 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-servers__sum { color: var(--ibx-text-muted); overflow-wrap: anywhere; }
 .ibx-servers[open] > summary { border-bottom: 1px solid var(--ibx-border); }
 .ibx-servers > .ibx-section { padding: 0 var(--ibx-s3); }
+
+/* ---------- Agenda panel (1.107.0, js/inbox-agenda.js) ---------- */
+.ibx-mailapp { position: relative; }
+.ibx-mailapp[data-agenda="open"] { grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
+.ibx-mailapp[data-folders="collapsed"][data-agenda="open"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
+.ibx-pane--agenda { background: var(--ibx-bg-pane); }
+/* No room for the reading: over it, on the right */
+.ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { position: absolute; top: 0; right: 0; bottom: 0; width: min(var(--ibx-w3, 18.75rem), 100%); z-index: 30; border-left: 1px solid var(--ibx-border); box-shadow: var(--ibx-shadow-float); }
+.ibx-agenda__head { gap: var(--ibx-s1); }
+.ibx-agenda__titles { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.ibx-agenda__date { font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-agenda__tools { display: inline-flex; gap: 0.125rem; }
+.ibx-agenda__body { padding: 0 0 var(--ibx-s3); }
+.ibx-agenda__skel { padding: var(--ibx-s3); }
+.ibx-agenda__group { padding: var(--ibx-s1) 0; }
+.ibx-agenda__day { position: sticky; top: 0; z-index: 1; margin: 0; padding: var(--ibx-s1) var(--ibx-s3); font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text-muted); background: var(--ibx-bg-sunken); }
+.ibx-agenda__day::first-letter { text-transform: uppercase; }
+.ibx-agenda__group--late .ibx-agenda__day { color: var(--ibx-danger); }
+.ibx-agenda__group--today .ibx-agenda__day { color: var(--ibx-accent); }
+.ibx-agenda__list { list-style: none; margin: 0; padding: 0; }
+.ibx-agenda__item { display: grid; grid-template-columns: 1.125rem auto minmax(0, 1fr) auto; column-gap: var(--ibx-s2); align-items: center; padding: 0.3125rem var(--ibx-s3); border-left: 3px solid transparent; }
+.ibx-agenda__item:hover { background: var(--ibx-bg-hover); }
+.ibx-agenda__check { margin: 0; width: 0.9375rem; height: 0.9375rem; accent-color: var(--ibx-accent); cursor: pointer; }
+.ibx-agenda__check:disabled { cursor: default; }
+.ibx-agenda__dot { justify-self: center; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ibx-agenda-dot, var(--ibx-text-faint)); }
+.ibx-agenda__when { font-size: var(--ibx-fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ibx-agenda__label { min-width: 0; padding: 0; border: 0; background: none; color: var(--ibx-text); font: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.ibx-agenda__label:hover, .ibx-agenda__label:focus-visible { text-decoration: underline; }
+.ibx-agenda__mail { grid-column: 4; }
+.ibx-agenda__sub { grid-column: 3 / 5; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-agenda__sub .ibx-icon { width: 0.75rem; height: 0.75rem; vertical-align: -0.0625rem; margin-right: 0.125rem; }
+.ibx-agenda__item.is-done .ibx-agenda__label { text-decoration: line-through; color: var(--ibx-text-muted); }
+.ibx-agenda__item.is-past { opacity: .7; }
+/* « Maybe »: dashed, as in the agendas that show the answers */
+.ibx-agenda__item.is-maybe { border-left: 3px dashed var(--ibx-border-strong); }
+.ibx-agenda__now { position: relative; display: flex; align-items: center; gap: var(--ibx-s2); padding: 0.125rem var(--ibx-s3); font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-danger); }
+.ibx-agenda__now::after { content: ""; flex: 1; height: 2px; background: var(--ibx-danger); border-radius: 1px; }
+.ibx-agenda__past { margin: 0.125rem var(--ibx-s2); color: var(--ibx-text-muted); }
+.ibx-agenda__group > .ibx-btn--ghost { margin: 0.125rem var(--ibx-s2); }
+.ibx-agenda__none, .ibx-agenda__more { padding: var(--ibx-s1) var(--ibx-s3); font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-agenda__note { display: flex; gap: var(--ibx-s1); align-items: center; margin: var(--ibx-s2) var(--ibx-s3); font-size: var(--ibx-fs-sm); }
+.ibx-agenda__note--error { color: var(--ibx-danger); }
+.ibx-agenda__foot { padding: var(--ibx-s2) var(--ibx-s2) 0; }
+.ibx-agenda__foot .ibx-icon { width: 0.875rem; height: 0.875rem; margin-left: var(--ibx-s1); }
+.ibx-rail__item.ibx-rail__agenda[aria-expanded="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
+@media (max-width: 79.9375rem) {
+	.ibx-mailapp[data-agenda="open"], .ibx-mailapp[data-folders="collapsed"][data-agenda="open"] { grid-template-columns: var(--ibx-w2, 23.75rem) 0.3125rem minmax(22.5rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
+}
+/* Phone: a sheet over the screen */
+@media (max-width: 63.9375rem) {
+	.ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { display: flex; position: fixed; inset: 0; width: auto; z-index: 60; border: 0; box-shadow: none; }
+}

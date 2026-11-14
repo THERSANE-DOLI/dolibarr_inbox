@@ -1,0 +1,8 @@
+{
+	"name": "thersane/inbox-vendor-versions",
+	"description": "Declared versions of the PHP libraries shipped in lib/vendor, read by Dependabot only (never installed)",
+	"license": "GPL-3.0-or-later",
+	"require": {
+		"ezyang/htmlpurifier": "4.19.1"
+	}
+}

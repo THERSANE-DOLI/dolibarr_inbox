@@ -1,0 +1,10 @@
+{
+  "name": "inbox-vendor-versions",
+  "private": true,
+  "description": "Declared versions of the JS libraries shipped in js/vendor, read by Dependabot only (never installed)",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "dompurify": "3.4.17",
+    "jsqr": "1.4.0"
+  }
+}

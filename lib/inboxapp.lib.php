@@ -168,6 +168,7 @@ function inboxAppContextVars(User $user)
 	global $conf, $db;
 
 	dol_include_once('/inbox/class/inboxuserparam.class.php');
+	dol_include_once('/inbox/class/inboxagendapanel.class.php');
 	$params = new InboxUserParam($db);
 	$moduleVersion = '';
 	if (class_exists('modInbox') || (include_once dol_buildpath('/inbox/core/modules/modInbox.class.php', 0))) {
@@ -214,6 +215,8 @@ function inboxAppContextVars(User $user)
 		// Lot W6: the user may write (an active mailbox with the level « send » at least)
 		'INBOX_CAN_SEND' => inboxCanSend($user),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
+		// Agenda panel (1.107.0): shown, case « done », pages of a module that took over (hook inboxAgendaProvider)
+		'INBOX_AGENDA_JSON' => (string) json_encode((new InboxAgendaPanel($db))->config($user)),
 		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#8a2b6e'),
 		// Colour blindness declared in the card of the user (tab Interface): flashy, protanopia, deuteranopes, tritanopes
 		'INBOX_COLORBLIND' => $colorblind,

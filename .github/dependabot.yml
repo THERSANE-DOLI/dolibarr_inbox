@@ -1,0 +1,71 @@
+# Dependabot: weekly update PRs on develop, plus security alerts on the same manifests.
+# The libraries shipped in lib/vendor and js/vendor have no manifest of their own: their versions are declared in
+# dev/vendor-versions (see its README). A Dependabot PR there only bumps the declared version: run the update script
+# of the library on the PR branch to bring the files, then the tests.
+version: 2
+updates:
+  # Shipped libraries, declared versions (HTMLPurifier)
+  - package-ecosystem: composer
+    directory: /dev/vendor-versions
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps
+    labels: [dependencies, vendor]
+
+  # Shipped libraries, declared versions (DOMPurify, jsQR)
+  - package-ecosystem: npm
+    directory: /dev/vendor-versions
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps
+    labels: [dependencies, vendor]
+
+  # Frozen Tiptap bundle (js/vendor/tiptap): rebuild with dev/tiptap/build.mjs on the PR branch
+  - package-ecosystem: npm
+    directory: /dev/tiptap
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: deps
+    labels: [dependencies, vendor]
+    groups:
+      tiptap:
+        patterns: ['@tiptap/*']
+
+  # Editor tests (jsdom), never shipped
+  - package-ecosystem: npm
+    directory: /dev/editor-tests
+    target-branch: develop
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: deps
+    labels: [dependencies, dev]
+
+  # Local Rspamd test stack, never shipped
+  - package-ecosystem: docker-compose
+    directory: /dev/rspamd
+    target-branch: develop
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: deps
+    labels: [dependencies, dev]
+
+  # Workflows (release, deploy)
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: deps
+    labels: [dependencies, ci]

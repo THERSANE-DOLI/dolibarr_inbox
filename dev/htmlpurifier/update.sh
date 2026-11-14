@@ -17,4 +17,5 @@ cp -r "$SRC/library" "$SRC/LICENSE" "$DEST/"
 sed -i "1s/.*/HTMLPurifier ${VERSION} (LGPL-2.1-or-later), folder library\/ only, taken by dev\/htmlpurifier\/update.sh/" "$DEST/VERSION"
 find "$DEST" -type f -exec chmod 664 {} \;
 find "$DEST" -type d -exec chmod 2775 {} \;
+sed -i "s/\"ezyang\/htmlpurifier\": \"[^\"]*\"/\"ezyang\/htmlpurifier\": \"${VERSION}\"/" "$HERE/dev/vendor-versions/composer.json"
 echo "Update dev/htmlpurifier/README.md (version, date, sha256) and run the tests (test/phpunit/InboxSafeTest.php)."

@@ -17,4 +17,5 @@ cp "$TMP/package/dist/purify.min.js" "$TMP/package/LICENSE" "$DEST/"
 sed -i "1s/.*/DOMPurify ${VERSION} (Apache-2.0 or MPL-2.0), taken by dev\/dompurify\/update.sh/" "$DEST/VERSION"
 chmod 664 "$DEST"/*
 sha256sum "$DEST/purify.min.js"
+sed -i "s/\"dompurify\": \"[^\"]*\"/\"dompurify\": \"${VERSION}\"/" "$HERE/dev/vendor-versions/package.json"
 echo "Update dev/dompurify/README.md (version, date, integrity, sha256) and run the tests (test/phpunit/InboxSafeTest.php, dev/editor-tests)."

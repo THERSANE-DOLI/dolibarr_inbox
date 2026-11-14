@@ -1,5 +1,18 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: agenda panel on the right of the emails, the events of the user late, today and coming :   1.107.0
+  - shown by itself when no email is open; beside an email, opened by the button of the rail or Shift+F9; pinned, it
+    always stays; closed by hand, it stays closed. Docked as a column when the reading keeps its room, over it
+    otherwise, as a sheet on a phone (never opened by itself there).
+  - the events of the agenda of Dolibarr the user owns or attends (not declined), late ones to do first, today with
+    the time now and the ones already over folded, then the next 7 days; neither the automatic events nor the
+    records of emails sent or received. « Maybe » shown dashed.
+  - case « done » on the events with a progress, with « Undo »; an event opens in a window of inbox, the email it
+    was made from opens in the list; a new event takes the thirdparty, the contact and the project of the email open.
+  - other agenda modules plug themselves: their own pages for « create », « open » and « open all », their own
+    events, or the whole content of the panel (PHP hooks inboxAgendaProvider, inboxAgendaEvents; JS hooks
+    inbox:agenda:render, action, toolbar, shown, hidden; README « Agenda panel »). inbox depends on none of them.
+
 - FIX: « update not finished » only when the module must be activated again :   1.106.5
   - shown for a new X.Y only; a fix (Z) replaces the files and asks nothing.
 
