@@ -22,8 +22,8 @@
  * itself, with the rights of the user: the editor (quote of an answer, draft reopened, template, paste, proposal of
  * the AI). Any HTML that goes there passes here first:
  * 1. DOMPurify, with the allow list of the sending (InboxMailBuilder::cleanHtml) plus the marks of the editor;
- * 2. then the Sanitizer API of the browser when it has one (Firefox 148, Chromium 146 behind a setting at the time of
- *    writing), never instead of DOMPurify; its configuration changed between the drafts of the specification: an
+ * 2. then the Sanitizer API of the browser when it has one (Firefox 148, Chrome 156 checked on 2026-11-14), never
+ *    instead of DOMPurify; its configuration changed between the drafts of the specification: an
  *    error keeps the result of DOMPurify alone.
  * Without DOMPurify (script not loaded) and without Sanitizer API: the text only, escaped (fails closed).
  *
@@ -50,6 +50,11 @@
 	const HREF = /^(?:https?:\/\/|mailto:|tel:[^:]{1,64}$|#)/i;
 	const SRC = /^(?:https:|data:image\/(?:png|jpeg|gif|webp);base64,)/i;
 	const BAD_STYLE = /expression\s*\(|javascript:|vbscript:|behavior\s*:|-moz-binding|@import/i;
+	/** Profile « tooltip »: card of an object of Dolibarr (core/ajax/ajaxtooltip.php), its classes kept for its look */
+	const TIP_TAGS = ['a', 'b', 'br', 'div', 'em', 'hr', 'i', 'img', 'li', 'p', 'small', 'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'u', 'ul'];
+	const TIP_ATTRS = ['class', 'title', 'alt', 'colspan', 'rowspan', 'width', 'height', 'style', 'href', 'src'];
+	/** Profile of the call being cleaned (read by the hooks) */
+	let profile = 'mail';
 
 	let purify = null;
 
@@ -67,6 +72,13 @@
 			const name = data.attrName;
 			const value = String(data.attrValue || '').trim();
 			let keep = true;
+			if (profile === 'tooltip') {
+				// Classes of the theme of Dolibarr kept; addresses already kept to Dolibarr by the caller
+				if (name === 'style' && BAD_STYLE.test(value)) {
+					data.keepAttr = false;
+				}
+				return;
+			}
 			if (name === 'class') {
 				const kept = value.split(/\s+/).filter(c => CLASSES.includes(c));
 				data.attrValue = kept.join(' ');
@@ -97,15 +109,17 @@
 	/**
 	 * Second pass by the Sanitizer API of the browser, when it has one
 	 *
-	 * @param {string} html HTML cleaned by DOMPurify
+	 * @param {string}  html HTML cleaned by DOMPurify
+	 * @param {boolean} tip  Profile « tooltip »
 	 * @return {string|null} null when the browser has none or refused the configuration
 	 */
-	function browserSanitizer(html) {
+	function browserSanitizer(html, tip) {
 		if (typeof window.Sanitizer !== 'function' || typeof Element.prototype.setHTML !== 'function') {
 			return null;
 		}
 		try {
-			const sanitizer = new window.Sanitizer({ elements: TAGS, attributes: ATTRS, comments: false });
+			// dataAttributes false: required by Chromium when data-* attributes are listed (only those listed are kept)
+			const sanitizer = new window.Sanitizer({ elements: tip ? TIP_TAGS : TAGS, attributes: tip ? TIP_ATTRS : ATTRS, comments: false, dataAttributes: false });
 			// Inert document: nothing is loaded, nothing runs
 			const box = document.implementation.createHTMLDocument('').createElement('div');
 			box.setHTML(html, { sanitizer });
@@ -130,25 +144,36 @@
 	 * HTML of a mail made safe for the page (editor, insertion)
 	 *
 	 * @param {string} html HTML
+	 * @param {string} [kind] 'mail' (default): allow list of the sending, marks of inbox only; 'tooltip': card of an
+	 *                        object of Dolibarr, its classes kept
 	 * @return {string}
 	 */
-	function safeHtml(html) {
+	function safeHtml(html, kind) {
 		html = String(html || '');
 		if (html.trim() === '') {
 			return '';
 		}
+		const tip = kind === 'tooltip';
 		const p = dompurify();
-		const first = p ? p.sanitize(html, {
-			ALLOWED_TAGS: TAGS,
-			ALLOWED_ATTR: ATTRS,
-			ALLOW_DATA_ATTR: false,
-			ALLOW_ARIA_ATTR: false,
-			ALLOW_UNKNOWN_PROTOCOLS: false,
-			FORBID_TAGS: ['style', 'svg', 'math', 'form', 'template'],
-			KEEP_CONTENT: true,
-			RETURN_TRUSTED_TYPE: false,
-		}) : null;
-		const second = browserSanitizer(first !== null ? first : html);
+		let first = null;
+		if (p) {
+			profile = tip ? 'tooltip' : 'mail';
+			try {
+				first = p.sanitize(html, {
+					ALLOWED_TAGS: tip ? TIP_TAGS : TAGS,
+					ALLOWED_ATTR: tip ? TIP_ATTRS : ATTRS,
+					ALLOW_DATA_ATTR: false,
+					ALLOW_ARIA_ATTR: false,
+					ALLOW_UNKNOWN_PROTOCOLS: false,
+					FORBID_TAGS: ['style', 'svg', 'math', 'form', 'template'],
+					KEEP_CONTENT: true,
+					RETURN_TRUSTED_TYPE: false,
+				});
+			} finally {
+				profile = 'mail';
+			}
+		}
+		const second = browserSanitizer(first !== null ? first : html, tip);
 		if (second !== null) {
 			return second;
 		}

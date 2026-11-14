@@ -129,6 +129,7 @@ test('the Sanitizer API, when the browser has one, gets the result of DOMPurify 
 	assert.equal(out, '<p>a</p><i>api</i>', 'second pass after DOMPurify');
 	assert.ok(log.sanitizer[0].elements.includes('p'));
 	assert.ok(!log.sanitizer[0].elements.includes('script'));
+	assert.equal(log.sanitizer[0].dataAttributes, false, 'required by Chromium with data-* attributes listed');
 	assert.equal(I.safeHtmlEngines().sanitizerApi, true);
 	assert.match(I.safeHtmlEngines().dompurify, /^3\./);
 });
@@ -143,4 +144,15 @@ test('no DOMPurify and no Sanitizer API: the text only, escaped (fails closed)',
 	const { I } = page({ noPurify: true });
 	assert.equal(I.safeHtml('<p>a <b>b</b></p><img src=x onerror=alert(1)>&lt;i&gt;'), 'a b&lt;i&gt;');
 	assert.equal(I.safeHtml(''), '');
+});
+
+test('profile « tooltip » (card of an object of Dolibarr): its classes kept, no script', () => {
+	const { w, I } = page();
+	const out = I.safeHtml('<div class="centpercent tdoverflowmax150"><u>Contact</u><br><b>Nom :</b> <img src=x onerror=alert(1)>'
+		+ '<a href="javascript:alert(1)" class="classfortooltip">x</a><svg onload=alert(1)></svg><form><input></form></div>', 'tooltip');
+	assert.match(out, /class="centpercent tdoverflowmax150"/);
+	assert.match(out, /class="classfortooltip"/);
+	assertSafe(w, out.replace(/ class="[^"]*"/g, ''), 'tooltip');
+	// The next call of a mail is not in the profile « tooltip » any more
+	assert.doesNotMatch(I.safeHtml('<p class="centpercent">x</p>'), /class=/);
 });

@@ -8,6 +8,9 @@ import { JSDOM } from 'jsdom';
 const root = new URL('../../', import.meta.url);
 const bundle = readFileSync(new URL('js/vendor/tiptap/tiptap.min.js', root), 'utf8');
 const adapter = readFileSync(new URL('js/inbox-editor.js', root), 'utf8');
+// The one door of the HTML in the page (lot S1), loaded before the editor as index.php does
+const purify = readFileSync(new URL('js/vendor/dompurify/purify.min.js', root), 'utf8');
+const safe = readFileSync(new URL('js/inbox-safe.js', root), 'utf8');
 // A 1 x 1 PNG, as a pasted picture becomes
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
@@ -25,7 +28,9 @@ async function editorWith(html) {
 	Object.defineProperty(w.HTMLImageElement.prototype, 'naturalWidth', { get: () => 400 });
 	Object.defineProperty(w.HTMLImageElement.prototype, 'naturalHeight', { get: () => 200 });
 	Object.defineProperty(w.HTMLImageElement.prototype, 'complete', { get: () => true });
-	w.Dolibarr = { tools: { inbox: { ctx: (k, d) => d } }, executeHook() {} };
+	w.Dolibarr = { tools: { inbox: { ctx: (k, d) => d, esc: t => String(t) } }, executeHook() {} };
+	w.eval(purify);
+	w.eval(safe);
 	w.eval(bundle + '\nwindow.InboxTiptap = InboxTiptap;');
 	w.eval(adapter);
 	const ed = await w.Dolibarr.tools.inbox.editors.create(w.document.getElementById('ed'), { html, label: 'Texte' });
@@ -273,4 +278,48 @@ test('a styled bold of a signature keeps its colour', async () => {
 	assert.match(html, /<strong[^>]*>Perso Test<\/strong>/);
 	assert.match(styles(html), /color:(#d31b11|rgb\(211,27,17\))/);
 	assert.doesNotMatch(styles(html), /font-weight/);
+});
+
+// ---------- Lot S3: every way in of an HTML goes through Dolibarr.tools.inbox.safeHtml ----------
+
+const EVIL = '<p>Bonjour<img src="x" onerror="window.__xss=1"><a href="javascript:window.__xss=2">lien</a>'
+	+ '<svg onload="window.__xss=3"></svg><span class="butAction" data-cmd="delete" style="color:red">x</span></p>';
+
+/** Nothing of EVIL left in the text nor in the page of the editor */
+function assertClean(w, ed, name) {
+	const html = ed.getHtml();
+	assert.doesNotMatch(html, /onerror|onload|javascript:|<svg|butAction|data-cmd/i, name + ': ' + html);
+	const box = w.document.getElementById('ed');
+	assert.equal(box.querySelectorAll('[onerror], [onload], svg, [data-cmd]').length, 0, name + ': page of the editor');
+	assert.match(html, /Bonjour/, name + ': text kept');
+	assert.match(html, /color: ?red/, name + ': style kept');
+}
+
+test('the HTML given at the opening (quote, draft) is made safe', async () => {
+	const { w, ed } = await editorWith(EVIL);
+	assertClean(w, ed, 'create');
+});
+
+test('setHtml, insertHtml, setSignature and replaceRange make the HTML safe', async () => {
+	const { w, ed } = await editorWith('<p>Début</p>');
+	ed.setHtml(EVIL);
+	assertClean(w, ed, 'setHtml');
+	ed.setHtml('<p>Début</p>');
+	ed.insertHtml(EVIL);
+	assertClean(w, ed, 'insertHtml');
+	ed.setHtml('<p>Début</p>');
+	ed.setSignature(EVIL);
+	assertClean(w, ed, 'setSignature');
+	assert.match(ed.getHtml(), /class="inbox-signature-edited"/, 'mark of the signature kept');
+	ed.setHtml('<p>Début</p>');
+	ed.replaceRange(null, null, EVIL);
+	assertClean(w, ed, 'replaceRange');
+});
+
+test('a rich paste is made safe before the schema of the editor reads it', async () => {
+	const { ed } = await editorWith('<p>Début</p>');
+	const t = ed.raw();
+	const out = t.options.editorProps.transformPastedHTML(EVIL);
+	assert.doesNotMatch(out, /onerror|javascript:|<svg|data-cmd/i);
+	assert.match(out, /Bonjour/);
 });

@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: editor and cards of objects through the one door in the page (lot S3) :   1.106.0
+  - editor of the writing (Tiptap, CKEditor, or the one of another module): the HTML given at its opening (quote,
+    draft reopened, template), inserted (AI, piece, signature) or put in place of a range goes through
+    Dolibarr.tools.inbox.safeHtml; a rich paste too (a mail shown, a page, Word).
+  - the value of a variable clicked in the text becomes text, never HTML.
+  - card of an object on hover: after its own allow list, DOMPurify and the Sanitizer API (classes of Dolibarr kept).
+  - Sanitizer API of Chromium: configuration accepted (data attributes declared), checked in Chrome 156.
+  - README: rules of the one door.
+
 - NEW: values of a mail written in Dolibarr through the one door (lot S2) :   1.105.0
   - quote of an answer or a forward: HTML Purifier before the filter of the sending; a text mail quoted keeps a
     « <b> » written in it (shown, no longer removed).

@@ -3541,7 +3541,8 @@
 			}
 		};
 		walk(doc.body);
-		return doc.body.innerHTML;
+		// Then the one door (lot S3): DOMPurify and the Sanitizer API, the classes of Dolibarr kept
+		return I.safeHtml(doc.body.innerHTML, 'tooltip');
 	}
 	function objTipLoad(key) {
 		if (!OT.cache.has(key)) {
