@@ -38,6 +38,19 @@
 	/** Mark of a signature changed for one mail (1.95.0): it stays in the text (drafts, sending), kept by the server */
 	const SIGNATURE_CLASS = 'inbox-signature-edited';
 
+	/**
+	 * HTML made safe before it enters the editor (lot S3): the editor runs in the page itself, with the rights of the
+	 * user; a quote, a draft, a template, a paste, a proposal of the AI pass here (js/inbox-safe.js). Without it: the
+	 * text only (fails closed).
+	 */
+	function safe(html) {
+		if (typeof I.safeHtml === 'function') {
+			return I.safeHtml(html);
+		}
+		const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+		return String(doc.body ? doc.body.textContent : '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])).replace(/\n/g, '<br>');
+	}
+
 	function register(name, factory) {
 		factories[name] = factory;
 	}
@@ -96,7 +109,7 @@
 		if (fence) {
 			text = fence[1];
 		}
-		return /^\s*</.test(text) && /<\/(p|div|ul|ol|li|h[1-6]|table|tr|td|blockquote|strong|b|em|i|u|a|span)>/i.test(text) ? text : '';
+		return /^\s*</.test(text) && /<\/(p|div|ul|ol|li|h[1-6]|table|tr|td|blockquote|strong|b|em|i|u|a|span)>/i.test(text) ? safe(text) : '';
 	}
 	/** Line breaks between blocks removed: the editor would make empty paragraphs and bullets of them (1.28.3) */
 	const tightBlocks = html => String(html || '').replace(/(<\/?(?:p|div|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tfoot|tr|td|th|br|hr)\b[^>]*>)\s+/gi, '$1')
@@ -660,6 +673,8 @@
 						inlineStyles,
 					],
 					editorProps: {
+						// A rich copy (a mail shown, a page, Word) made safe before the schema of the editor reads it
+						transformPastedHTML: html => safe(html),
 						handlePaste: (view, ev) => {
 							if (pastePictures(ev)) {
 								return true;
@@ -674,7 +689,8 @@
 						// A click on a chip with a value makes it text: it will not follow the recipient any more
 						handleClickOn: (view, pos, node) => {
 							if (o.varToText && node.type.name === 'inboxVar' && node.attrs.value !== '') {
-								editor.chain().focus().insertContentAt({ from: pos, to: pos + node.nodeSize }, node.attrs.value).run();
+								// As text: a value of Dolibarr (name of a thirdparty) is never read as HTML
+								editor.chain().focus().insertContentAt({ from: pos, to: pos + node.nodeSize }, { type: 'text', text: String(node.attrs.value) }).run();
 								return true;
 							}
 							return false;
@@ -1654,6 +1670,9 @@
 						if (html) {
 							ev.data.dataValue = tightBlocks(html);
 							ev.data.type = 'html';
+						} else if (ev.data.type === 'html' || (dt && dt.getData('text/html'))) {
+							// A rich copy (a mail shown, a page, Word) made safe before CKEditor reads it
+							ev.data.dataValue = safe(ev.data.dataValue);
 						}
 					}, null, null, 1);
 					if (!native) {
@@ -1978,7 +1997,33 @@
 	 * @param {object} o {html, placeholder, label, varToText, signatureLabel, nativeTools: the bar of inbox put in the toolbar of CKEditor when it shows its own}
 	 * @returns {Promise<object>}
 	 */
+	/**
+	 * Every way in of an HTML made safe, whatever the editor (Tiptap, CKEditor, the one of another module)
+	 *
+	 * @param {object} ed Editor created
+	 * @return {object}
+	 */
+	function guard(ed) {
+		if (!ed || ed.inboxSafe) {
+			return ed;
+		}
+		['setHtml', 'insertHtml', 'setSignature'].forEach(m => {
+			if (typeof ed[m] === 'function') {
+				const f = ed[m].bind(ed);
+				ed[m] = html => f(safe(html));
+			}
+		});
+		if (typeof ed.replaceRange === 'function') {
+			const f = ed.replaceRange.bind(ed);
+			ed.replaceRange = (from, to, html) => f(from, to, safe(html));
+		}
+		ed.inboxSafe = true;
+		return ed;
+	}
+
 	async function create(el, o) {
+		o = Object.assign({}, o || {});
+		o.html = safe(o.html || '');
 		const pick = pickEditor();
 		const name = pick.name;
 		const factory = factories[name] || factories.tiptap;
@@ -1987,7 +2032,7 @@
 			const pending = factory();
 			inboxBarOnly = false;
 			const ed = await pending;
-			return await ed.create(el, o);
+			return guard(await ed.create(el, o));
 		} catch (err) {
 			if (factory === factories.tiptap) {
 				throw err;
@@ -1997,7 +2042,7 @@
 			el.replaceChildren();
 			el.classList.remove('ibx-editor--ckeditor', 'ibx-editor--cknative');
 			const ed = await factories.tiptap();
-			return ed.create(el, o);
+			return guard(await ed.create(el, o));
 		}
 	}
 

@@ -1,0 +1,2 @@
+DOMPurify 3.4.17 (Apache-2.0 or MPL-2.0), taken by dev/dompurify/update.sh
+TODO core: when inbox moves to the core, this folder goes to htdocs/public/includes/dompurify/ (+ line in COPYRIGHT)

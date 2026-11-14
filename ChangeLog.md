@@ -1,5 +1,55 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: long name of an attachment keeps its extension :   1.106.4
+  - a name longer than 150 characters was cut with its extension (the file was put in the documents without its
+    type); the base is cut now, the extension kept (audit INBX-091).
+
+- FIX: quick creation of a customer, values cut to the length of their column :   1.106.3
+  - a long value of a site or of a signature (name of a contact over 50 characters) made the creation fail with the
+    error of the database shown as it was; each value is cut to the length of its column (audit INBX-090).
+
+- FIX: sender read again when a semicolon is in its quoted name :   1.106.2
+  - « "Service ; Compta" <x@y> »: the reader of the mails cut the list of addresses on the semicolon, the mail came
+    « without sender » and the checks made on the address (blocked senders, known senders, banners) did not run.
+    A reader of our own takes over when the library misses an address of the header (From, Reply-To, To, Cc), with
+    quoted names, escapes, comments and groups (audit INBX-089).
+
+- FIX: proposal of the AI shown through the one door too :   1.106.1
+  - the preview of a proposal of the AI (that may have read the mail) goes through Dolibarr.tools.inbox.safeHtml
+    as well, not only through the filter of the server (audit 2026-11-14).
+
+- NEW: editor and cards of objects through the one door in the page (lot S3) :   1.106.0
+  - editor of the writing (Tiptap, CKEditor, or the one of another module): the HTML given at its opening (quote,
+    draft reopened, template), inserted (AI, piece, signature) or put in place of a range goes through
+    Dolibarr.tools.inbox.safeHtml; a rich paste too (a mail shown, a page, Word).
+  - the value of a variable clicked in the text becomes text, never HTML.
+  - card of an object on hover: after its own allow list, DOMPurify and the Sanitizer API (classes of Dolibarr kept).
+  - Sanitizer API of Chromium: configuration accepted (data attributes declared), checked in Chrome 156.
+  - README: rules of the one door.
+
+- NEW: values of a mail written in Dolibarr through the one door (lot S2) :   1.105.0
+  - quote of an answer or a forward: HTML Purifier before the filter of the sending; a text mail quoted keeps a
+    « <b> » written in it (shown, no longer removed).
+  - quick creation of a thirdparty and its contact: values cleaned by the one door, extrafields by their type (an
+    HTML extrafield gets the text escaped, a list one of its keys only, the lists of the database nothing).
+  - « Create ▾ »: values of the mail (sender, subject, data of a site) cleaned before they go in the address of the
+    page of creation of Dolibarr, not only by the filter of that page.
+  - agenda (invitation, failed sending, sending recorded on a piece): titles and notes through the one door; an
+    address between angle brackets stays (‹paul@ex.fr›), a « <b> » of a note is shown instead of removed.
+  - data of a site (X-Data-Form, X-Quotation-Data), number of a signature put on a contact, file of a mail put in
+    the documents of a piece (no bidi override character in its name): through the one door.
+
+- NEW: one door for what comes from a mail, DOMPurify and HTML Purifier (lot S1) :   1.104.0
+  - InboxSafe: the HTML body for the reading frame (as before), the HTML body that leaves it (HTML Purifier, strict
+    list: no style block, no class, no id, no script scheme), plain values for the fields of Dolibarr (no tag, tags
+    written in entities included, no double quote, no control nor bidi override character), plain text escaped for
+    an HTML field.
+  - Dolibarr.tools.inbox.safeHtml in the page: DOMPurify, then the Sanitizer API of the browser when it has one;
+    without both, the text only.
+  - libraries shipped in the module (DOMPurify 3.4.17, HTML Purifier 4.19.1, loaded only when needed), update
+    scripts in dev/, marks « TODO core: » for the day inbox moves to the core.
+  - tests: corpus of attacks on both sides (PHPUnit, jsdom); tests of the editor run again (matchMedia of jsdom).
+
 - NEW: servers of a new mailbox found from its address (lot H1) :   1.103.0
   - the address typed, the server of Dolibarr looks for the servers in the order of Thunderbird: a mailbox of the
     same domain already in inbox, the configuration file published by the domain (autoconfig), its Autodiscover

@@ -23,6 +23,7 @@
  */
 
 require_once __DIR__.'/inboxreader.class.php';
+require_once __DIR__.'/inboxsafe.class.php';
 require_once __DIR__.'/inboxlink.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
 require_once __DIR__.'/inboxthreadlink.class.php';
@@ -73,6 +74,18 @@ class InboxLead
 
 	/** @var DoliDB */
 	protected $db;
+
+	/** @var array<string,array<string,int>> Lengths of the text columns per table, read once (audit INBX-090) */
+	protected static $columnSizes = array();
+
+	/** Property of the object => column, for the lengths (audit INBX-090) */
+	const COLUMNS = array(
+		'societe' => array('name' => 'nom', 'name_alias' => 'name_alias', 'address' => 'address', 'zip' => 'zip', 'town' => 'town', 'phone' => 'phone',
+			'email' => 'email', 'url' => 'url', 'idprof1' => 'siren', 'idprof2' => 'siret', 'idprof3' => 'ape', 'idprof4' => 'idprof4',
+			'idprof5' => 'idprof5', 'idprof6' => 'idprof6', 'tva_intra' => 'tva_intra', 'code_client' => 'code_client', 'code_fournisseur' => 'code_fournisseur'),
+		'socpeople' => array('lastname' => 'lastname', 'firstname' => 'firstname', 'poste' => 'poste', 'phone_pro' => 'phone',
+			'phone_mobile' => 'phone_mobile', 'email' => 'email'),
+	);
 
 	/** @var string */
 	public $error = '';
@@ -332,9 +345,9 @@ class InboxLead
 	 */
 	public static function cleanValue($field, $value)
 	{
-		// A tag coded in entities is a tag too: decoded, then removed (audit INBX-072); no < > left
-		$v = self::plainLines(strip_tags(html_entity_decode(strip_tags((string) $value), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-		$v = str_replace(array('<', '>'), '', $v);
+		// The one door (lot S1): no tag, tags coded in entities included (audit INBX-072), no double quote; no < > left
+		$v = InboxSafe::line(self::plainLines(strip_tags((string) $value)), 0);
+		$v = str_replace(array("\u{2039}", "\u{203A}"), '', $v);
 		$v = trim(preg_replace('/\s+/u', ' ', $v), " \t,;:|*_-");
 		if ($v === '') {
 			return '';
@@ -1072,11 +1085,38 @@ class InboxLead
 	}
 
 	/**
+	 * Values of a mail cut to the length of their column (audit INBX-090): a long value of a site or a signature made
+	 * the creation fail with an error of the database shown as it was
+	 *
+	 * @param object $o     Thirdparty or contact about to be created
+	 * @param string $table societe or socpeople
+	 * @return void
+	 */
+	protected function fitColumns($o, $table)
+	{
+		if (!isset(self::$columnSizes[$table])) {
+			$sizes = array();
+			foreach ((array) $this->db->DDLInfoTable($this->db->prefix().$table) as $row) {
+				$row = array_values((array) $row);
+				if (isset($row[1]) && preg_match('/char\((\d+)\)/i', (string) $row[1], $m)) {
+					$sizes[strtolower((string) $row[0])] = (int) $m[1];
+				}
+			}
+			self::$columnSizes[$table] = $sizes;
+		}
+		foreach (self::COLUMNS[$table] as $prop => $col) {
+			if (isset($o->$prop) && is_string($o->$prop) && !empty(self::$columnSizes[$table][$col])) {
+				$o->$prop = dol_trunc($o->$prop, self::$columnSizes[$table][$col], 'right', 'UTF-8', 1);
+			}
+		}
+	}
+
+	/**
 	 * Extrafields the page of creation would let the user fill (audit INBX-070): enabled, shown on creation, allowed
 	 * by their permission, not computed
 	 *
 	 * @param string $elementType societe or socpeople
-	 * @return array<string,true> options_xxx
+	 * @return array<string,array{type:string,size:string,param:array<string,mixed>}> options_xxx => definition
 	 */
 	protected function writableExtrafields($elementType)
 	{
@@ -1095,10 +1135,56 @@ class InboxLead
 			if (!empty($a['computed'][$key]) || !in_array(abs($list), array(1, 3), true) || !$ok($a['enabled'][$key] ?? '') || !$ok($a['perms'][$key] ?? '')) {
 				continue;
 			}
-			$out['options_'.$key] = true;
+			$out['options_'.$key] = array('type' => (string) ($a['type'][$key] ?? ''), 'size' => (string) ($a['size'][$key] ?? ''),
+				'param' => (array) ($a['param'][$key] ?? array()));
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Value of the panel for an extrafield, as its type wants it (lot S2): a text field gets a plain line, an HTML
+	 * field the text escaped, a list one of its keys only; the types the panel cannot fill (lists of the database,
+	 * links, dates...) get nothing
+	 *
+	 * @param array{type:string,size:string,param:array<string,mixed>} $def   Extrafield (writableExtrafields())
+	 * @param string                                                   $value Value of the panel (cleaned)
+	 * @return string|int|float|null null: not written
+	 */
+	public static function extrafieldValue(array $def, $value)
+	{
+		$value = (string) $value;
+		if ($value === '') {
+			return null;
+		}
+		$size = (int) $def['size'];
+		switch ($def['type']) {
+			case 'varchar':
+			case 'phone':
+			case 'mail':
+			case 'url':
+			case 'ip':
+				return InboxSafe::line($value, $size > 0 ? $size : 255);
+			case 'text':
+				return InboxSafe::lines($value);
+			case 'html':
+				return InboxSafe::textToHtml($value);
+			case 'int':
+				return preg_match('/^-?\d{1,18}$/', $value) ? (int) $value : null;
+			case 'double':
+			case 'price':
+			case 'pricecy':
+				$n = str_replace(array(' ', ','), array('', '.'), $value);
+				return is_numeric($n) ? (float) $n : null;
+			case 'boolean':
+				return in_array($value, array('0', '1'), true) ? (int) $value : null;
+			case 'select':
+			case 'radio':
+				$options = (array) ($def['param']['options'] ?? array());
+				return array_key_exists($value, $options) ? $value : null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -1362,10 +1448,12 @@ class InboxLead
 			$s->mode_reglement_id = (int) ($form['defaults']['soc']['mode_reglement_id'] ?? getDolGlobalInt('MAIN_DEFAULT_PAYMENT_TYPE_ID'));
 			$writable = $this->writableExtrafields('societe');
 			foreach ($soc as $k => $v) {
-				if (isset($writable[$k])) {
+				$v = isset($writable[$k]) ? self::extrafieldValue($writable[$k], $v) : null;
+				if ($v !== null) {
 					$s->array_options[$k] = $v;
 				}
 			}
+			$this->fitColumns($s, 'societe');
 			$socId = $s->create($user);
 			if ($socId <= 0) {
 				$this->db->rollback();
@@ -1409,10 +1497,12 @@ class InboxLead
 				$c->statut = 1;
 				$writable = $this->writableExtrafields('socpeople');
 				foreach ($contact as $k => $v) {
-					if (isset($writable[$k])) {
+					$v = isset($writable[$k]) ? self::extrafieldValue($writable[$k], $v) : null;
+					if ($v !== null) {
 						$c->array_options[$k] = $v;
 					}
 				}
+				$this->fitColumns($c, 'socpeople');
 				$contactId = $c->create($user);
 				if ($contactId <= 0) {
 					$this->db->rollback();
@@ -1615,9 +1705,11 @@ class InboxLead
 				$c = new Contact($this->db);
 				$c->socid = (int) $socId;
 				foreach (array('lastname', 'firstname', 'poste', 'phone_pro', 'phone_mobile', 'email') as $f) {
-					$c->$f = (string) ($contact[$f] ?? '');
+					// Kept in the session since the panel: cleaned again where it is written
+					$c->$f = self::cleanValue($f, (string) ($contact[$f] ?? ''));
 				}
 				$c->statut = 1;
+				$this->fitColumns($c, 'socpeople');
 				$contactId = $c->create($user);
 				if ($contactId <= 0) {
 					dol_syslog(__METHOD__.' contact not created: '.$c->error, LOG_WARNING);
