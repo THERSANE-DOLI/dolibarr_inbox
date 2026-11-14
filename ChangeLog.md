@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: proposal of the AI shown through the one door too :   1.106.1
+  - the preview of a proposal of the AI (that may have read the mail) goes through Dolibarr.tools.inbox.safeHtml
+    as well, not only through the filter of the server (audit 2026-11-14).
+
 - NEW: editor and cards of objects through the one door in the page (lot S3) :   1.106.0
   - editor of the writing (Tiptap, CKEditor, or the one of another module): the HTML given at its opening (quote,
     draft reopened, template), inserted (AI, piece, signature) or put in place of a range goes through

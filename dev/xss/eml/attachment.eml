@@ -1,0 +1,33 @@
+Message-ID: <xss-attachment@inbox-test.invalid>
+From: Pièce jointe <files@xss.example>
+To: perso@inbox-test.invalid
+Subject: XSS 5 noms de pièces jointes (A01-A03)
+Date: Sat, 14 Nov 2026 13:23:40 +0100
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="xss-b"
+
+--xss-b
+Content-Type: text/plain; charset=utf-8
+
+Voir les pièces jointes.
+--xss-b
+Content-Type: image/png; name="a01.png"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="A01 <img src=x onerror=(window.__xss=window.__xss||[]).push(/A01/.source);console.log(/XSS-A01/.source)>.png"
+
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGNgYGBgaGhgYGBgYGD4
+TwABmQMBgVpSegAAAABJRU5ErkJggg==
+--xss-b
+Content-Type: application/pdf; name="a02"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="A02 facture‮fdp.exe"
+
+JVBERi0xLjQgeA==
+--xss-b
+Content-Type: text/html; name="a03.html"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="a03.html"
+
+PHNjcmlwdD4od2luZG93Ll9feHNzPXdpbmRvdy5fX3hzc3x8W10pLnB1c2goL0EwMy8uc291cmNl
+KTtjb25zb2xlLmxvZygvWFNTLUEwMy8uc291cmNlKTwvc2NyaXB0Pg==
+--xss-b--

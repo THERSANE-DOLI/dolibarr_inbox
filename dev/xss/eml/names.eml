@@ -1,0 +1,12 @@
+Message-ID: <xss-names@inbox-test.invalid>
+From: "\"><img src=x onerror=\"(window.__xss=window.__xss||[]).push(/N01/.source);console.log(/XSS-N01/.source)\">" <names@xss.example>
+To: perso@inbox-test.invalid
+Subject: =?UTF-8?B?WFNTIDIgc3VqZXQgPGltZyBzcmM9eCBvbmVycm9yPSIod2luZG93Ll9feHNzPXdpbmRvdy5fX3hzc3x8W10pLnB1c2goL04wMi8uc291cmNlKTtjb25zb2xlLmxvZygvWFNTLU4wMi8uc291cmNlKSI+ICJndWlsbGVtZXQ=?=
+Date: Sat, 14 Nov 2026 13:23:40 +0100
+MIME-Version: 1.0
+Reply-To: "<svg onload=(window.__xss=window.__xss||[]).push(/N03/.source);console.log(/XSS-N03/.source)>" <reply@xss.example>
+Cc: "Copie <b onmouseover='(window.__xss=window.__xss||[]).push(/N04/.source);console.log(/XSS-N04/.source)'>x</b>" <cc@xss.example>
+List-Unsubscribe: <javascript:(window.__xss=window.__xss||[]).push(/N05/.source);console.log(/XSS-N05/.source)>, <https://xss.example/unsub?u=1"><img src=x onerror=(window.__xss=window.__xss||[]).push(/N06/.source);console.log(/XSS-N06/.source)>>
+Content-Type: text/html; charset=utf-8
+
+<p>Nom affiché, sujet, réponse à, copie et désinscription piégés (N01-N06).</p>

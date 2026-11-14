@@ -1,0 +1,33 @@
+Message-ID: <xss-invite@inbox-test.invalid>
+From: Organisateur <org@xss.example>
+To: perso@inbox-test.invalid
+Subject: XSS 6 invitation (I01-I05)
+Date: Sat, 14 Nov 2026 13:23:40 +0100
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="xss-b"
+
+--xss-b
+Content-Type: text/plain; charset=utf-8
+
+Invitation à une réunion.
+--xss-b
+Content-Type: text/calendar; method=REQUEST; charset=utf-8
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpWRVJTSU9OOjIuMA0KUFJPRElEOi0vL3hzcy8vYXVkaXQvL0ZSDQpN
+RVRIT0Q6UkVRVUVTVA0KQkVHSU46VkVWRU5UDQpVSUQ6eHNzLWljcy0xQHhzcy5leGFtcGxlDQpE
+VFNUQU1QOjIwMjYxMTE0VDA5MDAwMFoNCkRUU1RBUlQ6MjAyNjExMjBUMDkwMDAwWg0KRFRFTkQ6
+MjAyNjExMjBUMTAwMDAwWg0KU1VNTUFSWTpJMDEgUsOpdW5pb24gIjxpbWcgc3JjPXggb25lcnJv
+cj0nKHdpbmRvdy5fX3hzcz13aW5kb3cuX194c3N8fFtdKS5wdXNoKC9JMDEvLnNvdXJjZSk7Y29u
+c29sZS5sb2coL1hTUy1JMDEvLnNvdXJjZSknPg0KTE9DQVRJT046STAyIDxzdmcgb25sb2FkPSh3
+aW5kb3cuX194c3M9d2luZG93Ll9feHNzfHxbXSkucHVzaCgvSTAyLy5zb3VyY2UpO2NvbnNvbGUu
+bG9nKC9YU1MtSTAyLy5zb3VyY2UpPg0KREVTQ1JJUFRJT046STAzIE9yZHJlIGR1IGpvdXIgPHNj
+cmlwdD4od2luZG93Ll9feHNzPXdpbmRvdy5fX3hzc3x8W10pLnB1c2goL0kwMy8uc291cmNlKTtj
+b25zb2xlLmxvZygvWFNTLUkwMy8uc291cmNlKTwvc2NyaXB0PlxuJmx0XDtpbWcgc3JjPXggb25l
+cnJvcj0od2luZG93Ll9feHNzPXdpbmRvdy5fX3hzc3x8W10pLnB1c2goL0kwNC8uc291cmNlKTtj
+b25zb2xlLmxvZygvWFNTLUkwNC8uc291cmNlKSZndFw7DQpPUkdBTklaRVI7Q049Ik9yZyA8aW1n
+IHNyYz14IG9uZXJyb3I9KHdpbmRvdy5fX3hzcz13aW5kb3cuX194c3N8fFtdKS5wdXNoKC9JMDUv
+LnNvdXJjZSk7Y29uc29sZS5sb2coL1hTUy1JMDUvLnNvdXJjZSk+IjptYWlsdG86b3JnQHhzcy5l
+eGFtcGxlDQpBVFRFTkRFRTtDTj1QZXJzbztSU1ZQPVRSVUU6bWFpbHRvOnBlcnNvQGluYm94LXRl
+c3QuaW52YWxpZA0KRU5EOlZFVkVOVA0KRU5EOlZDQUxFTkRBUg0K
+--xss-b--

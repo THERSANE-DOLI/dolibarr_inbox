@@ -1,0 +1,18 @@
+Message-ID: <xss-text-signature@inbox-test.invalid>
+From: Paul Signature <paul@client2.xss.example>
+To: perso@inbox-test.invalid
+Subject: XSS 3 texte et signature (T01-T05)
+Date: Sat, 14 Nov 2026 13:23:40 +0100
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Bonjour,
+
+Merci de chiffrer <b>12 raccords</b> <img src=x onerror="(window.__xss=window.__xss||[]).push(/T01/.source);console.log(/XSS-T01/.source)">
+
+--
+Paul <script>(window.__xss=window.__xss||[]).push(/T02/.source);console.log(/XSS-T02/.source)</script> Signature
+Société : &lt;img src=x onerror="(window.__xss=window.__xss||[]).push(/T03/.source);console.log(/XSS-T03/.source)"&gt;Client Deux
+Tél : 01 98 76 54 32 <svg onload="(window.__xss=window.__xss||[]).push(/T04/.source);console.log(/XSS-T04/.source)">
+Adresse : 4 avenue " onfocus="(window.__xss=window.__xss||[]).push(/T05/.source);console.log(/XSS-T05/.source)" autofocus x="
+75002 Paris

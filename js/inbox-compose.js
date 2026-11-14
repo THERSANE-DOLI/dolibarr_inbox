@@ -1658,7 +1658,8 @@
 			+ '<div class="ibx-ai__row"><button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'insert' : 'replace') + '">' + th(req.kind === 'write' ? 'InboxAiInsert' : replaceWhat) + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'replace' : 'insert') + '">' + th(req.kind === 'write' ? replaceWhat : 'InboxAiInsert') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-airetry">' + th('InboxAiRetry') + '</button></div>';
-		$('.ibx-ai__proposal', res).innerHTML = r.html;
+		// The one door too (lot S4): the answer of the AI may be steered by the mail it read; a second layer after the server
+		$('.ibx-ai__proposal', res).innerHTML = I.safeHtml(r.html);
 		$('.ibx-js-airetry', res).addEventListener('click', () => aiRun(w, box, req));
 		$$('.ibx-js-aiuse', res).forEach(b => b.addEventListener('click', () => {
 			if (b.dataset.use === 'insert') {

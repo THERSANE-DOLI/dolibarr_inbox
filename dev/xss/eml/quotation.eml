@@ -1,0 +1,13 @@
+Message-ID: <xss-quotation@inbox-test.invalid>
+From: Formulaire <noreply@forms.xss.example>
+To: perso@inbox-test.invalid
+Subject: XSS 4 demande de devis X-Quotation-Data (Q01-Q06)
+Date: Sat, 14 Nov 2026 13:23:40 +0100
+MIME-Version: 1.0
+Authentication-Results: mx.inbox-test.invalid; spf=pass smtp.mailfrom=forms.xss.example; dkim=pass header.d=forms.xss.example; dmarc=pass header.from=forms.xss.example
+X-Quotation-Mail: jean.dupont@client.xss.example
+X-Quotation-Data: {"company":"&lt;img src=x onerror=\"(window.__xss=window.__xss||[]).push(/Q01/.source);console.log(/XSS-Q01/.source)\"&gt;ACME","firstname":"<b>Jean</b><img src=x onerror=\"(window.__xss=window.__xss||[]).push(/Q02/.source);console.log(/XSS-Q02/.source)\">","lastname":"Dupont\"/autofocus/onfocus=\"(window.__xss=window.__xss||[]).push(/Q03/.source);console.log(/XSS-Q03/.source)","email":"jean.dupont@client.xss.example","phone":"01 23 45 67 89<svg onload=\"(window.__xss=window.__xss||[]).push(/Q04/.source);console.log(/XSS-Q04/.source)\">","address":"12 rue <script>(window.__xss=window.__xss||[]).push(/Q05/.source);console.log(/XSS-Q05/.source)</script>","zip":"75001","town":"Paris\u202Esiraп","message":"Bonjour <img src=x onerror=\"(window.__xss=window.__xss||[]).push(/Q06/.source);console.log(/XSS-Q06/.source)\">"}
+X-Data-Form-Company: <img src=x onerror="(window.__xss=window.__xss||[]).push(/Q07/.source);console.log(/XSS-Q07/.source)">Form Co
+Content-Type: text/plain; charset=utf-8
+
+Nouvelle demande de devis depuis le site.
