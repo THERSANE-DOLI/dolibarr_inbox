@@ -1129,13 +1129,6 @@ InboxNoMailboxReadable = Vous n'avez accès à aucune boîte d'inbox
 # Place of the Dolibarr part (1.13.0)
 InboxDolibarrFold = Replier la partie Dolibarr
 InboxDolibarrUnfold = Déplier la partie Dolibarr
-InboxDolibarrToTop = Partie Dolibarr au-dessus du mail
-InboxDolibarrToRight = Partie Dolibarr à droite du mail
-InboxDolibarrPosition = Partie Dolibarr d'un mail
-InboxDolibarrPositionHelp = Expéditeur, pièces liées et notes : à droite du corps du mail (les notes se lisent comme un fil) ou au-dessus. Automatique : à droite quand le volet de lecture est assez large.
-Inbox_dolibar_position_auto = Automatique
-Inbox_dolibar_position_right = À droite du mail
-Inbox_dolibar_position_top = Au-dessus du mail
 
 # Notes: cards and the box to write (1.13.0)
 InboxNotesEmpty = Aucune note sur ce mail pour le moment.
@@ -3379,10 +3372,8 @@ InboxAutoconfigIspdbSettingHelp = Quand le domaine ne publie pas ses réglages, 
 InboxOutsideWhat_ispdb = Le nom de domaine de la boîte ajoutée, à Mozilla (autoconfig.thunderbird.net)
 
 # Agenda panel (1.107.0)
-InboxAgendaPanel = Agenda
+InboxAgendaPanel = Aujourd'hui
 InboxAgendaNewEvent = Nouvel événement
-InboxAgendaPin = Épingler : toujours affiché
-InboxAgendaUnpin = Ne plus épingler
 InboxAgendaClose = Fermer l'agenda
 InboxAgendaLate = En retard (%s)
 InboxAgendaShowMore = Voir les %s autres
@@ -3404,3 +3395,12 @@ InboxAgendaUndoneToast = « %s » à nouveau à faire
 InboxAgendaSaveError = L'événement n'a pas pu être enregistré.
 InboxAgendaNotFound = Événement introuvable, ou qui n'est pas à vous.
 InboxKeyAgenda = Afficher ou masquer l'agenda
+
+# Strip on the right, space Agenda, invitation already in the agenda (1.109.0)
+InboxSpaceAgenda = Agenda
+InboxSideStrip = Colonnes à côté de l'email
+InboxSideDolibarrNoMail = Dolibarr : ouvrez un email
+InboxSideClose = Fermer la colonne
+InboxInviteKnown = Déjà dans votre agenda
+InboxInviteKnownHelp = Votre réponse est enregistrée dans l'agenda de Dolibarr, aucun email n'est envoyé depuis cette boîte.
+InboxInviteKnownOpen = Ouvrir l'événement

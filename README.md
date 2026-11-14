@@ -15,7 +15,8 @@ README.txt saying so.
 Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolcontext (JavaScript context of Dolibarr 24).
 
 Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `inboxAccountImportSources`,
-`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators` (context `inbox`), the module_parts `inboxcss` and
+`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators`, `inboxMailActions`, `inboxAgendaProvider`,
+`inboxInviteEvent` (context `inbox`), the module_parts `inboxcss` and
 `inboxjs` (see « Extend the application ») and the triggers of its objects.
 
 Licence: GPLv3, see COPYING.
@@ -125,8 +126,22 @@ address stays inside Dolibarr; values of other modules are never shown for an in
 
 ## Agenda panel
 
-On the right of the mails, the events of the user: late ones to do, today, the next 7 days. Shown by itself when no
-mail is open, opened by hand (button of the rail, Shift+F9) beside a mail, pinned to stay. It reads the native agenda
+On the right of the mails, the panel « Today »: the events of the user, late ones to do, today, the next 7 days.
+
+On a computer, a strip of icons on the right edge of the mail space holds the columns beside a mail, one at a time:
+Dolibarr (the Dolibarr part of the mail, moved out of the mail into a column as high as the screen) and Today (with
+the day of the month); both take the same place, width and splitter. A click shows its column, a click on
+the icon pressed (or the cross of the column) closes it; Shift+F9 does it for Today. With a mail open the last column
+chosen comes back; with no mail open, Today is shown unless closed by hand. When the reading would keep less than
+40 rem beside a column, the column is a drawer over the reading, opened by hand only (never by itself), closed by a
+click beside it, Escape, its cross or its icon; a line of chips under the head of the mail (thirdparty, pieces,
+notes) opens the drawer Dolibarr. On a tablet or a phone nothing changes: the Dolibarr part on top of the mail (a
+sheet on a phone) and Today opened by the button of the rail.
+
+The rail also has the space « Agenda »: the whole agenda in a frame, the page « openAll » of a module that took over
+(below), else the agenda of Dolibarr on the user. « Open the whole agenda » of the panel goes there.
+
+It reads the native agenda
 of Dolibarr only (`llx_actioncomm`, the user owner or attendee who did not decline), without the automatic events
 (type `systemauto`) nor the records of mails (`AC_EMAIL`, `AC_EMAIL_IN`, `AC_FAX`, `AC_INBOX_BOUNCE`). Right
 « read his events » of the Agenda module; « create his events » for the case « done ».
@@ -158,6 +173,39 @@ Markers: `{id}` (the event), `{socid}`, `{contactids}`, `{projectid}` (recognize
 `{elements}` (pieces linked to the conversation, `type:id` separated by commas, types as Dolibarr names them:
 `propal:12,facture:34`), `{start}` (empty for now). Your page may close its window with
 `parent.postMessage({source: 'inbox-panel', action: 'close'}, location.origin)`.
+
+Markers of the mail open, **after the `#` only** (the browser never sends this part to the server, so no subject
+nor address of a mail lands in the logs of the web server; read it with `location.hash`): `{subject}`, `{messageid}`
+(without angle brackets), `{emails}` (the sender and the recipients, without the mailboxes of the user, separated by
+commas). Before the `#` they are emptied.
+
+**Actions of a mail**: hook `inboxMailActions`, context `inbox`, called with the mail open (`mail`, `account`,
+`message_id`, `from`, `subject`, and `socid`, `contactid` recognized, 0 when the user may not read them). Each action
+is a button of the Dolibarr band of the mail; the same markers are filled when it is clicked. `window` true opens the
+page in a window of inbox (it may tell its title, its unsaved work and when it is done, as the pages of the agenda
+panel), else in a new tab.
+
+```php
+public function inboxMailActions($parameters, &$object, &$action, $hookmanager)
+{
+	global $user;
+	if ($user->hasRight('mymodule', 'write')) {
+		$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true,
+			'url' => dol_buildpath('/mymodule/meeting.php', 1).'?socid={socid}#subject={subject}&emails={emails}');
+	}
+	return 0;
+}
+```
+
+**An invitation your module sent itself**: hook `inboxInviteEvent`, context `inbox`. When a mail holds an invitation
+(`METHOD` other than `REPLY`), inbox asks with `mode` `find` (`user`, `uid`, `method`, `sequence`, `organizer` email):
+put the event of this Dolibarr in `$this->results['event']` (`id`, `attendee` true when the user is an attendee and
+not the owner, `partstat` `ACCEPTED` / `TENTATIVE` / `DECLINED` or '', `url` of a page of this site). inbox keeps it
+only when the user owns the event or is one of its attendees; its card then says « Already in your agenda » with
+« Open the event » (a window of inbox) instead of « Add to the agenda », and an attendee answers with three buttons:
+inbox calls the hook again with `mode` `answer` (`event`, `partstat`, the event asked again on the server, never from
+the browser) and your module records the answer (`$this->results['answered'] = true`); no mail is sent from the
+mailbox.
 
 **Events of your own** (data not in `llx_actioncomm`): hook `inboxAgendaEvents`, context `inbox`. Mode `declare`:
 `$this->results['declare'] = 1` shows the panel even without the Agenda module. Mode `list` (`user`, `from`, `to`,

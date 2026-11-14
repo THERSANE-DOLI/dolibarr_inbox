@@ -1129,13 +1129,6 @@ InboxNoMailboxReadable = No tiene acceso a ningún buzón de inbox
 # Place of the Dolibarr part (1.13.0)
 InboxDolibarrFold = Plegar la parte Dolibarr
 InboxDolibarrUnfold = Desplegar la parte Dolibarr
-InboxDolibarrToTop = Parte Dolibarr encima del correo
-InboxDolibarrToRight = Parte Dolibarr a la derecha del correo
-InboxDolibarrPosition = Parte Dolibarr de un correo
-InboxDolibarrPositionHelp = Remitente, documentos vinculados y notas: a la derecha del cuerpo del correo (las notas se leen como un hilo) o encima. Automático: a la derecha cuando el panel de lectura es bastante ancho.
-Inbox_dolibar_position_auto = Automático
-Inbox_dolibar_position_right = A la derecha del correo
-Inbox_dolibar_position_top = Encima del correo
 
 # Notes: cards and the box to write (1.13.0)
 InboxNotesEmpty = Todavía ninguna nota en este correo.
@@ -3379,10 +3372,8 @@ InboxAutoconfigIspdbSettingHelp = Cuando el dominio no publica sus ajustes, su n
 InboxOutsideWhat_ispdb = El nombre de dominio del buzón añadido, a Mozilla (autoconfig.thunderbird.net)
 
 # Agenda panel (1.107.0)
-InboxAgendaPanel = Agenda
+InboxAgendaPanel = Hoy
 InboxAgendaNewEvent = Nuevo evento
-InboxAgendaPin = Fijar: siempre visible
-InboxAgendaUnpin = Dejar de fijar
 InboxAgendaClose = Cerrar la agenda
 InboxAgendaLate = Atrasados (%s)
 InboxAgendaShowMore = Ver los otros %s
@@ -3404,3 +3395,12 @@ InboxAgendaUndoneToast = « %s » de nuevo por hacer
 InboxAgendaSaveError = No se pudo guardar el evento.
 InboxAgendaNotFound = Evento no encontrado, o que no es suyo.
 InboxKeyAgenda = Mostrar u ocultar la agenda
+
+# Strip on the right, space Agenda, invitation already in the agenda (1.109.0)
+InboxSpaceAgenda = Agenda
+InboxSideStrip = Columnas junto al correo
+InboxSideDolibarrNoMail = Dolibarr: abra un correo
+InboxSideClose = Cerrar la columna
+InboxInviteKnown = Ya está en su agenda
+InboxInviteKnownHelp = Su respuesta se registra en la agenda de Dolibarr, no se envía ningún correo desde este buzón.
+InboxInviteKnownOpen = Abrir el evento

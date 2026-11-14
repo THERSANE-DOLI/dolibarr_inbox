@@ -1,5 +1,32 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the Dolibarr part as a column of its own, full height, at the place of the agenda :   1.110.0
+  - on a computer, the Dolibarr part of the email open leaves the email for a column beside the reading, as high as
+    the screen, as the panel Today: same width and splitter, same drawer when the reading is narrow.
+  - tablet and phone unchanged (on top of the email, a sheet on a phone).
+
+- FIX: agenda panel slow on a large agenda :   1.109.1
+  - the events of today and of the coming days were read from the whole history of the agenda (7 s for 800 000
+    events, the other calls of the page waiting behind); an event started more than 31 days before is left out.
+  - the panel Today as a drawer no longer covers the strip on the right.
+
+- NEW: strip on the right of the emails, space Agenda in the rail, invitations already in the agenda :   1.109.0
+  - on a computer, a strip of icons on the right edge holds the Dolibarr part and the panel Today, one column at a
+    time; when the reading is narrow, a drawer opened by hand only, and a line of chips under the head of the email.
+    The setting « Dolibarr part above / on the right » and the pin of the agenda are gone. Tablet and phone unchanged.
+  - space Agenda in the rail: the whole agenda in a frame (the page of an agenda module, else the agenda of
+    Dolibarr); « Open the whole agenda » goes there.
+  - an invitation an agenda module of this Dolibarr sent itself (hook inboxInviteEvent) says « Already in your
+    agenda »: never added twice, the answer recorded in Dolibarr without email.
+  - the choice of the agenda panel closed by hand with no email open is kept again (setting not declared before).
+  - a page of a module opened from an email: the blocks of the modules read again when its window closes.
+
+- NEW: actions of other modules in a window of inbox, with the subject and the correspondents of the email :   1.108.0
+  - an action of a module (hook inboxMailActions) may open its page in a window of inbox instead of a new tab, and
+    receives the thirdparty and the contact recognized.
+  - its address, as the ones of the agenda panel, may ask the subject, the Message-ID and the correspondents of the
+    email: given after the « # » only, never sent to the web server nor written in its logs (README).
+
 - NEW: agenda panel on the right of the emails, the events of the user late, today and coming :   1.107.0
   - shown by itself when no email is open; beside an email, opened by the button of the rail or Shift+F9; pinned, it
     always stays; closed by hand, it stays closed. Docked as a column when the reading keeps its room, over it

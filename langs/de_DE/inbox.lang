@@ -1129,13 +1129,6 @@ InboxNoMailboxReadable = Sie haben auf kein Postfach von inbox Zugriff
 # Place of the Dolibarr part (1.13.0)
 InboxDolibarrFold = Dolibarr-Bereich einklappen
 InboxDolibarrUnfold = Dolibarr-Bereich ausklappen
-InboxDolibarrToTop = Dolibarr-Bereich über der Mail
-InboxDolibarrToRight = Dolibarr-Bereich rechts der Mail
-InboxDolibarrPosition = Dolibarr-Bereich einer Mail
-InboxDolibarrPositionHelp = Absender, verknüpfte Belege und Notizen: rechts vom Text der Mail (die Notizen lesen sich wie ein Verlauf) oder darüber. Automatisch: rechts, wenn der Lesebereich breit genug ist.
-Inbox_dolibar_position_auto = Automatisch
-Inbox_dolibar_position_right = Rechts der Mail
-Inbox_dolibar_position_top = Über der Mail
 
 # Notes: cards and the box to write (1.13.0)
 InboxNotesEmpty = Noch keine Notiz zu dieser Mail.
@@ -3379,10 +3372,8 @@ InboxAutoconfigIspdbSettingHelp = Wenn die Domain keine Einstellungen veröffent
 InboxOutsideWhat_ispdb = Der Domainname des hinzugefügten Postfachs, an Mozilla (autoconfig.thunderbird.net)
 
 # Agenda panel (1.107.0)
-InboxAgendaPanel = Kalender
+InboxAgendaPanel = Heute
 InboxAgendaNewEvent = Neuer Termin
-InboxAgendaPin = Anheften: immer angezeigt
-InboxAgendaUnpin = Nicht mehr anheften
 InboxAgendaClose = Kalender schließen
 InboxAgendaLate = Überfällig (%s)
 InboxAgendaShowMore = Die %s weiteren anzeigen
@@ -3404,3 +3395,12 @@ InboxAgendaUndoneToast = « %s » wieder zu erledigen
 InboxAgendaSaveError = Der Termin konnte nicht gespeichert werden.
 InboxAgendaNotFound = Termin nicht gefunden oder nicht Ihrer.
 InboxKeyAgenda = Kalender ein- oder ausblenden
+
+# Strip on the right, space Agenda, invitation already in the agenda (1.109.0)
+InboxSpaceAgenda = Kalender
+InboxSideStrip = Spalten neben der E-Mail
+InboxSideDolibarrNoMail = Dolibarr: öffnen Sie eine E-Mail
+InboxSideClose = Spalte schließen
+InboxInviteKnown = Bereits in Ihrem Kalender
+InboxInviteKnownHelp = Ihre Antwort wird im Kalender von Dolibarr gespeichert, aus diesem Postfach wird keine E-Mail gesendet.
+InboxInviteKnownOpen = Termin öffnen

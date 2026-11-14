@@ -98,8 +98,10 @@ class InboxUserParam
 			'folder_icons' => array('color', array('color', 'plain')),
 			// Bandeau Dolibarr of the reading folded (1.13.0)
 			'dolibar_folded' => array('0', 'int:0:1'),
-			// Place of the bandeau Dolibarr: auto (on the right when the reading pane is wide enough), right, top
-			'dolibar_position' => array('auto', array('auto', 'right', 'top')),
+			// Column beside a mail open, chosen in the strip on the right (1.109.0): the Dolibarr part, the agenda panel or none
+			'side_panel' => array('dolibarr', array('dolibarr', 'agenda', 'none')),
+			// Agenda panel with no mail open (1.107.0, declared 1.109.0): shown (''), or closed by hand
+			'agenda_mode' => array('', array('', 'pinned', 'closed')),
 			// Writing (1.16.0): Ctrl+Enter sends (or nothing), size of the writing windows
 			'send_shortcut' => array('ctrl_enter', array('ctrl_enter', 'off')),
 			// Delay before a mail leaves (1.17.0): -1 = the one of the setup, 0 = at once

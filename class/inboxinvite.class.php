@@ -26,6 +26,7 @@ require_once __DIR__.'/inboxsystemmail.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxagenda.class.php';
+require_once __DIR__.'/inboxagendapanel.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 
@@ -225,8 +226,11 @@ class InboxInvite
 			}
 		}
 		$langs->loadLangs(array('main', 'inbox@inbox'));
+		// Already in the agenda through a module (1.109.0, hook inboxInviteEvent): never offered to be added twice
+		$known = $e['uid'] !== '' && $method !== 'REPLY' ? $this->known($user, $e, $method) : null;
 
 		return array(
+			'known' => $known ? array('url' => $known['url'], 'attendee' => $known['attendee'], 'partstat' => $known['partstat'], 'label' => $known['label']) : null,
 			'method' => $method,
 			'uid' => $e['uid'] !== '' ? sha1($e['uid']) : '',
 			'sequence' => (int) $e['sequence'],
@@ -355,7 +359,7 @@ class InboxInvite
 		}
 		$this->save($user, $e['uid'], array('sequence' => (int) $e['sequence'], 'partstat' => $partstat, 'date_reply' => $this->db->idate(dol_now())));
 		$eventId = 0;
-		if ($agenda && $partstat !== 'DECLINED') {
+		if ($agenda && $partstat !== 'DECLINED' && $this->known($user, $e, $l['method']) === null) {
 			$eventId = $this->toAgenda($user, $reader, $e);
 		}
 
@@ -443,6 +447,89 @@ class InboxInvite
 	}
 
 	/**
+	 * The event of an invitation already in the agenda of Dolibarr, as a module says it (hook inboxInviteEvent, mode
+	 * « find »): an invitation sent by an agenda module of this Dolibarr to a user already attendee. Kept only when the
+	 * user owns the event or is one of its attendees.
+	 *
+	 * @param User                $user   User
+	 * @param array<string,mixed> $e      Event of the invitation
+	 * @param string              $method METHOD of the calendar
+	 * @return array{id:int,url:string,attendee:bool,partstat:string,label:string}|null
+	 */
+	protected function known(User $user, array $e, $method)
+	{
+		global $hookmanager;
+
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($this->db);
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$parameters = array('mode' => 'find', 'user' => $user, 'uid' => (string) $e['uid'], 'method' => (string) $method, 'sequence' => (int) $e['sequence'],
+			'organizer' => $e['organizer'] ? (string) $e['organizer']['email'] : '');
+		$object = null;
+		$action = '';
+		if ($hookmanager->executeHooks('inboxInviteEvent', $parameters, $object, $action) < 0 || !is_array($hookmanager->resArray['event'] ?? null)) {
+			return null;
+		}
+		$x = $hookmanager->resArray['event'];
+		$id = (int) ($x['id'] ?? 0);
+		$p = $this->db->prefix();
+		$row = $id > 0 ? $this->db->getRow("SELECT a.id, a.label, a.fk_user_action FROM ".$p."actioncomm as a WHERE a.id = ".$id
+			." AND (a.fk_user_action = ".((int) $user->id)." OR EXISTS (SELECT 1 FROM ".$p."actioncomm_resources as r WHERE r.fk_actioncomm = a.id AND r.element_type = 'user' AND r.fk_element = ".((int) $user->id)."))") : null;
+		if (!is_object($row)) {
+			return null;
+		}
+		$url = InboxAgendaPanel::localUrl((string) ($x['url'] ?? ''));
+
+		return array(
+			'id' => $id,
+			'url' => $url !== '' ? $url : DOL_URL_ROOT.'/comm/action/card.php?id='.$id,
+			'attendee' => !empty($x['attendee']) && (int) $row->fk_user_action !== (int) $user->id,
+			'partstat' => in_array($x['partstat'] ?? '', self::PARTSTATS, true) ? (string) $x['partstat'] : '',
+			'label' => (string) $row->label,
+		);
+	}
+
+	/**
+	 * Answer of an attendee to an invitation already in the agenda: recorded in Dolibarr by the module that knows the
+	 * event (hook inboxInviteEvent, mode « answer »), no mail sent from the mailbox
+	 *
+	 * @param User   $user     User
+	 * @param int    $mailId   Mail of the invitation
+	 * @param string $partstat ACCEPTED, TENTATIVE, DECLINED
+	 * @return array{partstat:string}|null
+	 */
+	public function answerKnown(User $user, $mailId, $partstat)
+	{
+		global $hookmanager;
+
+		$this->error = '';
+		$this->errorCode = '';
+		if (!in_array($partstat, self::PARTSTATS, true)) {
+			return $this->fail('bad_value');
+		}
+		$l = $this->load($user, $mailId);
+		if ($l === null) {
+			return null;
+		}
+		// The event asked again on the server: never an id from the browser
+		$known = $this->known($user, $l['event'], $l['method']);
+		if ($known === null || !$known['attendee']) {
+			return $this->fail('no_agenda');
+		}
+		$parameters = array('mode' => 'answer', 'user' => $user, 'uid' => (string) $l['event']['uid'], 'event' => $known['id'], 'partstat' => $partstat);
+		$object = null;
+		$action = '';
+		if ($hookmanager->executeHooks('inboxInviteEvent', $parameters, $object, $action) < 0 || empty($hookmanager->resArray['answered'])) {
+			return $this->fail('agenda_error');
+		}
+		$this->save($user, $l['event']['uid'], array('sequence' => (int) $l['event']['sequence'], 'partstat' => $partstat, 'date_reply' => $this->db->idate(dol_now()), 'fk_actioncomm' => (int) $known['id']));
+
+		return array('partstat' => $partstat);
+	}
+
+	/**
 	 * Agenda on a click: add (or bring up to date) the event of the invitation, or mark it cancelled (cancel received)
 	 *
 	 * @param User   $user   User
@@ -463,6 +550,9 @@ class InboxInvite
 		$e = $l['event'];
 		if ($what === 'add') {
 			if ($l['method'] === 'CANCEL' || $e['status'] === 'CANCELLED') {
+				return $this->fail('bad_value');
+			}
+			if ($this->known($user, $e, $l['method']) !== null) {
 				return $this->fail('bad_value');
 			}
 			$id = $this->toAgenda($user, $l['reader'], $e);

@@ -96,6 +96,21 @@
 			}
 			return html + '</div></section>';
 		}
+		// Already in the agenda through a module (1.109.0): never added twice; an attendee answers in Dolibarr
+		if (inv.known) {
+			const k = inv.known;
+			html += '<div class="ibx-invite__line ibx-invite__known">' + ic('check') + ' ' + th('InboxInviteKnown')
+				+ (k.partstat ? ' ' + stateChip(k.partstat) : '') + '</div>';
+			if (k.attendee && !inv.cancelled) {
+				html += '<div class="ibx-invite__actions" role="group" aria-label="' + th('InboxInviteYourAnswer') + '">'
+					+ PARTSTATS.map(p => '<button type="button" class="ibx-btn ibx-btn--sm' + (k.partstat === p ? ' ibx-btn--primary' : '') + ' ibx-js-invknown" data-partstat="' + p + '"'
+						+ (k.partstat === p ? ' aria-pressed="true"' : '') + '>' + th('InboxInviteDo_' + p) + '</button>').join('') + '</div>'
+					+ '<div class="ibx-invite__line ibx-muted">' + th('InboxInviteKnownHelp') + '</div>';
+			}
+			html += '<div class="ibx-invite__actions"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-invknownopen" aria-haspopup="dialog">'
+				+ ic('agenda') + ' ' + th('InboxInviteKnownOpen') + '</button></div>';
+			return html + '</div></section>';
+		}
 		if (inv.conflicts.length && !inv.cancelled) {
 			html += '<div class="ibx-invite__line ibx-invite__conflict">' + ic('warning') + ' ' + th('InboxInviteConflict', inv.conflicts.map(c => c.label).join(', ')) + '</div>';
 		}
@@ -201,6 +216,33 @@
 				toast(err.message, { error: true });
 			}
 		}));
+		$$('.ibx-js-invknown', card).forEach(b => b.addEventListener('click', async () => {
+			if (b.getAttribute('aria-disabled') === 'true') {
+				return;
+			}
+			busy(root, true);
+			try {
+				await post('invite', 'answer', { mail: m.id, partstat: b.dataset.partstat });
+				m.invite.known.partstat = b.dataset.partstat;
+				toast(t('InboxInviteNoted'));
+				repaint(m, root);
+				if (I.agenda) {
+					I.agenda.refresh();
+				}
+			} catch (err) {
+				busy(root, false);
+				toast(err.message, { error: true });
+			}
+		}));
+		const open = $('.ibx-js-invknownopen', card);
+		if (open) {
+			open.addEventListener('click', () => {
+				const k = m.invite.known;
+				if (!I.openPageWindow || !I.openPageWindow({ key: 'invite-' + m.id, url: k.url, title: k.label || m.invite.summary, onClose: () => I.agenda && I.agenda.refresh() })) {
+					window.open(k.url, '_blank', 'noopener');
+				}
+			});
+		}
 		$$('.ibx-js-invagenda', card).forEach(b => b.addEventListener('click', async () => {
 			if (b.getAttribute('aria-disabled') === 'true') {
 				return;

@@ -16,9 +16,10 @@
 
 /**
  * Agenda panel of the mail space (1.107.0): the events of the user, late to do, today and the coming days.
- * - Shown by itself when no mail is open; opened by hand (button of the rail, Shift+F9) beside a mail; pinned, it
- *   stays. Closed by hand, it stays closed until opened again. Pinned, closed, width: kept for the user.
- * - Docked as a column when the reading keeps its room, else over the reading (and as a sheet on a phone).
+ * - Computer (1.109.0): one of the columns of the strip on the right of the mail space (js/inbox-mail.js, I.side),
+ *   with Dolibarr: shown when no mail is open (unless closed by hand), beside a mail when it is the last choice; a
+ *   column docked when the reading keeps its room, else a drawer over it, opened by hand only. Shift+F9 as before.
+ * - Tablet and phone: a sheet over the screen opened by the button of the rail, never by itself.
  * - inbox knows no other module. A module plugs itself (README, « Agenda panel »):
  *   inbox:agenda:render, inbox:agenda:action, inbox:agenda:toolbar, inbox:agenda:shown / hidden (JS hooks);
  *   inboxAgendaProvider and inboxAgendaEvents (PHP hooks); the API I.agenda (refresh, open, close, isVisible).
@@ -113,6 +114,14 @@
 			A.app.removeAttribute('data-agenda');
 			return;
 		}
+		if (!isPhone() && I.side) {
+			A.app.dataset.agenda = I.side.narrow() ? 'over' : 'open';
+			const split = $('.ibx-splitter--agenda', A.app);
+			if (split) {
+				split.hidden = A.app.dataset.agenda !== 'open';
+			}
+			return;
+		}
 		const read = $('.ibx-pane--read', A.app);
 		const agendaW = A.el.getBoundingClientRect().width || 300;
 		// Room of the reading with the panel docked: what the reading has now, less the panel when it is over it
@@ -162,6 +171,9 @@
 		if (isPhone()) {
 			// Phone: a sheet over the screen, never opened by itself (pinned included)
 			setVisible(byHand, reason);
+		} else if (I.side) {
+			setVisible(I.side.current() === 'agenda', reason);
+			place();
 		} else if (mode === 'pinned') {
 			setVisible(true, reason);
 		} else if (mode === 'closed') {
@@ -199,7 +211,6 @@
 		if (CONF.native || (CONF.provider && CONF.provider.urls.create)) {
 			ctx.buttons.push({ key: 'create', label: t('InboxAgendaNewEvent'), icon: 'event-new', rank: 10 });
 		}
-		ctx.buttons.push({ key: 'pin', label: t(mode === 'pinned' ? 'InboxAgendaUnpin' : 'InboxAgendaPin'), icon: 'pin', rank: 80, pressed: mode === 'pinned' });
 		ctx.buttons.push({ key: 'close', label: t('InboxAgendaClose'), icon: 'close', rank: 90 });
 		await hook('inbox:agenda:toolbar', ctx);
 		const tools = $('.ibx-js-agtools', A.el);
@@ -393,14 +404,6 @@
 			close('button');
 			return;
 		}
-		if (action === 'pin') {
-			mode = mode === 'pinned' ? '' : 'pinned';
-			byHand = false;
-			saveParam('agenda_mode', mode);
-			apply('button');
-			paintTools();
-			return;
-		}
 		run(action, findEvent(btn.closest('.ibx-agenda__item')));
 	}
 
@@ -418,6 +421,10 @@
 		}
 		const urls = CONF.provider && CONF.provider.urls ? CONF.provider.urls : {};
 		const native = !event || (event.source || 'dolibarr') === 'dolibarr';
+		if (action === 'openAll' && spaceUrl()) {
+			I.go('#/agenda');
+			return;
+		}
 		if (urls[action] && (action !== 'open' || native)) {
 			openPage(action, fill(urls[action], event, mail), CONF.provider.label || t('InboxAgendaPanel'));
 			return;
@@ -426,25 +433,16 @@
 			openPage('create', createUrl(mail), t('InboxAgendaNewEvent'));
 		} else if (action === 'open' && event && event.url) {
 			openPage('open', event.url, event.label);
-		} else if (action === 'openAll' && CONF.native) {
-			window.open(I.ctx('INBOX_DOLIBARR_URL', '/') + 'comm/action/index.php?mainmenu=agenda&filtert=' + encodeURIComponent(I.ctx('INBOX_USER_ID', 0)), '_blank', 'noopener');
+		} else if (action === 'openAll' && spaceUrl()) {
+			I.go('#/agenda');
 		} else if (action === 'openMail' && event && event.mail) {
 			Dolibarr.executeHook('inbox:mail:goto', { folder: +event.mail.folder, mail: +event.mail.mail });
 		}
 	}
 
-	/** Neutral markers of an address declared by a module, filled from the event and the mail open */
+	/** Neutral markers of an address declared by a module, filled from the event and the mail open (I.moduleUrl) */
 	function fill(url, event, mail) {
-		const m = mail || {};
-		const values = {
-			id: event ? event.id : '',
-			socid: m.thirdparty ? m.thirdparty.id : '',
-			contactids: m.contact ? m.contact.id : '',
-			projectid: m.project ? m.project.id : '',
-			elements: (m.elements || []).map(e => e.type + ':' + e.id).join(','),
-			start: '',
-		};
-		return String(url).replace(/\{(id|socid|contactids|projectid|elements|start)\}/g, (x, k) => encodeURIComponent(String(values[k])));
+		return I.moduleUrl(url, mail, { id: event ? event.id : '' });
 	}
 
 	/** Creation in the agenda of Dolibarr, filled from the mail open (its thirdparty, its contact, its project) */
@@ -537,7 +535,7 @@
 		b.title = t('InboxAgendaPanel') + ' (Maj+F9)';
 		b.setAttribute('aria-label', t('InboxAgendaPanel'));
 		b.setAttribute('aria-expanded', 'false');
-		b.innerHTML = ic('agenda');
+		b.innerHTML = ic('today');
 		const theme = $('.ibx-js-themeswitch', rail);
 		rail.insertBefore(b, theme || null);
 		b.addEventListener('click', () => {
@@ -567,6 +565,12 @@
 		if (!enabled() || !mount()) {
 			return;
 		}
+		if (!isPhone() && I.side) {
+			if (I.side.current() !== 'agenda') {
+				I.side.toggle('agenda', reason || 'api');
+			}
+			return;
+		}
 		if (mode === 'closed') {
 			mode = '';
 			saveParam('agenda_mode', '');
@@ -576,6 +580,12 @@
 	}
 	function close(reason) {
 		if (!A.el) {
+			return;
+		}
+		if (!isPhone() && I.side) {
+			if (I.side.current() === 'agenda') {
+				I.side.toggle('agenda', reason || 'api');
+			}
 			return;
 		}
 		byHand = false;
@@ -604,12 +614,50 @@
 		}
 	}
 
+	// ---------- Space « Agenda » of the rail (1.109.0) ----------
+	/**
+	 * The whole agenda in a frame: the page « openAll » of a module that took over (hook inboxAgendaProvider), else the
+	 * agenda of Dolibarr on the user. '' when neither (no right)
+	 * @returns {string}
+	 */
+	function spaceUrl() {
+		const urls = CONF.provider && CONF.provider.urls ? CONF.provider.urls : {};
+		if (urls.openAll) {
+			return fill(urls.openAll, null, null);
+		}
+		if (CONF.native) {
+			return I.ctx('INBOX_DOLIBARR_URL', '/') + 'comm/action/index.php?mainmenu=agenda&dol_hide_topmenu=1&dol_hide_leftmenu=1&filtert=' + encodeURIComponent(I.ctx('INBOX_USER_ID', 0));
+		}
+		return '';
+	}
+	if (enabled() && spaceUrl()) {
+		I.registerSpace({
+			id: 'agenda',
+			icon: 'agenda-space',
+			label: () => t('InboxSpaceAgenda'),
+			// Made once: the frame keeps its view (week, people shown) when the user comes back
+			render(el) {
+				if (el._frame) {
+					return;
+				}
+				el.innerHTML = '<iframe class="ibx-agendaspace" title="' + th('InboxSpaceAgenda') + '" src="' + esc(spaceUrl()) + '"></iframe>';
+				el._frame = el.firstChild;
+			},
+		});
+	}
+
 	I.agenda = {
 		enabled,
 		toggle,
 		open: () => open('api'),
 		close: () => close('api'),
 		isVisible: () => A.visible,
+		/** Called by the strip of the mail space (1.109.0): shown or not, docked or over, as it says */
+		sync(reason) {
+			if (enabled() && mount()) {
+				apply(reason);
+			}
+		},
 		refresh: () => load(),
 		/** Called by the mail space: a mail open (id) or none (0) */
 		mailChanged(id) {
