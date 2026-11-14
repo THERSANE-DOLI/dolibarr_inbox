@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: agenda panel slow on a large agenda :   1.109.1
+  - the events of today and of the coming days were read from the whole history of the agenda (7 s for 800 000
+    events, the other calls of the page waiting behind); an event started more than 31 days before is left out.
+  - the panel Today as a drawer no longer covers the strip on the right.
+
 - NEW: strip on the right of the emails, space Agenda in the rail, invitations already in the agenda :   1.109.0
   - on a computer, a strip of icons on the right edge holds the Dolibarr part and the panel Today, one column at a
     time; when the reading is narrow, a drawer opened by hand only, and a line of chips under the head of the email.

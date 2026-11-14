@@ -2919,7 +2919,7 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-sidestrip__btn[aria-disabled="true"] { opacity: .45; cursor: default; }
 .ibx-sidestrip__btn[aria-disabled="true"]:hover { background: none; color: var(--ibx-text-muted); }
 .ibx-sidestrip__day { font-size: 0.625rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { right: var(--ibx-strip-w); }
+.ibx-mailapp[data-agenda="over"] > .ibx-pane.ibx-pane--agenda { right: var(--ibx-strip-w); }
 /* The column not chosen is not shown: as a column of the mail, its place goes back to the mail */
 .ibx-mailapp:not([data-side="dolibarr"]) .ibx-pane--read[data-dolibar="right"] .ibx-reading { --ibx-dolibar-w: 0px; }
 .ibx-mailapp:not([data-side="dolibarr"]) .ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar { display: none; }

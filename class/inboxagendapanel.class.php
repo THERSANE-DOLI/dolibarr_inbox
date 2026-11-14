@@ -39,6 +39,8 @@ class InboxAgendaPanel
 	const DAYS_MAX = 31;
 
 	/** Lines read at most */
+	/** Longest event still shown while it lasts (days): one started earlier is left out of « today » and the coming days */
+	const SPAN_MAX = 31;
 	const MAX_COMING = 300;
 	const MAX_LATE = 50;
 
@@ -193,7 +195,10 @@ class InboxAgendaPanel
 			$canDone = $user->hasRight('agenda', 'myactions', 'create');
 			$base = $this->baseSql($user);
 			$coming = $this->db->getRows($this->select().$base
-				." AND a.datep < '".$this->db->idate($to)."' AND COALESCE(a.datep2, a.datep) >= '".$this->db->idate($from)."'"
+				// Started at most SPAN_MAX days before (1.109.1): a range on the index of datep, else the whole history of
+				// the agenda is read (7 s for 800 000 events)
+				." AND a.datep >= '".$this->db->idate($from - self::SPAN_MAX * 86400)."' AND a.datep < '".$this->db->idate($to)."'"
+				." AND COALESCE(a.datep2, a.datep) >= '".$this->db->idate($from)."'"
 				." ORDER BY a.datep ASC, a.id ASC LIMIT ".self::MAX_COMING);
 			foreach (is_array($coming) ? $coming : array() as $o) {
 				$events[] = $this->row($o, $user, $canDone);
