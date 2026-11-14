@@ -17,6 +17,8 @@ async function editorWith(html) {
 	const w = dom.window;
 	// No layout in jsdom: what ProseMirror measures is given flat
 	w.document.elementFromPoint = () => null;
+	// No media queries in jsdom: a desktop screen (the editor asks for the phone layout)
+	w.matchMedia = q => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 	w.Range.prototype.getClientRects = () => [];
 	w.Range.prototype.getBoundingClientRect = () => ({ left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 });
 	// A picture « loaded » at 400 x 200 (jsdom loads nothing)

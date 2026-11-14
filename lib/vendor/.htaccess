@@ -1,0 +1,2 @@
+# Library files of PHP: required by the module, never called by a browser
+Require all denied

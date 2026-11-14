@@ -22,6 +22,7 @@
  */
 
 require_once __DIR__.'/inboxmessage.class.php';
+require_once __DIR__.'/inboxsafe.class.php';
 
 /**
  * Raw mail (RFC 822 source) => InboxMessage, with the Webklex classes shipped with Dolibarr (Header, Structure: no
@@ -45,11 +46,8 @@ class InboxMimeParser
 	/** HTML body kept (bytes) */
 	const MAX_HTML_LENGTH = 1048576;
 
-	/** Elements removed with their content: scripts, frames, forms, documents inside the document */
-	const HTML_DROP = array('script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'form', 'input', 'button', 'select',
-		'textarea', 'link', 'meta', 'base', 'svg', 'math', 'template', 'noscript', 'audio', 'video', 'source', 'track', 'portal', 'title', 'head',
-		// Read by the browsers as raw text, by libxml as elements: what they hold would not be the same HTML (audit INBX-001)
-		'xmp', 'noembed', 'noframes', 'plaintext', 'listing', 'style');
+	/** Elements removed with their content: see InboxSafe::HTML_DROP (lot S1, moved there) */
+	const HTML_DROP = InboxSafe::HTML_DROP;
 
 	/**
 	 * @param string $raw   RFC 822 source
@@ -351,7 +349,7 @@ class InboxMimeParser
 	}
 
 	/**
-	 * HTML body of a mail => document to show in a sandboxed iframe (no script, no same origin). Allow list on top of
+	 * HTML body of a mail => document to show in a sandboxed iframe: InboxSafe::display() (lot S1). Allow list on top of
 	 * the sandbox: no script, frame, form or event attribute, links opened in a new tab, pictures of the mail (cid:)
 	 * as data URIs, remote pictures counted (the CSP of the page showing it must block them)
 	 *
@@ -362,75 +360,7 @@ class InboxMimeParser
 	 */
 	public static function safeHtml($html, array $inline, &$hasRemote)
 	{
-		$hasRemote = false;
-		$doc = new DOMDocument();
-		$previous = libxml_use_internal_errors(true);
-		// The body is UTF-8 already (toUtf8): the charset of its <meta> (Outlook « iso-8859-1 ») would win over the
-		// encoding given here and double encode the accents
-		$html = preg_replace('#<meta\b[^>]*charset[^>]*>#i', '', (string) $html);
-		// Conditional comments of Outlook shown to the other readers (« <![if !vml]> »): libxml would print them as text
-		$html = preg_replace('#<!\[(?:if\b[^\]]*|endif)\]>#i', '', $html);
-		// No network, no entity expansion (LIBXML_NOENT not set)
-		$doc->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NONET | LIBXML_HTML_NODEFDTD);
-		libxml_clear_errors();
-		libxml_use_internal_errors($previous);
-
-		$styles = array();
-		foreach (iterator_to_array($doc->getElementsByTagName('style')) as $style) {
-			// CSS of the mail kept (layout of the signatures, tables); no url() allowed by the CSP except data:
-			$styles[] = $style->textContent;
-			$style->parentNode->removeChild($style);
-		}
-		foreach (self::HTML_DROP as $tag) {
-			foreach (iterator_to_array($doc->getElementsByTagName($tag)) as $node) {
-				$node->parentNode->removeChild($node);
-			}
-		}
-		$xpath = new DOMXPath($doc);
-		// Comments and processing instructions: never sent to the browser, nothing hides in them (audit INBX-001)
-		foreach (iterator_to_array($xpath->query('//comment() | //processing-instruction()')) as $node) {
-			$node->parentNode->removeChild($node);
-		}
-		foreach (iterator_to_array($xpath->query('//*')) as $node) {
-			/** @var DOMElement $node */
-			foreach (iterator_to_array($node->attributes) as $attr) {
-				$name = strtolower($attr->name);
-				$value = trim($attr->value);
-				if (strpos($name, 'on') === 0 || in_array($name, array('srcset', 'formaction', 'action', 'ping', 'xmlns', 'target'), true)
-					|| preg_match('/^\s*(javascript|vbscript|data):/i', $value) && !in_array($name, array('src', 'alt', 'title'), true)) {
-					$node->removeAttribute($attr->name);
-				} elseif ($name === 'style' && preg_match('/url\s*\(\s*[\'"]?\s*https?:/i', $value)) {
-					$hasRemote = true;
-				} elseif ($name === 'background' && preg_match('/^https?:/i', $value)) {
-					$hasRemote = true;
-				}
-			}
-			$tag = strtolower($node->nodeName);
-			if ($tag === 'a' && $node->hasAttribute('href')) {
-				if (preg_match('#^(https?:|mailto:|tel:|\#)#i', trim($node->getAttribute('href')))) {
-					$node->setAttribute('target', '_blank');
-					$node->setAttribute('rel', 'noopener noreferrer');
-				} else {
-					$node->removeAttribute('href');
-				}
-			} elseif ($tag === 'img') {
-				$src = trim($node->getAttribute('src'));
-				if (stripos($src, 'cid:') === 0 && isset($inline[trim(rawurldecode(substr($src, 4)), '<>')])) {
-					$node->setAttribute('src', $inline[trim(rawurldecode(substr($src, 4)), '<>')]);
-				} elseif (preg_match('/^https?:/i', $src)) {
-					$hasRemote = true;
-				} elseif (!preg_match('#^data:image/(png|jpeg|gif|webp);base64,#i', $src)) {
-					$node->removeAttribute('src');
-				}
-			}
-		}
-		$body = $doc->getElementsByTagName('body')->item(0);
-		$inner = '';
-		foreach ($body ? $body->childNodes : array() as $child) {
-			$inner .= $doc->saveHTML($child);
-		}
-
-		return self::document($inner, implode("\n", $styles));
+		return InboxSafe::display($html, $inline, $hasRemote);
 	}
 
 	/**
@@ -579,24 +509,7 @@ class InboxMimeParser
 	 */
 	public static function textDocument($text)
 	{
-		return self::document('<pre class="inbox-text">'.htmlspecialchars((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8').'</pre>', '');
-	}
-
-	/**
-	 * @param string $body   Body (already safe)
-	 * @param string $styles CSS of the mail
-	 * @return string
-	 */
-	protected static function document($body, $styles)
-	{
-		// The CSS of a mail cannot close the style element nor open a tag: no « < » in it (written \3C, the same
-		// character for CSS), whatever the HTML parser of the browser (audit INBX-001)
-		$styles = str_replace('<', '\\3C ', (string) $styles);
-
-		return '<!doctype html><html><head><meta charset="utf-8"><style>'
-			.'html{color-scheme:light}body{margin:16px;font:14px/1.45 Arial,Helvetica,sans-serif;color:#222;background:#fff;overflow-wrap:break-word}'
-			.'img{max-width:100%;height:auto}pre.inbox-text{white-space:pre-wrap;font:inherit;margin:0}table{max-width:100%}'
-			.'</style><style>'.$styles.'</style></head><body>'.$body.'</body></html>';
+		return InboxSafe::textFrame($text);
 	}
 
 	/**

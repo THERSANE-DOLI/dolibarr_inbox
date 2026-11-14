@@ -253,6 +253,24 @@ get(part, field), set(part, field, value, source) }`: a module appends its block
 companies from the SIRET found, for example) and fills the panel with `set()`; the panel is drawn again after a
 `set()`, the event comes again.
 
+## Data of a mail: one door
+
+Everything a mail brings (body, sender, subject, headers X-Data-Form / X-Quotation-Data, invitations, file names) goes
+through one door before it is shown or written in Dolibarr; the type of the field it goes to decides:
+
+| Tool | For |
+|---|---|
+| `InboxSafe::display()` | the HTML body in the reading frame only (sandboxed iframe, CSP without script): styles of the mail kept |
+| `InboxSafe::html()` | the HTML body when it leaves the frame (note of an object, documents, draft, quote): `display()` then HTMLPurifier |
+| `InboxSafe::line()` / `lines()` | any other value for a plain field (name, town, title, place, address): no tag, no control character, no `"` (as the filter `alphanohtml` of the forms of the core) |
+| `InboxSafe::textToHtml()` | a plain text written in an HTML field of the core (note): escaped, never stripped |
+| `Dolibarr.tools.inbox.safeHtml()` (`js/inbox-safe.js`) | any HTML put in the page (editor): DOMPurify, then the Sanitizer API of the browser when it has one |
+
+Libraries (unchanged copies, update scripts in `dev/`): DOMPurify 3.4.17 in `js/vendor/dompurify/`, HTMLPurifier
+4.19.1 in `lib/vendor/htmlpurifier/` (loaded only by `InboxSafe::html()`, definition cache in
+`documents/inbox/temp/htmlpurifier`). The day inbox moves to the core, they go to the folders of the libraries of
+the core: `grep -rn "TODO core:"` lists what to change.
+
 ## Development
 
 - Icons: `dev/icons.json` (usage name => Tabler icon) and `dev/tabler/` (Tabler Icons 3.50.0, MIT license, see
@@ -273,5 +291,6 @@ companies from the SIRET found, for example) and fills the panel with `set()`; t
   - the card of an object calls `core/ajax/ajaxtooltip.php` with the `data-params` read in `getNomUrl()`
     (`InboxElements::describe()`): to check if the core changes this attribute or this page.
 
-Credits: icons [Tabler Icons](https://tabler.io/icons) (MIT).
+Credits: icons [Tabler Icons](https://tabler.io/icons) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify)
+(Apache 2.0 or MPL 2.0), [HTML Purifier](http://htmlpurifier.org) (LGPL 2.1 or later).
 

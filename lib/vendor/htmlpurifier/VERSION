@@ -1,0 +1,2 @@
+HTMLPurifier 4.19.1 (LGPL-2.1-or-later), folder library/ only, taken by dev/htmlpurifier/update.sh
+TODO core: when inbox moves to the core, this folder goes to htdocs/includes/ezyang/htmlpurifier/ (+ line in COPYRIGHT)

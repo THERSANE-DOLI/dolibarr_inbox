@@ -1,5 +1,16 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: one door for what comes from a mail, DOMPurify and HTML Purifier (lot S1) :   1.104.0
+  - InboxSafe: the HTML body for the reading frame (as before), the HTML body that leaves it (HTML Purifier, strict
+    list: no style block, no class, no id, no script scheme), plain values for the fields of Dolibarr (no tag, tags
+    written in entities included, no double quote, no control nor bidi override character), plain text escaped for
+    an HTML field.
+  - Dolibarr.tools.inbox.safeHtml in the page: DOMPurify, then the Sanitizer API of the browser when it has one;
+    without both, the text only.
+  - libraries shipped in the module (DOMPurify 3.4.17, HTML Purifier 4.19.1, loaded only when needed), update
+    scripts in dev/, marks « TODO core: » for the day inbox moves to the core.
+  - tests: corpus of attacks on both sides (PHPUnit, jsdom); tests of the editor run again (matchMedia of jsdom).
+
 - NEW: servers of a new mailbox found from its address (lot H1) :   1.103.0
   - the address typed, the server of Dolibarr looks for the servers in the order of Thunderbird: a mailbox of the
     same domain already in inbox, the configuration file published by the domain (autoconfig), its Autodiscover

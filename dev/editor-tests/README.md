@@ -18,3 +18,7 @@ Never shipped, never served (`dev/.htaccess`).
   told from the browser (Chrome, Edge, Safari, others, none in Firefox and Brave), button per mailbox, consent
   asked once and sent with the mailbox, refused by the server, words inserted at the cursor (escaped), what is being
   heard shown apart, started again after a silence, stopped by the user, microphone refused, writing closed.
+- What is covered (safe.test.mjs, js/inbox-safe.js with js/vendor/dompurify): the corpus of attacks of
+  test/phpunit/InboxSafeTest.php stopped, formatting and marks of the editor kept (quote, signature, variables,
+  widths of columns), pictures (https and real data: only), second pass by a fake Sanitizer API, its refusal,
+  no cleaner at all (text only).
