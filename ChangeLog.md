@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: « update not finished » only when the module must be activated again :   1.106.5
+  - shown for a new X.Y only; a fix (Z) replaces the files and asks nothing.
+
 - FIX: long name of an attachment keeps its extension :   1.106.4
   - a name longer than 150 characters was cut with its extension (the file was put in the documents without its
     type); the base is cut now, the extension kept.
