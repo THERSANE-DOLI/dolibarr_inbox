@@ -3260,7 +3260,53 @@
 			user: sender.user ? { id: +sender.user.id, name: sender.user.name || '' } : null,
 			project: project ? { id: +project.id, ref: project.ref || '' } : null,
 			elements: links.filter(l => !['societe', 'contact', 'project'].includes(l.type)).map(l => ({ type: l.type, id: +l.id, ref: l.ref || '' })),
+			// Addresses only (1.108.0); correspondents: the sender and the recipients, without the mailboxes of the user
+			to: addressList(m.to),
+			cc: addressList(m.cc),
+			correspondents: correspondents(m),
 		};
+	};
+	function addressList(list) {
+		return (Array.isArray(list) ? list : []).map(a => String((a && a.email) || '').trim().toLowerCase()).filter(e => e.indexOf('@') > 0);
+	}
+	function correspondents(m) {
+		const own = new Set();
+		S.folders.forEach(e => {
+			if (e && e.account && e.account.email) {
+				own.add(String(e.account.email).toLowerCase());
+			}
+		});
+		const all = addressList([m.from]).concat(addressList(m.to), addressList(m.cc));
+		return all.filter((e, i) => !own.has(e) && all.indexOf(e) === i).slice(0, 20);
+	}
+	/**
+	 * Address of a page of a module filled with the markers of inbox (1.108.0): {id}, {socid}, {contactids},
+	 * {projectid}, {elements}, {start} anywhere; {subject}, {messageid}, {emails} only after the « # », a part that
+	 * the browser never sends to the server (no mail address nor subject in its logs), emptied before it
+	 * @param {string} url Address declared by the module
+	 * @param {object|null} mail Context of the mail (I.mailContext())
+	 * @param {object} extra Other values ({id, start})
+	 * @returns {string}
+	 */
+	I.moduleUrl = (url, mail, extra) => {
+		const m = mail || {};
+		const values = Object.assign({
+			id: '',
+			socid: m.thirdparty ? m.thirdparty.id : '',
+			contactids: m.contact ? m.contact.id : '',
+			projectid: m.project ? m.project.id : '',
+			elements: (m.elements || []).map(e => e.type + ':' + e.id).join(','),
+			start: '',
+			subject: m.subject || '',
+			messageid: m.messageId || '',
+			emails: (m.correspondents || []).join(','),
+		}, extra || {});
+		const safe = /\{(id|socid|contactids|projectid|elements|start)\}/g;
+		const all = /\{(id|socid|contactids|projectid|elements|start|subject|messageid|emails)\}/g;
+		const text = String(url);
+		const cut = text.indexOf('#');
+		const head = (cut < 0 ? text : text.slice(0, cut)).replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails)\}/g, '');
+		return cut < 0 ? head : head + '#' + text.slice(cut + 1).replace(all, (x, k) => encodeURIComponent(String(values[k] ?? '')));
 	};
 	/**
 	 * A page of this site in a window of inbox, outside of a mail (the agenda panel): closed, onClose is called
@@ -6231,7 +6277,10 @@
 					})).join('')
 					+ '</span></div>' : '')
 				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
-					+ d.actions.map(a => '<a class="ibx-btn ibx-btn--sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
+					// In a window of inbox (1.108.0) or a new tab; the markers are filled on click, with the mail as it is then
+					+ d.actions.map((a, i) => a.window
+						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
+						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(I.moduleUrl(a.url, null)) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
@@ -6425,6 +6474,19 @@
 		}
 		if (e.target.closest('.ibx-js-linkpiece')) {
 			linkDialog(box);
+			return;
+		}
+		const modAction = e.target.closest('.ibx-js-modaction');
+		const action = modAction && box._data && (box._data.actions || [])[+modAction.dataset.i];
+		if (action) {
+			const url = I.moduleUrl(action.url, I.mailContext());
+			if (!action.window) {
+				modAction.href = url;
+				return;
+			}
+			if (insideUrl(url)) {
+				openModuleWindow({ mailId, box, url, title: action.label, panel: 'action:' + modAction.dataset.i });
+			}
 			return;
 		}
 		const panelBtn = e.target.closest('.ibx-js-mpanelopen');

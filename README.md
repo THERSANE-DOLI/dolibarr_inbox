@@ -15,7 +15,8 @@ README.txt saying so.
 Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolcontext (JavaScript context of Dolibarr 24).
 
 Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `inboxAccountImportSources`,
-`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators` (context `inbox`), the module_parts `inboxcss` and
+`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators`, `inboxMailActions`, `inboxAgendaProvider`
+(context `inbox`), the module_parts `inboxcss` and
 `inboxjs` (see « Extend the application ») and the triggers of its objects.
 
 Licence: GPLv3, see COPYING.
@@ -158,6 +159,29 @@ Markers: `{id}` (the event), `{socid}`, `{contactids}`, `{projectid}` (recognize
 `{elements}` (pieces linked to the conversation, `type:id` separated by commas, types as Dolibarr names them:
 `propal:12,facture:34`), `{start}` (empty for now). Your page may close its window with
 `parent.postMessage({source: 'inbox-panel', action: 'close'}, location.origin)`.
+
+Markers of the mail open, **after the `#` only** (the browser never sends this part to the server, so no subject
+nor address of a mail lands in the logs of the web server; read it with `location.hash`): `{subject}`, `{messageid}`
+(without angle brackets), `{emails}` (the sender and the recipients, without the mailboxes of the user, separated by
+commas). Before the `#` they are emptied.
+
+**Actions of a mail**: hook `inboxMailActions`, context `inbox`, called with the mail open (`mail`, `account`,
+`message_id`, `from`, `subject`, and `socid`, `contactid` recognized, 0 when the user may not read them). Each action
+is a button of the Dolibarr band of the mail; the same markers are filled when it is clicked. `window` true opens the
+page in a window of inbox (it may tell its title, its unsaved work and when it is done, as the pages of the agenda
+panel), else in a new tab.
+
+```php
+public function inboxMailActions($parameters, &$object, &$action, $hookmanager)
+{
+	global $user;
+	if ($user->hasRight('mymodule', 'write')) {
+		$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true,
+			'url' => dol_buildpath('/mymodule/meeting.php', 1).'?socid={socid}#subject={subject}&emails={emails}');
+	}
+	return 0;
+}
+```
 
 **Events of your own** (data not in `llx_actioncomm`): hook `inboxAgendaEvents`, context `inbox`. Mode `declare`:
 `$this->results['declare'] = 1` shows the panel even without the Agenda module. Mode `list` (`user`, `from`, `to`,

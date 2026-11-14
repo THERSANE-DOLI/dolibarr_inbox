@@ -433,18 +433,9 @@
 		}
 	}
 
-	/** Neutral markers of an address declared by a module, filled from the event and the mail open */
+	/** Neutral markers of an address declared by a module, filled from the event and the mail open (I.moduleUrl) */
 	function fill(url, event, mail) {
-		const m = mail || {};
-		const values = {
-			id: event ? event.id : '',
-			socid: m.thirdparty ? m.thirdparty.id : '',
-			contactids: m.contact ? m.contact.id : '',
-			projectid: m.project ? m.project.id : '',
-			elements: (m.elements || []).map(e => e.type + ':' + e.id).join(','),
-			start: '',
-		};
-		return String(url).replace(/\{(id|socid|contactids|projectid|elements|start)\}/g, (x, k) => encodeURIComponent(String(values[k])));
+		return I.moduleUrl(url, mail, { id: event ? event.id : '' });
 	}
 
 	/** Creation in the agenda of Dolibarr, filled from the mail open (its thirdparty, its contact, its project) */

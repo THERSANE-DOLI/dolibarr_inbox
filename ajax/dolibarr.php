@@ -341,7 +341,9 @@ switch ($action) {
 		}
 		$hookmanager->initHooks(array('inbox'));
 		$hookParams = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'message_id' => (string) $row->message_id, 'from' => $requester ? $email : strtolower((string) $row->from_email),
-			'subject' => (string) $row->subject, 'mailref' => (int) ($byRow[(int) $row->rowid] ?? 0));
+			'subject' => (string) $row->subject, 'mailref' => (int) ($byRow[(int) $row->rowid] ?? 0),
+			// Recognized on the mail (1.108.0): the thirdparty and the contact of the sender the user may read, else 0
+			'socid' => !empty($sender['soc']['readable']) ? (int) $socId : 0, 'contactid' => !empty($sender['contact']['readable']) ? (int) $contactId : 0);
 		$extraLinks = array();
 		$alerts = array();
 		$hookObject = null;
@@ -355,13 +357,15 @@ switch ($action) {
 				}
 			}
 		}
-		// Actions of the other modules (« Fill the proposal »...): a label and an address inside Dolibarr
+		// Actions of the other modules (« Fill the proposal »...): a label and an address inside Dolibarr, opened in a
+		// new tab, or in a window of inbox (« window », 1.108.0); the browser fills the markers of the mail
 		$actions = array();
 		if ($hookmanager->executeHooks('inboxMailActions', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['actions'] ?? null)) {
 			foreach ($hookmanager->resArray['actions'] as $x) {
 				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
 				if ($url !== '' && !empty($x['label']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
-					$actions[] = array('label' => dol_trunc((string) $x['label'], 80, 'right', 'UTF-8', 1), 'url' => $url, 'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic');
+					$actions[] = array('label' => dol_trunc((string) $x['label'], 80, 'right', 'UTF-8', 1), 'url' => $url, 'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic',
+						'window' => !empty($x['window']));
 				}
 			}
 		}

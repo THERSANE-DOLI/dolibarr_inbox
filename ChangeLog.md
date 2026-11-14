@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: actions of other modules in a window of inbox, with the subject and the correspondents of the email :   1.108.0
+  - an action of a module (hook inboxMailActions) may open its page in a window of inbox instead of a new tab, and
+    receives the thirdparty and the contact recognized.
+  - its address, as the ones of the agenda panel, may ask the subject, the Message-ID and the correspondents of the
+    email: given after the « # » only, never sent to the web server nor written in its logs (README).
+
 - NEW: agenda panel on the right of the emails, the events of the user late, today and coming :   1.107.0
   - shown by itself when no email is open; beside an email, opened by the button of the rail or Shift+F9; pinned, it
     always stays; closed by hand, it stays closed. Docked as a column when the reading keeps its room, over it
