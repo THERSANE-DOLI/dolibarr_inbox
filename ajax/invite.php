@@ -71,6 +71,16 @@ switch ($action) {
 		inboxAjaxReply($res);
 		// no break
 
+	case 'answer':
+		// An invitation already in the agenda (1.109.0): the answer recorded in Dolibarr by the module that knows it
+		$invite = new InboxInvite($db);
+		$res = $invite->answerKnown($user, $mailId, strtoupper((string) inboxAjaxParam('partstat', 'aZ09')));
+		if ($res === null) {
+			inboxInviteFail($invite->errorCode, $invite->error);
+		}
+		inboxAjaxReply($res);
+		// no break
+
 	case 'agenda':
 		// add: the event in the agenda (or brought up to date after an update); cancel: marked cancelled
 		$invite = new InboxInvite($db);

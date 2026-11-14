@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: strip on the right of the emails, space Agenda in the rail, invitations already in the agenda :   1.109.0
+  - on a computer, a strip of icons on the right edge holds the Dolibarr part and the panel Today, one column at a
+    time; when the reading is narrow, a drawer opened by hand only, and a line of chips under the head of the email.
+    The setting « Dolibarr part above / on the right » and the pin of the agenda are gone. Tablet and phone unchanged.
+  - space Agenda in the rail: the whole agenda in a frame (the page of an agenda module, else the agenda of
+    Dolibarr); « Open the whole agenda » goes there.
+  - an invitation an agenda module of this Dolibarr sent itself (hook inboxInviteEvent) says « Already in your
+    agenda »: never added twice, the answer recorded in Dolibarr without email.
+  - the choice of the agenda panel closed by hand with no email open is kept again (setting not declared before).
+
 - NEW: actions of other modules in a window of inbox, with the subject and the correspondents of the email :   1.108.0
   - an action of a module (hook inboxMailActions) may open its page in a window of inbox instead of a new tab, and
     receives the thirdparty and the contact recognized.

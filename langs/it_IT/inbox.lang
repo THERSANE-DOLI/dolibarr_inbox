@@ -1129,13 +1129,6 @@ InboxNoMailboxReadable = Non hai accesso a nessuna casella di inbox
 # Place of the Dolibarr part (1.13.0)
 InboxDolibarrFold = Comprimi la parte Dolibarr
 InboxDolibarrUnfold = Espandi la parte Dolibarr
-InboxDolibarrToTop = Parte Dolibarr sopra la mail
-InboxDolibarrToRight = Parte Dolibarr a destra della mail
-InboxDolibarrPosition = Parte Dolibarr di una mail
-InboxDolibarrPositionHelp = Mittente, documenti collegati e note: a destra del testo della mail (le note si leggono come un filo) o sopra. Automatico: a destra quando il riquadro di lettura è abbastanza largo.
-Inbox_dolibar_position_auto = Automatico
-Inbox_dolibar_position_right = A destra della mail
-Inbox_dolibar_position_top = Sopra la mail
 
 # Notes: cards and the box to write (1.13.0)
 InboxNotesEmpty = Ancora nessuna nota su questa mail.
@@ -3379,10 +3372,8 @@ InboxAutoconfigIspdbSettingHelp = Quando il dominio non pubblica le sue impostaz
 InboxOutsideWhat_ispdb = Il nome di dominio della casella aggiunta, a Mozilla (autoconfig.thunderbird.net)
 
 # Agenda panel (1.107.0)
-InboxAgendaPanel = Agenda
+InboxAgendaPanel = Oggi
 InboxAgendaNewEvent = Nuovo evento
-InboxAgendaPin = Fissa: sempre visibile
-InboxAgendaUnpin = Non fissare più
 InboxAgendaClose = Chiudi l'agenda
 InboxAgendaLate = In ritardo (%s)
 InboxAgendaShowMore = Mostra gli altri %s
@@ -3404,3 +3395,12 @@ InboxAgendaUndoneToast = « %s » di nuovo da fare
 InboxAgendaSaveError = Non è stato possibile salvare l'evento.
 InboxAgendaNotFound = Evento non trovato, o non tuo.
 InboxKeyAgenda = Mostra o nascondi l'agenda
+
+# Strip on the right, space Agenda, invitation already in the agenda (1.109.0)
+InboxSpaceAgenda = Agenda
+InboxSideStrip = Colonne accanto all'email
+InboxSideDolibarrNoMail = Dolibarr: apri un'email
+InboxSideClose = Chiudi la colonna
+InboxInviteKnown = Già nella tua agenda
+InboxInviteKnownHelp = La tua risposta è registrata nell'agenda di Dolibarr, nessuna email viene inviata da questa casella.
+InboxInviteKnownOpen = Apri l'evento

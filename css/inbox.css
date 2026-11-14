@@ -1478,22 +1478,22 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-pane--read[data-dolibar="right"] .ibx-convo > .ibx-dolibar { grid-area: side; }
 .ibx-pane--read[data-dolibar="right"] .ibx-reading.is-dolibar-folded { --ibx-dolibar-w: 2.75rem; }
 .ibx-pane--read[data-dolibar="right"] .ibx-dolibar { display: flex; flex-direction: column; min-height: 0; overflow: hidden; margin: var(--ibx-s2) var(--ibx-s3) var(--ibx-s3) 0; align-self: stretch; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar__body { flex: 1; min-height: 0; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar__row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar__label { padding-top: 0; font-size: var(--ibx-fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar__items { flex-direction: column; align-items: stretch; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar__body { flex: 1; min-height: 0; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar__row { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar__label { padding-top: 0; font-size: var(--ibx-fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar__items { flex-direction: column; align-items: stretch; }
 /* Card of the column, two lines at most: ref (shortened), status (never cut), warning, unlink on the first; the
    thirdparty when it is not the one of the sender, « their ref » and the action on the second. No column gap: the
    empty columns (no warning, no unlink) take no room */
-.ibx-pane--read[data-dolibar="right"] .ibx-piece { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "link st warn x" "foot foot foot foot"; column-gap: 0; row-gap: 0.125rem; width: 100%; padding: 0.25rem 0.5rem; border-radius: var(--ibx-radius); }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece:has(> .ibx-piece__x) { padding-right: 0.125rem; }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece__link { grid-area: link; }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece > .ibx-st { grid-area: st; margin-left: 0.375rem; }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece > .ibx-cited__warn { grid-area: warn; margin-left: 0.375rem; padding-right: 0; }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece > .ibx-piece__x { grid-area: x; margin-left: 0.25rem; }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece__foot { grid-area: foot; display: flex; align-items: center; gap: 0.375rem; min-width: 0; padding-left: calc(1em + 0.375rem); }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece__sub { flex: 1; font-size: var(--ibx-fs-sm); }
-.ibx-pane--read[data-dolibar="right"] .ibx-piece__act { margin: -0.125rem -0.25rem -0.125rem auto; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "link st warn x" "foot foot foot foot"; column-gap: 0; row-gap: 0.125rem; width: 100%; padding: 0.25rem 0.5rem; border-radius: var(--ibx-radius); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece:has(> .ibx-piece__x) { padding-right: 0.125rem; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece__link { grid-area: link; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece > .ibx-st { grid-area: st; margin-left: 0.375rem; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece > .ibx-cited__warn { grid-area: warn; margin-left: 0.375rem; padding-right: 0; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece > .ibx-piece__x { grid-area: x; margin-left: 0.25rem; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece__foot { grid-area: foot; display: flex; align-items: center; gap: 0.375rem; min-width: 0; padding-left: calc(1em + 0.375rem); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece__sub { flex: 1; font-size: var(--ibx-fs-sm); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-piece__act { margin: -0.125rem -0.25rem -0.125rem auto; }
 /* ===== Tab « Usage » of a mailbox (1.67.0) ===== */
 .ibx-usage { display: grid; gap: var(--ibx-s2); max-width: 44rem; }
 .ibx-usage__opt { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 0.25rem var(--ibx-s3); align-items: start; padding: var(--ibx-s3);
@@ -1531,7 +1531,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
    the whole card floats over the panel at its place (one block, one outline, a thin line before the detail), its slot
    keeping the height of the closed card: nothing moves below. One open at a time. */
 .ibx-soccard-slot { position: relative; min-width: 0; flex: 0 1 20rem; }
-.ibx-pane--read[data-dolibar="right"] .ibx-soccard-slot { flex: none; width: 100%; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-soccard-slot { flex: none; width: 100%; }
 .ibx-soccard { box-sizing: border-box; min-width: 0; border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg); }
 .ibx-soccard__top { display: flex; align-items: center; gap: 0.25rem; min-width: 0; border-radius: var(--ibx-radius); cursor: pointer; }
 .ibx-soccard__top:hover { background: var(--ibx-bg-hover); }
@@ -1604,15 +1604,15 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 @media (pointer: coarse) {
 	.ibx-soccard__chevbtn { width: 2.75rem; height: 2.75rem; }
 }
-.ibx-pane--read[data-dolibar="right"] .ibx-js-linkpiece { align-self: flex-start; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-js-linkpiece { align-self: flex-start; }
 /* The notes as a thread: the oldest on top, the last one in view, the field to write stuck under them */
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar__notes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.ibx-pane--read[data-dolibar="right"] .ibx-notes { flex: 1; min-height: 6rem; overflow: auto; flex-wrap: nowrap; }
-.ibx-pane--read[data-dolibar="right"] .ibx-note__new { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--ibx-s2); background: var(--ibx-bg-pane); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar__notes { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-notes { flex: 1; min-height: 6rem; overflow: auto; flex-wrap: nowrap; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-note__new { position: sticky; bottom: 0; margin-top: auto; padding-top: var(--ibx-s2); background: var(--ibx-bg-pane); }
 /* Folded on the right: a thin strip, its title written upward, the counts still read */
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar.is-folded { margin-left: 0; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar.is-folded .ibx-dolibar__head { writing-mode: vertical-rl; min-height: 0; height: 100%; padding: var(--ibx-s3) 0; justify-content: flex-start; }
-.ibx-pane--read[data-dolibar="right"] .ibx-dolibar.is-folded .ibx-dolibar__head .ibx-icon { transform: rotate(90deg); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar.is-folded { margin-left: 0; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar.is-folded .ibx-dolibar__head { writing-mode: vertical-rl; min-height: 0; height: 100%; padding: var(--ibx-s3) 0; justify-content: flex-start; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar.is-folded .ibx-dolibar__head .ibx-icon { transform: rotate(90deg); }
 
 /* ===== Notes of the Dolibarr part: cards and the box to write (1.13.0, after the first test) ===== */
 .ibx-dolibar__body { gap: var(--ibx-s3); }
@@ -1637,12 +1637,12 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-composer__send { flex: none; color: var(--ibx-accent); }
 .ibx-composer__send[aria-disabled="true"] { color: var(--ibx-text-muted); opacity: .5; cursor: default; }
 .ibx-composer__hint { margin: var(--ibx-s1) 0 0 var(--ibx-s1); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
-.ibx-pane--read[data-dolibar="right"] .ibx-note__text { padding-left: 0; }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-note__text { padding-left: 0; }
 @media (pointer: coarse) {
 	.ibx-composer__send, .ibx-note__more { width: 2.75rem; height: 2.75rem; }
 }
 /* On top, the box to write stays in the column of the notes, under them */
-.ibx-pane--read:not([data-dolibar="right"]) .ibx-dolibar__notes > .ibx-note__new { grid-column: 2; }
+.ibx-pane--read[data-dolibar="top"] .ibx-dolibar__notes > .ibx-note__new { grid-column: 2; }
 
 /* ===== Notes as text messages (1.13.0, as in the add-on of the other mail software) ===== */
 .ibx-notes { gap: var(--ibx-s3); }
@@ -1707,7 +1707,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-notes::-webkit-scrollbar-button { display: none; }
 .ibx-notes::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ibx-text) 22%, transparent); border-radius: 3px; }
 .ibx-notes:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--ibx-text) 40%, transparent); }
-.ibx-pane--read[data-dolibar="right"] .ibx-notes { padding-right: var(--ibx-s1); }
+.ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-notes { padding-right: var(--ibx-s1); }
 /* Under a bubble: the name and the date never cut in the middle, the date goes under the name when the column is narrow */
 .ibx-msg__meta { flex-wrap: wrap; justify-content: flex-end; column-gap: var(--ibx-s1); row-gap: 0; text-align: right; }
 .ibx-msg__meta > * { white-space: nowrap; }
@@ -2838,7 +2838,7 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 /* Narrow screens (UX fix series): one column in the Dolibarr part, the box to write a note too; its « column 2 »
    made a hidden second column and the label « Notes » shrank to nothing under the first note */
 @media (max-width: 63.9375rem) {
-	.ibx-pane--read:not([data-dolibar="right"]) .ibx-dolibar__notes > .ibx-note__new { grid-column: 1; }
+	.ibx-pane--read[data-dolibar="top"] .ibx-dolibar__notes > .ibx-note__new { grid-column: 1; }
 }
 /* Writing on a phone (UX fix series): the foot keeps send, attach and « More » (the other tools are first in that menu,
    discard at its end), round buttons of 48 px well apart; the signature as one line « Signature: name », its preview
@@ -2900,6 +2900,46 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-servers__sum { color: var(--ibx-text-muted); overflow-wrap: anywhere; }
 .ibx-servers[open] > summary { border-bottom: 1px solid var(--ibx-border); }
 .ibx-servers > .ibx-section { padding: 0 var(--ibx-s3); }
+
+/* ---------- Strip on the right of the mail space (1.109.0): Dolibarr or the agenda, one column at a time ---------- */
+.ibx-mailapp { --ibx-strip-w: 0px; position: relative; padding-right: var(--ibx-strip-w); }
+.ibx-sidestrip { display: none; }
+@media (min-width: 64rem) {
+	.ibx-mailapp { --ibx-strip-w: 2.75rem; }
+	.ibx-sidestrip { position: absolute; top: 0; right: 0; bottom: 0; z-index: 35; display: flex; flex-direction: column; align-items: center; gap: var(--ibx-s1); width: var(--ibx-strip-w); padding: var(--ibx-s2) 0; background: var(--ibx-bg-pane); border-left: 1px solid var(--ibx-border); }
+	.ibx-rail__item.ibx-rail__agenda { display: none; }
+}
+.ibx-sidestrip__btn { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.0625rem; width: 2.25rem; height: 2.5rem; padding: 0; color: var(--ibx-text-muted); background: none; border: 0; border-radius: var(--ibx-radius); cursor: pointer; }
+.ibx-sidestrip__btn[hidden] { display: none; }
+.ibx-sidestrip__btn .ibx-icon { width: 1.25rem; height: 1.25rem; }
+.ibx-sidestrip__btn:hover { color: var(--ibx-text); background: var(--ibx-bg-hover); }
+.ibx-sidestrip__btn:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-sidestrip__btn[aria-pressed="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
+.ibx-sidestrip__btn[aria-pressed="true"]::before { content: ""; position: absolute; top: 0.375rem; bottom: 0.375rem; left: -0.25rem; width: 3px; border-radius: 2px; background: var(--ibx-accent); }
+.ibx-sidestrip__btn[aria-disabled="true"] { opacity: .45; cursor: default; }
+.ibx-sidestrip__btn[aria-disabled="true"]:hover { background: none; color: var(--ibx-text-muted); }
+.ibx-sidestrip__day { font-size: 0.625rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { right: var(--ibx-strip-w); }
+/* The column not chosen is not shown: as a column of the mail, its place goes back to the mail */
+.ibx-mailapp:not([data-side="dolibarr"]) .ibx-pane--read[data-dolibar="right"] .ibx-reading { --ibx-dolibar-w: 0px; }
+.ibx-mailapp:not([data-side="dolibarr"]) .ibx-pane--read:is([data-dolibar="right"], [data-dolibar="drawer"]) .ibx-dolibar { display: none; }
+.ibx-dolibar__head--col { display: flex; align-items: center; gap: var(--ibx-s1); }
+.ibx-dolibar__head--col .ibx-js-sideclose { margin-left: auto; flex: none; }
+/* Narrow: a drawer over the reading, opened by hand only; the line of chips under the title opens it */
+.ibx-pane--read[data-dolibar="drawer"] .ibx-dolibar { position: absolute; top: 0; right: 0; bottom: 0; z-index: 30; display: flex; flex-direction: column; width: min(20rem, 100%); margin: 0; padding: var(--ibx-s2) var(--ibx-s3); overflow: auto; background: var(--ibx-bg-pane); border-left: 1px solid var(--ibx-border); box-shadow: var(--ibx-shadow-float); }
+.ibx-pane--read[data-dolibar="drawer"] .ibx-dolibar__body { flex: none; }
+.ibx-dolchips.is-line { gap: 0.25rem; }
+.ibx-dolchips.is-line .ibx-dolchip { min-height: 1.75rem; padding: 0 0.5rem; font-size: var(--ibx-fs-xs); }
+@media (prefers-reduced-motion: no-preference) {
+	.ibx-pane--read[data-dolibar="drawer"] .ibx-dolibar, .ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { animation: ibx-drawer-in .16s ease-out; }
+}
+@keyframes ibx-drawer-in { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Invitation already in the agenda (1.109.0) */
+.ibx-invite__known { color: var(--ibx-success, #2e7d32); font-weight: 600; }
+.ibx-invite__known .ibx-icon { vertical-align: -0.125rem; }
+
+/* ---------- Space « Agenda » (1.109.0): the whole agenda in a frame ---------- */
+.ibx-agendaspace { display: block; width: 100%; height: 100%; border: 0; background: var(--ibx-bg); }
 
 /* ---------- Agenda panel (1.107.0, js/inbox-agenda.js) ---------- */
 .ibx-mailapp { position: relative; }
