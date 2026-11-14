@@ -9,7 +9,7 @@
     error of the database shown as it was; each value is cut to the length of its column.
 
 - FIX: sender read again when a semicolon is in its quoted name :   1.106.2
-  - « "Service ; Compta" <x@y> »: the reader of the mails cut the list of addresses on the semicolon, the mail came
+  - `"Service ; Compta" <x@y>`: the reader of the mails cut the list of addresses on the semicolon, the mail came
     « without sender » and the checks made on the address (blocked senders, known senders, banners) did not run.
     A reader of our own takes over when the library misses an address of the header (From, Reply-To, To, Cc), with
     quoted names, escapes, comments and groups.
@@ -29,13 +29,13 @@
 
 - NEW: values of a mail written in Dolibarr through the one door :   1.105.0
   - quote of an answer or a forward: HTML Purifier before the filter of the sending; a text mail quoted keeps a
-    « <b> » written in it (shown, no longer removed).
+    « `<b>` » written in it (shown, no longer removed).
   - quick creation of a thirdparty and its contact: values cleaned by the one door, extrafields by their type (an
     HTML extrafield gets the text escaped, a list one of its keys only, the lists of the database nothing).
   - « Create ▾ »: values of the mail (sender, subject, data of a site) cleaned before they go in the address of the
     page of creation of Dolibarr, not only by the filter of that page.
   - agenda (invitation, failed sending, sending recorded on a piece): titles and notes through the one door; an
-    address between angle brackets stays (‹paul@ex.fr›), a « <b> » of a note is shown instead of removed.
+    address between angle brackets stays (‹paul@ex.fr›), a « `<b>` » of a note is shown instead of removed.
   - data of a site (X-Data-Form, X-Quotation-Data), number of a signature put on a contact, file of a mail put in
     the documents of a piece (no bidi override character in its name): through the one door.
 
@@ -112,7 +112,7 @@
   - while the address is followed (back, forward, reload) it is no longer rewritten (each back made a new step).
 
 - FIX: the mail open kept in the address, back of the browser to the list :   1.102.10
-  - #/mail/<folder>/<mail> (and #/mail/view/<view>/<mail>, #/mail/vview/<id>/<mail>): a reload opens the mail again,
+  - `#/mail/<folder>/<mail>` (and `#/mail/view/<view>/<mail>`, `#/mail/vview/<id>/<mail>`): a reload opens the mail again,
     a mail moved or removed meanwhile says so and gives back its list. Only numbers in the address.
   - opening a mail from its list is a step of the history: the back of the browser, or of a phone, closes it and
     shows the list; the back arrow of a phone is a real back. Going from a mail to another (keys, a click, the next
@@ -437,7 +437,7 @@
     evaluated on only (header.from = the sender shown); the domain of a DKIM signature read after the @ of header.i.
   - without a receiving server declared in Settings > Anti-spam, no sender is proven (pictures shown alone, badge
     of a recognized domain, requester of a data source, brand logo): the header may be written by the sender.
-  - entry of the mail into our servers: the block of the top only, a false « Received ... by <our server> » put
+  - entry of the mail into our servers: the block of the top only, a false « Received ... by `<our server>` » put
     lower by the sender no longer makes its anti-spam headers believed; without servers declared, the anti-spam
     engine of inbox no longer leaves aside a mail that brings its own verdict.
   - bank details: the text and the HTML of the mail read (a mail could show its IBAN in HTML only); groups of an IBAN
@@ -510,7 +510,7 @@
   - The reply mark takes the accent color, a little bigger and thicker, in the cards and in the table.
   - Its label « Answered » on hover and for the screen readers (5 languages).
 
-- FIX: glossary of the terms explained where they are named, their word underlined with dots (<dfn>) opening the
+- FIX: glossary of the terms explained where they are named, their word underlined with dots (`<dfn>`) opening the
   definition :   1.88.9
   - SPF, DKIM, DMARC in « All the headers » and in « Recognize this domain »; Gravatar, BIMI, lists of reputation
     and Rspamd in the « Outside services » and the section of the engine.
@@ -542,7 +542,7 @@
     publish the logo of another one); no more promise that a forged mail never shows it.
 
 - FIX: « Rspamd » explained where it is named (Outside services, section of the engine in Settings > Anti-spam): the
-  word underlined with dots (<dfn>) opens a bubble on hover, keyboard focus or touch; the infotips of inbox take a
+  word underlined with dots (`<dfn>`) opens a bubble on hover, keyboard focus or touch; the infotips of inbox take a
   term as well as their icon :   1.88.4
 
 - FIX: Settings > Security opens on the « Outside services »: every function of inbox that asks a service out of
@@ -700,7 +700,7 @@
     of a mail written by hand.
 
 - FIX: panel « New customer », values cleaned before they are offered and when they are received: no target of a
-  link (« Tel: + 33 199 00 12 34<tel:...> » of a HTML mail), phones written plainly (+33 1 99 00 12 34), emails
+  link (`Tel: + 33 199 00 12 34<tel:...>` of a HTML mail), phones written plainly (+33 1 99 00 12 34), emails
   checked, site without its scheme, identifiers without spaces; a street without its zip code and the company named
   like the domain read in the signature :   1.79.2
 
@@ -884,7 +884,7 @@
 - NEW: the other modules add their styles and scripts to the application :   1.63.0
   - module_parts `inboxcss` and `inboxjs` in their descriptor, loaded after the styles and the scripts of the
     application (like the parts css and js of Dolibarr, own keys: those are written for the pages of Dolibarr).
-  - hook `addInboxHtmlHeader` (context inbox) for a dynamic header, printed before </head>; own name so that the
+  - hook `addInboxHtmlHeader` (context inbox) for a dynamic header, printed before `</head>`; own name so that the
     modules on addHtmlHeader never enter the application.
   - README « Extend the application »: example, rules, the variables of the application as public API.
 
@@ -1037,14 +1037,14 @@
   - the address is copied only when inbox cannot write the mail (no right to send, unsigned header).
 
 - NEW: variables in the signatures (identity, user who sends, company, other modules) :   1.52.0
-  - the signature of an identity is filled in the writing and at the sending: __INBOX_IDENTITY_NAME__,
-    __INBOX_IDENTITY_EMAIL__, __INBOX_IDENTITY_REPLYTO__, __INBOX_MAILBOX_EMAIL__, __INBOX_MAILBOX_LABEL__ (the old
-    __INBOX_IDENTITY__ and __INBOX_MAILBOX__ kept), those of the user who sends, of the company and of the other
+  - the signature of an identity is filled in the writing and at the sending: `__INBOX_IDENTITY_NAME__`,
+    `__INBOX_IDENTITY_EMAIL__`, `__INBOX_IDENTITY_REPLYTO__`, `__INBOX_MAILBOX_EMAIL__`, `__INBOX_MAILBOX_LABEL__` (the old
+    `__INBOX_IDENTITY__` and `__INBOX_MAILBOX__` kept), those of the user who sends, of the company and of the other
     modules (a signature kept in a module of mail templates); a variable holding variables filled too.
   - the identity is known before the other modules complete the variables: a substitution of another module holding
-    __INBOX_IDENTITY_NAME__ gets it, in the templates too; __SENDEREMAIL_SIGNATURE__ of a template comes filled.
-  - values of the identity always escaped (a name « R&D <Sales> » stays text); an unknown variable kept as it is.
-  - two variables side by side read as two (« __A____B__ » was one unknown key), in the templates too.
+    `__INBOX_IDENTITY_NAME__` gets it, in the templates too; `__SENDEREMAIL_SIGNATURE__` of a template comes filled.
+  - values of the identity always escaped (a name `R&D <Sales>` stays text); an unknown variable kept as it is.
+  - two variables side by side read as two (« `__A____B__` » was one unknown key), in the templates too.
   - dialog of an identity: « Insert a variable » (identity first) and « Preview » of the signature as it will be
     sent, naming the variables that nothing replaces.
 
@@ -1062,7 +1062,7 @@
   - the editor keeps the inline styles that no button makes (size, font, line height, colour and decoration of a
     link, width of a table) in signatures, templates and writings: a signature copied from Dolibarr is drawn as
     before, checked on the signatures and mail templates of a real database.
-  - text outside any block kept in <div> instead of <p> (no margins added), an empty line « <br>&nbsp; » kept,
+  - text outside any block kept in `<div>` instead of `<p>` (no margins added), an empty line « `<br>&nbsp;` » kept,
     border/cellpadding/cellspacing/valign of the old tables kept, a cell width in px kept and written for the mail
     software, the font of a div holding blocks given to them (a text pasted from Outlook or Word).
 
@@ -1459,7 +1459,7 @@
     contact, the mails from and to its addresses, only in the mailboxes the user can read; « Open in inbox ».
   - mails without Message-ID: a print of the mail is their key (assigned, linked, noted as the others).
   - other modules: public classes InboxMailRef, InboxLink, InboxNote (origin, no double), triggers INBOX_LINK_CREATE,
-    INBOX_LINK_DELETE, INBOX_NOTE_CREATE, _MODIFY, _DELETE, hooks inboxMailLinks and inboxMailAlerts.
+    INBOX_LINK_DELETE, INBOX_NOTE_CREATE, `_MODIFY`, `_DELETE`, hooks inboxMailLinks and inboxMailAlerts.
 - NEW: import and export of mails :   1.12.0
   - files dropped on a folder (or « Import mails… » of its menu): .eml files and mbox files (the local folders of
     most mail software), read by slices in the browser and sent by batches that fit the server; progress, « Stop »,
@@ -1481,7 +1481,7 @@
     confirmation that says how many mails; emptying the trash removes its subfolders too.
   - the special folders (inbox, sent, drafts, archives, junk, trash) keep their name and place: the actions are
     greyed with the reason; level « manage » of the mailbox, « mark the folder read » with the level « read ».
-  - written in the journal of the actions; triggers INBOX_FOLDER_CREATE, _MOVE, _DELETE, _SEEN, _EMPTY.
+  - written in the journal of the actions; triggers INBOX_FOLDER_CREATE, `_MOVE`, `_DELETE`, `_SEEN`, `_EMPTY`.
 - NEW: assignment of the mails and notifications (bell) :   1.9.0
   - Space (or the menus, the bulk bar, « Assigned to » in the reading) assigns me or removes me; « Assign a
     person… » picks among the people who can read the mailbox; several people per mail. Initials on the cards and in
@@ -1607,7 +1607,7 @@
   - nightly job: lines of the cache without file and .eml files unknown to the module (older than a day) removed.
 - FIX: tests of the setup page :   1.0.1
   - Message-ID pasted with its angle brackets was emptied by the HTML filter (« invalid Message-ID »).
-  - line breaks of the text of the mail shown as « \n » and « <br> ».
+  - line breaks of the text of the mail shown as « \n » and « `<br>` ».
 - NEW: first version, mail foundation (Dolibarr 23+) :   1.0.0
   - one mail read in a mailbox declared in CRM Client Connector from its complete Message-ID, read only (BODY.PEEK,
     no flag, no move): inbox, sent, other folders, junk and trash last; exact Message-ID check after the IMAP search.
