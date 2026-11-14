@@ -69,15 +69,15 @@ class InboxMimeParser
 		$message->messageId = trim(self::headerString($header, 'message_id'), " <>\t");
 		$message->subject = self::clean(self::decodeWords(self::headerString($header, 'subject')));
 		$message->inReplyTo = trim(self::headerString($header, 'in_reply_to'), " <>\t");
-		$from = self::addresses($header, 'from');
+		$from = self::addresses($header, 'from', $rawHeader);
 		if (!empty($from)) {
 			$message->fromEmail = $from[0]['email'];
 			$message->fromName = $from[0]['name'];
 		}
-		$replyTo = self::addresses($header, 'reply_to');
+		$replyTo = self::addresses($header, 'reply_to', $rawHeader);
 		$message->replyToEmail = !empty($replyTo) ? $replyTo[0]['email'] : '';
-		$message->to = self::addresses($header, 'to');
-		$message->cc = self::addresses($header, 'cc');
+		$message->to = self::addresses($header, 'to', $rawHeader);
+		$message->cc = self::addresses($header, 'cc', $rawHeader);
 		$date = $header->get('date');
 		$dateValue = is_object($date) && method_exists($date, 'first') ? $date->first() : $date;
 		if ($dateValue instanceof \DateTimeInterface) {
@@ -213,11 +213,16 @@ class InboxMimeParser
 	}
 
 	/**
-	 * @param \Webklex\PHPIMAP\Header $header Header
-	 * @param string                  $name   Attribute (from, to, cc, reply_to)
+	 * Addresses of a header: the reader of the library, then a reader of our own when the library missed some (audit
+	 * INBX-089: « "Service ; Compta" <x@y> », a semicolon inside the quotes, gave no address at all, the mail had no
+	 * sender and the checks made on the address did not run)
+	 *
+	 * @param \Webklex\PHPIMAP\Header $header    Header
+	 * @param string                  $name      Attribute (from, to, cc, reply_to)
+	 * @param string                  $rawHeader Raw header of the mail
 	 * @return array<int,array{email:string,name:string}>
 	 */
-	protected static function addresses($header, $name)
+	protected static function addresses($header, $name, $rawHeader = '')
 	{
 		$out = array();
 		$value = $header->get($name);
@@ -226,6 +231,127 @@ class InboxMimeParser
 			if (is_object($address) && !empty($address->mail)) {
 				$out[] = array('email' => strtolower(trim((string) $address->mail)), 'name' => self::clean(self::decodeWords((string) ($address->personal ?? ''))));
 			}
+		}
+		$field = self::rawField($rawHeader, str_replace('_', '-', $name));
+		if ($field === '') {
+			return $out;
+		}
+		$own = self::parseAddressList($field);
+		if (count($own) > count($out)) {
+			// The library missed some: the order of the header is kept, its names when it read them
+			$byEmail = array_column($out, null, 'email');
+			$out = array();
+			foreach ($own as $a) {
+				$out[] = isset($byEmail[$a['email']]) && $byEmail[$a['email']]['name'] !== '' ? $byEmail[$a['email']] : $a;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Value of the first field of a raw header, lines unfolded ('' when absent)
+	 *
+	 * @param string $rawHeader Raw header
+	 * @param string $name      Field (From, Reply-To...)
+	 * @return string
+	 */
+	public static function rawField($rawHeader, $name)
+	{
+		$unfolded = (string) preg_replace('/\r?\n[ \t]+/', ' ', (string) $rawHeader);
+		if (!preg_match('/^'.preg_quote($name, '/').'[ \t]*:[ \t]*(.*)$/mi', $unfolded, $m)) {
+			return '';
+		}
+
+		return trim($m[1]);
+	}
+
+	/**
+	 * List of addresses of a header (RFC 5322): display names quoted with escapes, comments, groups, « , » and « ; »
+	 * as separators only outside quotes, angle brackets and comments. Encoded words of the names decoded.
+	 *
+	 * @param string $value Value of the field (unfolded)
+	 * @return array<int,array{email:string,name:string}>
+	 */
+	public static function parseAddressList($value)
+	{
+		$value = (string) $value;
+		$items = array();
+		$cur = array('name' => '', 'addr' => '', 'comment' => '', 'angle' => false);
+		$quoted = false;
+		$angle = false;
+		$depth = 0;
+		$flush = function () use (&$items, &$cur) {
+			$items[] = $cur;
+			$cur = array('name' => '', 'addr' => '', 'comment' => '', 'angle' => false);
+		};
+		$len = strlen($value);
+		for ($i = 0; $i < $len; $i++) {
+			$c = $value[$i];
+			if ($quoted) {
+				if ($c === '\\' && $i + 1 < $len) {
+					$cur['name'] .= $value[++$i];
+				} elseif ($c === '"') {
+					$quoted = false;
+				} else {
+					$cur['name'] .= $c;
+				}
+				continue;
+			}
+			if ($depth > 0) {
+				if ($c === '\\' && $i + 1 < $len) {
+					$cur['comment'] .= $value[++$i];
+				} elseif ($c === '(') {
+					$depth++;
+				} elseif ($c === ')') {
+					$depth--;
+				} else {
+					$cur['comment'] .= $c;
+				}
+				continue;
+			}
+			if ($angle) {
+				if ($c === '>') {
+					$angle = false;
+				} else {
+					$cur['addr'] .= $c;
+				}
+				continue;
+			}
+			if ($c === '"') {
+				$quoted = true;
+			} elseif ($c === '(') {
+				$depth = 1;
+			} elseif ($c === '<') {
+				$angle = true;
+				$cur['angle'] = true;
+				$cur['addr'] = '';
+			} elseif ($c === ':') {
+				// Name of a group (« Equipe: a@x, b@y; »): not an address
+				$cur['name'] = '';
+				$cur['addr'] = '';
+			} elseif ($c === ',' || $c === ';') {
+				$flush();
+			} elseif (!$cur['angle']) {
+				$cur['addr'] .= $c;
+				$cur['name'] .= $c;
+			}
+		}
+		$flush();
+		$out = array();
+		foreach ($items as $it) {
+			$email = strtolower(trim($it['addr']));
+			if (!$it['angle']) {
+				// A bare address: what was read outside quotes and comments, the name in a comment if any
+				$email = strtolower(trim((string) preg_replace('/\s+/', '', $email)));
+				$name = trim($it['comment']);
+			} else {
+				$name = trim($it['name']);
+			}
+			if (!preg_match('/^[^\s@<>"(),;:\\\\]+@[^\s@<>"(),;:\\\\]+\.[^\s@<>"(),;:\\\\]+$/', $email)) {
+				continue;
+			}
+			$out[] = array('email' => $email, 'name' => self::clean(self::decodeWords($name)));
 		}
 
 		return $out;
@@ -546,7 +672,17 @@ class InboxMimeParser
 		$name = preg_replace('/[^\p{L}\p{N} ._()\-]/u', '_', $name);
 		$name = trim(preg_replace('/\.{2,}/', '.', $name), ' .');
 
-		return $name !== '' ? mb_substr($name, 0, 150, 'UTF-8') : 'piece-jointe';
+		if ($name === '') {
+			return 'piece-jointe';
+		}
+		// Cut on the base, the extension kept (audit INBX-091: a long name lost its type)
+		if (mb_strlen($name, 'UTF-8') > 150) {
+			$ext = (string) pathinfo($name, PATHINFO_EXTENSION);
+			$ext = $ext !== '' && mb_strlen($ext, 'UTF-8') <= 10 ? '.'.$ext : '';
+			$name = rtrim(mb_substr($name, 0, 150 - mb_strlen($ext, 'UTF-8'), 'UTF-8'), ' .').$ext;
+		}
+
+		return $name;
 	}
 
 	/**

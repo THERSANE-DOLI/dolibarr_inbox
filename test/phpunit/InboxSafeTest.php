@@ -293,6 +293,72 @@ class InboxSafeTest extends TestCase
 	}
 
 	/**
+	 * Audit INBX-089: a semicolon (or any separator) inside a quoted display name never takes the sender away
+	 *
+	 * @return void
+	 */
+	public function testSenderWithSemicolon()
+	{
+		$cases = array(
+			'"Service ; Compta" <compta@ex.example>' => array('compta@ex.example', 'Service ; Compta'),
+			'"a;b" <x@ex.example>' => array('x@ex.example', 'a;b'),
+			'"\\"><img src=x onerror=\\"a(\'N\');b\\">" <n@ex.example>' => array('n@ex.example', '"><img src=x onerror="a(\'N\');b">'),
+			'Paul Dupont <paul@ex.example>' => array('paul@ex.example', 'Paul Dupont'),
+			'=?UTF-8?B?w4l0w6k=?= <ete@ex.example>' => array('ete@ex.example', 'Été'),
+			'paul@ex.example (Paul via site)' => array('paul@ex.example', 'Paul via site'),
+		);
+		foreach ($cases as $from => $expected) {
+			$m = InboxMimeParser::parse("From: ".$from."\r\nTo: a@ex.example\r\nSubject: s\r\n\r\nx");
+			$this->assertSame($expected, array($m->fromEmail, $m->fromName), $from);
+		}
+		$m = InboxMimeParser::parse("From: x@ex.example\r\nTo: \"A;B\" <a@ex.example>, b@ex.example; Equipe: c@ex.example, \"D, E\" <d@ex.example>;\r\n\r\nx");
+		$this->assertSame(array('a@ex.example', 'b@ex.example', 'c@ex.example', 'd@ex.example'), array_column($m->to, 'email'));
+		$this->assertSame('A;B', $m->to[0]['name']);
+		// The index reads the same
+		dol_include_once('/inbox/class/inboxheaderparser.class.php');
+		$h = InboxHeaderParser::parse("From: \"Service ; Compta\" <compta@ex.example>\r\nSubject: s\r\n");
+		$this->assertSame('compta@ex.example', $h['from_email']);
+	}
+
+	/**
+	 * Audit INBX-091: a long file name keeps its extension
+	 *
+	 * @return void
+	 */
+	public function testLongFileNameKeepsExtension()
+	{
+		$name = InboxMimeParser::fileName(str_repeat('a', 300).'.png');
+		$this->assertSame(150, mb_strlen($name, 'UTF-8'));
+		$this->assertStringEndsWith('.png', $name);
+		$this->assertSame('court.pdf', InboxMimeParser::fileName('court.pdf'));
+	}
+
+	/**
+	 * Audit INBX-090: values cut to the length of their column before the creation
+	 *
+	 * @return void
+	 */
+	public function testFitColumns()
+	{
+		$lead = new InboxLead($GLOBALS['db']);
+		$fit = new ReflectionMethod($lead, 'fitColumns');
+		$fit->setAccessible(true);
+		$c = new stdClass();
+		$c->lastname = str_repeat('é', 300);
+		$c->firstname = 'Jean';
+		$c->phone_pro = str_repeat('1', 300);
+		$fit->invoke($lead, $c, 'socpeople');
+		$this->assertLessThanOrEqual(50, mb_strlen($c->lastname, 'UTF-8'));
+		$this->assertGreaterThan(10, mb_strlen($c->lastname, 'UTF-8'));
+		$this->assertSame('Jean', $c->firstname);
+		$this->assertLessThanOrEqual(30, strlen($c->phone_pro));
+		$s = new stdClass();
+		$s->name = str_repeat('x', 300);
+		$fit->invoke($lead, $s, 'societe');
+		$this->assertLessThan(300, strlen($s->name));
+	}
+
+	/**
 	 * A fragment that the page can show: allowed elements only, no event, no script scheme, no class, no id
 	 *
 	 * @param string $html   Fragment

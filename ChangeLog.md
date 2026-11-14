@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: long name of an attachment keeps its extension :   1.106.4
+  - a name longer than 150 characters was cut with its extension (the file was put in the documents without its
+    type); the base is cut now, the extension kept (audit INBX-091).
+
+- FIX: quick creation of a customer, values cut to the length of their column :   1.106.3
+  - a long value of a site or of a signature (name of a contact over 50 characters) made the creation fail with the
+    error of the database shown as it was; each value is cut to the length of its column (audit INBX-090).
+
+- FIX: sender read again when a semicolon is in its quoted name :   1.106.2
+  - « "Service ; Compta" <x@y> »: the reader of the mails cut the list of addresses on the semicolon, the mail came
+    « without sender » and the checks made on the address (blocked senders, known senders, banners) did not run.
+    A reader of our own takes over when the library misses an address of the header (From, Reply-To, To, Cc), with
+    quoted names, escapes, comments and groups (audit INBX-089).
+
 - FIX: proposal of the AI shown through the one door too :   1.106.1
   - the preview of a proposal of the AI (that may have read the mail) goes through Dolibarr.tools.inbox.safeHtml
     as well, not only through the filter of the server (audit 2026-11-14).

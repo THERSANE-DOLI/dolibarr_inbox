@@ -453,7 +453,7 @@ class InboxCreate
 			return '';
 		}
 		// The one door first (no tag, no control nor bidi override character: « facture\u{202E}fdp.exe »), then Dolibarr
-		$name = dol_sanitizeFileName(InboxSafe::line((string) $name, 200)) ?: 'file';
+		$name = dol_sanitizeFileName(InboxMimeParser::fileName(InboxSafe::line((string) $name, 0))) ?: 'file';
 		// An executable file of a mail (.php, .phtml...) gets .noexe, as an upload of Dolibarr (dol_move_uploaded_file)
 		if (isAFileWithExecutableContent($name) && !getDolGlobalString('MAIN_DOCUMENT_IS_OUTSIDE_WEBROOT_SO_NOEXE_NOT_REQUIRED')) {
 			$name .= '.noexe';

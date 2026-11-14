@@ -75,6 +75,18 @@ class InboxLead
 	/** @var DoliDB */
 	protected $db;
 
+	/** @var array<string,array<string,int>> Lengths of the text columns per table, read once (audit INBX-090) */
+	protected static $columnSizes = array();
+
+	/** Property of the object => column, for the lengths (audit INBX-090) */
+	const COLUMNS = array(
+		'societe' => array('name' => 'nom', 'name_alias' => 'name_alias', 'address' => 'address', 'zip' => 'zip', 'town' => 'town', 'phone' => 'phone',
+			'email' => 'email', 'url' => 'url', 'idprof1' => 'siren', 'idprof2' => 'siret', 'idprof3' => 'ape', 'idprof4' => 'idprof4',
+			'idprof5' => 'idprof5', 'idprof6' => 'idprof6', 'tva_intra' => 'tva_intra', 'code_client' => 'code_client', 'code_fournisseur' => 'code_fournisseur'),
+		'socpeople' => array('lastname' => 'lastname', 'firstname' => 'firstname', 'poste' => 'poste', 'phone_pro' => 'phone',
+			'phone_mobile' => 'phone_mobile', 'email' => 'email'),
+	);
+
 	/** @var string */
 	public $error = '';
 
@@ -1073,6 +1085,33 @@ class InboxLead
 	}
 
 	/**
+	 * Values of a mail cut to the length of their column (audit INBX-090): a long value of a site or a signature made
+	 * the creation fail with an error of the database shown as it was
+	 *
+	 * @param object $o     Thirdparty or contact about to be created
+	 * @param string $table societe or socpeople
+	 * @return void
+	 */
+	protected function fitColumns($o, $table)
+	{
+		if (!isset(self::$columnSizes[$table])) {
+			$sizes = array();
+			foreach ((array) $this->db->DDLInfoTable($this->db->prefix().$table) as $row) {
+				$row = array_values((array) $row);
+				if (isset($row[1]) && preg_match('/char\((\d+)\)/i', (string) $row[1], $m)) {
+					$sizes[strtolower((string) $row[0])] = (int) $m[1];
+				}
+			}
+			self::$columnSizes[$table] = $sizes;
+		}
+		foreach (self::COLUMNS[$table] as $prop => $col) {
+			if (isset($o->$prop) && is_string($o->$prop) && !empty(self::$columnSizes[$table][$col])) {
+				$o->$prop = dol_trunc($o->$prop, self::$columnSizes[$table][$col], 'right', 'UTF-8', 1);
+			}
+		}
+	}
+
+	/**
 	 * Extrafields the page of creation would let the user fill (audit INBX-070): enabled, shown on creation, allowed
 	 * by their permission, not computed
 	 *
@@ -1414,6 +1453,7 @@ class InboxLead
 					$s->array_options[$k] = $v;
 				}
 			}
+			$this->fitColumns($s, 'societe');
 			$socId = $s->create($user);
 			if ($socId <= 0) {
 				$this->db->rollback();
@@ -1462,6 +1502,7 @@ class InboxLead
 						$c->array_options[$k] = $v;
 					}
 				}
+				$this->fitColumns($c, 'socpeople');
 				$contactId = $c->create($user);
 				if ($contactId <= 0) {
 					$this->db->rollback();
@@ -1668,6 +1709,7 @@ class InboxLead
 					$c->$f = self::cleanValue($f, (string) ($contact[$f] ?? ''));
 				}
 				$c->statut = 1;
+				$this->fitColumns($c, 'socpeople');
 				$contactId = $c->create($user);
 				if ($contactId <= 0) {
 					dol_syslog(__METHOD__.' contact not created: '.$c->error, LOG_WARNING);
