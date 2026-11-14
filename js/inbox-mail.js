@@ -1410,6 +1410,7 @@
 			if (seq !== S.listSeq) {
 				return;
 			}
+			S.listLocked = 0;
 			S.pills = res.query;
 			// Meilisearch (lot W7 1.20.0): mailboxes fully indexed, error, order, crops of the text
 			S.ft = res.fulltext || null;
@@ -1444,7 +1445,17 @@
 				return;
 			}
 			body.removeAttribute('aria-busy');
-			if (!keep) {
+			// Protected mailbox not unlocked yet in this session (first load of a new session, the silent unlock
+			// comes just after): told as locked, the list loaded again once unlocked (inbox:protect:state)
+			S.listLocked = err.code === 'locked' ? +(err.data.account || 0) : 0;
+			if (!keep && S.listLocked) {
+				body.innerHTML = '<div class="ibx-empty">' + ic('lock', 'ibx-empty__icon') + '<div>' + esc(err.message) + '</div><button type="button" class="ibx-btn ibx-js-unlocklist">' + th('InboxProtectUnlock') + '</button></div>';
+				$('.ibx-js-unlocklist', body).addEventListener('click', () => {
+					if (I.protect) {
+						I.protect.openLock(S.listLocked).then(ok => (ok ? refreshTree().then(() => loadList()) : null));
+					}
+				});
+			} else if (!keep) {
 				body.innerHTML = '<div class="ibx-empty">' + ic('warning', 'ibx-empty__icon') + '<div>' + esc(err.message) + '</div><button type="button" class="ibx-btn ibx-js-retry">' + th('InboxRetry') + '</button></div>';
 				$('.ibx-js-retry', body).addEventListener('click', () => loadList());
 			}
@@ -11293,8 +11304,11 @@
 		if (!S.el || !(S.accounts || []).length || !I.protect) {
 			return;
 		}
-		if (S.accounts.some(a => a.protected && !!a.locked !== I.protect.isLocked(a.id))) {
-			refreshTree();
+		const tree = S.accounts.some(a => a.protected && !!a.locked !== I.protect.isLocked(a.id)) ? refreshTree() : Promise.resolve();
+		// The list refused as locked (first load of the session, before the silent unlock): loaded again
+		if (S.listLocked && !I.protect.isLocked(S.listLocked)) {
+			S.listLocked = 0;
+			tree.then(() => loadList(), () => loadList());
 		}
 	});
 

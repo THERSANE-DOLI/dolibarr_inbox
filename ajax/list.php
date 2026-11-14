@@ -67,14 +67,32 @@ function inboxListLivePage($folder, array $query)
 $readable = array_keys(array_filter($access->getLevels($user), function ($level) {
 	return InboxAccess::rank($level) >= InboxAccess::rank(InboxAccess::LEVEL_READ);
 }));
-// A protected mailbox not unlocked in this session: its index and its cache are never read (audit INBX-055)
-$readable = array_values(array_diff($readable, (new InboxProtect($db))->lockedIds()));
+// A protected mailbox not unlocked in this session: its index and its cache are never read (audit INBX-055).
+// Its folders are in the tree all the same: asked, it answers « locked » and not « not found », the page unlocks it
+// in silence just after the first load of a new session (PWA) and loads the list again.
+$inboxLockedReadable = array_values(array_intersect($readable, (new InboxProtect($db))->lockedIds()));
+$readable = array_values(array_diff($readable, $inboxLockedReadable));
 // Only the active mailboxes
 if ($readable) {
 	$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', array_map('intval', $readable)).") AND status = ".InboxAccount::STATUS_ACTIVE." LIMIT 10000");
 	$readable = array_map(function ($r) {
 		return (int) $r->rowid;
 	}, is_array($rows) ? $rows : array());
+}
+
+/**
+ * Mailbox the user may read but protected and not unlocked in this session: answer « locked » (423) and stop
+ *
+ * @param int $accountId Mailbox of the folder asked
+ * @return void
+ */
+function inboxListLockedStop($accountId)
+{
+	global $langs, $inboxLockedReadable;
+
+	if ($accountId > 0 && in_array($accountId, (array) $inboxLockedReadable, true)) {
+		inboxAjaxReply(array('error' => $langs->transnoentities('InboxProtectLockedShort'), 'code' => 'locked', 'account' => $accountId, 'fields' => new stdClass()), 423);
+	}
 }
 
 /**
@@ -104,6 +122,7 @@ function inboxListFolder($folderId, array $readable)
 		return $live;
 	}
 	$row = $folderId > 0 ? $db->getRow("SELECT rowid, fk_account, total, unread FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1") : null;
+	inboxListLockedStop(is_object($row) ? (int) $row->fk_account : 0);
 	if (!is_object($row) || !in_array((int) $row->fk_account, $readable, true)) {
 		inboxAjaxNotFound();
 	}

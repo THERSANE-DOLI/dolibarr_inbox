@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: protected mailbox at the login, « locked » instead of « mailbox not found » :   1.102.17
+  - the first list of a new session (PWA) came before the silent unlock of a protected mailbox and was refused as
+    « mailbox not found », only a retry button; it is now told as locked (unlock button) and the list is loaded
+    again by itself once the silent unlock is done.
+
 - FIX: writing on a phone, formatting strip right above the keyboard :   1.102.16
   - the bubble of a selection was set near it, where the menu of Android (translate, cut, copy) also goes and covered
     it: it is now a strip of the whole width right above the keyboard, above the foot once the keyboard is closed.
