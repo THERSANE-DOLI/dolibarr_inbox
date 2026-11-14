@@ -129,7 +129,8 @@ address stays inside Dolibarr; values of other modules are never shown for an in
 On the right of the mails, the panel « Today »: the events of the user, late ones to do, today, the next 7 days.
 
 On a computer, a strip of icons on the right edge of the mail space holds the columns beside a mail, one at a time:
-Dolibarr (the Dolibarr part of the mail) and Today (with the day of the month). A click shows its column, a click on
+Dolibarr (the Dolibarr part of the mail, moved out of the mail into a column as high as the screen) and Today (with
+the day of the month); both take the same place, width and splitter. A click shows its column, a click on
 the icon pressed (or the cross of the column) closes it; Shift+F9 does it for Today. With a mail open the last column
 chosen comes back; with no mail open, Today is shown unless closed by hand. When the reading would keep less than
 40 rem beside a column, the column is a drawer over the reading, opened by hand only (never by itself), closed by a

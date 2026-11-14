@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the Dolibarr part as a column of its own, full height, at the place of the agenda :   1.110.0
+  - on a computer, the Dolibarr part of the email open leaves the email for a column beside the reading, as high as
+    the screen, as the panel Today: same width and splitter, same drawer when the reading is narrow.
+  - tablet and phone unchanged (on top of the email, a sheet on a phone).
+
 - FIX: agenda panel slow on a large agenda :   1.109.1
   - the events of today and of the coming days were read from the whole history of the agenda (7 s for 800 000
     events, the other calls of the page waiting behind); an event started more than 31 days before is left out.

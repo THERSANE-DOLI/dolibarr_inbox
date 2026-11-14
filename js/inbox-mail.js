@@ -3244,7 +3244,7 @@
 		if (!m || !S.openId) {
 			return null;
 		}
-		const box = $('.ibx-js-dolibar', readPane());
+		const box = dolibarIn(readPane());
 		const d = box && box._data ? box._data : null;
 		const sender = d && d.sender ? d.sender : {};
 		const links = d && Array.isArray(d.links) ? d.links.filter(l => l && l.readable !== false && +l.id > 0) : [];
@@ -5283,6 +5283,67 @@
 	}
 
 	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
+	/**
+	 * Column Dolibarr of a computer (1.110.0): a pane of the mail space beside the reading, full height, at the place
+	 * of the agenda panel (same splitter, same drawer when narrow). The bandeau of the mail open is moved into it; on a
+	 * tablet or a phone it stays in the mail (on top, sheet on a phone). The bandeau keeps its mail (_reading) and the
+	 * place it came from (_home).
+	 */
+	function dolSide() {
+		return S.el ? $('.ibx-js-dolside', S.el) : null;
+	}
+	/** The mail (or conversation) of a bandeau, in the mail or in the column */
+	function readingOf(box) {
+		if (!box) {
+			return null;
+		}
+		return box.closest('.ibx-reading') || (box._reading && box._reading.isConnected ? box._reading : null);
+	}
+	/** The bandeau of what is under root (the reading pane, a mail, a conversation), in it or moved into the column */
+	function dolibarIn(root) {
+		if (!root) {
+			return null;
+		}
+		const inside = $('.ibx-js-dolibar', root);
+		if (inside) {
+			return inside;
+		}
+		const side = dolSide();
+		return side ? Array.from(side.children).find(b => b._reading && b._reading.isConnected && root.contains(b._reading)) || null : null;
+	}
+	/** Each bandeau where it belongs: in the column on a computer, back in its mail on a tablet or a phone */
+	function seatDolibar() {
+		const side = dolSide();
+		const pane = readPane();
+		if (!side || !pane) {
+			return;
+		}
+		// The bandeau of a mail no longer shown leaves the column
+		Array.from(side.children).forEach(b => {
+			if (!b._reading || !b._reading.isConnected) {
+				b.remove();
+			}
+		});
+		if (!isPhone()) {
+			$$('.ibx-js-dolibar', pane).forEach(b => {
+				const home = document.createElement('span');
+				home.className = 'ibx-dolibar-home';
+				home.hidden = true;
+				b.before(home);
+				b._home = home;
+				b._reading = b.closest('.ibx-reading');
+				side.appendChild(b);
+			});
+		} else {
+			Array.from(side.children).forEach(b => {
+				if (b._home && b._home.isConnected) {
+					b._home.replaceWith(b);
+				} else {
+					b.remove();
+				}
+			});
+		}
+	}
 	function dolibarSlot(mailId, thread) {
 		return '<section class="ibx-dolibar ibx-js-dolibar" data-mail="' + mailId + '" data-thread="' + (thread ? 1 : 0) + '" aria-label="' + th('InboxDolibarr') + '"></section>';
 	}
@@ -5308,13 +5369,14 @@
 			return;
 		}
 		const mode = dolibarMode();
-		if (pane.dataset.dolibar !== mode) {
-			pane.dataset.dolibar = mode;
-			$$('.ibx-js-dolibar', pane).forEach(b => {
-				if (b._data) {
-					paintDolibar(b);
-				}
-			});
+		pane.dataset.dolibar = mode === 'top' ? 'top' : 'side';
+		seatDolibar();
+		if (pane._dolMode !== mode) {
+			pane._dolMode = mode;
+			const b = dolibarIn(readPane());
+			if (b && b._data) {
+				paintDolibar(b);
+			}
 		}
 	}
 	// ---------- Strip on the right (1.109.0): one column at a time beside the mail, Dolibarr or the agenda ----------
@@ -5331,8 +5393,9 @@
 		if (!pane || isPhone()) {
 			return false;
 		}
-		const agenda = sideApp().dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el) : null;
-		const width = pane.clientWidth + (agenda ? agenda.getBoundingClientRect().width + 5 : 0);
+		const app = sideApp();
+		const docked = app.dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el) : (app.dataset.dolside === 'open' ? dolSide() : null);
+		const width = pane.clientWidth + (docked ? docked.getBoundingClientRect().width + 5 : 0);
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 		return width / rem < 60;
 	}
@@ -5381,7 +5444,27 @@
 		if (I.agenda && I.agenda.sync) {
 			I.agenda.sync(reason || 'auto');
 		}
+		layoutDolside();
 		paintStrip();
+	}
+	/** The column Dolibarr shown or not, docked or as a drawer; the splitter of the right column for the one docked */
+	function layoutDolside() {
+		const app = sideApp();
+		const side = dolSide();
+		if (!app || !side) {
+			return;
+		}
+		const on = !isPhone() && app.dataset.side === 'dolibarr';
+		side.hidden = !on;
+		if (on) {
+			app.dataset.dolside = app.dataset.narrow === '1' ? 'over' : 'open';
+		} else {
+			app.removeAttribute('data-dolside');
+		}
+		const split = $('.ibx-splitter--agenda', app);
+		if (split) {
+			split.hidden = !(app.dataset.dolside === 'open' || app.dataset.agenda === 'open');
+		}
 	}
 	/**
 	 * A click on an icon of the strip (or Shift+F9 for the agenda): its column, or none when it is already shown
@@ -5402,7 +5485,7 @@
 		}
 		applySide(reason || 'button');
 		if (next) {
-			const col = next === 'dolibarr' ? $('.ibx-pane--read .ibx-js-dolibar', S.el) : $('.ibx-pane--agenda', S.el);
+			const col = next === 'dolibarr' ? dolSide() : $('.ibx-pane--agenda', S.el);
 			if (col && sideApp().dataset.narrow === '1') {
 				col.setAttribute('tabindex', '-1');
 				col.focus({ preventScroll: true });
@@ -5456,7 +5539,7 @@
 			if (!S.el || sideApp().dataset.narrow !== '1' || !S.sideDrawer || !e.target.closest) {
 				return;
 			}
-			if (e.target.closest('.ibx-dolibar, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
+			if (e.target.closest('.ibx-dolibar, .ibx-pane--dolside, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
 				return;
 			}
 			closeSide('outside');
@@ -5496,7 +5579,7 @@
 	 * @param {object}      x     {soc, canLead, canWrite, rq, pieces, notes}
 	 */
 	function dolChips(box, sheet, x) {
-		const reading = box.closest('.ibx-reading');
+		const reading = readingOf(box);
 		const slot = reading && $('.ibx-js-dolchips', reading);
 		if (!slot) {
 			return;
@@ -5544,10 +5627,9 @@
 			if (sideCurrent() !== 'dolibarr') {
 				toggleSide('dolibarr');
 			}
-			const body = $('.ibx-dolibar__body', box);
 			const row = $('[data-sec="' + b.dataset.sec + '"]', box);
-			if (body && row) {
-				box.scrollTop = Math.max(0, row.offsetTop - 8);
+			if (row) {
+				row.scrollIntoView({ block: 'start' });
 			}
 		}));
 	}
@@ -5910,7 +5992,7 @@
 	 * column: the red one first
 	 */
 	function showDolAlerts(box, alerts) {
-		const reading = box.closest('.ibx-reading');
+		const reading = readingOf(box);
 		if (!reading) {
 			return;
 		}
@@ -6486,7 +6568,7 @@
 		hydrateUserPhotos(box);
 		I.mount(box);
 		box.classList.toggle('is-folded', folded);
-		const reading = box.closest('.ibx-reading');
+		const reading = readingOf(box);
 		if (reading) {
 			reading.classList.toggle('is-dolibar-folded', folded);
 		}
@@ -6812,8 +6894,10 @@
 	}
 	/** The Dolibarr part of the mail of an element (reading pane, or the conversation) */
 	function dolibarOf(el) {
-		const reading = el && el.closest('.ibx-reading');
-		return reading ? $('.ibx-js-dolibar', reading) : null;
+		if (el && el.closest('.ibx-js-dolibar')) {
+			return el.closest('.ibx-js-dolibar');
+		}
+		return dolibarIn(el && el.closest('.ibx-reading'));
 	}
 	/** A file of the mail in the documents of a piece (antivirus first, by the server) */
 	async function attachToPiece(box, m, a, type, id) {
@@ -8183,7 +8267,9 @@
 		bindQuickReply(pane);
 		hydrateAvatars(pane);
 		I.mount(pane);
-		loadDolibar($('.ibx-js-dolibar', pane));
+		const dolBox = $('.ibx-js-dolibar', pane);
+		seatDolibar();
+		loadDolibar(dolBox);
 		$$('.ibx-js-expand', pane).forEach(b => b.addEventListener('click', () => {
 			const item = b.closest('[data-mailblock]');
 			const open = b.getAttribute('aria-expanded') === 'true';
@@ -8309,7 +8395,9 @@
 		bindMail(m, pane);
 		hydrateAvatars(pane);
 		I.mount(pane);
-		loadDolibar($('.ibx-js-dolibar', pane));
+		const dolBox = $('.ibx-js-dolibar', pane);
+		seatDolibar();
+		loadDolibar(dolBox);
 	}
 
 	/** Tests of an anti-spam filter that weigh towards spam, in words (3 reasons at most; the others left) */
@@ -11246,7 +11334,9 @@
 				sp.setPointerCapture(e.pointerId);
 				sp.classList.add('is-dragging');
 				const start = e.clientX;
-				const base = pane.getBoundingClientRect().width;
+				// Right column: the agenda or Dolibarr, the one shown (1.110.0)
+				const target = which === 'w3' && dolSide() && !dolSide().hidden ? dolSide() : pane;
+				const base = target.getBoundingClientRect().width;
 				const app = $('.ibx-mailapp', S.el);
 				const move = ev => {
 					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(window.innerWidth * (which === 'w3' ? 0.4 : 0.6), base + dir * (ev.clientX - start))) + 'px');
@@ -11261,7 +11351,7 @@
 					} catch (er) {
 						w = {};
 					}
-					w[which] = Math.round(pane.getBoundingClientRect().width);
+					w[which] = Math.round(target.getBoundingClientRect().width);
 					saveParam('pane_widths', JSON.stringify(w));
 				};
 				sp.addEventListener('pointermove', move);
@@ -11335,6 +11425,8 @@
 			// Agenda panel (1.107.0, js/inbox-agenda.js): its splitter and its column, filled by that script
 			+ '<div class="ibx-splitter ibx-splitter--agenda" data-split="3" role="separator" aria-orientation="vertical" tabindex="0" aria-label="' + th('InboxResizePane') + '" hidden></div>'
 			+ '<aside class="ibx-pane ibx-pane--agenda ibx-js-agenda" aria-label="' + th('InboxAgendaPanel') + '" hidden></aside>'
+			// Column Dolibarr (1.110.0): the bandeau of the mail open, moved here on a computer
+			+ '<aside class="ibx-pane ibx-pane--dolside ibx-js-dolside" aria-label="' + th('InboxDolibarr') + '" hidden></aside>'
 			// Strip on the right (1.109.0): Dolibarr and the agenda, one column at a time
 			+ stripHtml()
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')
