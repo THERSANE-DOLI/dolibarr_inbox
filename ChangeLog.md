@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a long call of inbox no longer makes the other pages of the user wait :   1.110.1
+  - a read lets the PHP session go at once: a mail read on the server or an archive checked by the antivirus kept
+    the session, and every other call of the user (the agenda, the notifications of Dolibarr) waited behind it.
+    Kept for the writes and while a protected mailbox is unlocked.
+
 - NEW: the Dolibarr part as a column of its own, full height, at the place of the agenda :   1.110.0
   - on a computer, the Dolibarr part of the email open leaves the email for a column beside the reading, as high as
     the screen, as the panel Today: same width and splitter, same drawer when the reading is narrow.

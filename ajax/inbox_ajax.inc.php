@@ -240,6 +240,13 @@ function inboxAjaxStart($write)
 			inboxAjaxError('bad_token', 403);
 		}
 	}
+	// A read lets the session go at once (1.110.1): PHP runs the calls of a session one after the other, so a long one
+	// (a mail read on the server, the antivirus on an archive) made every other page of the user wait, the agenda
+	// and the notifications of Dolibarr included. Kept for the writes, and while a protected mailbox is unlocked
+	// (its live data is kept in the session while it is read)
+	if (!$write && empty($_SESSION['inbox_unlocked']) && session_status() === PHP_SESSION_ACTIVE) {
+		session_write_close();
+	}
 }
 
 /**
