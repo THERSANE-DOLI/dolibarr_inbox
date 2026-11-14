@@ -99,6 +99,8 @@ function inboxGeneralSettings()
 		'INBOX_RSPAMD_LEARN' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Lists of reputation asked by DNS to outside services (Spamhaus, SURBL...): off by default
 		'INBOX_RSPAMD_DNSLISTS' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
+		// New mailbox (lot H1): the ISPDB of Thunderbird (Mozilla) asked with the domain of the address, off by default
+		'INBOX_AUTOCONFIG_ISPDB' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 	);
 }
 

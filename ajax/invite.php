@@ -50,7 +50,11 @@ function inboxInviteFail($code, $detail)
 		'smtp_no_auth' => 'InboxComposeSmtpAuth', 'smtp_no_starttls' => 'InboxComposeSmtpCertificate', 'agenda_error' => 'InboxInviteAgendaError');
 	$shown = in_array($code, array('smtp_recipient', 'smtp_refused', 'error', 'smtp_connect', 'agenda_error'), true) ? (string) $detail : '';
 	dol_syslog('inbox invite '.$code.' '.$detail, LOG_WARNING);
-	inboxAjaxReply(array('error' => $langs->transnoentities($keys[$code] ?? 'InboxComposeFailed', ''), 'code' => $code, 'detail' => dol_trunc($shown, 300)), $http[$code] ?? 502);
+	// The option of Dolibarr that stops the sending, cited by its own label
+	if ($code === 'mails_disabled') {
+		$langs->load('admin');
+	}
+	inboxAjaxReply(array('error' => $langs->transnoentities($keys[$code] ?? 'InboxComposeFailed', $code === 'mails_disabled' ? $langs->transnoentities('MAIN_DISABLE_ALL_MAILS') : ''), 'code' => $code, 'detail' => dol_trunc($shown, 300)), $http[$code] ?? 502);
 }
 
 $mailId = (int) inboxAjaxParam('mail', 'int');

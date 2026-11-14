@@ -52,7 +52,12 @@ function inboxComposeFail(InboxComposer $composer)
 	$key = $keys[$code] ?? 'InboxComposeFailed';
 	$detail = in_array($code, array('smtp_recipient', 'smtp_refused', 'hook', 'error', 'smtp_connect'), true) ? (string) $composer->error : '';
 	dol_syslog('inbox compose '.$code.' '.$composer->error, LOG_WARNING);
-	inboxAjaxReply(array('error' => $langs->transnoentities($key, implode(', ', $composer->bad)), 'code' => $code, 'detail' => dol_trunc($detail, 300)), $http[$code] ?? 502);
+	// The option of Dolibarr that stops the sending, cited by its own label (its words in every language)
+	if ($code === 'mails_disabled') {
+		$langs->load('admin');
+	}
+	$arg = $code === 'mails_disabled' ? $langs->transnoentities('MAIN_DISABLE_ALL_MAILS') : implode(', ', $composer->bad);
+	inboxAjaxReply(array('error' => $langs->transnoentities($key, $arg), 'code' => $code, 'detail' => dol_trunc($detail, 300)), $http[$code] ?? 502);
 }
 
 /**

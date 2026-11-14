@@ -89,7 +89,7 @@
 		if (sec < 3600) {
 			return t('InboxAgoMinutes', Math.round(sec / 60));
 		}
-		return new Date(ts * 1000).toLocaleString();
+		return new Date(ts * 1000).toLocaleString(I.locale());
 	}
 	function levelLabel(level) {
 		return t('InboxLevel_' + level);
@@ -149,7 +149,7 @@
 	I.registerSpace(space);
 
 	/** Sections of Settings > General (1.32.0): id of the route, icon, title; in the menu, on the phone, on the titles */
-	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['editor', 'fmt-bold', 'InboxEditorSection'], ['avatars', 'user-circle', 'InboxAvatars'],
+	const GENERAL_SECTIONS = [['look', 'theme', 'InboxSectionLook'], ['defaults', 'tools', 'InboxSectionDefaults'], ['editor', 'fmt-bold', 'InboxEditorSection'], ['avatars', 'user-circle', 'InboxAvatars'], ['newbox', 'mailbox', 'InboxAutoconfigSection'],
 		['ai', 'magic', 'InboxAiSection'], ['dictation', 'mic', 'InboxDictationSection'], ['search', 'search', 'InboxSectionSearch'], ['tags', 'tag', 'InboxGlobalTags']];
 	/** Sections of Settings > My account (1.32.0); the 4th value: shown only for some users, hidden until there */
 	const ME_SECTIONS = [['reading', 'mail-opened', 'InboxSectionReading'], ['mybox', 'mailbox', 'InboxSectionMyBox', true], ['order', 'folders', 'InboxBoxOrderSection', true],
@@ -863,7 +863,7 @@
 		}
 		const order = { error: 0, warning: 1, info: 2 };
 		points.sort((x, y) => order[x.level] - order[y.level]);
-		const when = a.date_sync ? new Date(a.date_sync * 1000).toLocaleString() : '';
+		const when = a.date_sync ? new Date(a.date_sync * 1000).toLocaleString(I.locale()) : '';
 		const state = a.status !== 1 ? '' : (a.protect_level === 'content' ? t('InboxOverviewProtectedState') : (when ? t('InboxOverviewSyncedAt', when) : ''));
 		box.innerHTML = (points.length
 			? '<ul class="ibx-overview">' + points.map(x => '<li class="ibx-overview__item ibx-overview__item--' + x.level + '">' + ic(x.level === 'info' ? 'info' : 'warning')
@@ -1138,7 +1138,7 @@
 				return esc(l.from) + ' → ' + (l.account_to ? '<b>' + esc(l.account_to) + '</b> / ' : '') + esc(l.to);
 			};
 			list.innerHTML = '<table class="ibx-table ibx-journal"><thead><tr><th>' + th('InboxJournalDate') + '</th><th>' + th('InboxJournalWho') + '</th><th>' + th('InboxJournalAction') + '</th><th>' + th('InboxJournalMails') + '</th><th>' + th('InboxJournalWhere') + '</th></tr></thead><tbody>'
-				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString()) + '</td><td>' + esc(l.user) + '</td>'
+				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString(I.locale())) + '</td><td>' + esc(l.user) + '</td>'
 					+ '<td>' + th('InboxJournal_' + l.action) + (l.undone ? ' <span class="ibx-badge">' + th('InboxJournalUndone') + '</span>' : '') + (l.incoming ? ' <span class="ibx-badge">' + th('InboxJournalIncoming') + '</span>' : '') + '</td>'
 					+ '<td>' + (l.nb > 1 ? '<b>' + th('InboxJournalNbMails', l.nb) + '</b>' + (l.subject ? '<div class="ibx-muted ibx-ellipsis">' + th('InboxJournalFirst', l.subject) + '</div>' : '')
 						: '<span class="ibx-ellipsis" title="' + esc(l.message_id) + '">' + esc(l.subject || l.message_id || '') + '</span>') + '</td>'
@@ -1231,37 +1231,36 @@
 		const owner = a.summary && a.summary.owner ? a.summary.owner : '';
 		const noAccess = account && !a.own_level ? (a.type === 'personal' && owner ? t('InboxProtectNotYoursPersonal', a.me || '', owner) : t('InboxProtectNotYoursShared', a.me || '')) : '';
 		const protWhy = !account ? '' : (a.imap_auth_mode !== 'login' ? t('InboxProtectErrorAuthMode') : (a.status !== 1 ? t('InboxProtectNeedActive') : noAccess));
-		let html = '<form class="ibx-form" novalidate autocomplete="off">'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMailbox') + '</h2><div class="ibx-form">'
-			+ field('email', t('InboxAccountEmail'), a.email, { type: 'email', required: true, autocomplete: 'off', placeholder: 'devis@example.com', cls: 'ibx-field--medium' })
+		const mailboxSection = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMailbox') + '</h2><div class="ibx-form">'
+			+ field('email', t('InboxAccountEmail'), a.email, { type: 'email', required: true, autocomplete: 'off', placeholder: 'devis@example.com', cls: 'ibx-field--medium', help: account ? '' : t('InboxAutoconfigEmailHelp') })
+			// New mailbox (lot H1): the servers found from the address, where they come from
+			+ (account ? '' : '<div class="ibx-autoconf ibx-js-autoconf" aria-live="polite"></div>')
 			+ field('label', t('InboxAccountLabel'), a.label, { help: t('InboxAccountLabelHelp'), cls: 'ibx-field--medium' })
 			+ field('type', t('InboxAccountType'), a.type, { options: [['shared', t('InboxTypeShared')], ['personal', t('InboxTypePersonal')]], cls: 'ibx-field--medium' })
 			+ '<div class="ibx-formrow" data-field="fk_user_owner"' + (a.type === 'personal' ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-owner-q">' + th('InboxAccountOwner') + ' <span class="ibx-req" aria-hidden="true">*</span></label><div>'
 			+ '<input type="hidden" name="fk_user_owner" value="' + esc(a.fk_user_owner || '') + '"><input class="ibx-field ibx-field--medium" id="f-owner-q" list="ibx-owner-list" autocomplete="off" placeholder="' + th('InboxSearchUser') + '" value="' + esc(a.owner_name || (account && account.summary ? account.summary.owner : '')) + '"><datalist id="ibx-owner-list"></datalist>'
 			+ '<div class="ibx-formrow__help">' + th('InboxAccountOwnerHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>'
-			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionImap') + '</h2><div class="ibx-form">'
-			+ field('imap_host', t('InboxImapHost'), a.imap_host, { required: true, placeholder: 'mail.example.com', cls: 'ibx-field--medium', inputmode: 'url' })
+			+ '</div></section>';
+		const imapHostRows = field('imap_host', t('InboxImapHost'), a.imap_host, { required: true, placeholder: 'mail.example.com', cls: 'ibx-field--medium', inputmode: 'url' })
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxPortEncryption') + '</span><div class="ibx-inline">'
 			+ '<input class="ibx-field ibx-field--narrow" name="imap_port" type="number" min="1" max="65535" inputmode="numeric" aria-label="' + th('InboxImapPort') + '" value="' + esc(a.imap_port) + '">'
-			+ '<select class="ibx-field ibx-field--medium" name="imap_encryption" aria-label="' + th('InboxEncryption') + '">' + enc.map(([v, l]) => '<option value="' + v + '"' + (v === a.imap_encryption ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div></div>'
-			+ field('imap_auth_mode', t('InboxImapAuthMode'), a.imap_auth_mode, { options: [['login', t('InboxAuthLogin')], ['master', t('InboxAuthMaster')], ['oauth', t('InboxAuthOAuth')]], cls: 'ibx-field--medium' })
+			+ '<select class="ibx-field ibx-field--medium" name="imap_encryption" aria-label="' + th('InboxEncryption') + '">' + enc.map(([v, l]) => '<option value="' + v + '"' + (v === a.imap_encryption ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select></div></div>';
+		const authRows = field('imap_auth_mode', t('InboxImapAuthMode'), a.imap_auth_mode, { options: [['login', t('InboxAuthLogin')], ['master', t('InboxAuthMaster')], ['oauth', t('InboxAuthOAuth')]], cls: 'ibx-field--medium' })
 			+ field('oauth_service', t('InboxOAuthService'), a.oauth_service, { hidden: a.imap_auth_mode !== 'oauth', help: t('InboxOAuthServiceHelp'), cls: 'ibx-field--medium' })
 			+ field('imap_login', t('InboxImapLogin'), a.imap_login, { placeholder: t('InboxLoginDefault'), autocomplete: 'off', cls: 'ibx-field--medium', hidden: a.imap_auth_mode === 'master' })
 			+ (prot ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxPassword') + '</span><div><div>' + ic('lock') + ' ' + th('InboxProtectPasswordOn') + '</div>'
 				+ '<a class="ibx-btn ibx-btn--sm" href="#/settings/accounts/' + a.id + '/protection">' + ic('key') + ' ' + th('InboxProtectManage') + '</a></div></div>'
 				: '<div class="ibx-formrow" data-field="imap_password"' + (a.imap_auth_mode === 'login' ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-imap_password">' + th('InboxPassword') + '</label><div>'
 			+ '<div class="ibx-password"><input class="ibx-field ibx-field--medium" id="f-imap_password" name="imap_password" type="password" autocomplete="new-password" placeholder="' + (a.has_imap_password ? th('InboxPasswordKept') : '') + '"></div>'
-			+ '<div class="ibx-formrow__help">' + th(a.has_imap_password ? 'InboxPasswordKeptHelp' : 'InboxPasswordHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>')
-			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxCertificate') + '</span><div><label class="ibx-check"><input type="checkbox" name="imap_validate_cert"' + (a.imap_validate_cert ? ' checked' : '') + '> ' + th('InboxValidateCert') + '</label></div></div>'
-			// Protection (1.89.0): what becomes of the password, beside it; the encrypted accesses in their own tab
-			+ (account && !prot ? '<div class="ibx-formrow" data-field="protection"><span class="ibx-formrow__label">' + th('InboxProtectRow') + '</span><div>'
+			+ '<div class="ibx-formrow__help">' + th(a.has_imap_password ? 'InboxPasswordKeptHelp' : 'InboxPasswordHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>');
+		const certRow = '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxCertificate') + '</span><div><label class="ibx-check"><input type="checkbox" name="imap_validate_cert"' + (a.imap_validate_cert ? ' checked' : '') + '> ' + th('InboxValidateCert') + '</label></div></div>';
+		// Protection (1.89.0): what becomes of the password, beside it; the encrypted accesses in their own tab
+		const protRows = (account && !prot ? '<div class="ibx-formrow" data-field="protection"><span class="ibx-formrow__label">' + th('InboxProtectRow') + '</span><div>'
 				+ '<div class="ibx-formrow__help">' + th('InboxProtectNotOn') + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-protect"' + (protWhy ? ' aria-disabled="true" title="' + esc(protWhy) + '"' : '') + '>' + ic('lock') + ' ' + th('InboxProtectAction') + '</button>'
 				+ (protWhy ? '<div class="ibx-formrow__help">' + esc(protWhy) + '</div>' : '') + '</div></div>' : '')
-			+ (prot ? '<p class="ibx-section__help">' + ic('lock') + ' ' + th('InboxProtectServerReadonly') + '</p>' : '')
-			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionSmtp') + '</h2><div class="ibx-form">'
+			+ (prot ? '<p class="ibx-section__help">' + ic('lock') + ' ' + th('InboxProtectServerReadonly') + '</p>' : '');
+		const smtpSection = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionSmtp') + '</h2><div class="ibx-form">'
 			+ field('smtp_host', t('InboxSmtpHost'), a.smtp_host, { placeholder: t('InboxSameAsImap'), cls: 'ibx-field--medium', inputmode: 'url' })
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxPortEncryption') + '</span><div class="ibx-inline">'
 			+ '<input class="ibx-field ibx-field--narrow" name="smtp_port" type="number" min="1" max="65535" inputmode="numeric" aria-label="' + th('InboxSmtpPort') + '" value="' + esc(a.smtp_port) + '">'
@@ -1271,8 +1270,8 @@
 			+ '<div class="ibx-formrow" data-field="smtp_password"' + (a.smtp_same_credentials ? ' hidden' : '') + '><label class="ibx-formrow__label" for="f-smtp_password">' + th('InboxPassword') + '</label><div><input class="ibx-field ibx-field--medium" id="f-smtp_password" name="smtp_password" type="password" autocomplete="new-password" placeholder="' + (a.has_smtp_password ? th('InboxPasswordKept') : '') + '"></div></div>'
 			// Copy of the mails sent (1.26.0): some sending servers file it themselves
 			+ field('sent_copy', t('InboxSentCopy'), (a.connector_config && a.connector_config.sent_copy) || 'auto', { options: [['auto', t('InboxSentCopy_auto')], ['inbox', t('InboxSentCopy_inbox')], ['server', t('InboxSentCopy_server')]], help: t('InboxSentCopyHelp'), cls: 'ibx-field--medium' })
-			+ '</div></section>'
-			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMore') + '</h2><div class="ibx-form">'
+			+ '</div></section>';
+		const moreSection = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMore') + '</h2><div class="ibx-form">'
 			+ field('sieve_port', t('InboxSievePort'), a.sieve_port, { type: 'number', min: 0, max: 65535, inputmode: 'numeric', help: t('InboxSievePortHelp'), cls: 'ibx-field--narrow' })
 			+ field('sync_max_days', t('InboxSyncMaxDays'), a.sync_max_days, { type: 'number', min: 0, max: 36500, inputmode: 'numeric', help: t('InboxSyncLimitsHelp'), cls: 'ibx-field--narrow' })
 			+ field('sync_max_mails', t('InboxSyncMaxMails'), a.sync_max_mails, { type: 'number', min: 0, max: 1000000, inputmode: 'numeric', cls: 'ibx-field--narrow' })
@@ -1281,7 +1280,14 @@
 			+ '<div class="ibx-formrow__help">' + th('InboxAiOffHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxDictationSection') + '</span><div><label class="ibx-check"><input type="checkbox" name="dictation_off"' + (a.connector_config && a.connector_config.dictation_off ? ' checked' : '') + '> ' + th('InboxDictationOff') + '</label>'
 			+ '<div class="ibx-formrow__help">' + th('InboxDictationOffHelp') + '</div></div></div>'
-			+ '</div></section>'
+			+ '</div></section>';
+		const imapTitle = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionImap') + '</h2><div class="ibx-form">';
+		let html = '<form class="ibx-form" novalidate autocomplete="off">' + mailboxSection
+			+ (account ? imapTitle + imapHostRows + authRows + certRow + protRows + '</div></section>' + smtpSection + moreSection
+				// New mailbox (lot H1): one field to start, the login beside it, the servers folded and filled from the address
+				: '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionLogin') + '</h2><div class="ibx-form">' + authRows + '</div></section>'
+				+ '<details class="ibx-servers ibx-js-servers"><summary><span class="ibx-servers__title">' + th('InboxAutoconfigServers') + '</span> <span class="ibx-servers__sum ibx-js-serverssum">' + th('InboxAutoconfigServersEmpty') + '</span></summary>'
+				+ imapTitle + imapHostRows + certRow + '</div></section>' + smtpSection + moreSection + '</details>')
 			+ '<div class="ibx-js-testresult"></div>'
 			+ '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-test">' + ic('check') + ' ' + th('InboxTestConnection') + '</button>'
 			+ '<span class="ibx-formfoot__spacer"></span>'
@@ -1393,8 +1399,14 @@
 			}
 		});
 		ownerPicker(form);
+		autoconfigBind(form, sync);
 		const showErrors = err => {
 			$$('.ibx-formrow.is-invalid', form).forEach(r => r.classList.remove('is-invalid'));
+			// New mailbox: a field to fix among the folded servers opens them
+			const folded = $('.ibx-js-servers', form);
+			if (folded && err.fields && Object.keys(err.fields).some(k => folded.querySelector('[name="' + k + '"]'))) {
+				folded.open = true;
+			}
 			toast(err.message, { error: true });
 		};
 		form.addEventListener('submit', async e => {
@@ -1487,6 +1499,180 @@
 			run.scrollIntoView({ block: 'center' });
 			run.click();
 		}
+	}
+
+	/**
+	 * New mailbox (lot H1): the servers looked for by the server of Dolibarr from the address typed (a mailbox of the
+	 * same domain, file published by the domain, Autodiscover, known providers, ISPDB of Thunderbird, DNS, usual
+	 * names), put in the folded fields with where they come from. Servers changed by hand are never replaced: the
+	 * result is then offered. The connection test checks what was found.
+	 */
+	function autoconfigBind(form, sync) {
+		const zone = $('.ibx-js-autoconf', form);
+		const servers = $('.ibx-js-servers', form);
+		if (!zone || !servers) {
+			return;
+		}
+		const sum = $('.ibx-js-serverssum', form);
+		const FIELDS = ['imap_host', 'imap_port', 'imap_encryption', 'imap_auth_mode', 'oauth_service', 'imap_login', 'smtp_host', 'smtp_port', 'smtp_encryption'];
+		const EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
+		let touched = false;
+		let filling = false;
+		// The servers on screen were put by a previous search (not typed): cleared when another address finds nothing
+		let filled = false;
+		let searched = '';
+		let seq = 0;
+		let timer = 0;
+		let result = null;
+		const paintSum = () => {
+			const v = formValues(form);
+			sum.textContent = v.imap_host ? t('InboxAutoconfigServersSum', v.imap_host + ':' + v.imap_port, (v.smtp_host || v.imap_host) + ':' + v.smtp_port) : t('InboxAutoconfigServersEmpty');
+		};
+		const notice = (kind, icon, body) => '<div class="ibx-notice ibx-notice--' + kind + '"' + (kind === 'error' ? ' role="alert"' : '') + '>' + icon + '<div class="ibx-notice__text">' + body + '</div></div>';
+		const apply = r => {
+			filling = true;
+			const set = (name, value) => {
+				const el = form.elements[name];
+				if (el && value !== undefined && value !== null) {
+					el.value = String(value);
+				}
+			};
+			const email = form.elements.email.value.trim();
+			set('imap_host', r.imap.host);
+			set('imap_port', r.imap.port);
+			set('imap_encryption', r.imap.encryption);
+			set('smtp_host', r.smtp ? r.smtp.host : '');
+			set('smtp_port', r.smtp ? r.smtp.port : (r.imap.encryption === 'ssl' ? 465 : 587));
+			set('smtp_encryption', r.smtp ? r.smtp.encryption : r.imap.encryption);
+			set('imap_auth_mode', r.auth_mode || 'login');
+			set('oauth_service', r.oauth_service || '');
+			set('imap_login', r.login === 'localpart' ? email.slice(0, email.indexOf('@')) : '');
+			sync();
+			filling = false;
+			touched = false;
+			filled = true;
+			paintSum();
+		};
+		const clear = () => {
+			filling = true;
+			['imap_host', 'smtp_host', 'oauth_service', 'imap_login'].forEach(n => {
+				form.elements[n].value = '';
+			});
+			form.elements.imap_port.value = '993';
+			form.elements.imap_encryption.value = 'ssl';
+			form.elements.smtp_port.value = '465';
+			form.elements.smtp_encryption.value = 'ssl';
+			form.elements.imap_auth_mode.value = 'login';
+			sync();
+			filling = false;
+			filled = false;
+			paintSum();
+		};
+		const tried = r => !r.tried || !r.tried.length ? '' : '<details class="ibx-autoconf__tried"><summary>' + th('InboxAutoconfigTried') + '</summary><ul>'
+			+ r.tried.map(x => '<li><span class="ibx-autoconf__src">' + th('InboxAutoconfigTriedSource_' + x.source) + '</span> <span class="ibx-muted">' + esc(x.detail) + '</span> '
+				+ '<span class="ibx-status' + (x.result === 'found' ? ' ibx-status--ok' : '') + '">' + th('InboxAutoconfigTried_' + x.result) + '</span></li>').join('') + '</ul></details>';
+		const ispdbOffer = (r, domain) => !r.ispdb_offer ? '' : '<div class="ibx-autoconf__ispdb"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-ispdb">' + ic('search') + ' ' + th('InboxAutoconfigIspdbAsk') + '</button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxAutoconfigIspdbHelp', domain) + '</div></div>';
+		const paint = (r, email) => {
+			const domain = email.slice(email.indexOf('@') + 1);
+			if (!r.found) {
+				zone.innerHTML = notice('info', ic('info'), '<p>' + th('InboxAutoconfigNone', domain) + '</p>' + ispdbOffer(r, domain) + tried(r));
+				servers.open = true;
+				return;
+			}
+			const label = r.provider_label || '';
+			const detail = r.source === 'provider' ? label : (r.source === 'guess' ? r.imap.host : r.detail);
+			const lines = ['<b>' + th('InboxAutoconfigFound', r.imap.host + ':' + r.imap.port + (r.smtp ? ' · ' + r.smtp.host + ':' + r.smtp.port : '')) + '</b>',
+				th('InboxAutoconfigFoundVia', t('InboxAutoconfigSource_' + r.source, detail)) + ' ' + th('InboxAutoconfigCheck')];
+			let kind = 'info';
+			if (r.source === 'guess') {
+				lines.push(th('InboxAutoconfigGuessWarn'));
+				kind = 'warning';
+			}
+			if (r.insecure) {
+				lines.push(th('InboxAutoconfigInsecure'));
+				kind = 'warning';
+			}
+			(r.notes || []).forEach(n => {
+				if (n === 'oauth') {
+					const s = r.oauth_services.find(x => x.key === r.oauth_service);
+					lines.push(th('InboxAutoconfigOAuth', label, s ? s.label : r.oauth_service));
+				} else if (n === 'oauth_needed') {
+					lines.push(th('InboxAutoconfigOAuthNeeded', label));
+					kind = 'warning';
+				} else if (n === 'oauth_offered') {
+					lines.push(th('InboxAutoconfigOAuthOffered', label));
+				}
+			});
+			if (touched) {
+				lines.push(th('InboxAutoconfigKept'));
+			}
+			zone.innerHTML = notice(kind, ic(kind === 'warning' ? 'warning' : 'info'), lines.map(l => '<p>' + l + '</p>').join('')
+				+ '<div class="ibx-autoconf__actions">' + (touched ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-use">' + th('InboxAutoconfigUse') + '</button>' : '')
+				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-show">' + th('InboxAutoconfigShow') + '</button></div>'
+				+ ispdbOffer(r, domain) + tried(r));
+		};
+		const search = async ispdb => {
+			const email = form.elements.email.value.trim().toLowerCase();
+			if (!EMAIL.test(email) || (email === searched && !ispdb)) {
+				return;
+			}
+			searched = email;
+			const mine = ++seq;
+			zone.innerHTML = '<div class="ibx-notice ibx-notice--info" role="status"><span class="ibx-spinner" aria-hidden="true"></span><div class="ibx-notice__text">' + th('InboxAutoconfigSearching', email.slice(email.indexOf('@') + 1)) + '</div></div>';
+			try {
+				const r = (await post('account', 'discover', { email, ispdb: ispdb ? 1 : 0 })).discover;
+				if (mine !== seq) {
+					return;
+				}
+				result = r;
+				if (r.found && !touched) {
+					apply(r);
+				} else if (!r.found && filled && !touched) {
+					clear();
+				}
+				paint(r, email);
+			} catch (err) {
+				if (mine !== seq) {
+					return;
+				}
+				searched = '';
+				zone.innerHTML = notice('error', ic('warning'), th('InboxAutoconfigError', err.message));
+				servers.open = true;
+			}
+		};
+		const onEdit = e => {
+			if (!filling && FIELDS.includes(e.target.name)) {
+				touched = true;
+			}
+			paintSum();
+		};
+		form.addEventListener('input', e => {
+			onEdit(e);
+			if (e.target.name === 'email') {
+				clearTimeout(timer);
+				timer = setTimeout(() => search(false), 1000);
+			}
+		});
+		form.addEventListener('change', e => {
+			onEdit(e);
+			if (e.target.name === 'email') {
+				clearTimeout(timer);
+				search(false);
+			}
+		});
+		zone.addEventListener('click', e => {
+			if (e.target.closest('.ibx-js-ispdb')) {
+				search(true);
+			} else if (e.target.closest('.ibx-js-use') && result && result.found) {
+				apply(result);
+				paint(result, searched);
+			} else if (e.target.closest('.ibx-js-show')) {
+				servers.open = true;
+				servers.scrollIntoView({ block: 'start', behavior: 'smooth' });
+			}
+		});
+		paintSum();
 	}
 
 	function ownerPicker(form) {
@@ -2590,7 +2776,7 @@
 		if (!lines.length) {
 			return '<p class="ibx-muted">' + th('InboxJournalEmpty') + '</p>';
 		}
-		const fmt = ts => new Date(ts * 1000).toLocaleString();
+		const fmt = ts => new Date(ts * 1000).toLocaleString(I.locale());
 		const describe = l => {
 			const v = Object.assign({}, l.before, l.after);
 			switch (l.action) {
@@ -3261,18 +3447,18 @@
 		}
 		if (st.error && stateCls === 'error') {
 			html += '<div class="ibx-notice ibx-notice--error" role="alert">' + ic('warning') + '<div class="ibx-notice__text"><b>' + th('InboxSyncState_' + st.state) + '</b> : ' + esc(st.error)
-				+ (st.retry_at ? '<br>' + th('InboxSyncRetryAt', new Date(st.retry_at * 1000).toLocaleTimeString()) : '') + '</div></div>';
+				+ (st.retry_at ? '<br>' + th('InboxSyncRetryAt', new Date(st.retry_at * 1000).toLocaleTimeString(I.locale())) : '') + '</div></div>';
 		}
 		html += '<div class="ibx-form"><div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>'
 			+ (st.state ? '<span class="ibx-status' + (stateCls ? ' ibx-status--' + stateCls : '') + '">' + th('InboxSyncState_' + st.state) + '</span>' : '<span class="ibx-status">' + th('InboxSyncWaiting') + '</span>')
 			+ (st.running ? ' · ' + th('InboxSyncRunning') : '') + (st.date_sync ? ' · ' + th('InboxSyncLast', ago(st.date_sync)) : '') + '</div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSyncIndexed') + '</span><div>'
 			+ '<progress max="100" value="' + pct + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxSyncIndexed') + '"></progress> '
-			+ th('InboxSyncIndexedOf', st.progress.indexed.toLocaleString(), st.progress.total.toLocaleString())
+			+ th('InboxSyncIndexedOf', st.progress.indexed.toLocaleString(I.locale()), st.progress.total.toLocaleString(I.locale()))
 			+ (st.progress.first_sync_left ? ' · ' + th('InboxSyncFoldersLeft', st.progress.first_sync_left) : '') + '</div></div>'
 				+ (st.quota ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxQuota') + '</span><div>'
 					+ '<meter min="0" max="' + st.quota.limit + '" low="' + Math.round(st.quota.limit * 0.8) + '" high="' + Math.round(st.quota.limit * 0.9) + '" optimum="0" value="' + st.quota.used + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxQuota') + '"></meter> '
-					+ th('InboxQuotaUsed', (st.quota.used / 1024).toLocaleString(undefined, { maximumFractionDigits: 0 }), (st.quota.limit / 1024).toLocaleString(undefined, { maximumFractionDigits: 0 }), Math.round(100 * st.quota.used / st.quota.limit))
+					+ th('InboxQuotaUsed', (st.quota.used / 1024).toLocaleString(I.locale(), { maximumFractionDigits: 0 }), (st.quota.limit / 1024).toLocaleString(I.locale(), { maximumFractionDigits: 0 }), Math.round(100 * st.quota.used / st.quota.limit))
 					+ (st.quota.used >= st.quota.limit * 0.9 ? ' <span class="ibx-status ibx-status--warning">' + th('InboxQuotaAlmostFull', Math.round(100 * st.quota.used / st.quota.limit)) + '</span>' : '')
 					+ '</div></div>' : '')
 				+ '</div>';
@@ -3289,8 +3475,8 @@
 					+ (f.error ? '<div class="ibx-formrow__error">' + esc(f.error) + '</div>' : '') + '</td>'
 					+ '<td>' + (f.selectable ? '<button type="button" class="ibx-switch" role="switch" data-folder="' + f.id + '" aria-checked="' + (f.sync_enabled ? 'true' : 'false')
 						+ '" aria-label="' + th('InboxSyncFollowed') + ' ' + esc(f.label) + '"></button>' : '<span class="ibx-muted">-</span>') + '</td>'
-					+ '<td>' + esc(f.total.toLocaleString()) + (f.unread ? ' <span class="ibx-muted">(' + th('InboxSyncUnread', f.unread) + ')</span>' : '') + '</td>'
-					+ '<td>' + (f.sync_enabled ? esc(f.indexed.toLocaleString()) + (f.first_sync_done ? '' : ' <span class="ibx-status ibx-status--warning">' + th('InboxSyncInProgress') + '</span>') : '<span class="ibx-muted">-</span>') + '</td>'
+					+ '<td>' + esc(f.total.toLocaleString(I.locale())) + (f.unread ? ' <span class="ibx-muted">(' + th('InboxSyncUnread', f.unread) + ')</span>' : '') + '</td>'
+					+ '<td>' + (f.sync_enabled ? esc(f.indexed.toLocaleString(I.locale())) + (f.first_sync_done ? '' : ' <span class="ibx-status ibx-status--warning">' + th('InboxSyncInProgress') + '</span>') : '<span class="ibx-muted">-</span>') + '</td>'
 					+ '<td class="ibx-muted">' + (f.date_sync ? esc(ago(f.date_sync)) : '-') + '</td></tr>').join('')
 				+ '</tbody></table>';
 		}
@@ -3560,6 +3746,7 @@
 		['INBOX_AI_ENABLED', 'InboxAiEnabled', 'ai', '#/settings/general/ai'],
 		['INBOX_DICTATION_ENABLED', 'InboxDictationEnabled', 'dictation', '#/settings/general/dictation'],
 		['INBOX_RSPAMD_DNSLISTS', 'InboxRspamdDnsLists', 'dnslists', '#/settings/antispam/settings'],
+		['INBOX_AUTOCONFIG_ISPDB', 'InboxAutoconfigIspdbSetting', 'ispdb', '#/settings/general/newbox'],
 	];
 	function outsideServices(s) {
 		return '<section class="ibx-section ibx-outside" data-section="outside"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxOutsideTitle') + '</h2>'
@@ -3785,7 +3972,7 @@
 		const urlLock = name => (locked(name) ? ' readonly aria-describedby="g-rsurlhelp"' : '');
 		return '<section class="ibx-section" data-section="engine"><h2 class="ibx-section__title">' + ic('shield') + ' ' + I.thTerms('InboxRspamdSection') + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxRspamdHelp') + '</p>'
-			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(), st.error.message) + '</div></div>' : '')
+			+ (st.error ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxRspamdError', new Date(st.error.since * 1000).toLocaleString(I.locale()), st.error.message) + '</div></div>' : '')
 			+ row(th('InboxRspamdEnabled'), sw('INBOX_RSPAMD_ENABLED', t('InboxRspamdEnabled'), false), th('InboxRspamdEnabledHelp'))
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="g-rsurl">' + th('InboxRspamdUrl') + '</label><div><input class="ibx-field ibx-field--medium" type="text" id="g-rsurl" data-name="INBOX_RSPAMD_URL" autocomplete="off" spellcheck="false" value="' + esc(s.INBOX_RSPAMD_URL) + '"' + urlLock('INBOX_RSPAMD_URL') + '>'
 				+ (locked('INBOX_RSPAMD_URL') ? '<div class="ibx-formrow__help" id="g-rsurlhelp">' + th('InboxRspamdUrlAdminHelp') + '</div>' : '') + '</div></div>'
@@ -3979,6 +4166,12 @@
 			+ [['INBOX_AVATAR_DOLIBARR', 'InboxAvatarDolibarr'], ['INBOX_AVATAR_BIMI', 'InboxAvatarBimi'], ['INBOX_AVATAR_GRAVATAR', 'InboxAvatarGravatar']].map(([k, label]) => '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th(label) + '</span><div>'
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
+			+ '</div></section>'
+			// New mailboxes (lot H1): the ISPDB of Thunderbird asked at each search, else offered by a click
+			+ '<section class="ibx-section" data-section="newbox">' + title('newbox') + '<p class="ibx-section__help">' + th('InboxAutoconfigSectionHelp') + '</p><div class="ibx-form">'
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAutoconfigIspdbSetting') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_AUTOCONFIG_ISPDB" aria-checked="' + (s.INBOX_AUTOCONFIG_ISPDB === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxAutoconfigIspdbSetting') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxAutoconfigIspdbSettingHelp') + '</div></div></div>'
 			+ '</div></section>'
 			// AI in the writing (1.27.0): through the AI module of Dolibarr, off by default
 			+ '<section class="ibx-section" data-section="ai">' + title('ai')
@@ -4874,7 +5067,7 @@
 			box.innerHTML = html + '<p class="ibx-muted">' + th('InboxServerCronNone') + '</p>';
 			return;
 		}
-		const when = ts => (ts ? '<span title="' + esc(new Date(ts * 1000).toLocaleString()) + '">' + esc(ago(ts)) + '</span>' : '<span class="ibx-muted">' + th('InboxServerCronNever') + '</span>');
+		const when = ts => (ts ? '<span title="' + esc(new Date(ts * 1000).toLocaleString(I.locale())) + '">' + esc(ago(ts)) + '</span>' : '<span class="ibx-muted">' + th('InboxServerCronNever') + '</span>');
 		html += '<div class="ibx-tablewrap"><table class="ibx-table ibx-crontable"><thead><tr><th>' + th('InboxServerCronJob') + '</th><th>' + th('InboxServerCronActive') + '</th><th>' + th('InboxServerCronEvery')
 			+ '</th><th>' + th('InboxServerCronLast') + '</th><th>' + th('InboxServerCronNext') + '</th></tr></thead><tbody>'
 			+ jobs.map(j => '<tr>'
@@ -5198,7 +5391,7 @@
 			+ '<div class="ibx-formrow__help">' + th('InboxMeiliIndexBoxHelp') + '</div></div></div>'
 			+ (st.on ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMeiliProgress') + '</span><div>'
 				+ '<progress max="100" value="' + pct + '" style="width:16rem;vertical-align:middle" aria-label="' + th('InboxMeiliProgress') + '"></progress> '
-				+ th('InboxSyncIndexedOf', st.sent.toLocaleString(), st.total.toLocaleString())
+				+ th('InboxSyncIndexedOf', st.sent.toLocaleString(I.locale()), st.total.toLocaleString(I.locale()))
 				+ ' <span class="ibx-status' + (st.state === 'ready' ? ' ibx-status--ok' : ' ibx-status--warning') + '">' + th('InboxMeiliState_' + (st.state || 'indexing')) + '</span>'
 				+ (st.error ? '<div class="ibx-formrow__error">' + esc(st.error) + '</div>' : '') + '</div></div>' : '')
 			+ '</div></section>';
