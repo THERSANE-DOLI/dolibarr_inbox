@@ -336,4 +336,19 @@ class InboxAjaxSecurityTest extends InboxTestCase
 			dolibarr_set_const($this->db, 'INBOX_DICTATION_ENABLED', $before === '' ? '0' : $before, 'chaine', 0, '', $conf->entity);
 		}
 	}
+
+	/**
+	 * DMARC reports (1.111.0): session required, a mail out of reach is 404, values checked before any DNS query
+	 *
+	 * @return void
+	 */
+	public function testDmarcEndpoint()
+	{
+		$this->assertSame(401, $this->call('/custom/inbox/ajax/dmarc.php?action=analyze&id=1&part=0', null, false)['code']);
+		$this->login();
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/dmarc.php?action=analyze&id=999999999&part=0')['code']);
+		$this->assertSame(422, $this->call('/custom/inbox/ajax/dmarc.php?action=dns&domain='.rawurlencode('x y;rm'))['code']);
+		$this->assertSame(422, $this->call('/custom/inbox/ajax/dmarc.php?action=ptr&ip=not-an-ip')['code']);
+		$this->assertSame(404, $this->call('/custom/inbox/ajax/dmarc.php?action=other')['code']);
+	}
 }

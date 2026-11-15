@@ -258,6 +258,7 @@ class InboxReader
 		$links = $trusted->linkVerdicts($message->bodyHtml, $message->bodyText, $canTrust);
 		$senderCheck = $this->senderCheck($raw);
 		require_once __DIR__.'/inboxbankcheck.class.php';
+		require_once __DIR__.'/inboxdmarc.class.php';
 		// Data sources (1.72.0): the requester read again from all the headers (a mail indexed before its source was
 		// declared, a source changed since); the index follows, so does its thirdparty unless chosen by hand
 		require_once __DIR__.'/inboxdatasource.class.php';
@@ -322,6 +323,9 @@ class InboxReader
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
 			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
 			'invite' => $this->inviteView($user, $message),
+			// DMARC aggregate report (1.111.0): found by the names of the attachments and the subject, nothing unpacked
+			// here; the analysis is asked by the dialog (ajax/dmarc.php)
+			'dmarc' => InboxDmarc::detect($message->subject, $attachments),
 			'receipt' => InboxReceipt::view($this, $headers, $params->get($user, 'mdn_mode')),
 			// Users of Dolibarr among the addresses of the mail: their name, photo and card in the head of the mail
 			'people' => (object) $this->people($user, array_merge(array($message->fromEmail), array_column($message->to, 'email'), array_column($message->cc, 'email'))),

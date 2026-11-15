@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: DMARC aggregate reports read in one click from the email that holds them :   1.111.0
+  - a bar « DMARC report » above the email, « Analyze »: figures, sources by IP, records, current DNS on a click.
+  - « Your servers fail »: a server allowed by the SPF whose DKIM does not pass; spoofing counted, no alert.
+  - hostile until proven: ceilings on unpacking, XML without DTD, values typed, nothing stored.
+
 - FIX: editor of the writing on Tiptap 3.33.1 :   1.110.2
   - bundle of Tiptap shipped in the module (js/vendor/tiptap) rebuilt from 3.32.0 to 3.33.1, fixes of the editor
     upstream; nothing changes in the use.

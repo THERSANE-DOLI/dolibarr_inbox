@@ -3404,3 +3404,125 @@ InboxSideClose = Spalte schließen
 InboxInviteKnown = Bereits in Ihrem Kalender
 InboxInviteKnownHelp = Ihre Antwort wird im Kalender von Dolibarr gespeichert, aus diesem Postfach wird keine E-Mail gesendet.
 InboxInviteKnownOpen = Termin öffnen
+
+# DMARC aggregate reports (1.111.0)
+InboxDmarcReport = DMARC-Bericht
+InboxDmarcBy = gesendet von %s
+InboxDmarcPeriod = %s bis %s
+InboxDmarcAnalyze = Analysieren
+InboxDmarcTitle = DMARC-Bericht: %s
+InboxDmarcLoading = Wird gelesen…
+InboxDmarcTabSources = Quellen
+InboxDmarcTabRecords = Datensätze
+InboxDmarcTabDns = DNS
+InboxDmarcOwnTitle = Ihre Server schlagen fehl
+InboxDmarcOwnFailure = %s sendet für %s (%s Nachrichten), aber seine DKIM-Signatur besteht nicht
+InboxDmarcOwnHelp = Ihr [[spf:SPF]] erlaubt diesen Server: Er gehört Ihnen oder ist ein von Ihnen eingetragener Dienst. Prüfen Sie seinen [[dkim:DKIM]]-Schlüssel im DNS (veröffentlicht, unverändert) und die Signatur der E-Mails auf dem Server.
+InboxDmarcCheckDns = DNS prüfen
+InboxDmarcNotProven = Dieser Bericht ist nicht nachgewiesen: Sein Absender ist nicht authentifiziert ([[dmarc:DMARC]] oder [[dkim:DKIM]] seiner Domain), sein Inhalt kann erfunden sein.
+InboxDmarcForeign = Dieser Bericht betrifft %s, keine Domain Ihrer Postfächer: Jemand hat vielleicht eine Ihrer Adressen in seinen DMARC-Eintrag gesetzt oder einen gefälschten Bericht gesendet.
+InboxDmarcSpoofInfo = %s Nachrichten aus anderen Quellen sind fehlgeschlagen. Mit einer Richtlinie quarantine oder reject sortieren die Empfänger sie aus: nichts zu tun.
+InboxDmarcPartial = Sehr großer Bericht: Nur ein Teil wurde gelesen.
+InboxDmarcRowsCut = Nur %s Zeilen werden angezeigt, Fehler zuerst: Nutzen Sie die Suche oder den Filter für die übrigen.
+InboxDmarcReporter = Berichterstatter
+InboxDmarcPeriodLabel = Zeitraum
+InboxDmarcDomain = Domain
+InboxDmarcPolicy = Veröffentlichte Richtlinie
+InboxDmarcKpiMessages = Nachrichten
+InboxDmarcKpiSources = Quell-IPs
+InboxDmarcKpiCompliant = DMARC-konform
+InboxDmarcKpiDkim = DKIM ausgerichtet
+InboxDmarcKpiSpf = SPF ausgerichtet
+InboxDmarcKpiQuarantine = In Quarantäne
+InboxDmarcKpiReject = Abgelehnt
+InboxDmarcSearch = Suchen (IP, Name, Domain, Selektor)
+InboxDmarcFailuresOnly = Nur Fehler
+InboxDmarcPass = konform
+InboxDmarcFail = schlägt fehl
+InboxDmarcShowName = Namen anzeigen
+InboxDmarcNoName = kein Name
+InboxDmarcNoRow = Keine passende Zeile.
+InboxDmarcColIp = Quell-IP
+InboxDmarcColName = Name
+InboxDmarcColMessages = Nachrichten
+InboxDmarcColResult = DMARC
+InboxDmarcColSigners = Signiert von
+InboxDmarcColCause = Warum
+InboxDmarcColDisposition = Angewendet
+InboxDmarcColFrom = From
+InboxDmarcColDkim = DKIM
+InboxDmarcColSpf = SPF
+InboxDmarcOurs = Ihrer
+InboxDmarcEnvelope = Umschlag: %s
+InboxDmarcNone = keine
+InboxDmarcAligned = ausgerichtet
+InboxDmarcNotAligned = nicht ausgerichtet
+InboxDmarcDisposition_none = zugestellt
+InboxDmarcDisposition_quarantine = in Quarantäne
+InboxDmarcDisposition_reject = abgelehnt
+InboxDmarcCause_nodkim = keine DKIM-Signatur
+InboxDmarcCause_dkim_other = DKIM von einer anderen Domain signiert
+InboxDmarcCause_dkim_fail = DKIM-Signatur ungültig
+InboxDmarcCause_spf_other = SPF gültig für eine andere Domain
+InboxDmarcCause_spf_fail = SPF: Server nicht erlaubt
+InboxDmarcCause_forwarded = Weiterleitung oder Mailingliste
+InboxDmarcDnsNote = Aktuelle Einträge, vom Server abgefragt: Sie können von denen zum Zeitpunkt des Berichts abweichen.
+InboxDmarcDnsRun = Aktuelles DNS von %s prüfen
+InboxDmarcDnsAgain = Erneut prüfen
+InboxDmarcDnsDmarc = DMARC
+InboxDmarcDnsSpf = SPF
+InboxDmarcDnsDkimTitle = DKIM
+InboxDmarcDnsDkim = DKIM, Selektor %s
+InboxDmarcDnsKey = %s-Schlüssel mit %s Bit
+InboxDmarcDnsNoSelector = Kein DKIM-Selektor der Domain in diesem Bericht.
+InboxDmarcCheck_dns_error = Das DNS hat nicht geantwortet
+InboxDmarcCheck_dns_inherited = Kein Eintrag auf der Subdomain: Richtlinie geerbt von %s
+InboxDmarcCheck_dmarc_none = Kein DMARC-Eintrag auf %s
+InboxDmarcCheck_dmarc_multiple = %s DMARC-Einträge: Die Empfänger ignorieren alle
+InboxDmarcCheck_dmarc_bad_version = Der Eintrag muss mit v=DMARC1 beginnen
+InboxDmarcCheck_dmarc_bad_p = Richtlinie (p=) fehlt oder ist ungültig
+InboxDmarcCheck_dmarc_p_none = p=none: nur Überwachung, gefälschte Nachrichten werden weiterhin zugestellt
+InboxDmarcCheck_dmarc_p_quarantine = p=quarantine: fehlgeschlagene Nachrichten landen im Spam
+InboxDmarcCheck_dmarc_p_reject = p=reject: fehlgeschlagene Nachrichten werden abgelehnt
+InboxDmarcCheck_dmarc_sp_weaker = Die Richtlinie der Subdomains sp=%s ist schwächer als p=%s
+InboxDmarcCheck_dmarc_pct = pct=%s: Die Richtlinie gilt nur für einen Teil der fehlgeschlagenen Nachrichten
+InboxDmarcCheck_dmarc_no_rua = Keine rua=-Adresse: Sie erhalten keine Sammelberichte
+InboxDmarcCheck_dmarc_rua_ok = Sammelberichte gehen an %s
+InboxDmarcCheck_dmarc_rua_auth = Sammelberichte gehen an %s (externes Ziel erlaubt)
+InboxDmarcCheck_dmarc_rua_unauth = Die Berichte an %s werden nicht gesendet: Das externe Ziel hat den Eintrag %s nicht veröffentlicht
+InboxDmarcCheck_dmarc_rua_unknown = Die Erlaubnis des externen Ziels %s konnte nicht geprüft werden
+InboxDmarcCheck_spf_none = Kein SPF-Eintrag
+InboxDmarcCheck_spf_multiple = %s SPF-Einträge: SPF ist fehlerhaft (permerror)
+InboxDmarcCheck_spf_all_pass = +all: Jeder Server der Welt darf senden
+InboxDmarcCheck_spf_all_neutral = ?all: Nicht aufgeführte Server sind weder erlaubt noch abgelehnt
+InboxDmarcCheck_spf_all_soft = ~all: Nicht aufgeführte Server erhalten ein softfail
+InboxDmarcCheck_spf_all_fail = -all: Nicht aufgeführte Server werden abgelehnt
+InboxDmarcCheck_spf_no_all = Kein abschließendes all (noch redirect=): Nicht aufgeführte Server sind neutral
+InboxDmarcCheck_spf_redirect = Richtlinie an %s delegiert (redirect=)
+InboxDmarcCheck_spf_ptr = Der Mechanismus ptr ist nicht empfohlen und langsam
+InboxDmarcCheck_dkim_missing = Kein Schlüssel für diesen Selektor veröffentlicht
+InboxDmarcCheck_dkim_multiple = Mehrere Einträge für diesen Selektor
+InboxDmarcCheck_dkim_bad = DKIM-Eintrag ungültig
+InboxDmarcCheck_dkim_revoked = Schlüssel widerrufen (p= leer)
+InboxDmarcCheck_dkim_ok = Gültiger Schlüssel
+InboxDmarcCheck_dkim_weak = %s Bit: zu schwach, verwenden Sie 2048 Bit
+InboxDmarcCheck_dkim_1024 = %s Bit: 2048 Bit empfohlen
+InboxDmarcCheck_dkim_size_unknown = Schlüsselgröße unbekannt
+InboxDmarcCheck_dkim_test = Testmodus (t=y): Die Empfänger können DKIM-Fehler ignorieren
+InboxDmarcTooBig = Dieser Bericht ist zu groß, um hier gelesen zu werden.
+InboxDmarcUnknownFormat = Dieser Anhang ist weder XML noch gzip noch zip.
+InboxDmarcNoZlib = Die PHP-Erweiterung zlib fehlt: Der Bericht kann nicht entpackt werden.
+InboxDmarcNoZip = Die PHP-Erweiterung zip fehlt: Der Bericht kann nicht entpackt werden.
+InboxDmarcUnreadable = Dieser Bericht ist nicht lesbar (beschädigte Datei).
+InboxDmarcTooManyFiles = Dieses Archiv enthält zu viele Dateien für einen DMARC-Bericht.
+InboxDmarcNested = Ein Archiv im Archiv wird abgelehnt.
+InboxDmarcEmpty = Kein DMARC-Bericht in diesem Anhang.
+InboxDmarcDoctype = Dieses XML deklariert eine DTD oder Entitäten: aus Sicherheitsgründen abgelehnt.
+InboxDmarcNoXml = Die XML-Erweiterungen von PHP fehlen: Der Bericht kann nicht gelesen werden.
+InboxDmarcNotReport = Dieses XML ist kein DMARC-Bericht.
+InboxDmarcBadDomain = Ungültiger Domainname.
+InboxDmarcBadIp = Ungültige IP-Adresse.
+InboxDmarcDnsLimit = Zu viele DNS-Abfragen in der letzten Stunde: Versuchen Sie es später erneut.
+InboxDmarcOutsideLabel = Prüfungen der DMARC-Berichte
+InboxOutsideWhat_dmarcdns = Die Domain eines Berichts und die IP-Adressen, deren Name abgefragt wird, an die DNS-Server dieser Domains und Netze
+InboxOutsideOnClick = Nur auf Klick
