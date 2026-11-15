@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: editor of the writing on Tiptap 3.33.1 :   1.110.2
+  - bundle of Tiptap shipped in the module (js/vendor/tiptap) rebuilt from 3.32.0 to 3.33.1, fixes of the editor
+    upstream; nothing changes in the use.
+
 - FIX: a long call of inbox no longer makes the other pages of the user wait :   1.110.1
   - a read lets the PHP session go at once: a mail read on the server or an archive checked by the antivirus kept
     the session, and every other call of the user (the agenda, the notifications of Dolibarr) waited behind it.
