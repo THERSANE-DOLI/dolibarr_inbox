@@ -7,14 +7,14 @@
     "build": "node build.mjs"
   },
   "devDependencies": {
-    "@tiptap/core": "3.32.0",
-    "@tiptap/extension-image": "3.32.0",
-    "@tiptap/extension-table": "3.32.0",
-    "@tiptap/extension-text-align": "3.32.0",
-    "@tiptap/extension-text-style": "3.32.0",
-    "@tiptap/extensions": "3.32.0",
-    "@tiptap/pm": "3.32.0",
-    "@tiptap/starter-kit": "3.32.0",
+    "@tiptap/core": "3.33.1",
+    "@tiptap/extension-image": "3.33.1",
+    "@tiptap/extension-table": "3.33.1",
+    "@tiptap/extension-text-align": "3.33.1",
+    "@tiptap/extension-text-style": "3.33.1",
+    "@tiptap/extensions": "3.33.1",
+    "@tiptap/pm": "3.33.1",
+    "@tiptap/starter-kit": "3.33.1",
     "esbuild": "0.28.2"
   }
 }
