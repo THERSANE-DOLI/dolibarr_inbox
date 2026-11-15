@@ -27,6 +27,11 @@ jobs:
       MODULE: inbox
       DESCRIPTOR: core/modules/modInbox.class.php
       TITLE: Inbox
+      # Copy of the zip on SourceForge (download stats), skipped while the secret SF_SSH_KEY is not set
+      SF_PROJECT: ${{ secrets.SF_SSH_KEY != '' && 'inbox-for-dolibarr' || '' }}
+      SF_USER: ${{ vars.SF_USER }}
+      SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
+      SF_API_KEY: ${{ secrets.SF_API_KEY }}
     steps:
       - name: Source
         uses: actions/checkout@v4

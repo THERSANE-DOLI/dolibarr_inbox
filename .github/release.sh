@@ -114,3 +114,29 @@ awk -v hi="$v" -v lo="$from" -v first="$xy.0" '
 
 gh release create "v$v" "$zip" --title "$TITLE $v" --notes-file "$work/notes.md" --target "$sha" --latest="$latest"
 echo "::notice::Published v$v (latest: $latest)"
+
+# Optional copy on SourceForge (download stats): only the releases of stable (never the fixes of a series X.Y),
+# and only when SF_PROJECT is set. The zip goes by rsync over SSH
+# (SF_USER + private key SF_SSH_KEY) into the folder X.Y.Z of the project files; when the release is Latest, the
+# Release API key SF_API_KEY (optional) makes it the default download of every platform.
+# Never fatal: the GitHub release is already published, a failure only leaves a warning with the command to replay.
+sf_publish() {
+	local key="$work/sf_key" dest="/home/frs/project/$SF_PROJECT/$v/"
+	(umask 077 && printf '%s\n' "${SF_SSH_KEY:?}" > "$key") || return 1
+	rsync -e "ssh -i $key -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$work/known_hosts" \
+		"$zip" "${SF_USER:?}@frs.sourceforge.net:$dest" || return 1
+	if [ "$latest" = true ] && [ -n "${SF_API_KEY:-}" ]; then
+		curl -fsS -X PUT -H 'Accept: application/json' \
+			-d default=windows -d default=mac -d default=linux -d default=bsd -d default=solaris -d default=others \
+			--data-urlencode "api_key=$SF_API_KEY" \
+			"https://sourceforge.net/projects/$SF_PROJECT/files/$v/$(basename "$zip")" >/dev/null || return 1
+	fi
+}
+if [ "$branch" = stable ] && [ -n "${SF_PROJECT:-}" ]; then
+	if sf_publish; then
+		echo "::notice::Copied on SourceForge: https://sourceforge.net/projects/$SF_PROJECT/files/$v/"
+	else
+		echo "::warning::SourceForge copy failed, replay by hand: rsync $(basename "$zip") <user>@frs.sourceforge.net:/home/frs/project/$SF_PROJECT/$v/"
+	fi
+fi
+rm -f "$work/sf_key"
