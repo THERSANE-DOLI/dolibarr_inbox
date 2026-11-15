@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the last version published is known from Setup > Modules :   1.111.1
+  - « Check the last version » asks the site of inbox, which follows the latest GitHub release.
+
 - NEW: DMARC aggregate reports read in one click from the email that holds them :   1.111.0
   - a bar « DMARC report » above the email, « Analyze »: figures, sources by IP, records, current DNS on a click.
   - « Your servers fail »: a server allowed by the SPF whose DKIM does not pass; spoofing counted, no alert.
