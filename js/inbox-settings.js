@@ -3747,18 +3747,20 @@
 		['INBOX_DICTATION_ENABLED', 'InboxDictationEnabled', 'dictation', '#/settings/general/dictation'],
 		['INBOX_RSPAMD_DNSLISTS', 'InboxRspamdDnsLists', 'dnslists', '#/settings/antispam/settings'],
 		['INBOX_AUTOCONFIG_ISPDB', 'InboxAutoconfigIspdbSetting', 'ispdb', '#/settings/general/newbox'],
+		// Nothing to turn on (1.111.0): the DNS of a DMARC report is asked only when the user clicks, said here
+		['', 'InboxDmarcOutsideLabel', 'dmarcdns', ''],
 	];
 	function outsideServices(s) {
 		return '<section class="ibx-section ibx-outside" data-section="outside"><h2 class="ibx-section__title">' + ic('shield') + ' ' + th('InboxOutsideTitle') + '</h2>'
 			+ '<p class="ibx-muted">' + th('InboxOutsideHelp') + '</p>'
 			+ '<table class="ibx-table"><thead><tr><th>' + th('InboxOutsideService') + '</th><th>' + th('InboxOutsideWhat') + '</th><th>' + th('InboxOutsideState') + '</th><th></th></tr></thead><tbody>'
 			+ OUTSIDE_SERVICES.map(([k, label, id, href]) => {
-				const on = s[k] === '1';
+				const on = k !== '' && s[k] === '1';
 				// Gravatar and BIMI explained by the glossary (their labels are the ones of Settings > General)
 				return '<tr><td data-label="' + th('InboxOutsideService') + '"><b>' + (['gravatar', 'bimi'].includes(id) ? I.term(id, t(label)) : th(label)) + '</b></td>'
 					+ '<td data-label="' + th('InboxOutsideWhat') + '">' + I.thTerms('InboxOutsideWhat_' + id) + '</td>'
-					+ '<td data-label="' + th('InboxOutsideState') + '"><span class="ibx-status' + (on ? ' ibx-status--warning' : '') + '">' + th(on ? 'InboxOutsideOn' : 'InboxOutsideOff') + '</span></td>'
-					+ '<td class="ibx-table__actions"><a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="' + href + '">' + th('InboxOutsideSet') + '</a></td></tr>';
+					+ '<td data-label="' + th('InboxOutsideState') + '"><span class="ibx-status' + (on ? ' ibx-status--warning' : '') + '">' + th(k === '' ? 'InboxOutsideOnClick' : (on ? 'InboxOutsideOn' : 'InboxOutsideOff')) + '</span></td>'
+					+ '<td class="ibx-table__actions">' + (href ? '<a class="ibx-btn ibx-btn--sm ibx-btn--ghost" href="' + href + '">' + th('InboxOutsideSet') + '</a>' : '') + '</td></tr>';
 			}).join('')
 			+ '</tbody></table></section>';
 	}

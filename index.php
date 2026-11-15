@@ -136,6 +136,7 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-editor.js').'" de
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-dictation.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-invite.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-dmarc.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-rules.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-import-qr.js').'" defer></script>'."\n";
 // Scripts of the other modules after the ones of the application (Dolibarr.tools.inbox ready for them)
