@@ -39,6 +39,9 @@ Read before changing anything:
   en_US). Never a customer or company name in user texts.
 - Styles of the application: classes `ibx-*`, variables `--ibx-*`, a new component goes into the catalogue
   (`ux.php`). Icons by usage name (`ic('name')`), see `dev/icons.json`.
+- CSS class names: prefer the BEM naming (`block__element--modifier`, states as `is-*`), as in the application
+  (`ibx-picklist__item`, `ibx-badge--warning`, `is-current`). A preference, not an obligation: follow the code
+  around you, and the classes of Dolibarr on its own pages.
 - Database: `sql/llx_*.sql` + `.key.sql`. The `.key.sql` files run **before** the `update_*.sql` files: an index on a
   column added later goes into the update file. Every step of `init()` must be replayable (disable and enable the
   module is always harmless).

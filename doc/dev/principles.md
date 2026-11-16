@@ -44,7 +44,7 @@ written here.
 | # | Principle |
 |---|---|
 | P19 | **Full screen application** without the menus of Dolibarr; **everything in ajax**, no reload once opened; the address follows the screen (Back, bookmark, F5 open the same screen). |
-| P20 | **Own styles**: the application does not load the theme of Dolibarr; prefixes `ibx-` / `--ibx-`; values only through variables; **catalogue first** (`ux.php`): a new style exists only with its section in the catalogue. |
+| P20 | **Own styles**: the application does not load the theme of Dolibarr; prefixes `ibx-` / `--ibx-`; values only through variables; **catalogue first** (`ux.php`): a new style exists only with its section in the catalogue. Class names: **BEM preferred** (`block__element--modifier`, states `is-*`), a preference rather than a rule. |
 | P21 | **Tabler icons** shipped in the module, by **usage name** (`ibx-i-…`), never the Tabler name in the code. |
 | P22 | **One primary action per area**; destructive actions apart and **undoable** (toast « Undo ») rather than confirmed; definitive only with a confirmation that names the object. |
 | P23 | **Nothing on hover only**; a toggle button shows its state (`aria-pressed`); a forbidden action is **greyed with its reason visible**. |
