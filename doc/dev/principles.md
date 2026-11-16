@@ -60,7 +60,7 @@ written here.
 
 | # | Principle |
 |---|---|
-| P30 | **JavaScript context of Dolibarr**: values through context variables, translations through `Dolibarr.tools.langs`, `Dolibarr.initNewContent()` after an injection; Inbox is a tool (`Dolibarr.tools.inbox`); **never PHP inside JavaScript**; no jQuery. |
+| P30 | **JavaScript context of Dolibarr**: values through context variables, translations through `Dolibarr.tools.langs`, `Dolibarr.initNewContent()` after an injection; Inbox is a tool (`Dolibarr.tools.inbox`); **never PHP inside JavaScript**; no jQuery. HTML built in JavaScript: **`I.html` preferred**, the tagged template that escapes every value (`I.raw()` only for HTML already safe); new code uses it, the existing concatenations are rewritten when a file is reworked. |
 | P31 | **Languages**: en, fr, de, it, es for every key (checked against en_US); texts of the user in the language files, never hard coded. |
 | P32 | **Writing**: comments in English; no em dash anywhere (code, languages, docs); an option cited to the user by its label in the setup. |
 | P33 | **Versions**: X.Y.Z. Y for a new feature or a change that needs the module to be activated again (table, column, right, constant, menu); Z for a fix that only replaces files. One ChangeLog entry per version: a short summary ending with the version, then 1 to 3 short sub-items. |

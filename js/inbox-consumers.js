@@ -23,9 +23,13 @@
 	'use strict';
 
 	const I = Dolibarr.tools.inbox;
-	const { esc, t, th, ic, api, post, toast, dialog, confirmDialog, $, $$ } = I;
+	const { html, raw, t, ic, api, post, toast, dialog, confirmDialog, $, $$ } = I;
 	const skeleton = lines => I.settingsUi.skeleton(lines);
 	const errorBox = (err, retry) => I.settingsUi.errorBox(err, retry);
+	/** Icon of the application, as HTML for html`` */
+	const icon = (name, cls) => raw(ic(name, cls));
+	/** A boolean attribute (checked, hidden...) when cond is true */
+	const attr = (cond, name) => (cond ? raw(' ' + name) : '');
 
 	/** Translation key of an event (mail.received → InboxConsumerEvent_mail_received) */
 	const eventKey = e => 'InboxConsumerEvent_' + String(e).replace(/\./g, '_');
@@ -36,16 +40,16 @@
 	function stateBadge(c) {
 		const g = c.grant;
 		if (!g) {
-			return '<span class="ibx-badge">' + th('InboxConsumerStateNone') + '</span>';
+			return html`<span class="ibx-badge">${t('InboxConsumerStateNone')}</span>`;
 		}
 		if (!c.declared) {
-			return '<span class="ibx-badge ibx-badge--warning">' + th('InboxConsumerStateGone') + '</span>';
+			return html`<span class="ibx-badge ibx-badge--warning">${t('InboxConsumerStateGone')}</span>`;
 		}
 		if (g.paused) {
-			return '<span class="ibx-badge ibx-badge--warning">' + th(g.pause_reason === 'protected' ? 'InboxConsumerStatePausedProtected' : 'InboxConsumerStatePaused') + '</span>';
+			return html`<span class="ibx-badge ibx-badge--warning">${t(g.pause_reason === 'protected' ? 'InboxConsumerStatePausedProtected' : 'InboxConsumerStatePaused')}</span>`;
 		}
-		return g.mode === 'active' ? '<span class="ibx-badge ibx-badge--accent">' + th('InboxConsumerStateActive') + '</span>'
-			: '<span class="ibx-badge">' + th('InboxConsumerStateTest') + '</span>';
+		return g.mode === 'active' ? html`<span class="ibx-badge ibx-badge--accent">${t('InboxConsumerStateActive')}</span>`
+			: html`<span class="ibx-badge">${t('InboxConsumerStateTest')}</span>`;
 	}
 
 	/** What is allowed, in one line */
@@ -56,8 +60,8 @@
 		}
 		const what = g.events.map(e => t(eventKey(e))).concat(g.actions.map(a => t('InboxConsumerAction_' + a)));
 		const where = g.folders.length ? t('InboxConsumerFoldersSome', g.folders.length) : t('InboxConsumerFoldersAll');
-		return '<div class="ibx-muted">' + esc(what.join(', ')) + ' · ' + esc(where) + '</div>'
-			+ '<div class="ibx-muted">' + esc(t('InboxConsumerGrantedBy', g.user || '-', new Date(g.date * 1000).toLocaleDateString(I.locale()))) + '</div>';
+		return html`<div class="ibx-muted">${what.join(', ')} · ${where}</div>
+			<div class="ibx-muted">${t('InboxConsumerGrantedBy', g.user || '-', new Date(g.date * 1000).toLocaleDateString(I.locale()))}</div>`;
 	}
 
 	/** Something the module asks since the decision of the managers */
@@ -75,43 +79,49 @@
 		paint(box, account, data);
 	}
 
+	/** Why the actions are greyed (P23: the reason visible), on each button concerned */
+	const whyAttrs = blocked => (blocked ? html` aria-disabled="true" title="${t(blocked)}"` : '');
+
+	/** Buttons of a line: allow or change, pause or resume, remove */
+	function rowButtons(c, i, blocked) {
+		const g = c.grant;
+		return html`${c.declared && html`<button type="button" class="ibx-btn ibx-btn--sm${attr(!g, 'ibx-btn--primary')}" data-edit="${i}"${whyAttrs(blocked)}>${icon(g ? 'edit' : 'plug')} ${t(g ? 'InboxConsumerChange' : 'InboxConsumerAllow')}</button>`}
+			${g && c.declared && html`<button type="button" class="ibx-btn ibx-btn--sm" data-pause="${i}"${g.paused ? whyAttrs(blocked) : ''}>${t(g.paused ? 'InboxConsumerResume' : 'InboxConsumerPause')}</button>`}
+			${g && html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-revoke="${i}" title="${t('InboxConsumerRevoke')}" aria-label="${t('InboxConsumerRevoke')}">${icon('close')}</button>`}`;
+	}
+
+	/** Notice above the list: switch of the instance off, mailbox that cannot have modules, protected with its password */
+	function notice(data) {
+		const blocked = data.blocked;
+		if (blocked === 'InboxConsumersOff') {
+			return html`<div class="ibx-notice ibx-notice--info">${icon('info')}<div class="ibx-notice__text">${t('InboxConsumersOff')}
+				${data.setup_url ? html`<a href="${data.setup_url}">${t('InboxConsumersOpenSetup')}</a>` : t('InboxConsumersAskAdmin')}</div></div>`;
+		}
+		if (blocked) {
+			return html`<div class="ibx-notice ibx-notice--warning">${icon('lock')}<div class="ibx-notice__text">${t(blocked)}</div></div>`;
+		}
+		if (data.locked_sync) {
+			return html`<div class="ibx-notice ibx-notice--info">${icon('lock')}<div class="ibx-notice__text">${t('InboxConsumersLockedSync')}</div></div>`;
+		}
+		return '';
+	}
+
 	function paint(box, account, data) {
 		const blocked = data.blocked;
-		let html = '<p class="ibx-section__help">' + th('InboxConsumersHelp') + '</p>';
-		if (blocked === 'InboxConsumersOff') {
-			html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxConsumersOff')
-				+ (data.setup_url ? ' <a href="' + esc(data.setup_url) + '">' + th('InboxConsumersOpenSetup') + '</a>' : ' ' + th('InboxConsumersAskAdmin')) + '</div></div>';
-		} else if (blocked) {
-			html += '<div class="ibx-notice ibx-notice--warning">' + ic('lock') + '<div class="ibx-notice__text">' + th(blocked) + '</div></div>';
-		} else if (data.locked_sync) {
-			html += '<div class="ibx-notice ibx-notice--info">' + ic('lock') + '<div class="ibx-notice__text">' + th('InboxConsumersLockedSync') + '</div></div>';
-		}
+		const intro = html`<p class="ibx-section__help">${t('InboxConsumersHelp')}</p>${notice(data)}`;
 		if (!data.consumers.length) {
-			html += '<div class="ibx-empty" style="height:auto">' + ic('plug', 'ibx-empty__icon') + '<div class="ibx-empty__title">' + th('InboxConsumersNone') + '</div><div>' + th('InboxConsumersNoneHelp') + '</div></div>';
-			box.innerHTML = html;
+			box.innerHTML = html`${intro}<div class="ibx-empty" style="height:auto">${icon('plug', 'ibx-empty__icon')}<div class="ibx-empty__title">${t('InboxConsumersNone')}</div><div>${t('InboxConsumersNoneHelp')}</div></div>`;
 			return;
 		}
-		const why = blocked ? ' aria-disabled="true" title="' + th(blocked) + '"' : '';
-		html += '<table class="ibx-table"><thead><tr><th>' + th('InboxConsumerModule') + '</th><th>' + th('InboxConsumerState') + '</th><th><span class="ibx-sr-only">' + th('InboxConsumerRowActions') + '</span></th></tr></thead><tbody>'
-			+ data.consumers.map((c, i) => {
+		box.innerHTML = html`${intro}<table class="ibx-table"><thead><tr><th>${t('InboxConsumerModule')}</th><th>${t('InboxConsumerState')}</th><th><span class="ibx-sr-only">${t('InboxConsumerRowActions')}</span></th></tr></thead><tbody>
+			${data.consumers.map((c, i) => {
 				const g = c.grant;
-				let btns = '';
-				if (c.declared) {
-					btns += '<button type="button" class="ibx-btn ibx-btn--sm' + (g ? '' : ' ibx-btn--primary') + '" data-edit="' + i + '"' + why + '>' + ic(g ? 'edit' : 'plug') + ' ' + th(g ? 'InboxConsumerChange' : 'InboxConsumerAllow') + '</button>';
-				}
-				if (g && c.declared) {
-					btns += ' <button type="button" class="ibx-btn ibx-btn--sm" data-pause="' + i + '"' + (g.paused && blocked ? why : '') + '>' + th(g.paused ? 'InboxConsumerResume' : 'InboxConsumerPause') + '</button>';
-				}
-				if (g) {
-					btns += ' <button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-revoke="' + i + '" title="' + th('InboxConsumerRevoke') + '" aria-label="' + th('InboxConsumerRevoke') + '">' + ic('close') + '</button>';
-				}
-				return '<tr><td><b>' + esc(c.label) + '</b>' + (c.purpose ? '<div class="ibx-muted">' + esc(c.purpose) + '</div>' : '')
-					+ (!c.declared ? '<div class="ibx-muted">' + th('InboxConsumerGoneHelp') + '</div>' : '') + grantSummary(c) + '</td>'
-					+ '<td>' + stateBadge(c) + (g && hasPending(c) ? ' <span class="ibx-badge ibx-badge--warning">' + th('InboxConsumerPending') + '</span>' : '')
-					+ (g && g.last_error ? '<div class="ibx-formrow__error">' + esc(g.last_error) + '</div>' : '') + '</td>'
-					+ '<td class="ibx-table__actions">' + btns + '</td></tr>';
-			}).join('') + '</tbody></table>';
-		box.innerHTML = html;
+				return html`<tr>
+					<td><b>${c.label}</b>${c.purpose && html`<div class="ibx-muted">${c.purpose}</div>`}${!c.declared && html`<div class="ibx-muted">${t('InboxConsumerGoneHelp')}</div>`}${grantSummary(c)}</td>
+					<td>${stateBadge(c)}${g && hasPending(c) && html` <span class="ibx-badge ibx-badge--warning">${t('InboxConsumerPending')}</span>`}${g && g.last_error && html`<div class="ibx-formrow__error">${g.last_error}</div>`}</td>
+					<td class="ibx-table__actions">${rowButtons(c, i, blocked)}</td>
+				</tr>`;
+			})}</tbody></table>`;
 
 		const done = (res, msg) => {
 			toast(msg);
@@ -151,9 +161,7 @@
 
 	/** One checkbox of the dialog; « new » when the module asks it since the decision of the managers */
 	function check(name, value, label, help, checked, isNew) {
-		return '<label class="ibx-check ibx-check--block"><input type="checkbox" name="' + name + '" value="' + esc(value) + '"' + (checked ? ' checked' : '') + '> <span><b>' + esc(label)
-			+ (isNew ? ' <span class="ibx-badge ibx-badge--warning">' + th('InboxConsumerNew') + '</span>' : '') + '</b>'
-			+ (help ? '<span class="ibx-formrow__help">' + esc(help) + '</span>' : '') + '</span></label>';
+		return html`<label class="ibx-check ibx-check--block"><input type="checkbox" name="${name}" value="${value}"${attr(checked, 'checked')}> <span><b>${label}${isNew && html` <span class="ibx-badge ibx-badge--warning">${t('InboxConsumerNew')}</span>`}</b>${help && html`<span class="ibx-formrow__help">${help}</span>`}</span></label>`;
 	}
 
 	/** Allow a module, or change what it is allowed: only what it asks, test mode proposed the first time */
@@ -162,26 +170,30 @@
 		const isNewEvent = e => !!g && c.pending.events.includes(e);
 		const isNewAction = a => !!g && c.pending.actions.includes(a);
 		const limited = !!g && g.folders.length > 0;
+		const mode = g ? g.mode : 'test';
 		// Folders named as everywhere in inbox: the inbox by its role, the others without « INBOX / »
 		const folders = data.folders.map(f => Object.assign({}, f, { name: f.role === 'inbox' ? t('InboxFolderRoleInbox') : f.name.replace(/^INBOX \/ /i, '') }));
-		const body = (c.purpose ? '<p>' + esc(c.purpose) + '</p>' : '')
-			+ '<form class="ibx-js-consumer">'
-			+ '<fieldset class="ibx-fieldset"><legend>' + th('InboxConsumerEvents') + '</legend>'
-			+ c.events.map(e => check('events', e, t(eventKey(e)), t(eventKey(e) + '_help'), g ? g.events.includes(e) : true, isNewEvent(e))).join('') + '</fieldset>'
-			+ (c.actions.length ? '<fieldset class="ibx-fieldset"><legend>' + th('InboxConsumerActions') + '</legend><p class="ibx-formrow__help">' + th('InboxConsumerActionsHelp') + '</p>'
-				+ c.actions.map(a => check('actions', a, t('InboxConsumerAction_' + a), t('InboxConsumerActionHelp_' + a), g ? g.actions.includes(a) : false, isNewAction(a))).join('') + '</fieldset>' : '')
-			+ '<fieldset class="ibx-fieldset"><legend>' + th('InboxConsumerFolders') + '</legend>'
-			+ '<label class="ibx-radio"><input type="radio" name="scope" value="all"' + (limited ? '' : ' checked') + '> ' + th('InboxConsumerFoldersAll') + '</label><br>'
-			+ '<label class="ibx-radio"><input type="radio" name="scope" value="some"' + (limited ? ' checked' : '') + (folders.length ? '' : ' disabled') + '> ' + th('InboxConsumerFoldersOnly') + '</label>'
-			+ '<div class="ibx-js-folders"' + (limited ? '' : ' hidden') + '>'
-			+ (folders.length > FOLDER_SEARCH_FROM ? '<input type="search" class="ibx-field ibx-js-fsearch" autocomplete="off" placeholder="' + th('InboxConsumerFoldersSearch') + '" aria-label="' + th('InboxConsumerFoldersSearch') + '">' : '')
-			+ '<div class="ibx-picklist" role="group" aria-label="' + th('InboxConsumerFolders') + '">'
-			+ folders.map(f => '<label class="ibx-picklist__item ibx-check" data-name="' + esc(f.name.toLowerCase()) + '"><input type="checkbox" name="folders" value="' + f.id + '"' + (g && g.folders.includes(f.id) ? ' checked' : '') + '> ' + esc(f.name) + '</label>').join('')
-			+ '</div></div></fieldset>'
-			+ '<fieldset class="ibx-fieldset"><legend>' + th('InboxConsumerMode') + '</legend>'
-			+ ['test', 'active'].map(m => '<label class="ibx-check ibx-check--block"><input type="radio" name="mode" value="' + m + '"' + ((g ? g.mode : 'test') === m ? ' checked' : '') + '> <span><b>' + th('InboxConsumerMode_' + m) + '</b>'
-				+ '<span class="ibx-formrow__help">' + th('InboxConsumerModeHelp_' + m) + '</span></span></label>').join('')
-			+ '</fieldset></form>';
+		const body = html`${c.purpose && html`<p>${c.purpose}</p>`}
+			<form class="ibx-js-consumer">
+			<fieldset class="ibx-fieldset"><legend>${t('InboxConsumerEvents')}</legend>
+				${c.events.map(e => check('events', e, t(eventKey(e)), t(eventKey(e) + '_help'), g ? g.events.includes(e) : true, isNewEvent(e)))}
+			</fieldset>
+			${c.actions.length > 0 && html`<fieldset class="ibx-fieldset"><legend>${t('InboxConsumerActions')}</legend><p class="ibx-formrow__help">${t('InboxConsumerActionsHelp')}</p>
+				${c.actions.map(a => check('actions', a, t('InboxConsumerAction_' + a), t('InboxConsumerActionHelp_' + a), g ? g.actions.includes(a) : false, isNewAction(a)))}
+			</fieldset>`}
+			<fieldset class="ibx-fieldset"><legend>${t('InboxConsumerFolders')}</legend>
+				<label class="ibx-radio"><input type="radio" name="scope" value="all"${attr(!limited, 'checked')}> ${t('InboxConsumerFoldersAll')}</label><br>
+				<label class="ibx-radio"><input type="radio" name="scope" value="some"${attr(limited, 'checked')}${attr(!folders.length, 'disabled')}> ${t('InboxConsumerFoldersOnly')}</label>
+				<div class="ibx-js-folders"${attr(!limited, 'hidden')}>
+					${folders.length > FOLDER_SEARCH_FROM && html`<input type="search" class="ibx-field ibx-js-fsearch" autocomplete="off" placeholder="${t('InboxConsumerFoldersSearch')}" aria-label="${t('InboxConsumerFoldersSearch')}">`}
+					<div class="ibx-picklist" role="group" aria-label="${t('InboxConsumerFolders')}">
+						${folders.map(f => html`<label class="ibx-picklist__item ibx-check" data-name="${f.name.toLowerCase()}"><input type="checkbox" name="folders" value="${f.id}"${attr(!!g && g.folders.includes(f.id), 'checked')}> ${f.name}</label>`)}
+					</div>
+				</div>
+			</fieldset>
+			<fieldset class="ibx-fieldset"><legend>${t('InboxConsumerMode')}</legend>
+				${['test', 'active'].map(m => html`<label class="ibx-check ibx-check--block"><input type="radio" name="mode" value="${m}"${attr(mode === m, 'checked')}> <span><b>${t('InboxConsumerMode_' + m)}</b><span class="ibx-formrow__help">${t('InboxConsumerModeHelp_' + m)}</span></span></label>`)}
+			</fieldset></form>`;
 		const dlg = dialog({
 			title: t(g ? 'InboxConsumerChangeTitle' : 'InboxConsumerAllowTitle', c.label),
 			body,

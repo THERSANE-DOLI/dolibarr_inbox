@@ -58,6 +58,59 @@
 		return String(text === null || text === undefined ? '' : text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 	}
 
+	/**
+	 * HTML made by html`` or marked by raw(): put as it is in another html``; its string is the HTML (innerHTML,
+	 * concatenation and insertAdjacentHTML take it as a string)
+	 */
+	class SafeHtml {
+		constructor(text) {
+			this.text = text;
+		}
+		toString() {
+			return this.text;
+		}
+	}
+
+	/**
+	 * HTML already safe, put as it is in html`` (output of th(), ic(), of a function that builds escaped HTML). Never a
+	 * value that comes from a mail, a user or the server without escaping
+	 * @param {string} text HTML
+	 * @returns {SafeHtml}
+	 */
+	function raw(text) {
+		return new SafeHtml(text === null || text === undefined ? '' : String(text));
+	}
+
+	/** One value of html``: escaped, unless it is SafeHtml; a list joined; null, undefined, true and false give nothing */
+	function htmlPart(value) {
+		if (value instanceof SafeHtml) {
+			return value.text;
+		}
+		if (Array.isArray(value)) {
+			return value.map(htmlPart).join('');
+		}
+		if (value === null || value === undefined || typeof value === 'boolean') {
+			return '';
+		}
+		return esc(value);
+	}
+
+	/**
+	 * Tagged template that escapes every value: I.html`<b>${name}</b>${I.raw(ic('mail'))}`. Forgetting esc() is no
+	 * longer possible; HTML is let through only with raw() or another html``. ${cond && I.html`...`} shows nothing
+	 * when cond is false
+	 * @param {TemplateStringsArray} strings Parts of the template
+	 * @param {...*} values Values
+	 * @returns {SafeHtml}
+	 */
+	function html(strings, ...values) {
+		let out = strings[0];
+		values.forEach((v, i) => {
+			out += htmlPart(v) + strings[i + 1];
+		});
+		return new SafeHtml(out);
+	}
+
 	/** Translation (keys of langs/xx_XX/inbox.lang); escaped by default for HTML */
 	function t(key, ...args) {
 		const langs = Dolibarr.tools && Dolibarr.tools.langs;
@@ -680,7 +733,7 @@
 
 	// ---------- Tool of the JS context ----------
 	const inbox = {
-		ctx, ctxJson, locale, size, rights, esc, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
+		ctx, ctxJson, locale, size, rights, esc, html, raw, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,

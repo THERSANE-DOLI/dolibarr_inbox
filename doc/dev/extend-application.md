@@ -15,6 +15,15 @@ Dynamic header (CSS computed from a setting...): hook `addInboxHtmlHeader`, cont
 `</head>` like `addHtmlHeader` of Dolibarr (`$this->resprints`, `getNonce()` on the `<style>` and `<script>`). Own
 name on purpose: the modules on `addHtmlHeader` (often context `all`, code for jQuery) never enter the application.
 
+HTML built by a script of a module: `Dolibarr.tools.inbox.html` is a tagged template that escapes every value, so
+that a value of a mail or of a user never becomes HTML by mistake; HTML already safe passes through
+`Dolibarr.tools.inbox.raw()` or another `html` template:
+
+```js
+const { html, raw, ic, t } = Dolibarr.tools.inbox;
+el.innerHTML = html`<span class="mymodule-badge">${raw(ic('tag'))} ${t('MyModuleLabel')}: ${value}</span>`;
+```
+
 Rules for the styles of a module:
 
 - its own classes, prefixed by the name of the module; never restyle the `.ibx-*` classes of the application;

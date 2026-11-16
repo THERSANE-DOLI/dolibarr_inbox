@@ -28,6 +28,10 @@ Read before changing anything:
 - **Nothing leaves the server** without a decision: no CDN, no outside service for the content of the mails.
 - **Never PHP inside JavaScript**: values through the JS context of Dolibarr, translations through
   `Dolibarr.tools.langs`. No jQuery in the application.
+- **HTML built in JavaScript: prefer `I.html`** (`Dolibarr.tools.inbox.html`), a tagged template that escapes every
+  value: ``I.html`<b>${name}</b>${I.raw(ic('mail'))}` ``. HTML passes only through `I.raw()` (never on a value of a
+  mail, a user or the server) or another `I.html`. New code uses it; the concatenations with `esc()` of the existing
+  files are rewritten when a file is reworked, not all at once. Example: `js/inbox-consumers.js`.
 - **No file path from a request parameter**: a page chosen by a parameter is looked up in a declared index
   (example: `class/inboxdocumentation.class.php`).
 - **Settings pages of Dolibarr** (`admin/*.php`) use `FormSetup`, never a hand made table of settings.
