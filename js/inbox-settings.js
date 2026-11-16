@@ -676,6 +676,7 @@
 		{ id: 'usage', key: 'InboxTabUsage', admin: false },
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
 		{ id: 'rules', key: 'InboxTabRules', admin: false },
+		{ id: 'consumers', key: 'InboxTabConsumers', admin: false },
 		{ id: 'away', key: 'InboxTabAway', admin: false },
 		{ id: 'protection', key: 'InboxTabProtection', admin: false },
 		{ id: 'journal', key: 'InboxTabJournal', admin: false },
@@ -693,7 +694,7 @@
 		// Outgoing: what is written (the out of office is a mail written in advance)
 		{ id: 'writing', key: 'InboxTabWriting', sections: ['identities', 'templates', 'away'] },
 		// Incoming: sorted at the arrival, classed, shown beside the mail
-		{ id: 'reception', key: 'InboxTabReception', sections: ['rules', 'tags', 'usage'] },
+		{ id: 'reception', key: 'InboxTabReception', sections: ['rules', 'tags', 'usage', 'consumers'] },
 		{ id: 'journal', key: 'InboxTabJournal', sections: ['journal'] },
 	];
 	/** Name of a section in its chip (the section « access » under the tab Access: the people) */
@@ -729,7 +730,7 @@
 	let card = null;
 	/** Mailbox whose test was asked from the head of the card (button beside the switch): run once its form is there */
 	let testAsked = 0;
-	const TAB_FNS = () => ({ overview: tabOverview, server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), protection: tabProtection, journal: tabJournal });
+	const TAB_FNS = () => ({ overview: tabOverview, server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), consumers: (b, a) => I.consumers.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), protection: tabProtection, journal: tabJournal });
 
 	/**
 	 * Content of a tab, without flash: made aside and put in place once loaded (or after 300 ms, then with its
@@ -2800,6 +2801,15 @@
 					return t(l.after && l.after.ids ? 'InboxLogIndicatorsOwn' : 'InboxLogIndicatorsReset');
 				case 'carriers':
 					return t('InboxLogCarriers');
+				// Modules subscribed (1.112.0): the name of the module, as it was when the line was written
+				case 'consumer_grant':
+				case 'consumer_change':
+				case 'consumer_pause':
+				case 'consumer_resume':
+				case 'consumer_revoke':
+					return t('InboxLog_' + l.action, (l.after && l.after.label) || (l.before && l.before.label) || '');
+				case 'consumer_suspend':
+					return t('InboxLog_consumer_suspend', ((l.after && l.after.labels) || []).join(', '));
 				case 'protect':
 				case 'protect_level':
 				case 'unprotect':

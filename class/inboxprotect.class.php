@@ -24,6 +24,7 @@
 require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxaccountlog.class.php';
+require_once __DIR__.'/inboxconsumer.class.php';
 
 /**
  * A protected mailbox has no password on the server. Its password is encrypted in the browsers (WebCrypto, ECDH P-256
@@ -1001,6 +1002,8 @@ class InboxProtect
 			.($content ? ", sync_state = NULL, sync_error = NULL, date_sync = NULL, date_folders = NULL, sync_lock = NULL, sync_retry_at = NULL, sync_fail_count = 0" : ", sync_retry_at = NULL, sync_fail_count = 0")
 			." WHERE rowid = ".$id);
 		$ok = $ok && (!$content || $this->purgeLocal($id));
+		// Modules subscribed (1.112.0): nothing can run in the background on a mailbox protected with its content
+		$ok = $ok && (!$content || (new InboxConsumer($this->db))->suspendForProtection($user, $id));
 		if ($ok) {
 			$account->protected = 1;
 			$account->protect_level = $level;
@@ -1173,7 +1176,8 @@ class InboxProtect
 		}
 		$this->db->begin();
 		$ok = $this->db->query("UPDATE ".$prefix."inbox_account SET protect_level = '".$this->db->escape($level)."', sync_state = NULL, date_sync = NULL, date_folders = NULL WHERE rowid = ".$id)
-			&& (!$content || $this->purgeLocal($id));
+			&& (!$content || $this->purgeLocal($id))
+			&& (!$content || (new InboxConsumer($this->db))->suspendForProtection($user, $id));
 		if (!$ok) {
 			$this->error = $this->error ?: $this->db->lasterror();
 			$this->db->rollback();
