@@ -155,6 +155,47 @@ print '<br>';
 print '<div class="info">'.$langs->trans('InboxSetupServerMoved').' <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings/server">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxNavServer').'</a></div>';
 print '<br>';
 
+// Modules subscribed to the mailboxes (1.112.0), with FormSetup: the switch of the instance (off by default, saved at
+// once by the ajax switch), then one read-only line per module that declares itself: what it asks, the mailboxes where
+// it runs. Each mailbox has its managers allow each module, in its card
+require_once '../class/inboxconsumer.class.php';
+if (!class_exists('FormSetup')) {
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+}
+$formSetup = new FormSetup($db);
+$item = $formSetup->newItem('INBOX_CONSUMERS_TITLE')->setAsTitle();
+$item->nameText = $langs->trans('InboxConsumersSetupTitle');
+$item = $formSetup->newItem('INBOX_CONSUMERS_ENABLED')->setAsYesNo();
+$item->nameText = $langs->trans('InboxConsumersSetupSwitch');
+$item->helpText = $langs->trans('InboxConsumersSetupHelp');
+$consumerDecl = InboxConsumer::declared();
+$consumerCounts = (new InboxConsumer($db))->counts();
+if (!$consumerDecl && !$consumerCounts) {
+	$item = $formSetup->newItem('INBOX_CONSUMERS_NONE');
+	$item->nameText = $langs->trans('InboxConsumersSetupDeclared');
+	$item->fieldOverride = '<span class="opacitymedium">'.$langs->trans('InboxConsumersNone').'</span>';
+}
+foreach (array_unique(array_merge(array_keys($consumerDecl), array_keys($consumerCounts))) as $consumerCode) {
+	$d = isset($consumerDecl[$consumerCode]) ? $consumerDecl[$consumerCode] : null;
+	$n = isset($consumerCounts[$consumerCode]) ? $consumerCounts[$consumerCode] : array('active' => 0, 'test' => 0, 'paused' => 0);
+	$asks = array();
+	foreach ($d ? $d['events'] : array() as $e) {
+		$asks[] = $langs->trans('InboxConsumerEvent_'.str_replace('.', '_', $e));
+	}
+	foreach ($d ? $d['actions'] : array() as $a) {
+		$asks[] = $langs->trans('InboxConsumerAction_'.$a);
+	}
+	// Read only: a line of information, never a constant
+	$item = $formSetup->newItem('INBOX_CONSUMER_'.strtoupper($consumerCode));
+	$item->nameText = dol_escape_htmltag($d ? $d['label'] : $consumerCode);
+	$item->helpText = $d ? dol_escape_htmltag($d['purpose']) : $langs->trans('InboxConsumerGoneHelp');
+	$item->fieldOverride = ($asks ? $langs->trans('InboxConsumersSetupAsks').' : '.dol_escape_htmltag(implode(', ', $asks)).'<br>' : '')
+		.'<span class="opacitymedium">'.$langs->trans('InboxConsumersSetupCounts', $n['active'], $n['test'], $n['paused']).'</span>';
+}
+print '<span id="consumers"></span>';
+print $formSetup->generateOutput();
+print '<span class="opacitymedium">'.$langs->trans('InboxConsumersSetupWhere').'</span><br><br>';
+
 // Cache: what it holds, emptied on demand
 if ($action == 'clearcache') {
 	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans('InboxClearCache'), $langs->trans('InboxClearCacheConfirm'), 'confirm_clearcache', '', 0, 1);
