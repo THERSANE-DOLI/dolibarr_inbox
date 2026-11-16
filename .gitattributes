@@ -4,3 +4,6 @@
 /.github export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
+# Instructions for the contributors and their coding agents: not needed on an instance
+/AGENTS.md export-ignore
+/CLAUDE.md export-ignore

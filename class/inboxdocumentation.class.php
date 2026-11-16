@@ -63,6 +63,7 @@ class InboxDocumentation
 				'module_subscriptions' => array('icon' => 'fa-plug', 'version' => '1.112.0', 'files' => array('en_US' => 'admin/module-subscriptions.md')),
 			)),
 			'InboxDocGroupDev' => array('icon' => 'fa-code', 'pages' => array(
+				'dev_principles' => array('icon' => 'fa-balance-scale', 'version' => '1.113.0', 'files' => array('en_US' => 'dev/principles.md')),
 				'dev_overview' => array('icon' => 'fa-book', 'version' => '1.0.0', 'files' => array('en_US' => 'dev/README.md')),
 				'dev_extend' => array('icon' => 'fa-puzzle-piece', 'version' => '', 'files' => array('en_US' => 'dev/extend-application.md')),
 				'dev_agenda' => array('icon' => 'fa-calendar-alt', 'version' => '1.107.0', 'files' => array('en_US' => 'dev/agenda.md')),

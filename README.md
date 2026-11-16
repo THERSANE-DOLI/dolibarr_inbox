@@ -8,6 +8,7 @@ Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolconte
 
 - [For administrators](doc/admin/README.md): installation and branches, settings, anti-spam, agenda panel...
 - [For developers](doc/dev/README.md): API, hooks, extending the application, development and tests
+- Contributing, also with a coding agent: [AGENTS.md](AGENTS.md)
 
 Quick install: the zip `module_inbox-X.Y.Z.zip` of the [GitHub releases](https://github.com/THERSANE-DOLI/dolibarr_inbox/releases/latest),
 deployed in Setup > Modules > Deploy an external module; git deployment and branches: [Installation](doc/admin/install.md).
