@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   rspamd:
-    image: rspamd/rspamd:3.11.1
+    image: rspamd/rspamd:4.2.3
     container_name: inbox-rspamd
     depends_on:
       - redis

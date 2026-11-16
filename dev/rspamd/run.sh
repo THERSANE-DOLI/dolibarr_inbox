@@ -12,7 +12,7 @@ if [ "$1" = "stop" ]; then
 	docker compose down
 	exit 0
 fi
-RSPAMD_IMAGE=rspamd/rspamd:3.11.1
+RSPAMD_IMAGE=rspamd/rspamd:4.2.3
 PASSWORD=$RSPAMD_PASSWORD
 if [ -z "$PASSWORD" ]; then
 	PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | cut -c1-24)
@@ -26,7 +26,7 @@ case "$HASH" in
 	*) echo "Hash of the password failed" >&2; exit 1 ;;
 esac
 mkdir -p override.d
-printf 'password = "%s";\nenable_password = "%s";\nbind_socket = "*:11334";\n' "$HASH" "$HASH" > override.d/worker-controller.inc
+printf 'password = "%s";\nenable_password = "%s";\nbind_socket = "*:11334";\nallow_file_and_shm_inputs = false;\n' "$HASH" "$HASH" > override.d/worker-controller.inc
 # Read by the user of Rspamd in the container: readable by all, the password is hashed
 chmod 644 override.d/worker-controller.inc
 docker compose up -d

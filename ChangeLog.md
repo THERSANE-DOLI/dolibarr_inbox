@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: anti-spam engine on Rspamd 4 :   1.113.1
+  - dev/rspamd moves to Rspamd 4.2.3 and Redis 8; verdicts, learning and counters unchanged for inbox.
+  - its new list of equivalent domains read from the image, never from maps.rspamd.com.
+  - no worker reads a file path given in a request; run dev/rspamd/run.sh again to apply it.
+
 - NEW: documentation of the module in its setup, tab Technical documentation :   1.113.0
   - the pages of doc/ by theme, the same as in the repository: administrators, then developers of modules.
 
