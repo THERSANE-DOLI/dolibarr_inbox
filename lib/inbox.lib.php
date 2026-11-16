@@ -45,6 +45,12 @@ function inboxAdminPrepareHead()
 	$head[$h][2] = 'readlog';
 	$h++;
 
+	// Documentation of the administrators (doc/admin), the same pages as in the repository (1.113.0)
+	$head[$h][0] = dol_buildpath("/inbox/admin/doc.php", 1);
+	$head[$h][1] = $langs->trans("InboxDocTab");
+	$head[$h][2] = 'doc';
+	$h++;
+
 	// Catalogue of the components of the interface: a page for the developers and the admins, not in the application
 	$head[$h][0] = dol_buildpath("/inbox/ux.php", 1);
 	$head[$h][1] = $langs->trans("InboxCatalogue");

@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: documentation of the module in its setup, tab Technical documentation :   1.113.0
+  - the pages of doc/ by theme, the same as in the repository: administrators, then developers of modules.
+
 - NEW: modules allowed mailbox by mailbox before they react to the mails :   1.112.0
   - a module declares what it wants; a manager allows it in Reception > Modules, only what is ticked, test mode first.
   - off by default, switch in the setup of the module; every authorization written in the journal of the mailbox.
