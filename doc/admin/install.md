@@ -9,11 +9,11 @@
 |---|---|---|
 | `stable` | the last published version (the one of the latest release) | **production** (recommended) |
 | `X.Y` (`1.83`...) | one published series and its fixes only | a production that must stay on a series |
-| `release` | every change of `develop` as soon as it is pushed, before any release, without `dev/` nor `test/` | a test or preproduction instance that follows the work in progress |
+| `edge` | every change of `develop` as soon as it is pushed, before any release, without `dev/` nor `test/` | a test or preproduction instance that follows the work in progress |
 | `develop` | the work in progress, with the development tools and the tests | development only |
 
-`stable`, `X.Y` and `release` only go forward, a `git pull` is always enough. `stable` and `X.Y` also hold `dev/` and
-`test/` (left out of the zip and of `release`): not used by the module, they can be removed or refused by the web
+`stable`, `X.Y` and `edge` only go forward, a `git pull` is always enough. `stable` and `X.Y` also hold `dev/` and
+`test/` (left out of the zip and of `edge`): not used by the module, they can be removed or refused by the web
 server. As after any update of a module, disable and enable the module again when its version changed, so that its
 database updates run.
 
