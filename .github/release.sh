@@ -122,9 +122,14 @@ echo "::notice::Published v$v (latest: $latest)"
 # Never fatal: the GitHub release is already published, a failure only leaves a warning with the command to replay.
 sf_publish() {
 	local key="$work/sf_key" dest="/home/frs/project/$SF_PROJECT/$v/"
-	(umask 077 && printf '%s\n' "${SF_SSH_KEY:?}" > "$key") || return 1
+	# A missing setting gives the warning below, never the end of the script (${VAR:?} would exit the whole shell)
+	if [ -z "${SF_USER:-}" ] || [ -z "${SF_SSH_KEY:-}" ]; then
+		echo "::warning::SourceForge: the variable SF_USER (Settings > Secrets and variables > Actions > Variables) or the secret SF_SSH_KEY is empty"
+		return 1
+	fi
+	(umask 077 && printf '%s\n' "$SF_SSH_KEY" > "$key") || return 1
 	rsync -e "ssh -i $key -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$work/known_hosts" \
-		"$zip" "${SF_USER:?}@frs.sourceforge.net:$dest" || return 1
+		"$zip" "$SF_USER@frs.sourceforge.net:$dest" || return 1
 	if [ "$latest" = true ] && [ -n "${SF_API_KEY:-}" ]; then
 		curl -fsS -X PUT -H 'Accept: application/json' \
 			-d default=windows -d default=mac -d default=linux -d default=bsd -d default=solaris -d default=others \
