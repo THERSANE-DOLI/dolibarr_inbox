@@ -65,7 +65,7 @@ class InboxActivity
 		if (!$or) {
 			return array();
 		}
-		$rows = $this->db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.in_reply_to, m.subject, m.to_text, m.date_mail, m.date_received FROM ".$p."inbox_mail as m"
+		$rows = $this->db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.in_reply_to, m.subject, m.snippet, m.to_text, m.date_mail, m.date_received FROM ".$p."inbox_mail as m"
 			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.role = 'sent'"
 			." WHERE m.fk_account = ".((int) $row->fk_account)." AND (".implode(' OR ', $or).") AND m.rowid <> ".((int) $row->rowid)
 			.($msgid !== '' ? " AND (m.message_id IS NULL OR m.message_id <> '".$this->db->escape($msgid)."')" : "")
@@ -80,6 +80,7 @@ class InboxActivity
 			$seen[$k] = true;
 			$date = $r->date_mail ? $r->date_mail : $r->date_received;
 			$out[] = array('mail' => (int) $r->rowid, 'folder' => (int) $r->fk_folder, 'date' => $date ? (int) $this->db->jdate($date) : 0, 'subject' => (string) $r->subject,
+				'snippet' => dol_trunc((string) $r->snippet, 120, 'right', 'UTF-8', 1),
 				'to' => dol_trunc((string) $r->to_text, 120, 'right', 'UTF-8', 1), 'reply' => (string) $r->in_reply_to !== '', 'message_id' => (string) $r->message_id,
 				'author' => 0, 'author_name' => '', 'by_inbox' => false);
 		}

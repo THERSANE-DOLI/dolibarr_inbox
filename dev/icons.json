@@ -30,6 +30,8 @@
 		"tag-off": ["tag-off", "outline"],
 		"caret": ["chevron-down", "outline"],
 		"chevron-down": ["chevron-down", "outline"],
+		"sort-asc": ["arrow-narrow-up", "outline"],
+		"sort-desc": ["arrow-narrow-down", "outline"],
 		"chevron-up": ["chevron-up", "outline"],
 		"chevron-right": ["chevron-right", "outline"],
 		"chevron-left": ["chevron-left", "outline"],
