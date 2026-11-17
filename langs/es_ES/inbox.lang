@@ -714,6 +714,7 @@ InboxMailboxFolder = Buzón / carpeta
 InboxColumns = Columnas…
 InboxColumnsDefault = Columnas por defecto
 InboxColumnsDragHint = Arrastrar un encabezado para mover la columna
+InboxColumnsRightClickHint = Clic derecho: elegir las columnas
 InboxQuota = Espacio del buzón
 InboxQuotaUsed = %s MB usados de %s MB (%s %%)
 InboxQuotaAlmostFull = Buzón casi lleno: %s %%

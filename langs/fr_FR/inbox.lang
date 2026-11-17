@@ -714,6 +714,7 @@ InboxMailboxFolder = Boîte / dossier
 InboxColumns = Colonnes…
 InboxColumnsDefault = Colonnes par défaut
 InboxColumnsDragHint = Glisser un en-tête pour déplacer la colonne
+InboxColumnsRightClickHint = Clic droit : choisir les colonnes
 InboxQuota = Espace de la boîte
 InboxQuotaUsed = %s Mo utilisés sur %s Mo (%s %%)
 InboxQuotaAlmostFull = Boîte presque pleine : %s %%

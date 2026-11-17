@@ -714,6 +714,7 @@ InboxMailboxFolder = Mailbox / folder
 InboxColumns = Columns…
 InboxColumnsDefault = Columns by default
 InboxColumnsDragHint = Drag a header to move its column
+InboxColumnsRightClickHint = Right click: choose the columns
 InboxQuota = Space of the mailbox
 InboxQuotaUsed = %s MB used of %s MB (%s %%)
 InboxQuotaAlmostFull = Mailbox almost full: %s %%

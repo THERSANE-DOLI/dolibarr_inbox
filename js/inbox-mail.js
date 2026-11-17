@@ -1655,7 +1655,7 @@
 		}
 		const list = S.threadCache[r.thread.key];
 		if (!list) {
-			return view === 'table' ? '<tr class="ibx-mailrow ibx-mailrow--child"><td></td><td colspan="' + (cols.length + 1) + '"><span class="ibx-skeleton" style="width:40%"></span></td></tr>'
+			return view === 'table' ? '<tr class="ibx-mailrow ibx-mailrow--child"><td></td><td colspan="' + cols.length + '"><span class="ibx-skeleton" style="width:40%"></span></td></tr>'
 				: '<div class="ibx-thread"><span class="ibx-skeleton" style="width:50%"></span></div>';
 		}
 		const kids = list.filter(m => m.id !== r.id).slice().reverse();
@@ -1681,7 +1681,7 @@
 						return '<td class="ibx-mailrow__marks">' + marksHtml(m) + '</td>';
 					}
 					return '<td></td>';
-				}).join('') + '<td></td></tr>').join('');
+				}).join('') + '</tr>').join('');
 		}
 		return '<div class="ibx-thread" role="group" aria-label="' + th('InboxThreadCount', list.length) + '">' + kids.map(m => '<div class="ibx-mailcard ibx-mailcard--child' + (seenOf(m) ? '' : ' is-unread') + (isMine(m) ? ' is-mine' : '') + '" role="option" data-mail="' + m.id + '" data-child="1" aria-selected="' + S.selected.has(m.id) + '" tabindex="-1">'
 			+ '<span class="ibx-mailcard__from"><span class="ibx-ellipsis">' + (isMine(m) ? ic('sent', 'ibx-faint') + ' <span class="ibx-sr-only">' + th('InboxSent') + ' </span>' + esc(mineLabel(m))
@@ -1834,7 +1834,7 @@
 	function tableMinWidth(cols) {
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 		const subject = cols.find(c => c.id === 'subject');
-		let fixed = 2 * 1.625 * rem + (subject && subject.w ? subject.w : 12 * rem);
+		let fixed = 1.625 * rem + (subject && subject.w ? subject.w : 12 * rem);
 		let pct = 0;
 		cols.forEach(c => {
 			if (c.id === 'subject') {
@@ -1918,7 +1918,7 @@
 		// The whole header sorts (data-sort on the cell, the button stays for the keyboard); a click never follows a
 		// drag, so dragging the same header still moves the column. Faint arrow: the order a click would give
 		const next = on ? (dir === 'asc' ? 'desc' : 'asc') : naturalSort(c.sort);
-		return '<th data-col="' + id + '" draggable="true" title="' + th(label) + '"' + (c.sort ? ' class="is-sortable" data-sort="' + c.sort + '" aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>'
+		return '<th data-col="' + id + '" draggable="true" title="' + th(label) + '&#10;' + th('InboxColumnsRightClickHint') + '"' + (c.sort ? ' class="is-sortable" data-sort="' + c.sort + '" aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>'
 			+ (c.sort ? '<button type="button" class="ibx-sorthead" data-sort="' + c.sort + '">' + inner
 				+ (on ? ' ' + ic(dir === 'asc' ? 'chevron-up' : 'chevron-down') : '')
 				+ '<span class="ibx-sorthead__next" aria-hidden="true">' + ic(next === 'asc' ? 'chevron-up' : 'chevron-down') + '</span></button>' : inner)
@@ -1957,19 +1957,39 @@
 		if (!table) {
 			return;
 		}
-		const picker = $('.ibx-js-colpicker', table);
-		picker.addEventListener('click', e => {
-			e.stopPropagation();
-			columnsMenu(picker);
-		});
 		$('thead', table).addEventListener('contextmenu', e => {
 			// Browser menu kept with Shift (interface §6 bis)
 			if (e.shiftKey) {
 				return;
 			}
 			e.preventDefault();
-			columnsMenu(picker, { x: e.clientX, y: e.clientY });
+			// Anchor that can take the focus back when the menu closes: the sort button of the header, else « ⋯ »
+			const th = e.target.closest('th');
+			columnsMenu((th && $('.ibx-sorthead', th)) || $('.ibx-js-listmenu', S.el), { x: e.clientX, y: e.clientY });
 		});
+		const all = $('.ibx-js-checkall', table);
+		all.addEventListener('click', e => {
+			e.stopPropagation();
+			if (listSelectedCount() >= S.rows.length) {
+				S.selected.clear();
+				S.allInFolder = false;
+				paintSelection();
+				showNothing();
+			} else {
+				selectAll();
+			}
+			// Clicked with the mouse: the focus goes back to the list, else the box would keep it and the shortcuts
+			// (Delete, archive, arrows...) would wait for another click; from the keyboard, it stays on the box
+			if (e.detail > 0) {
+				const row = $('[data-mail][tabindex="0"]', table);
+				if (row) {
+					row.focus({ preventScroll: true });
+				} else {
+					all.blur();
+				}
+			}
+		});
+		paintCheckAll();
 		table.addEventListener('pointerdown', e => {
 			const grip = e.target.closest('[data-resize]');
 			if (!grip) {
@@ -2078,16 +2098,17 @@
 			const cols = tableColumns();
 			S.tagsColumn = cols.some(c => c.id === 'tags');
 			S.marksSlots = marksSlots();
+			// Columns chosen by « ⋯ > Columns » or a right click on a header: no column kept for a button
 			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true" style="min-width:' + tableMinWidth(cols) + 'px"><colgroup><col class="ibx-col--icon">'
 				+ cols.map(c => '<col data-col="' + c.id + '"' + colWidthStyle(c) + '>').join('')
-				+ '<col class="ibx-col--icon"></colgroup><thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th>'
+				+ '</colgroup><thead><tr><th class="ibx-mailtable__checkall"><input type="checkbox" class="ibx-js-checkall" title="' + th('InboxSelectAll') + '" aria-label="' + th('InboxSelectAll') + '"></th>'
 				+ cols.map(c => colHead(c.id)).join('')
-				+ '<th class="ibx-colpicker"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-colpicker" aria-haspopup="menu" title="' + th('InboxChooseColumns') + '" aria-label="' + th('InboxChooseColumns') + '">' + ic('view-table') + '</button></th></tr></thead><tbody>';
+				+ '</tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
 				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '" draggable="true">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
-					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '<td></td></tr>'
+					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '</tr>'
 					+ threadChildren(r, 'table', cols);
 			});
 			html += '</tbody></table>';
@@ -3266,7 +3287,25 @@
 				cb.checked = sel;
 			}
 		});
+		paintCheckAll();
 		renderBulkBar();
+	}
+	/** Mails of the list selected (the mails of an unfolded conversation are not counted) */
+	function listSelectedCount() {
+		return S.rows.reduce((n, r) => n + (S.selected.has(r.id) ? 1 : 0), 0);
+	}
+	/** « Select all » box of the table: checked when every mail of the list is, partly checked when some are */
+	function paintCheckAll() {
+		const all = S.el && $('.ibx-js-checkall', S.el);
+		if (!all) {
+			return;
+		}
+		const n = listSelectedCount();
+		all.checked = n > 0 && n >= S.rows.length;
+		all.indeterminate = n > 0 && n < S.rows.length;
+		const label = t(all.checked ? 'InboxClearSelection' : 'InboxSelectAll');
+		all.title = label;
+		all.setAttribute('aria-label', label);
 	}
 	/** Click on a mail: alone (open it), Ctrl (add / remove), Shift (range from the anchor) */
 	function select(id, mode) {

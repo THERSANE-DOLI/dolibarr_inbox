@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: « Select all » box in the corner of the list, no more column for the columns button :   1.116.0
+  - the box selects or unselects every mail of the list, partly checked when some are selected.
+  - the columns are chosen from « ⋯ > Columns » or a right click on a header, the subject gets the room back.
+
 - NEW: « Indicators » column in the list, columns of fixed width, the whole header sorts :   1.115.0
   - star, attachment and assigned people in one column by default, as narrow as its content allows.
   - resizing a column no longer moves the others: only the subject takes or gives the room.
