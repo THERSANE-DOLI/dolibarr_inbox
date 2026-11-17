@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the dots of the tags show their names in a clean bubble :   1.117.1
+  - on hover, every tag of the mail as its badge (colour, border, full name), instead of the native title.
+
 - NEW: tags as dots in the list, and a tag can colour the rows of its mails :   1.117.0
   - columns menu: tags shown with their names or as dots (colour and initial, the name on hover).
   - tag settings: « Row colour » gives its mails a light background of its colour in the list.

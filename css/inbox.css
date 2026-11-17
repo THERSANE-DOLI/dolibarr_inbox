@@ -273,6 +273,12 @@
 .ibx-tagdots { display: inline-flex; align-items: center; gap: 0.1875rem; vertical-align: middle; }
 .ibx-tagdots .ibx-tag--b-solid, .ibx-tagdots .ibx-tag--b-dashed, .ibx-tagdots .ibx-tag--b-dotted, .ibx-tagdots .ibx-tag--b-double { margin-inline: 0.1875rem; }
 .ibx-tagdots__more { font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); }
+/* Bubble over the dots: the tags of the mail as badges, the look of the tooltips of inbox, fixed to the window */
+.ibx-tagpop {
+	position: fixed; z-index: 1000; display: flex; flex-wrap: wrap; gap: 0.25rem; max-width: 20rem; padding: 0.375rem 0.5rem;
+	background: var(--ibx-tip-bg); border: 1px solid var(--ibx-tip-border); border-radius: 0.375rem; box-shadow: 0 1px 20px rgba(0, 0, 0, .12); pointer-events: none;
+}
+.ibx-tagpop[hidden] { display: none; }
 .ibx-tagkeyword { font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); white-space: nowrap; }
 /* Keyword of another software, not in the list of the tags: neutral, dashed, the raw keyword */
 .ibx-tag--unknown { color: var(--ibx-text-muted, var(--ibx-text)); background: transparent; outline: 1px dashed var(--ibx-border); outline-offset: -1px; font-weight: 500; }

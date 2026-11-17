@@ -1538,7 +1538,7 @@
 				if (!userKeyword(k)) {
 					return '';
 				}
-				return dots ? '<span class="ibx-tag ibx-tag--unknown ibx-tag--dot" title="' + th('InboxTagUnknown', String(k)) + '"><span aria-hidden="true">?</span><span class="ibx-sr-only">' + esc(String(k)) + '</span></span>'
+				return dots ? '<span class="ibx-tag ibx-tag--unknown ibx-tag--dot"><span aria-hidden="true">?</span><span class="ibx-sr-only">' + esc(String(k)) + '</span></span>'
 					: '<span class="ibx-tag ibx-tag--unknown" title="' + th('InboxTagUnknown', String(k)) + '">' + esc(String(k)) + '</span>';
 			}
 			// The tag and its alias $labelN on the same mail: one badge
@@ -1551,7 +1551,7 @@
 		if (!dots) {
 			return out.join(' ');
 		}
-		// Dots: 4 at most, then « +n » (every name in its title)
+		// Dots: 4 at most, then « +n » (every tag with its name in the bubble over the dots, tagPop)
 		const list = out.filter(Boolean);
 		if (!list.length) {
 			return '';
@@ -1559,6 +1559,41 @@
 		// The dots beyond 4 stay for the screen readers, hidden on screen behind « +n »
 		const more = list.length > 4 ? '<span class="ibx-tagdots__more" aria-hidden="true">+' + (list.length - 4) + '</span>' : '';
 		return '<span class="ibx-tagdots">' + list.slice(0, 4).join('') + (more ? '<span class="ibx-sr-only">' + list.slice(4).join('') + '</span>' : '') + more + '</span>';
+	}
+	/**
+	 * Bubble over the dots of a row (pointer only, after 120 ms like the tooltips of inbox): every tag of the mail as
+	 * its badge, the « +n » included. Fixed to the window, so the cell that clips its content does not cut it
+	 */
+	function tagPop(dots) {
+		let pop = S.tagPop;
+		if (!pop || !pop.isConnected) {
+			pop = document.createElement('div');
+			pop.className = 'ibx-tagpop';
+			pop.setAttribute('aria-hidden', 'true');
+			pop.hidden = true;
+			document.body.appendChild(pop);
+			S.tagPop = pop;
+		}
+		const item = dots.closest('[data-mail]');
+		const row = item ? rowOf(+item.dataset.mail) : null;
+		if (!row) {
+			return;
+		}
+		pop.innerHTML = tagsHtml(row, false);
+		pop.hidden = false;
+		const r = dots.getBoundingClientRect();
+		const w = pop.offsetWidth;
+		const h = pop.offsetHeight;
+		const top = r.top - h - 6 < 8 ? r.bottom + 6 : r.top - h - 6;
+		pop.style.top = Math.round(top) + 'px';
+		pop.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))) + 'px';
+	}
+	function hideTagPop() {
+		clearTimeout(S.tagPopTimer);
+		S.tagPopFor = null;
+		if (S.tagPop) {
+			S.tagPop.hidden = true;
+		}
 	}
 	/**
 	 * Colour of the row of a mail: the one of its first tag (in the order of the list of the mailbox) that colours
@@ -2210,6 +2245,7 @@
 		if (S.next) {
 			html += '<div class="ibx-js-more ibx-listmore">' + '<span class="ibx-skeleton" style="width:60%"></span>' + '</div>';
 		}
+		hideTagPop();
 		body.innerHTML = html;
 		bindTableHead(body);
 		hydrateAvatars(body);
@@ -11866,6 +11902,23 @@
 			listBody.scrollTo({ top: 0, behavior: 'smooth' });
 			$('.ibx-js-newpill', el).hidden = true;
 		});
+		// Dots of the tags: their names in a bubble (tagPop), never on a touch screen (a tap opens the mail)
+		listBody.addEventListener('pointerover', e => {
+			const dots = e.pointerType === 'touch' ? null : e.target.closest('.ibx-tagdots');
+			if (!dots || dots === S.tagPopFor) {
+				return;
+			}
+			hideTagPop();
+			S.tagPopFor = dots;
+			S.tagPopTimer = setTimeout(() => tagPop(dots), 120);
+		});
+		listBody.addEventListener('pointerout', e => {
+			const dots = e.target.closest('.ibx-tagdots');
+			if (dots && !dots.contains(e.relatedTarget)) {
+				hideTagPop();
+			}
+		});
+		listBody.addEventListener('scroll', hideTagPop, { passive: true });
 		listBody.addEventListener('scroll', () => {
 			if (listBody.scrollTop < 40) {
 				$('.ibx-js-newpill', el).hidden = true;
