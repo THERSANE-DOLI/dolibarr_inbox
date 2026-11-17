@@ -1528,22 +1528,64 @@
 			+ tagsHtml(row) + '<span class="ibx-readhead__tagadd">' + ic('plus') + '</span></button>';
 	}
 
-	function tagsHtml(row) {
+	function tagsHtml(row, dots) {
 		const entry = S.folders.get(row.folder);
 		const defs = entry ? entry.account.tags : [];
 		const shown = new Set();
-		return (row.tags || []).map(k => {
+		const out = (row.tags || []).map(k => {
 			const d = tagOf(defs, k);
 			if (!d) {
-				return userKeyword(k) ? '<span class="ibx-tag ibx-tag--unknown" title="' + th('InboxTagUnknown', String(k)) + '">' + esc(String(k)) + '</span>' : '';
+				if (!userKeyword(k)) {
+					return '';
+				}
+				return dots ? '<span class="ibx-tag ibx-tag--unknown ibx-tag--dot" title="' + th('InboxTagUnknown', String(k)) + '"><span aria-hidden="true">?</span><span class="ibx-sr-only">' + esc(String(k)) + '</span></span>'
+					: '<span class="ibx-tag ibx-tag--unknown" title="' + th('InboxTagUnknown', String(k)) + '">' + esc(String(k)) + '</span>';
 			}
 			// The tag and its alias $labelN on the same mail: one badge
 			if (shown.has(d.keyword.toLowerCase())) {
 				return '';
 			}
 			shown.add(d.keyword.toLowerCase());
-			return Dolibarr.tools.inboxColors.badge(d, d.view);
-		}).join(' ');
+			return dots ? Dolibarr.tools.inboxColors.dot(d, d.view) : Dolibarr.tools.inboxColors.badge(d, d.view);
+		});
+		if (!dots) {
+			return out.join(' ');
+		}
+		// Dots: 4 at most, then « +n » (every name in its title)
+		const list = out.filter(Boolean);
+		if (!list.length) {
+			return '';
+		}
+		// The dots beyond 4 stay for the screen readers, hidden on screen behind « +n »
+		const more = list.length > 4 ? '<span class="ibx-tagdots__more" aria-hidden="true">+' + (list.length - 4) + '</span>' : '';
+		return '<span class="ibx-tagdots">' + list.slice(0, 4).join('') + (more ? '<span class="ibx-sr-only">' + list.slice(4).join('') + '</span>' : '') + more + '</span>';
+	}
+	/**
+	 * Colour of the row of a mail: the one of its first tag (in the order of the list of the mailbox) that colours
+	 * its rows, '' when none does
+	 */
+	function rowTint(row) {
+		const entry = S.folders.get(row.folder);
+		const defs = entry ? entry.account.tags : [];
+		let best = -1;
+		(row.tags || []).forEach(k => {
+			const d = tagOf(defs, k);
+			const i = d && d.tint ? defs.indexOf(d) : -1;
+			if (i >= 0 && (best < 0 || i < best)) {
+				best = i;
+			}
+		});
+		if (best < 0) {
+			return '';
+		}
+		const C = Dolibarr.tools.inboxColors;
+		const c = C.isColor(defs[best].view) ? defs[best].view : defs[best].color;
+		return C.isColor(c) ? c : '';
+	}
+	/** Class and style of a row coloured by a tag (nothing when no tag of the mail colours its rows) */
+	function tintAttrs(row) {
+		const c = rowTint(row);
+		return c ? { cls: ' has-tint', style: ' style="--ibx-row-tint:' + c + '"' } : { cls: '', style: '' };
 	}
 	/**
 	 * Tag of a keyword in the active tags of a mailbox (in their order): its keyword, else $labelN of Thunderbird as an
@@ -1765,8 +1807,8 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '14rem', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
-		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
+		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r, S.tagsDots) + '</td>' },
 		assign: { label: 'InboxAssigned', icon: 'user-circle', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees, '', 2) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
@@ -1867,7 +1909,18 @@
 		if (c.w) {
 			return c.w + 'px';
 		}
-		return (COLUMNS[c.id].fit && S.fitWidths && S.fitWidths[c.id]) ? S.fitWidths[c.id] + 'px' : COLUMNS[c.id].width;
+		if (isFit(c)) {
+			return S.fitWidths && S.fitWidths[c.id] ? S.fitWidths[c.id] + 'px' : fitMin(c) + 'rem';
+		}
+		return COLUMNS[c.id].width;
+	}
+	/** Column that fits its content: indicators, assigned, and the tags shown as dots */
+	function isFit(c) {
+		return !!COLUMNS[c.id].fit || (c.id === 'tags' && !!S.tagsDots);
+	}
+	/** Smallest width of a column that fits its content (rem): one icon for the dots */
+	function fitMin(c) {
+		return c.id === 'tags' ? 1.625 : parseFloat(COLUMNS[c.id].width);
 	}
 	/**
 	 * Columns that fit their content (indicators, assigned): their default width is a minimum, they widen to the
@@ -1881,10 +1934,10 @@
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 		S.fitWidths = S.fitWidths || {};
 		let changed = false;
-		cols.filter(c => COLUMNS[c.id].fit && !c.w).forEach(c => {
+		cols.filter(c => isFit(c) && !c.w).forEach(c => {
 			// +2: the column of the checkboxes first, nth-child counts from 1
 			const idx = cols.indexOf(c) + 2;
-			let need = Math.ceil(parseFloat(COLUMNS[c.id].width) * rem);
+			let need = Math.ceil(fitMin(c) * rem);
 			$$('tbody tr > td:nth-child(' + idx + ')', table).forEach(td => {
 				const inner = td.firstElementChild;
 				if (inner) {
@@ -1943,7 +1996,13 @@
 				saveColumns(now);
 				renderList();
 			},
-		})).concat([{ sep: true }, {
+		})).concat([{ sep: true }, { header: t('InboxTags') }].concat(['names', 'dots'].map(v => ({
+			label: t(v === 'dots' ? 'InboxTagsViewDots' : 'InboxTagsViewNames'), checked: (params.list_tags_view === 'dots' ? 'dots' : 'names') === v,
+			run: () => {
+				saveParam('list_tags_view', v);
+				renderList();
+			},
+		}))), [{ sep: true }, {
 			label: t('InboxColumnsDefault'), run: () => {
 				saveParam('list_columns', '');
 				renderList();
@@ -2097,6 +2156,7 @@
 		if (view === 'table') {
 			const cols = tableColumns();
 			S.tagsColumn = cols.some(c => c.id === 'tags');
+			S.tagsDots = params.list_tags_view === 'dots';
 			S.marksSlots = marksSlots();
 			// Columns chosen by « ⋯ > Columns » or a right click on a header: no column kept for a button
 			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true" style="min-width:' + tableMinWidth(cols) + 'px"><colgroup><col class="ibx-col--icon">'
@@ -2106,7 +2166,8 @@
 				+ '</tr></thead><tbody>';
 			S.rows.forEach(r => {
 				const sel = S.selected.has(r.id);
-				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '" draggable="true">'
+				const tint = tintAttrs(r);
+				html += '<tr class="ibx-mailrow' + (seenOf(r) ? '' : ' is-unread') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + tint.cls + '"' + tint.style + ' data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '" draggable="true">'
 					+ '<td><input type="checkbox" class="ibx-js-check" tabindex="-1"' + (sel ? ' checked' : '') + ' aria-label="' + th('InboxSelect') + '"></td>'
 					+ cols.map(c => COLUMNS[c.id].cell(r)).join('') + '</tr>'
 					+ threadChildren(r, 'table', cols);
@@ -2125,7 +2186,8 @@
 					}
 				}
 				const sel = S.selected.has(r.id);
-				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + '" role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
+				const tint = tintAttrs(r);
+				html += '<div class="ibx-mailcard' + (seenOf(r) ? '' : ' is-unread') + (isNew(r) ? ' is-new' : '') + (r.watched ? ' is-watched' : '') + (r.ignored ? ' is-ignored' : '') + tint.cls + '"' + tint.style + ' role="option" data-mail="' + r.id + '" aria-selected="' + sel + '" tabindex="' + (r.id === S.anchor ? 0 : -1) + '"' + (isPhone() ? '' : ' draggable="true"') + '>'
 					+ '<span class="ibx-mailcard__from" title="' + esc(r.from_email) + '">' + (sentLike(r) ? recipientAvatar(r) : avatar(r.from_name, r.from_email, 'ibx-avatar--xs', r.id))
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width

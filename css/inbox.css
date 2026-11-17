@@ -268,6 +268,11 @@
 }
 /* Dark text on a light colour (js/inbox-colors.js darkText) */
 .ibx-tag--dark { color: #111111; }
+/* Tag as a dot (list in table mode, « Dots »): its colour and its initial, the name in its title */
+.ibx-tag--dot { justify-content: center; width: 1.125rem; padding: 0; font-size: 0.625rem; }
+.ibx-tagdots { display: inline-flex; align-items: center; gap: 0.1875rem; vertical-align: middle; }
+.ibx-tagdots .ibx-tag--b-solid, .ibx-tagdots .ibx-tag--b-dashed, .ibx-tagdots .ibx-tag--b-dotted, .ibx-tagdots .ibx-tag--b-double { margin-inline: 0.1875rem; }
+.ibx-tagdots__more { font-size: var(--ibx-fs-xs); font-weight: 600; color: var(--ibx-text-muted); }
 .ibx-tagkeyword { font-family: var(--ibx-font-mono); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); white-space: nowrap; }
 /* Keyword of another software, not in the list of the tags: neutral, dashed, the raw keyword */
 .ibx-tag--unknown { color: var(--ibx-text-muted, var(--ibx-text)); background: transparent; outline: 1px dashed var(--ibx-border); outline-offset: -1px; font-weight: 500; }
@@ -414,7 +419,16 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-mailtable col.ibx-col--date { width: 5.75rem; }
 .ibx-mailrow { cursor: pointer; }
 .ibx-mailrow:hover { background: var(--ibx-bg-hover); }
-.ibx-mailrow[aria-selected="true"] { background: var(--ibx-accent-soft); }
+/* Row coloured by a tag: a light background of its colour (stronger in the dark theme, none in high contrast); the
+   selection, the hover and the watched mails keep their own background over it */
+:root { --ibx-tint-mix: 12%; }
+@media (prefers-color-scheme: dark) { :root:not([data-ibx-theme="light"]) { --ibx-tint-mix: 18%; } }
+:root[data-ibx-theme="dark"] { --ibx-tint-mix: 18%; }
+:root[data-ibx-theme="contrast"] { --ibx-tint-mix: 0%; }
+.ibx-mailrow.has-tint, .ibx-mailcard.has-tint { background: color-mix(in srgb, var(--ibx-row-tint) var(--ibx-tint-mix), transparent); }
+.ibx-mailrow.has-tint:hover { background: color-mix(in srgb, var(--ibx-row-tint) var(--ibx-tint-mix), var(--ibx-bg-hover)); }
+.ibx-mailcard.has-tint:hover { background: color-mix(in srgb, var(--ibx-row-tint) var(--ibx-tint-mix), var(--ibx-accent-softer)); }
+.ibx-mailrow[aria-selected="true"], .ibx-mailrow.has-tint[aria-selected="true"] { background: var(--ibx-accent-soft); }
 .ibx-mailrow.is-unread td { font-weight: 700; }
 .ibx-mailrow.is-unread td:first-child { box-shadow: inset 3px 0 0 var(--ibx-accent); }
 .ibx-mailrow--child td.ibx-mailrow__subject { padding-left: 1.625rem; }
@@ -432,7 +446,7 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); cursor: pointer;
 }
 .ibx-mailcard:hover { border-color: var(--ibx-border-strong); background: var(--ibx-accent-softer); }
-.ibx-mailcard[aria-selected="true"] { border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
+.ibx-mailcard[aria-selected="true"], .ibx-mailcard.has-tint[aria-selected="true"] { border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 .ibx-mailcard.is-unread { box-shadow: inset 3px 0 0 var(--ibx-accent); }
 .ibx-mailcard.is-unread .ibx-mailcard__from, .ibx-mailcard.is-unread .ibx-mailcard__subject { font-weight: 700; }
 .ibx-mailcard__dot { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ibx-accent); }

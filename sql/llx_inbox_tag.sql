@@ -22,6 +22,7 @@ CREATE TABLE llx_inbox_tag(
 	label varchar(128) NOT NULL,
 	color varchar(7) DEFAULT NULL,
 	border varchar(8) DEFAULT NULL,
+	tint smallint DEFAULT 0 NOT NULL,
 	position integer DEFAULT 0 NOT NULL,
 	status smallint DEFAULT 1 NOT NULL,
 	date_creation datetime NOT NULL,
