@@ -713,6 +713,7 @@ InboxSizeUnits = B|KB|MB|GB|TB
 InboxMailboxFolder = Mailbox / folder
 InboxColumns = Columns…
 InboxColumnsDefault = Columns by default
+InboxColumnsDragHint = Drag a header to move its column
 InboxQuota = Space of the mailbox
 InboxQuotaUsed = %s MB used of %s MB (%s %%)
 InboxQuotaAlmostFull = Mailbox almost full: %s %%
@@ -931,6 +932,7 @@ InboxErrorLookSave = The colour and the icon could not be saved
 
 # Assignment and bell (1.9.0)
 InboxAssigned = Assigned
+InboxIndicators = Indicators
 InboxAssignedTo = Assigned to: %s
 InboxAssignedToLabel = Assigned to
 InboxAssignedNobody = Not assigned

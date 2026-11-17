@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: « Indicators » column in the list, columns of fixed width, the whole header sorts :   1.115.0
+  - star, attachment and assigned people in one column by default, as narrow as its content allows.
+  - resizing a column no longer moves the others: only the subject takes or gives the room.
+  - a click anywhere on a header sorts, dragging it still moves the column.
+
 - FIX: an assignment shows in the lists open by the other users :   1.114.1
   - added or removed, it now appears at their next refresh, without reloading the page.
 

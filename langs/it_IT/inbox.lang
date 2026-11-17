@@ -713,6 +713,7 @@ InboxSizeUnits = B|KB|MB|GB|TB
 InboxMailboxFolder = Casella / cartella
 InboxColumns = Colonne…
 InboxColumnsDefault = Colonne predefinite
+InboxColumnsDragHint = Trascinare un'intestazione per spostare la colonna
 InboxQuota = Spazio della casella
 InboxQuotaUsed = %s MB usati su %s MB (%s %%)
 InboxQuotaAlmostFull = Casella quasi piena: %s %%
@@ -931,6 +932,7 @@ InboxErrorLookSave = Non è stato possibile salvare il colore e l'icona
 
 # Assegnazione e campanella (1.9.0)
 InboxAssigned = Assegnato
+InboxIndicators = Indicatori
 InboxAssignedTo = Assegnato a: %s
 InboxAssignedToLabel = Assegnato a
 InboxAssignedNobody = Non assegnato

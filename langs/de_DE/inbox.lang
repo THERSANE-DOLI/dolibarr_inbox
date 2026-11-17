@@ -713,6 +713,7 @@ InboxSizeUnits = B|KB|MB|GB|TB
 InboxMailboxFolder = Postfach / Ordner
 InboxColumns = Spalten…
 InboxColumnsDefault = Standardspalten
+InboxColumnsDragHint = Eine Spaltenüberschrift ziehen, um die Spalte zu verschieben
 InboxQuota = Speicherplatz des Postfachs
 InboxQuotaUsed = %s MB von %s MB belegt (%s %%)
 InboxQuotaAlmostFull = Postfach fast voll: %s %%
@@ -931,6 +932,7 @@ InboxErrorLookSave = Farbe und Symbol konnten nicht gespeichert werden
 
 # Zuweisung und Glocke (1.9.0)
 InboxAssigned = Zugewiesen
+InboxIndicators = Indikatoren
 InboxAssignedTo = Zugewiesen an: %s
 InboxAssignedToLabel = Zugewiesen an
 InboxAssignedNobody = Nicht zugewiesen

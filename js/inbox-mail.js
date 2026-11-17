@@ -1675,7 +1675,10 @@
 						return '<td>' + (m.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>';
 					}
 					if (c.id === 'assign') {
-						return '<td class="ibx-mailrow__assign">' + assigneesHtml(m.assignees) + '</td>';
+						return '<td class="ibx-mailrow__assign">' + assigneesHtml(m.assignees, '', 2) + '</td>';
+					}
+					if (c.id === 'marks') {
+						return '<td class="ibx-mailrow__marks">' + marksHtml(m) + '</td>';
 					}
 					return '<td></td>';
 				}).join('') + '<td></td></tr>').join('');
@@ -1758,18 +1761,51 @@
 	 * always shown. Each one: label, width by default, sort key, cell
 	 */
 	const COLUMNS = {
+		marks: { label: 'InboxIndicators', icon: 'circles', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__marks">' + marksHtml(r) + '</td>' },
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
-		from: { label: 'InboxCorrespondent', sort: 'from', width: '32%', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
+		from: { label: 'InboxCorrespondent', sort: 'from', width: '14rem', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r) + '</td>' },
-		assign: { label: 'InboxAssigned', width: '5rem', cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees) + '</td>' },
-		soc: { label: 'InboxThirdparty', width: '20%', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
+		assign: { label: 'InboxAssigned', icon: 'user-circle', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees, '', 2) + '</td>' },
+		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
-		box: { label: 'InboxMailboxFolder', width: '22%', cell: r => '<td class="ibx-muted">' + boxHtml(r) + '</td>' },
+		box: { label: 'InboxMailboxFolder', width: '12rem', cell: r => '<td class="ibx-muted">' + boxHtml(r) + '</td>' },
 		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
 	};
-	const DEFAULT_COLUMNS = ['flag', 'att', 'from', 'subject', 'tags', 'assign', 'date'];
+	const DEFAULT_COLUMNS = ['marks', 'from', 'subject', 'tags', 'date'];
+
+	/**
+	 * Indicators of a line in fixed slots (star, attachment, assigned people): an empty slot stays empty so that
+	 * each indicator keeps its place from one line to the next
+	 */
+	function marksHtml(r) {
+		const used = S.marksSlots || {};
+		return '<span class="ibx-marks">'
+			+ (used.flag || r.flagged ? '<span class="ibx-marks__slot">' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</span>' : '')
+			+ (used.att || r.attachments ? '<span class="ibx-marks__slot">' + (r.attachments ? '<span title="' + th('InboxAttachments') + '">' + ic('attachment', 'ibx-faint') + '<span class="ibx-sr-only">' + th('InboxAttachments') + '</span></span>' : '') + '</span>' : '')
+			+ (used.assign || (r.assignees && r.assignees.length) ? '<span class="ibx-marks__slot ibx-marks__slot--assign">' + assigneesHtml(r.assignees) + '</span>' : '')
+			+ '</span>';
+	}
+	/**
+	 * Slots of the indicators column: only the indicators present in the lines shown (unfolded conversations
+	 * included), so that the column takes no room for an indicator no line has
+	 */
+	function marksSlots() {
+		const used = { flag: false, att: false, assign: false };
+		const look = m => {
+			used.flag = used.flag || !!m.flagged;
+			used.att = used.att || !!m.attachments;
+			used.assign = used.assign || !!(m.assignees && m.assignees.length);
+		};
+		S.rows.forEach(r => {
+			look(r);
+			if (r.thread && S.expanded.has(r.thread.key) && S.threadCache[r.thread.key]) {
+				S.threadCache[r.thread.key].forEach(look);
+			}
+		});
+		return used;
+	}
 
 	/** Columns of the user: [{id, w (px, optional)}], subject always there; search in every mailbox: mailbox added */
 	function tableColumns() {
@@ -1792,15 +1828,19 @@
 		return cols;
 	}
 	/**
-	 * Width the table needs so that the subject keeps 12 rem: the other columns take their width (px, rem or % of the
-	 * table); beyond the pane, the list scrolls sideways instead of hiding the subject
+	 * Width the table needs so that the subject keeps its minimum (12 rem, or the width given by its edge): the other
+	 * columns have a fixed width, the subject alone takes the rest; beyond the pane, the list scrolls sideways
 	 */
 	function tableMinWidth(cols) {
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-		let fixed = 2 * 1.625 * rem + 12 * rem;
+		const subject = cols.find(c => c.id === 'subject');
+		let fixed = 2 * 1.625 * rem + (subject && subject.w ? subject.w : 12 * rem);
 		let pct = 0;
 		cols.forEach(c => {
-			const w = c.w ? c.w + 'px' : COLUMNS[c.id].width;
+			if (c.id === 'subject') {
+				return;
+			}
+			const w = colWidth(c);
 			if (!w) {
 				return;
 			}
@@ -1814,8 +1854,60 @@
 		});
 		return Math.ceil(fixed / Math.max(0.2, 1 - pct));
 	}
+	/** Width of a column (the subject has none: it takes the room the other columns leave) */
+	function colWidthStyle(c) {
+		if (c.id === 'subject') {
+			return '';
+		}
+		const w = colWidth(c);
+		return w ? ' style="width:' + w + '"' : '';
+	}
+	/** Width of a column: the one given by its edge, else the fitted one (columns that fit their content), else the default */
+	function colWidth(c) {
+		if (c.w) {
+			return c.w + 'px';
+		}
+		return (COLUMNS[c.id].fit && S.fitWidths && S.fitWidths[c.id]) ? S.fitWidths[c.id] + 'px' : COLUMNS[c.id].width;
+	}
+	/**
+	 * Columns that fit their content (indicators, assigned): their default width is a minimum, they widen to the
+	 * widest content of the lines shown (several people assigned...) and never move the other columns but the subject
+	 */
+	function fitColumns(body, cols) {
+		const table = $('.ibx-mailtable', body);
+		if (!table) {
+			return;
+		}
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		S.fitWidths = S.fitWidths || {};
+		let changed = false;
+		cols.filter(c => COLUMNS[c.id].fit && !c.w).forEach(c => {
+			// +2: the column of the checkboxes first, nth-child counts from 1
+			const idx = cols.indexOf(c) + 2;
+			let need = Math.ceil(parseFloat(COLUMNS[c.id].width) * rem);
+			$$('tbody tr > td:nth-child(' + idx + ')', table).forEach(td => {
+				const inner = td.firstElementChild;
+				if (inner) {
+					const cs = getComputedStyle(td);
+					need = Math.max(need, Math.ceil(inner.getBoundingClientRect().width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight)));
+				}
+			});
+			if (S.fitWidths[c.id] !== need) {
+				S.fitWidths[c.id] = need;
+				$('col[data-col="' + c.id + '"]', table).style.width = need + 'px';
+				changed = true;
+			}
+		});
+		if (changed) {
+			table.style.minWidth = tableMinWidth(cols) + 'px';
+		}
+	}
 	function saveColumns(cols) {
 		saveParam('list_columns', JSON.stringify(cols.filter(c => !c.auto).map(c => (c.w ? { id: c.id, w: c.w } : { id: c.id }))));
+	}
+	/** Order of a first click on a column: the newest / the biggest first, the others from A to Z */
+	function naturalSort(key) {
+		return key === 'date' || key === 'size' ? 'desc' : 'asc';
 	}
 	function colHead(id) {
 		const c = COLUMNS[id];
@@ -1823,8 +1915,13 @@
 		const inner = c.icon ? ic(c.icon) + '<span class="ibx-sr-only">' + th(label) + '</span>' : th(label);
 		const [k, dir] = (params.list_sort || 'date:desc').split(':');
 		const on = c.sort && k === c.sort;
-		return '<th data-col="' + id + '" draggable="true" title="' + th(label) + '"' + (c.sort ? ' aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>'
-			+ (c.sort ? '<button type="button" class="ibx-sorthead" data-sort="' + c.sort + '">' + inner + (on ? ' ' + ic(dir === 'asc' ? 'chevron-up' : 'chevron-down') : '') + '</button>' : inner)
+		// The whole header sorts (data-sort on the cell, the button stays for the keyboard); a click never follows a
+		// drag, so dragging the same header still moves the column. Faint arrow: the order a click would give
+		const next = on ? (dir === 'asc' ? 'desc' : 'asc') : naturalSort(c.sort);
+		return '<th data-col="' + id + '" draggable="true" title="' + th(label) + '"' + (c.sort ? ' class="is-sortable" data-sort="' + c.sort + '" aria-sort="' + (on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' : '') + '>'
+			+ (c.sort ? '<button type="button" class="ibx-sorthead" data-sort="' + c.sort + '">' + inner
+				+ (on ? ' ' + ic(dir === 'asc' ? 'chevron-up' : 'chevron-down') : '')
+				+ '<span class="ibx-sorthead__next" aria-hidden="true">' + ic(next === 'asc' ? 'chevron-up' : 'chevron-down') + '</span></button>' : inner)
 			+ (c.icon ? '' : '<span class="ibx-colresize" data-resize="' + id + '" aria-hidden="true"></span>') + '</th>';
 	}
 
@@ -1851,7 +1948,7 @@
 				saveParam('list_columns', '');
 				renderList();
 			},
-		}]), at);
+		}, { note: t('InboxColumnsDragHint') }]), at);
 	}
 
 	/** Width by the edge of a header (double click = default), order by drag and drop of the headers */
@@ -1885,17 +1982,25 @@
 			const thEl = grip.closest('th');
 			const start = e.clientX;
 			const base = thEl.getBoundingClientRect().width;
+			const cols = tableColumns();
+			const c = cols.find(x => x.id === id);
 			grip.setPointerCapture(e.pointerId);
+			// Only the dragged column changes: the subject takes or gives the difference, the list scrolls sideways
+			// when the columns no longer fit; the edge of the subject sets its minimum width
 			const move = ev => {
-				col.style.width = Math.max(48, Math.round(base + ev.clientX - start)) + 'px';
+				if (!c) {
+					return;
+				}
+				c.w = Math.max(48, Math.round(base + ev.clientX - start));
+				if (id !== 'subject') {
+					col.style.width = c.w + 'px';
+				}
+				table.style.minWidth = tableMinWidth(cols) + 'px';
 			};
 			const up = () => {
 				grip.removeEventListener('pointermove', move);
 				grip.removeEventListener('pointerup', up);
-				const cols = tableColumns();
-				const c = cols.find(x => x.id === id);
-				if (c) {
-					c.w = Math.round(thEl.getBoundingClientRect().width);
+				if (c && c.w) {
 					saveColumns(cols);
 				}
 			};
@@ -1972,8 +2077,9 @@
 		if (view === 'table') {
 			const cols = tableColumns();
 			S.tagsColumn = cols.some(c => c.id === 'tags');
+			S.marksSlots = marksSlots();
 			html = '<table class="ibx-mailtable" role="grid" aria-label="' + th('InboxMails') + '" aria-multiselectable="true" style="min-width:' + tableMinWidth(cols) + 'px"><colgroup><col class="ibx-col--icon">'
-				+ cols.map(c => '<col data-col="' + c.id + '"' + (c.w ? ' style="width:' + c.w + 'px"' : (COLUMNS[c.id].width ? ' style="width:' + COLUMNS[c.id].width + '"' : '')) + '>').join('')
+				+ cols.map(c => '<col data-col="' + c.id + '"' + colWidthStyle(c) + '>').join('')
 				+ '<col class="ibx-col--icon"></colgroup><thead><tr><th><span class="ibx-sr-only">' + th('InboxSelect') + '</span></th>'
 				+ cols.map(c => colHead(c.id)).join('')
 				+ '<th class="ibx-colpicker"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-colpicker" aria-haspopup="menu" title="' + th('InboxChooseColumns') + '" aria-label="' + th('InboxChooseColumns') + '">' + ic('view-table') + '</button></th></tr></thead><tbody>';
@@ -2024,6 +2130,9 @@
 		body.innerHTML = html;
 		bindTableHead(body);
 		hydrateAvatars(body);
+		if (view === 'table') {
+			fitColumns(body, tableColumns());
+		}
 		I.mount(body);
 		if (anchorId && body.querySelector('[data-mail="' + anchorId + '"]')) {
 			body.scrollTop += body.querySelector('[data-mail="' + anchorId + '"]').getBoundingClientRect().top - anchorTop;
@@ -4940,15 +5049,16 @@
 		return id === S.me ? t('InboxMe') : (S.people[id] || '#' + id);
 	}
 	/** Initials of the people assigned (mine in the accent), their names in the title and for the screen readers */
-	function assigneesHtml(list, cls) {
+	function assigneesHtml(list, cls, max) {
 		list = list || [];
+		max = max || 3;
 		if (!list.length) {
 			return '';
 		}
 		const text = t('InboxAssignedTo', list.map(personName).join(', '));
 		return ' <span class="ibx-assignees' + (cls ? ' ' + cls : '') + '" title="' + esc(text) + '">'
-			+ list.slice(0, 3).map(id => personAvatar(id)).join('')
-			+ (list.length > 3 ? '<span class="ibx-assignees__more" aria-hidden="true">+' + (list.length - 3) + '</span>' : '')
+			+ list.slice(0, max).map(id => personAvatar(id)).join('')
+			+ (list.length > max ? '<span class="ibx-assignees__more" aria-hidden="true">+' + (list.length - max) + '</span>' : '')
 			+ '<span class="ibx-sr-only">' + esc(text) + '</span></span>';
 	}
 	/** Line « Assigned to » of the reading: full names, « Me », assign me / remove me, choose the people */
@@ -11607,10 +11717,14 @@
 		});
 		listBody.addEventListener('click', e => {
 			const sortBtn = e.target.closest('[data-sort]');
-			if (sortBtn) {
+			// The edge of a header resizes, it never sorts (its pointerup ends in a click on the header)
+			if (sortBtn && !e.target.closest('[data-resize]')) {
 				const [k, dir] = (params.list_sort || 'date:desc').split(':');
 				const key = sortBtn.dataset.sort;
-				setSort(key + ':' + (k === key ? (dir === 'asc' ? 'desc' : 'asc') : (key === 'date' || key === 'size' ? 'desc' : 'asc')));
+				setSort(key + ':' + (k === key ? (dir === 'asc' ? 'desc' : 'asc') : naturalSort(key)));
+				return;
+			}
+			if (sortBtn) {
 				return;
 			}
 			const tg = e.target.closest('.ibx-js-threadtoggle');
