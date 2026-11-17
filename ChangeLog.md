@@ -1,5 +1,21 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: people and groups chosen from a real list, with their picture :   1.120.0
+  - accesses and owner of a mailbox: photo or initials of a user, a group in its colour with its members.
+  - who already has an access is greyed with its level; « n more, type to narrow » when the list is cut.
+
+- NEW: order of the list shown and changed at hand, an answer of the fil read without leaving the mail :   1.119.0
+  - the order is a chip with its arrow: the arrow turns it, its words (or a right click) choose another order.
+  - orders chosen as a key (date, correspondent, subject, size) then a direction in its own words.
+  - « See the email » under an answer opens it in a dialog, « Go to the email » to open it for good.
+
+- FIX: the answers of the fil said who they went to only once one was unfolded :   1.118.2
+  - « Replied to … » always written, with the first words of the answer; section « Notes and answers ».
+
+- FIX: « Always show » the pictures had no effect on own sent mails :   1.118.1
+  - applied in the sent and drafts folders to the mailbox and its identities.
+  - an unauthenticated sender no longer offers a choice that would not be remembered.
+
 - NEW: default templates on four levels, and templates that are a complete mail :   1.118.0
   - a new mail or an answer receives its template by itself: me in the mailbox, the mailbox, me, everyone.
   - « No template » at a level stops there; a level not set lets the next one answer.

@@ -2407,11 +2407,25 @@
 		$('.ibx-js-view', S.el).innerHTML = ic(params.view === 'table' ? 'view-cards' : 'view-table');
 		$('.ibx-js-view', S.el).title = t(params.view === 'table' ? 'InboxViewCards' : 'InboxViewTable');
 		$('.ibx-js-view', S.el).setAttribute('aria-label', $('.ibx-js-view', S.el).title);
-		const sortKey = { 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFrom', 'from:desc': 'InboxSortFrom', 'subject:asc': 'InboxSortSubject', 'subject:desc': 'InboxSortSubject', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSize' }[params.list_sort || 'date:desc'];
-		const sortLabel = S.ft && S.ft.relevance ? t('InboxSortRelevance') : (sortKey ? t(sortKey) : '');
+		const sort = params.list_sort || 'date:desc';
+		const sortKey = { 'date:desc': 'InboxSortDateDesc', 'date:asc': 'InboxSortDateAsc', 'from:asc': 'InboxSortFromAsc', 'from:desc': 'InboxSortFromDesc',
+			'subject:asc': 'InboxSortSubjectAsc', 'subject:desc': 'InboxSortSubjectDesc', 'size:desc': 'InboxSortSize', 'size:asc': 'InboxSortSizeAsc' }[sort];
+		const relevance = !!(S.ft && S.ft.relevance);
 		// Trash and junk emptied after some days (1.41.0): said where the mails are, nobody surprised
 		const purge = S.scope === 'folder' && f && f.folder.purge ? ' · ' + t('InboxRetentionHint', f.folder.purge) : '';
-		$('.ibx-js-scopehint', S.el).textContent = (S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '') + (sortLabel ? ' · ' + t('InboxSortedBy', sortLabel) : '') + purge;
+		const where = S.scope === 'folder' && f ? t('InboxSearchIn', folderName(f.folder)) : '';
+		$('.ibx-js-scopehint', S.el).textContent = where + (relevance ? ' · ' + t('InboxSortedBy', t('InboxSortRelevance')) : '') + purge;
+		// The usual order (newest first) said only on a line already there, never a line of its own
+		const chip = $('.ibx-js-sortchip', S.el);
+		chip.hidden = relevance || !sortKey || (sort === 'date:desc' && !where);
+		if (!chip.hidden) {
+			const desc = sort.split(':')[1] === 'desc';
+			// Two targets: the arrow turns the order, the words open the other orders (a right click too)
+			chip.innerHTML = '<button type="button" class="ibx-sortchip__dir ibx-js-sortdir" title="' + th('InboxSortReverse') + '" aria-label="' + th('InboxSortReverse') + '">' + ic(desc ? 'sort-desc' : 'sort-asc') + '</button>'
+				+ '<button type="button" class="ibx-sortchip__key ibx-js-sortkey" aria-haspopup="menu" title="' + th('InboxSortChange') + '" aria-label="' + esc(t('InboxSortedBy', t(sortKey)) + '. ' + t('InboxSortChange')) + '">'
+				+ '<span>' + th(sortKey) + '</span>' + ic('chevron-down') + '</button>';
+			chip.classList.toggle('is-custom', sort !== 'date:desc');
+		}
 		renderPills();
 	}
 
@@ -2444,7 +2458,7 @@
 		vsave.title = t(update ? 'InboxViewUpdate' : 'InboxViewSaveAs');
 		const hint = $('.ibx-js-scopehint', S.el);
 		hint.title = hint.textContent;
-		$('.ibx-searchinfo', S.el).hidden = box.hidden && $('.ibx-js-scopehint', S.el).textContent === '' && !hasFilter();
+		$('.ibx-searchinfo', S.el).hidden = box.hidden && $('.ibx-js-scopehint', S.el).textContent === '' && $('.ibx-js-sortchip', S.el).hidden && !hasFilter();
 	}
 
 	/** The cross in the search field: shown as soon as something is searched, typed or kept (pills, filters...) */
@@ -6798,7 +6812,7 @@
 						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(I.moduleUrl(a.url, null)) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
-				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th('InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
+				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)
 				+ '</div>'
 				+ (canWrite ? '<div class="ibx-note__new">' + composerHtml('ibx-js-newnote', 'ibx-newnote-' + box.dataset.mail, '', th('InboxNotePlaceholder'), true) + '</div>' : '')
@@ -6878,7 +6892,9 @@
 			const row = (label, value) => '<dt>' + th(label) + '</dt><dd>' + value + '</dd>';
 			return '<div class="ibx-activity" role="note">'
 				+ '<button type="button" class="ibx-activity__sum ibx-js-activitytoggle" aria-expanded="false" aria-controls="' + id + '">' + ic(a.reply ? 'reply' : 'sent')
-				+ '<span class="ibx-activity__line">' + esc(line) + '</span>'
+				+ '<span class="ibx-activity__text"><span class="ibx-activity__line">' + esc(line) + '</span>'
+				// Its first words (UX fix series): several answers to the same person told apart without unfolding them
+				+ (a.snippet ? '<span class="ibx-activity__snippet">' + esc(a.snippet) + '</span>' : '') + '</span>'
 				+ '<time class="ibx-activity__when" datetime="' + new Date(a.date * 1000).toISOString() + '">' + esc(headDate(a.date)) + '</time>'
 				+ ic('chevron-right', 'ibx-activity__chev') + '</button>'
 				+ '<div class="ibx-activity__more" id="' + id + '" hidden><dl class="ibx-activity__dl">'
@@ -7071,7 +7087,13 @@
 		}
 		const seeSent = e.target.closest('.ibx-js-activitysee');
 		if (seeSent) {
-			Dolibarr.executeHook('inbox:mail:goto', { folder: +seeSent.dataset.folder, mail: +seeSent.dataset.mail });
+			// Wide screen (UX fix series): the answer seen over the mail being read, which stays; going to it is a
+			// choice made in the dialog. A phone has no room for it: the answer opened instead
+			if (isPhone()) {
+				Dolibarr.executeHook('inbox:mail:goto', { folder: +seeSent.dataset.folder, mail: +seeSent.dataset.mail });
+			} else {
+				sentMailDialog(+seeSent.dataset.folder, +seeSent.dataset.mail);
+			}
 			return;
 		}
 		const rqBtn = e.target.closest('.ibx-js-createrequest');
@@ -8758,10 +8780,12 @@
 		}
 		if (m.body.remote && !m.body.images) {
 			banners += '<div class="ibx-banner ibx-banner--info ibx-js-imagesbar">' + ic('remote-blocked') + '<div class="ibx-banner__text">' + th('InboxRemoteBlocked')
-				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '') + '</div>'
+				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '')
+				// Sender not proven: a choice « Always » would be saved but never applied, so not offered
+				+ (!(m.auth && m.auth.fail) && m.body.always !== 'never' && m.body.always_ok === false ? '<div class="ibx-muted">' + th('InboxImagesAlwaysUnproven') + '</div>' : '') + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-showimages">' + th('InboxShowImages') + '</button>'
 				// « Always » refused by the administrator (setting 1.78.0): the pictures of each mail on a click only
-				+ (m.auth && m.auth.fail || m.body.always === 'never' ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu" aria-label="' + th('InboxAlwaysShowImages') + '"><span class="ibx-banner__lbl">' + th('InboxAlwaysShowImages') + '</span> ' + ic('chevron-down') + '</button>') + '</div>';
+				+ (m.auth && m.auth.fail || m.body.always === 'never' || m.body.always_ok === false ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu" aria-label="' + th('InboxAlwaysShowImages') + '"><span class="ibx-banner__lbl">' + th('InboxAlwaysShowImages') + '</span> ' + ic('chevron-down') + '</button>') + '</div>';
 		}
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
@@ -9363,6 +9387,36 @@
 		saveParam('mail_zoom', z);
 		$$('.ibx-js-frame', readPane()).forEach(frame => frameReady(frame, S.mail));
 		toast(t('InboxMailZoom', z), { key: 'mail-zoom' });
+	}
+
+	/**
+	 * A mail of the fil (an answer sent) read in a dialog: its head and its body with the same protections as the
+	 * reading (body.php, sandbox, remote pictures as chosen for its sender); « Go to the email » opens it for good
+	 */
+	async function sentMailDialog(folder, id) {
+		let m;
+		try {
+			m = await api('mail', 'open', { id });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const people = (m.to || []).concat(m.cc || []).map(a => a.name ? a.name + ' <' + a.email + '>' : a.email).join(', ');
+		const files = (m.attachments || []).map(a => a.name).join(', ');
+		const row = (label, value) => value ? '<dt>' + th(label) + '</dt><dd>' + esc(value) + '</dd>' : '';
+		dialog({
+			title: m.subject || t('InboxNoSubject'),
+			wide: true,
+			cancelLabel: t('InboxCloseWindow'),
+			body: '<dl class="ibx-activity__dl ibx-sentview__head">' + row('InboxActivityToLabel', people) + row('InboxActivityOn', longDate(m.date))
+				+ row('InboxAttachments', files) + '</dl>'
+				+ (m.security && m.security.encrypted ? '<p class="ibx-muted">' + th('InboxEncrypted') + '</p>'
+					: '<iframe class="ibx-sentview__frame" title="' + th('InboxMailBody') + '" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"'
+						+ ' referrerpolicy="no-referrer" src="' + bodyUrl(m, m.body.images) + '"></iframe>'),
+			actions: [{ label: t('InboxActivityGoToMail'), primary: true, run: () => {
+				Dolibarr.executeHook('inbox:mail:goto', { folder, mail: id });
+			} }],
+		});
 	}
 
 	function headersDialog(m) {
@@ -11654,7 +11708,9 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__clear ibx-js-sxclearin" aria-label="' + th('InboxClearSearch') + '" title="' + th('InboxClearSearch') + '" hidden>' + ic('close') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__close ibx-js-sxclose" aria-label="' + th('InboxSxClose') + '" title="' + th('InboxSxClose') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-sx__panel ibx-js-sxpanel" id="ibx-sxpanel" hidden></div></div></div></div>'
-			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span> <span class="ibx-js-pills" hidden></span><span class="ibx-spacer"></span>'
+			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span>'
+			// Order of the list (UX fix series): its arrow and its words, a click turns it the other way
+			+ '<span class="ibx-sortchip ibx-js-sortchip" hidden></span> <span class="ibx-js-pills" hidden></span><span class="ibx-spacer"></span>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-vsave" hidden>' + ic('folder-heart') + '<span class="ibx-searchinfo__word ibx-js-vsavelabel"></span></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-sxclear" hidden>' + th('InboxClearSearch') + '</button></div>'
 			+ '<div class="ibx-sx-deepbar ibx-js-deepbar" role="status" hidden></div>'
@@ -11825,11 +11881,26 @@
 			renderListHead();
 		});
 		$('.ibx-js-refresh', el).addEventListener('click', () => refreshNow());
+		const chip = $('.ibx-js-sortchip', el);
+		chip.addEventListener('click', e => {
+			if (e.target.closest('.ibx-js-sortdir')) {
+				const [k, dir] = (params.list_sort || 'date:desc').split(':');
+				setSort(k + ':' + (dir === 'asc' ? 'desc' : 'asc'));
+			} else if (e.target.closest('.ibx-js-sortkey')) {
+				menu($('.ibx-js-sortkey', chip), sortItems());
+			}
+		});
+		chip.addEventListener('contextmenu', e => {
+			// Browser menu kept with Shift (interface §6 bis)
+			if (e.shiftKey) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			menu($('.ibx-js-sortkey', chip), sortItems(), { x: e.clientX, y: e.clientY });
+		});
 		$('.ibx-js-listmenu', el).addEventListener('click', e => {
-			const cur = params.list_sort || 'date:desc';
-			const opt = (v, k) => ({ label: t(k), checked: cur === v, run: () => setSort(v) });
-			menu(e.currentTarget, [
-				opt('date:desc', 'InboxSortDateDesc'), opt('date:asc', 'InboxSortDateAsc'), opt('from:asc', 'InboxSortFrom'), opt('subject:asc', 'InboxSortSubject'), opt('size:desc', 'InboxSortSize'),
+			menu(e.currentTarget, sortItems().concat([
 				{ sep: true },
 				{ label: t('InboxViewTable'), checked: params.view === 'table', run: () => setView('table') },
 				{ label: t('InboxViewCards'), checked: params.view !== 'table', run: () => setView('cards') },
@@ -11842,7 +11913,7 @@
 				{ label: t('InboxDensity_compact'), checked: params.density === 'compact', run: () => setDensity('compact') },
 				{ label: t('InboxDensity_normal'), checked: (params.density || 'normal') === 'normal', run: () => setDensity('normal') },
 				{ label: t('InboxDensity_comfortable'), checked: params.density === 'comfortable', run: () => setDensity('comfortable') },
-			]);
+			]));
 		});
 		bindSearchPanel(el);
 		const listBody = $('.ibx-pane--list .ibx-pane__body', el);
@@ -11926,6 +11997,18 @@
 		}, { passive: true });
 	}
 
+	/**
+	 * Orders of the list (menu « ⋯ » and the chip of the order): the key first (taken in its natural direction), then
+	 * the two directions of this key in its own words (newest / oldest, A → Z / Z → A, biggest / smallest)
+	 */
+	function sortItems() {
+		const [k, dir] = (params.list_sort || 'date:desc').split(':');
+		const key = (v, label) => ({ label: t(label), checked: k === v, run: () => setSort(v + ':' + naturalSort(v)) });
+		const words = { date: ['InboxSortDateDesc', 'InboxSortDateAsc'], size: ['InboxSortSize', 'InboxSortSizeAsc'] }[k] || ['InboxSortZA', 'InboxSortAZ'];
+		const way = (d, label) => ({ label: t(label), checked: dir === d, run: () => setSort(k + ':' + d) });
+		const ways = naturalSort(k) === 'desc' ? [way('desc', words[0]), way('asc', words[1])] : [way('asc', words[1]), way('desc', words[0])];
+		return [key('date', 'InboxSortByDate'), key('from', 'InboxSortFrom'), key('subject', 'InboxSortSubject'), key('size', 'InboxSortBySize'), { sep: true }].concat(ways);
+	}
 	function setSort(v) {
 		saveParam('list_sort', v);
 		loadList();

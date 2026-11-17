@@ -1239,7 +1239,10 @@
 			+ field('label', t('InboxAccountLabel'), a.label, { help: t('InboxAccountLabelHelp'), cls: 'ibx-field--medium' })
 			+ field('type', t('InboxAccountType'), a.type, { options: [['shared', t('InboxTypeShared')], ['personal', t('InboxTypePersonal')]], cls: 'ibx-field--medium' })
 			+ '<div class="ibx-formrow" data-field="fk_user_owner"' + (a.type === 'personal' ? '' : ' hidden') + '><label class="ibx-formrow__label" for="f-owner-q">' + th('InboxAccountOwner') + ' <span class="ibx-req" aria-hidden="true">*</span></label><div>'
-			+ '<input type="hidden" name="fk_user_owner" value="' + esc(a.fk_user_owner || '') + '"><input class="ibx-field ibx-field--medium" id="f-owner-q" list="ibx-owner-list" autocomplete="off" placeholder="' + th('InboxSearchUser') + '" value="' + esc(a.owner_name || (account && account.summary ? account.summary.owner : '')) + '"><datalist id="ibx-owner-list"></datalist>'
+			+ '<select class="ibx-field ibx-field--medium" id="f-owner-q" name="fk_user_owner"><option value=""></option>'
+			+ (+a.fk_user_owner ? '<option value="' + esc(a.fk_user_owner) + '" selected' + (a.owner_photo ? ' data-avatar-img="' + esc(a.owner_photo) + '"' : '')
+				+ ' data-avatar-text="' + esc(initialsOf(a.owner_name || (account && account.summary ? account.summary.owner : ''))) + '" data-avatar-color="hsl(' + hueOf('u' + a.fk_user_owner) + ' 55% 90%)">'
+				+ esc(a.owner_name || (account && account.summary ? account.summary.owner : '')) + '</option>' : '') + '</select>'
 			+ '<div class="ibx-formrow__help">' + th('InboxAccountOwnerHelp') + '</div><div class="ibx-formrow__error" hidden></div></div></div>'
 			+ '</div></section>';
 		const imapHostRows = field('imap_host', t('InboxImapHost'), a.imap_host, { required: true, placeholder: 'mail.example.com', cls: 'ibx-field--medium', inputmode: 'url' })
@@ -1677,37 +1680,8 @@
 	}
 
 	function ownerPicker(form) {
-		const q = $('#f-owner-q', form);
-		const list = $('#ibx-owner-list', form);
-		const hidden = $('[name="fk_user_owner"]', form);
-		// Users seen, by the name shown (same reason as the access picker)
-		const seen = new Map();
-		let timer = 0;
-		q.addEventListener('input', () => {
-			const hit = seen.get(q.value);
-			hidden.value = hit ? hit.id : '';
-			clearTimeout(timer);
-			if (hit) {
-				return;
-			}
-			timer = setTimeout(async () => {
-				try {
-					const users = (await api('access', 'search', { q: q.value })).results.filter(x => x.kind === 'user');
-					users.forEach(u => {
-						if (!seen.has(u.name)) {
-							seen.set(u.name, u);
-						}
-					});
-					if (users.length) {
-						list.innerHTML = users.map(u => '<option value="' + esc(u.name) + '"></option>').join('');
-					}
-					const again = seen.get(q.value);
-					hidden.value = again ? again.id : '';
-				} catch (e) {
-					// The picker stays usable with what it has
-				}
-			}, 200);
-		});
+		// Same picker as the accesses (UX fix series), users only; the value is the id of the user
+		whoPicker($('#f-owner-q', form), { groups: false, ids: true, placeholder: t('InboxSearchUser') });
 	}
 
 	function checklist(test) {
@@ -2670,18 +2644,21 @@
 			html += '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th(data.owner ? 'InboxNoOtherAccess' : 'InboxNoAccessYet') + '</div></div>';
 		} else {
 			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxAccessWho') + '</th><th>' + th('InboxAccessLevel') + '</th><th></th></tr></thead><tbody>'
-				+ data.accesses.map(a => '<tr><td>' + ic(a.fk_usergroup ? 'multi' : 'account') + ' ' + esc(a.name) + (a.fk_usergroup ? ' <span class="ibx-muted">' + th('InboxGroupAllMembers') + '</span>' : '') + '</td>'
+				+ data.accesses.map(a => '<tr><td><span class="ibx-who">' + whoPicture(a.fk_usergroup ? { kind: 'group', id: a.fk_usergroup, name: a.name, color: a.color } : { kind: 'user', id: a.fk_user, name: a.name, photo: a.photo })
+					+ '<span>' + esc(a.name) + (a.fk_usergroup ? ' <span class="ibx-muted">' + th('InboxGroupAllMembers') + '</span>' : '') + '</span></span></td>'
 					+ '<td><select class="ibx-field ibx-field--medium" data-level="' + a.fk_user + ':' + a.fk_usergroup + '" aria-label="' + th('InboxAccessLevel') + '">' + levels.map(l => '<option value="' + l + '"' + (l === a.level ? ' selected' : '') + '>' + esc(levelLabel(l)) + '</option>').join('') + '</select></td>'
 					+ '<td class="ibx-table__actions"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-revoke="' + a.fk_user + ':' + a.fk_usergroup + ':' + a.level + '" title="' + th('InboxRemoveAccess') + '" aria-label="' + th('InboxRemoveAccess') + '">' + ic('close') + '</button></td></tr>').join('')
 				+ '</tbody></table>';
 		}
-		html += '<form class="ibx-inline ibx-js-grant" style="margin-top:1rem"><input class="ibx-field ibx-field--medium" list="ibx-access-list" placeholder="' + th('InboxSearchUserOrGroup') + '" aria-label="' + th('InboxSearchUserOrGroup') + '" autocomplete="off"><datalist id="ibx-access-list"></datalist>'
+		html += '<form class="ibx-inline ibx-js-grant" style="margin-top:1rem"><select class="ibx-field ibx-field--medium" name="who" aria-label="' + th('InboxSearchUserOrGroup') + '"><option value=""></option></select>'
 			+ '<select class="ibx-field ibx-field--medium" name="level" aria-label="' + th('InboxAccessLevel') + '">' + levels.map(l => '<option value="' + l + '">' + esc(levelLabel(l)) + '</option>').join('') + '</select>'
 			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('user-plus') + ' ' + th('InboxGiveAccess') + '</button></form>'
 			// What the level chosen gives, and what it does not (1.91.0)
 			+ '<p class="ibx-formrow__help ibx-js-levelhint" aria-live="polite">' + th('InboxAccessHint_read') + '</p>';
 		html += '<section class="ibx-section" style="margin-top:2rem"><h2 class="ibx-section__title">' + th('InboxJournal') + '</h2>' + journalHtml(log.log) + '</section>';
 		box.innerHTML = html;
+		// A photo that does not load leaves the letters
+		$$('.ibx-who__pic img', box).forEach(img => img.addEventListener('error', () => img.remove()));
 
 		const refresh = () => {
 			I.changed('access', account.id);
@@ -2712,54 +2689,93 @@
 			}
 		}));
 		const grant = $('.ibx-js-grant', box);
-		const q = $('input', grant);
 		grant.level.addEventListener('change', () => {
 			$('.ibx-js-levelhint', box).textContent = t('InboxAccessHint_' + grant.level.value);
 		});
-		// Every result seen, by the name shown: choosing an entry of the list fires a new search on the full name,
-		// whose answer must not make the choice unknown
-		const seen = new Map();
-		let timer = 0;
-		const search = async () => {
-			try {
-				const results = (await api('access', 'search', { q: q.value })).results;
-				results.forEach(x => {
-					if (!seen.has(x.name)) {
-						seen.set(x.name, x);
-					}
-				});
-				if (results.length) {
-					$('#ibx-access-list', box).innerHTML = results.map(x => '<option value="' + esc(x.name) + '">' + esc(t(x.kind === 'group' ? 'InboxGroup' : 'InboxUser')) + '</option>').join('');
-				}
-			} catch (e) {
-				// keep the last list
-			}
-		};
-		q.addEventListener('input', () => {
-			clearTimeout(timer);
-			if (!seen.has(q.value)) {
-				timer = setTimeout(search, 200);
-			}
-		});
+		// Searchable list of the people and groups (UX fix series): a picture, a second line that tells them apart, the
+		// ones that already have an access greyed with their level
+		const has = new Map(data.accesses.map(a => [(a.fk_usergroup ? 'g:' + a.fk_usergroup : 'u:' + a.fk_user), a.level]));
+		if (data.owner) {
+			has.set('u:' + data.owner.id, 'owner');
+		}
+		whoPicker(grant.who, { groups: true, has, placeholder: t('InboxSearchUserOrGroup') });
 		grant.addEventListener('submit', async e => {
 			e.preventDefault();
-			clearTimeout(timer);
-			if (!seen.has(q.value) && q.value.trim() !== '') {
-				await search();
-			}
-			const hit = seen.get(q.value);
-			if (!hit) {
+			const [kind, id] = grant.who.value.split(':');
+			if (!id) {
 				toast(t('InboxChooseUserOrGroup'), { error: true });
-				q.focus();
+				const btn = grant.who._dolCombo ? grant.who._dolCombo.btn : grant.who;
+				btn.focus();
 				return;
 			}
+			const name = grant.who.selectedOptions[0].textContent.trim();
 			try {
-				await post('access', 'grant', { id: account.id, fk_user: hit.kind === 'user' ? hit.id : 0, fk_usergroup: hit.kind === 'group' ? hit.id : 0, level: grant.level.value });
-				toast(t('InboxAccessGiven', hit.name));
+				await post('access', 'grant', { id: account.id, fk_user: kind === 'u' ? +id : 0, fk_usergroup: kind === 'g' ? +id : 0, level: grant.level.value });
+				toast(t('InboxAccessGiven', name));
 				refresh();
 			} catch (err) {
 				toast(err.message, { error: true });
 			}
+		});
+	}
+
+	/** Letters of a name (« John BOTELLA » → JB) */
+	function initialsOf(name) {
+		const parts = String(name || '?').trim().split(/[\s.@_-]+/).filter(Boolean);
+		return ((parts[0] || '?')[0] + (parts.length > 1 ? parts[1][0] : '')).toUpperCase();
+	}
+	/** Hue drawn from a text: the same user keeps the same colour as in the reading (avatars of inbox-mail.js) */
+	function hueOf(text) {
+		let h = 0;
+		for (const c of String(text || '')) {
+			h = (h * 31 + c.charCodeAt(0)) % 360;
+		}
+		return h;
+	}
+	/** Picture of a user (photo, else letters) or of a group (its colour, a group icon), for the lists of the combo */
+	function whoAvatar(x) {
+		return x.kind === 'group' ? { icon: 'group', shape: 'square', color: x.color || '' }
+			: { img: x.photo || '', text: initialsOf(x.name), color: 'hsl(' + hueOf('u' + x.id) + ' 55% 90%)' };
+	}
+	/** Same picture in a table of the page */
+	function whoPicture(x) {
+		if (x.kind === 'group') {
+			const col = /^#?[0-9a-f]{6}$/i.test(x.color || '') ? '#' + x.color.replace('#', '') : '';
+			// The icon dark on a light colour, white on a dark one
+			const lum = col ? [1, 3, 5].map(i => parseInt(col.substr(i, 2), 16)).reduce((acc, v, i) => acc + v * [0.299, 0.587, 0.114][i], 0) : 255;
+			return '<span class="ibx-who__pic ibx-who__pic--group"' + (col ? ' style="--ibx-who-bg:' + col + ';color:' + (lum > 160 ? '#1f2328' : '#fff') + '"' : '') + ' aria-hidden="true">' + ic('multi') + '</span>';
+		}
+		return '<span class="ibx-avatar ibx-avatar--sm ibx-who__pic" style="--ibx-avatar-h:' + hueOf('u' + x.id) + '" aria-hidden="true">' + esc(initialsOf(x.name))
+			+ (x.photo ? '<img src="' + esc(x.photo) + '" alt="" loading="lazy">' : '') + '</span>';
+	}
+	/**
+	 * Picker of a user (and of a group with o.groups) on a select: Dolibarr.tools.combo fed by the search of the server
+	 * @param {HTMLSelectElement} sel Select (value u:id / g:id, or the id alone with o.ids)
+	 * @param {object} o {groups, has: Map key => level, placeholder, ids}
+	 */
+	function whoPicker(sel, o) {
+		if (!Dolibarr.tools.combo) {
+			return;
+		}
+		Dolibarr.tools.combo.attach(sel, {
+			minLength: 0,
+			delay: 150,
+			placeholder: o.placeholder,
+			nativeOnTouch: false,
+			source: async term => {
+				const res = await api('access', 'search', { q: term });
+				const results = res.results.filter(x => o.groups || x.kind === 'user').map(x => {
+					const key = (x.kind === 'group' ? 'g:' : 'u:') + x.id;
+					const level = o.has ? o.has.get(key) : '';
+					const sub = x.kind === 'group' ? t('InboxGroupMembers', x.members) : (x.login || t('InboxUser'));
+					return {
+						value: o.ids ? String(x.id) : key, label: x.name, avatar: whoAvatar(x), disabled: !!level,
+						sub: level ? sub + ' · ' + (level === 'owner' ? t('InboxAccessIsOwner') : t('InboxAccessAlready', levelLabel(level))) : sub,
+					};
+				});
+				// Beyond the first ones given by the server: « n more, type to narrow » under the list
+				return { results, more: (+res.more_users || 0) + (o.groups ? +res.more_groups || 0 : 0) };
+			},
 		});
 	}
 

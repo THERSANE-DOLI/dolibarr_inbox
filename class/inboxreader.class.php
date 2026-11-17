@@ -254,7 +254,10 @@ class InboxReader
 		$bounce = new InboxBounce($this->db);
 		$readable = array_keys((new InboxAccess($this->db))->getLevels($user));
 		$passed = self::authPass($auth, (string) $this->row->from_email);
-		$allowImages = $remote && $passed && $this->imagesAllowed($user, (string) $this->row->from_email);
+		// « Always show » applies to a proven sender, or to a mail of the mailbox itself in its sent or drafts folder:
+		// written there by the mailbox, with no receiving server to prove it, nobody else can forge it
+		$alwaysOk = $passed || $this->isOwnMail();
+		$allowImages = $remote && $alwaysOk && $this->imagesAllowed($user, (string) $this->row->from_email);
 		// Recognized domains (1.59.0): the sender (authenticated only) and the links, lookalikes of the list
 		require_once __DIR__.'/inboxtrusteddomain.class.php';
 		$trusted = new InboxTrustedDomain($this->db);
@@ -298,7 +301,7 @@ class InboxReader
 			'size' => strlen($raw),
 			'body' => array('html' => $message->bodyHtml !== '', 'text' => $message->bodyText !== '', 'remote' => $remote, 'trackers' => $trackers, 'images' => $allowImages,
 				// « Always show » offered for: domain (sender or domain), sender, never (setting 1.78.0)
-				'always' => self::imagesAlwaysMode()),
+				'always' => self::imagesAlwaysMode(), 'always_ok' => $alwaysOk),
 			'attachments' => $attachments,
 			'headers' => $headers,
 			'auth' => $auth,
@@ -548,6 +551,29 @@ class InboxReader
 		$mode = getDolGlobalString('INBOX_UNSUBSCRIBE', 'oneclick');
 
 		return in_array($mode, array('oneclick', 'mail', 'off'), true) ? $mode : 'oneclick';
+	}
+
+	/**
+	 * Mail written by the mailbox: in its sent or drafts folder, from the mailbox or one of its identities
+	 *
+	 * @return bool
+	 */
+	public function isOwnMail()
+	{
+		if (!in_array((string) ($this->row->folder_role ?? ''), array('sent', 'drafts'), true)) {
+			return false;
+		}
+		$from = strtolower(trim((string) $this->row->from_email));
+		if ($from === '') {
+			return false;
+		}
+		if ($from === strtolower(trim((string) $this->account->email))) {
+			return true;
+		}
+		$row = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_identity WHERE fk_account = ".((int) $this->account->id)
+			." AND LOWER(email) = '".$this->db->escape($from)."' LIMIT 1");
+
+		return is_object($row);
 	}
 
 	/**
