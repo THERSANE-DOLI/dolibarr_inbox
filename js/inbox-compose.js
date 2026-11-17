@@ -155,13 +155,19 @@
 			paint();
 			w.changed();
 		};
+		// The field is emptied before the add: add() tells the window, which reads the recipients again
 		const commit = () => {
 			const v = input.value.trim();
+			input.value = '';
+			hide();
 			if (v) {
 				add(parseList(v));
-				input.value = '';
 			}
+		};
+		const pick = f => {
+			input.value = '';
 			hide();
+			add([{ email: f.email, name: f.name }]);
 		};
 		const showSug = () => {
 			if (!found.length) {
@@ -217,9 +223,7 @@
 				showSug();
 			} else if ((e.key === 'Enter' || e.key === 'Tab') && active >= 0 && found[active]) {
 				e.preventDefault();
-				add([{ email: found[active].email, name: found[active].name }]);
-				input.value = '';
-				hide();
+				pick(found[active]);
 			} else if (e.key === 'Enter' && input.value.trim()) {
 				e.preventDefault();
 				commit();
@@ -249,9 +253,7 @@
 			const o = e.target.closest('[data-i]');
 			if (o) {
 				e.preventDefault();
-				add([{ email: found[+o.dataset.i].email, name: found[+o.dataset.i].name }]);
-				input.value = '';
-				hide();
+				pick(found[+o.dataset.i]);
 				input.focus();
 			}
 		});
@@ -268,12 +270,17 @@
 		});
 		paint();
 		return {
+			// get() turns the text typed into chips (sending); list() and peek() never touch the field being typed
 			get: () => {
 				commit();
 				return items.slice();
 			},
 			add,
 			list: () => items.slice(),
+			peek: () => {
+				const v = input.value.trim();
+				return items.concat(v ? parseList(v).filter(a => a.email && !items.some(x => x.email === a.email)) : []);
+			},
 			count: () => items.length + (input.value.trim() ? 1 : 0),
 			clear: () => {
 				const old = items.splice(0, items.length);
@@ -449,13 +456,15 @@
 		});
 	}
 
-	function data(w) {
+	/** The draft keeps the text being typed without making a chip of it; the sending (final) makes the chips */
+	function data(w, final) {
+		const r = k => (final ? w[k].get() : w[k].peek());
 		return {
 			compose: w.token,
 			identity: +$('.ibx-js-from', w.dlg).value,
-			to: w.to.get(),
-			cc: w.cc.get(),
-			bcc: w.bcc.get(),
+			to: r('to'),
+			cc: r('cc'),
+			bcc: r('bcc'),
 			subject: $('.ibx-js-subject', w.dlg).value,
 			html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(),
 			quote: w.quote ? 1 : 0,
@@ -556,7 +565,7 @@
 			status(w, t('InboxComposeWaitUpload'), true);
 			return;
 		}
-		const d = data(w);
+		const d = data(w, true);
 		if (!d.to.length && !d.cc.length && !d.bcc.length) {
 			status(w, t('InboxComposeNoRecipient'), true);
 			w.to.focus();
@@ -1968,13 +1977,13 @@
 
 	// ---------- Templates (lot W6 1.18.0): those of the mailbox, those of the linked pieces ----------
 	function firstTo(w) {
-		const to = w.to.get();
+		const to = w.to.list();
 		return to.length ? to[0].email : '';
 	}
 	/** Recipients that may fill the variables: À then Cc, each address once */
 	function varRecipients(w) {
 		const seen = new Set();
-		return w.to.get().concat(w.cc.get()).filter(r => r.email && !seen.has(r.email.toLowerCase()) && seen.add(r.email.toLowerCase()));
+		return w.to.list().concat(w.cc.list()).filter(r => r.email && !seen.has(r.email.toLowerCase()) && seen.add(r.email.toLowerCase()));
 	}
 	/** Recipient of the variables (1.26.0): the one chosen while still a recipient, else the first À */
 	function refTo(w) {
@@ -2434,7 +2443,7 @@
 	 * chosen, what goes in the mail (recall, table of its lines, PDF, online signature or payment)
 	 */
 	function pieceDialog(w) {
-		const emails = ['to', 'cc'].flatMap(k => w[k].get().map(r => (r && r.email) || r)).filter(x => typeof x === 'string' && x);
+		const emails = ['to', 'cc'].flatMap(k => w[k].list().map(r => (r && r.email) || r)).filter(x => typeof x === 'string' && x);
 		let chosen = null;
 		let seqSearch = 0;
 		let timer = 0;
