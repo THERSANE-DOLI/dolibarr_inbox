@@ -522,6 +522,9 @@ class Inbox
 		// Notifications of the bell (INBOX_NOTIFICATION_DAYS)
 		require_once __DIR__.'/inboxnotification.class.php';
 		InboxNotification::purge($this->db);
+		// Mails gone from the server for long (1.114.0): their references forgotten with their links and notes
+		require_once __DIR__.'/inboxmailref.class.php';
+		$forgotten = (new InboxMailRef($this->db))->shed();
 		// Writings left open (lot W6): their temporary folder
 		require_once __DIR__.'/inboxcomposer.class.php';
 		InboxComposer::purge();
@@ -563,7 +566,7 @@ class Inbox
 		if (is_dir($dir)) {
 			self::writeReadme($dir);
 		}
-		$this->output = $removed.' mail(s) removed from the cache';
+		$this->output = $removed.' mail(s) removed from the cache, '.$forgotten.' mail(s) gone from the server forgotten';
 
 		return 0;
 	}

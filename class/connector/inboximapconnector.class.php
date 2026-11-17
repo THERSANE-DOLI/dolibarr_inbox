@@ -2100,6 +2100,9 @@ class InboxImapConnector extends InboxConnector
 	/** Mails read per FETCH */
 	const FETCH_CHUNK = 200;
 
+	/** The index of a folder compared mail by mail with the server at least this often, whatever the counts say */
+	const COMPARE_SECONDS = 3600;
+
 	/**
 	 * @param string $folder Folder path
 	 * @return array{total:int,unread:int,changed:bool,token:string,uidvalidity:int,uidnext:int,modseq:string}|null
@@ -2157,8 +2160,9 @@ class InboxImapConnector extends InboxConnector
 		$c = is_array($c) ? $c : array();
 		$out = array('cursor' => '', 'reset' => false, 'new' => array(), 'changed' => array(), 'deleted' => array(), 'more' => false,
 			'total' => $status['total'], 'unread' => $status['unread']);
-		// Nothing changed since the last call, and the first indexing is done: nothing to read
-		if (!empty($c['token']) && $c['token'] === $status['token'] && !empty($c['done'])) {
+		// Nothing changed since the last call, and the first indexing is done: nothing to read. A cursor that never
+		// compared the index with the server (written before 1.113.2) goes on once to do it
+		if (!empty($c['token']) && $c['token'] === $status['token'] && !empty($c['done']) && !empty($c['cmp'])) {
 			$out['cursor'] = (string) $cursor;
 			return $out;
 		}
@@ -2182,13 +2186,15 @@ class InboxImapConnector extends InboxConnector
 			$v = $status['uidvalidity'];
 			$read = 0;
 			if (empty($c)) {
-				// First call: every UID of the folder, the most recent read first
-				$all = $this->searchUids($since > 0 ? array('SINCE', date('d-M-Y', $since)) : array('ALL'));
+				// First call: every UID of the folder, the most recent read first; a mail marked \Deleted by another
+				// client (removed at its next expunge, hidden by the other clients) is not indexed
+				$all = $this->searchUids($since > 0 ? array('SINCE', date('d-M-Y', $since), 'UNDELETED') : array('UNDELETED'));
 				rsort($all);
 				$take = array_slice($all, 0, $max);
 				$out['new'] = $this->fetchMails($take, $v);
 				$read = count($take);
-				$c = array('v' => $v, 'next' => $status['uidnext'], 'low' => $take ? min($take) : $status['uidnext'], 'done' => count($all) <= $max, 'modseq' => $status['modseq']);
+				$c = array('v' => $v, 'next' => $status['uidnext'], 'low' => $take ? min($take) : $status['uidnext'], 'done' => count($all) <= $max, 'modseq' => $status['modseq'],
+					'cmp' => dol_now());
 			} else {
 				// New mails since the last call
 				if ($status['uidnext'] > (int) $c['next']) {
@@ -2214,10 +2220,18 @@ class InboxImapConnector extends InboxConnector
 				} elseif (!$condstore && !empty($options['flags'])) {
 					$out['changed'] = $this->fetchFlags(((int) $c['low']).':*', $v, '');
 				}
+				// Marked \Deleted elsewhere (Thunderbird, a phone): gone for the user, it leaves the index now
+				foreach ($out['changed'] as $i => $ch) {
+					if (!empty($ch['deleted'])) {
+						$out['deleted'][] = (string) $ch['remote_id'];
+						unset($out['changed'][$i]);
+					}
+				}
+				$out['changed'] = array_values($out['changed']);
 				$c['modseq'] = $status['modseq'];
 				// Older mails not indexed yet (first indexing), within what is left of the budget
 				if (empty($c['done']) && !empty($options['backfill']) && $read < $max && (int) $c['low'] > 1) {
-					$older = $this->searchUids(array('UID', '1:'.((int) $c['low'] - 1)));
+					$older = $this->searchUids(array('UID', '1:'.((int) $c['low'] - 1), 'UNDELETED'));
 					$older = array_values(array_filter($older, function ($u) use ($c) {
 						return $u < (int) $c['low'];
 					}));
@@ -2235,15 +2249,17 @@ class InboxImapConnector extends InboxConnector
 				} elseif (empty($c['done']) && (int) $c['low'] <= 1) {
 					$c['done'] = true;
 				}
-				// Mails removed or moved elsewhere: the index is compared only when the numbers differ
+				// Mails removed, moved elsewhere or marked \Deleted: the index is compared when the numbers differ, and
+				// at least every hour (a mail removed while another one stays out of the index leaves equal numbers)
 				if (isset($options['known']) && is_callable($options['known'])) {
 					// indexed: number of mails of the folder in the index; the list is asked only when it differs
-					$expected = (int) ($options['indexed'] ?? -1) + count($out['new']);
-					$present = $this->searchUids(array('UID', ((int) $c['low']).':*'));
+					$expected = (int) ($options['indexed'] ?? -1) + count($out['new']) - count($out['deleted']);
+					$present = $this->searchUids(array('UID', ((int) $c['low']).':*', 'UNDELETED'));
 					$present = array_values(array_filter($present, function ($u) use ($c) {
 						return $u >= (int) $c['low'];
 					}));
-					if ($expected !== count($present)) {
+					if ($expected !== count($present) || empty($c['cmp']) || (int) $c['cmp'] < dol_now() - self::COMPARE_SECONDS) {
+						$c['cmp'] = dol_now();
 						$known = call_user_func($options['known']);
 						$here = array_flip(array_map(function ($u) use ($v) {
 							return $v.':'.$u;
@@ -2266,6 +2282,8 @@ class InboxImapConnector extends InboxConnector
 		}
 		$c['token'] = $status['token'];
 		$out['cursor'] = (string) json_encode($c);
+		// A mail marked \Deleted is seen twice (its flags, the comparison)
+		$out['deleted'] = array_values(array_unique($out['deleted']));
 
 		return $out;
 	}
@@ -2312,7 +2330,9 @@ class InboxImapConnector extends InboxConnector
 			// Decoded by inbox: Webklex merges the sub parts of a BODYSTRUCTURE written « NIL)( » (attachments not seen)
 			$response = $this->fetchDecoded($set, '(UID FLAGS INTERNALDATE RFC822.SIZE BODYSTRUCTURE'.$preview.' BODY.PEEK[HEADER.FIELDS ('.self::SYNC_HEADERS.($extra ? ' '.implode(' ', $extra) : '').')])');
 			foreach ($this->fetchItems($response) as $item) {
-				if (empty($item['UID'])) {
+				$flags = self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
+				// Marked \Deleted by another client: gone for the user, never indexed
+				if (empty($item['UID']) || $flags['deleted']) {
 					continue;
 				}
 				$mail = InboxHeaderParser::parse((string) ($item['HEADER'] ?? ''), isset($item['BODYSTRUCTURE']) && is_array($item['BODYSTRUCTURE']) ? $item['BODYSTRUCTURE'] : null);
@@ -2325,7 +2345,7 @@ class InboxImapConnector extends InboxConnector
 					// Read by InboxMail with the sources (requester of a mail sent by a site)
 					$mail['source_header'] = substr((string) ($item['HEADER'] ?? ''), 0, InboxHeaderParser::MAX_HEADER);
 				}
-				$out[] = $mail + self::flagFields(isset($item['FLAGS']) ? (array) $item['FLAGS'] : array());
+				$out[] = $mail + $flags;
 			}
 		}
 
@@ -2458,7 +2478,7 @@ class InboxImapConnector extends InboxConnector
 	 */
 	public static function flagFields(array $flags)
 	{
-		$out = array('seen' => 0, 'answered' => 0, 'flagged' => 0, 'draft' => 0, 'keywords' => array());
+		$out = array('seen' => 0, 'answered' => 0, 'flagged' => 0, 'draft' => 0, 'deleted' => 0, 'keywords' => array());
 		foreach ($flags as $f) {
 			if (!is_string($f)) {
 				continue;
@@ -2472,6 +2492,9 @@ class InboxImapConnector extends InboxConnector
 				$out['flagged'] = 1;
 			} elseif ($l === '\\draft') {
 				$out['draft'] = 1;
+			} elseif ($l === '\\deleted') {
+				// Removed at the next expunge of the folder, hidden by the other clients until then
+				$out['deleted'] = 1;
 			} elseif ($f !== '' && $f[0] !== '\\' && preg_match('/^[\x21-\x7E]{1,64}$/', $f)) {
 				$out['keywords'][] = $f;
 			}

@@ -34,6 +34,9 @@ class InboxMailRef
 	/** @var string */
 	public $error = '';
 
+	/** @var bool|null Column date_gone there (1.114.0) */
+	protected static $dateGone = null;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -287,6 +290,167 @@ class InboxMailRef
 	{
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET last_account = ".((int) $accountId).", last_folder = '".$this->db->escape(dol_trunc((string) $folder, 250, 'right', 'UTF-8', 1))."'"
 			." WHERE rowid = ".((int) $mailrefId)." AND (last_account IS NULL OR last_account <> ".((int) $accountId)." OR last_folder IS NULL OR last_folder <> '".$this->db->escape((string) $folder)."')");
+	}
+
+	/**
+	 * The column date_gone is there (1.114.0): files may be replaced before the module is activated again
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return bool
+	 */
+	public static function hasDateGone(DoliDB $db)
+	{
+		if (self::$dateGone === null) {
+			self::$dateGone = (bool) $db->query("SELECT date_gone FROM ".$db->prefix()."inbox_mailref WHERE 1 = 0");
+		}
+
+		return self::$dateGone;
+	}
+
+	/**
+	 * Mailrefs of rows of the index, by their keys, among the given condition on date_gone
+	 *
+	 * @param object[] $rows Rows (message_id; else date_mail, from_email, subject, size)
+	 * @param string   $cond Condition on the mailref (r.date_gone ...)
+	 * @return object[]       Mailrefs (rowid)
+	 */
+	protected function refsOfRows(array $rows, $cond)
+	{
+		global $conf;
+
+		$keys = array();
+		foreach ($rows as $r) {
+			$k = $this->keyOf($r);
+			if ($k !== '') {
+				$keys[$k] = "'".$this->db->escape($k)."'";
+			}
+		}
+		$out = array();
+		foreach (array_chunk(array_values($keys), 500) as $chunk) {
+			$found = $this->db->getRows("SELECT r.rowid FROM ".$this->db->prefix()."inbox_mailref as r WHERE r.entity = ".((int) $conf->entity)
+				." AND r.message_id IN (".implode(',', $chunk).") AND ".$cond." LIMIT 10000");
+			foreach (is_array($found) ? $found : array() as $f) {
+				$out[] = $f;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Rows that left the index because their mail left the server (removed, moved elsewhere, folder removed): the
+	 * mailrefs of the ones found nowhere else in the index are marked gone from now. Never called for a row that leaves
+	 * the index while its mail stays on the server (index rebuilt, folder no longer followed, new UIDVALIDITY).
+	 *
+	 * @param object[] $rows Rows removed (message_id, date_mail, from_email, subject, size)
+	 * @return int           Mailrefs marked
+	 */
+	public function markGone(array $rows)
+	{
+		if (!$rows || !self::hasDateGone($this->db)) {
+			return 0;
+		}
+		$n = 0;
+		foreach ($this->refsOfRows($rows, "r.date_gone IS NULL") as $ref) {
+			if (!$this->copies((int) $ref->rowid)) {
+				$this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET date_gone = '".$this->db->idate(dol_now())."' WHERE rowid = ".((int) $ref->rowid));
+				$n++;
+			}
+		}
+
+		return $n;
+	}
+
+	/**
+	 * Rows just indexed: a mail gone that comes back (moved back, restored from a backup with the same Message-ID) takes
+	 * its links, notes and assignments back, its mailref is no longer gone
+	 *
+	 * @param object[] $rows Rows added (message_id, date_mail, from_email, subject, size)
+	 * @return void
+	 */
+	public function markBack(array $rows)
+	{
+		if (!$rows || !self::hasDateGone($this->db)) {
+			return;
+		}
+		$ids = array_map(function ($r) {
+			return (int) $r->rowid;
+		}, $this->refsOfRows($rows, "r.date_gone IS NOT NULL"));
+		foreach (array_chunk($ids, 500) as $chunk) {
+			$this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET date_gone = NULL WHERE rowid IN (".implode(',', $chunk).")");
+		}
+	}
+
+	/**
+	 * Days before a mailref gone is forgotten: with links, notes or assignments (setting, 0 = never), without (hidden
+	 * constant, 90 days)
+	 *
+	 * @return array{linked:int,bare:int}
+	 */
+	public static function goneDays()
+	{
+		return array(
+			'linked' => getDolGlobalString('INBOX_GONE_LINKED_DAYS') === '' ? 730 : max(0, getDolGlobalInt('INBOX_GONE_LINKED_DAYS')),
+			'bare' => max(1, getDolGlobalInt('INBOX_GONE_BARE_DAYS', 90)),
+		);
+	}
+
+	/**
+	 * Nightly job: the mailrefs gone for long are forgotten with their links, notes, assignments and notifications.
+	 * Without links, notes nor assignments after INBOX_GONE_BARE_DAYS; with, after INBOX_GONE_LINKED_DAYS (never if 0).
+	 * Each one is looked for again in the index first: a mail back by a way that did not clear the date stays.
+	 *
+	 * @return int Mailrefs forgotten
+	 */
+	public function shed()
+	{
+		global $conf;
+
+		if (!self::hasDateGone($this->db)) {
+			return 0;
+		}
+		$p = $this->db->prefix();
+		$days = self::goneDays();
+		$rows = $this->db->getRows("SELECT r.rowid, r.date_gone FROM ".$p."inbox_mailref as r WHERE r.entity = ".((int) $conf->entity)
+			." AND r.date_gone IS NOT NULL AND r.date_gone < '".$this->db->idate(dol_now() - $days['bare'] * 86400)."' ORDER BY r.date_gone LIMIT 2000");
+		require_once __DIR__.'/inboxlink.class.php';
+		$linker = new InboxLink($this->db);
+		$n = 0;
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$id = (int) $r->rowid;
+			if ($this->copies($id)) {
+				$this->db->query("UPDATE ".$p."inbox_mailref SET date_gone = NULL WHERE rowid = ".$id);
+				continue;
+			}
+			$used = $this->db->getRow("SELECT (SELECT COUNT(rowid) FROM ".$p."inbox_link WHERE fk_mailref = ".$id.")"
+				." + (SELECT COUNT(rowid) FROM ".$p."inbox_note WHERE fk_mailref = ".$id.")"
+				." + (SELECT COUNT(rowid) FROM ".$p."inbox_mail_assign WHERE fk_mailref = ".$id.") as n");
+			if (is_object($used) && (int) $used->n > 0
+				&& ($days['linked'] === 0 || (int) $this->db->jdate($r->date_gone) >= dol_now() - $days['linked'] * 86400)) {
+				continue;
+			}
+			$this->db->begin();
+			// Links one by one: INBOX_LINK_DELETE told to the modules (author: the user of the scheduled job)
+			$links = $this->db->getRows("SELECT rowid FROM ".$p."inbox_link WHERE fk_mailref = ".$id." LIMIT 10000");
+			foreach (is_array($links) ? $links : array() as $l) {
+				$linker->unlink((int) $l->rowid);
+			}
+			$ok = true;
+			foreach (array("DELETE FROM ".$p."inbox_link WHERE fk_mailref = ".$id, "DELETE FROM ".$p."inbox_note WHERE fk_mailref = ".$id, "DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref = ".$id,
+				"DELETE FROM ".$p."inbox_notification WHERE fk_mailref = ".$id, "UPDATE ".$p."inbox_blocked_sender SET fk_mailref = NULL WHERE fk_mailref = ".$id,
+				"DELETE FROM ".$p."inbox_mailref WHERE rowid = ".$id) as $sql) {
+				$ok = $ok && $this->db->query($sql);
+			}
+			if ($ok) {
+				$this->db->commit();
+				$n++;
+			} else {
+				$this->db->rollback();
+				dol_syslog(__METHOD__.' mailref '.$id.' not forgotten: '.$this->db->lasterror(), LOG_WARNING);
+			}
+		}
+
+		return $n;
 	}
 
 	/**

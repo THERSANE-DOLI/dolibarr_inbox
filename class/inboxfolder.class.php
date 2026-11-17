@@ -119,7 +119,7 @@ class InboxFolder
 			}
 			if ((int) $row->status === self::STATUS_GONE) {
 				// Gone at two readings in a row: removed with its mails from the index
-				$mail->clearFolder((int) $row->rowid);
+				$mail->clearFolder((int) $row->rowid, true);
 				$this->db->query("DELETE FROM ".$p."inbox_folder WHERE rowid = ".((int) $row->rowid));
 				$stats['removed']++;
 			} else {

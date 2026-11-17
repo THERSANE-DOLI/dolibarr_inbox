@@ -92,7 +92,8 @@ $refIds = $linker->mailrefsOf($type, $id);
 $keys = array();
 $refRows = array();
 if ($refIds) {
-	$found = $db->getRows("SELECT rowid, message_id, subject, from_email, date_mail, last_account, last_folder FROM ".$p."inbox_mailref WHERE rowid IN (".implode(',', $refIds).") LIMIT 50000");
+	$found = $db->getRows("SELECT rowid, message_id, subject, from_email, date_mail, last_account, last_folder".(InboxMailRef::hasDateGone($db) ? ", date_gone" : "")
+		." FROM ".$p."inbox_mailref WHERE rowid IN (".implode(',', $refIds).") LIMIT 50000");
 	foreach (is_array($found) ? $found : array() as $r) {
 		$refRows[(int) $r->rowid] = $r;
 		if (strpos((string) $r->message_id, 'fp:') !== 0) {
@@ -194,10 +195,17 @@ print '<div class="div-table-responsive">';
 print '<table class="noborder centpercent">';
 print '<tr class="liste_titre"><th>'.$langs->trans('Date').'</th><th>'.$langs->trans('InboxSender').'</th><th>'.$langs->trans('InboxSubject').'</th>';
 print '<th>'.$langs->trans('InboxMailboxFolder').'</th><th class="center">'.$langs->trans('InboxNotes').'</th><th></th></tr>';
+$goneDays = InboxMailRef::goneDays();
 foreach ($gone as $r) {
 	print '<tr class="oddeven opacitymedium"><td class="nowraponall">'.dol_print_date($db->jdate($r->date_mail), 'dayhour').'</td><td>'.dol_escape_htmltag((string) $r->from_email).'</td>';
 	print '<td>'.dol_escape_htmltag((string) $r->subject).'</td>';
-	print '<td colspan="3">'.dol_escape_htmltag($langs->trans('InboxMailGoneEverywhere').((string) $r->last_folder !== '' ? ' '.$langs->trans('InboxLastSeenIn', mb_convert_encoding((string) $r->last_folder, 'UTF-8', 'UTF7-IMAP')) : '')).'</td></tr>';
+	// Gone from the server for sure (1.114.0): since when, and when its link is forgotten unless it comes back
+	$goneAt = !empty($r->date_gone) ? (int) $db->jdate($r->date_gone) : 0;
+	$state = $goneAt ? $langs->trans('InboxMailGoneSince', dol_print_date($goneAt, 'day')) : $langs->trans('InboxMailGoneEverywhere');
+	if ($goneAt && $goneDays['linked'] > 0) {
+		$state .= ' '.$langs->trans('InboxMailGoneForgetOn', dol_print_date($goneAt + $goneDays['linked'] * 86400, 'day'));
+	}
+	print '<td colspan="3">'.dol_escape_htmltag($state.((string) $r->last_folder !== '' ? ' '.$langs->trans('InboxLastSeenIn', mb_convert_encoding((string) $r->last_folder, 'UTF-8', 'UTF7-IMAP')) : '')).'</td></tr>';
 }
 foreach ($rows as $r) {
 	$date = $r->date_received ? $r->date_received : $r->date_mail;

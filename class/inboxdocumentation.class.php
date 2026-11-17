@@ -61,6 +61,7 @@ class InboxDocumentation
 				'shared_domains' => array('icon' => 'fa-globe', 'version' => '1.76.0', 'files' => array('en_US' => 'admin/shared-domains.md')),
 				'data_sources' => array('icon' => 'fa-file-import', 'version' => '1.72.0', 'files' => array('en_US' => 'admin/data-sources.md')),
 				'module_subscriptions' => array('icon' => 'fa-plug', 'version' => '1.112.0', 'files' => array('en_US' => 'admin/module-subscriptions.md')),
+				'gone_mails' => array('icon' => 'fa-unlink', 'version' => '1.114.0', 'files' => array('en_US' => 'admin/gone-mails.md')),
 			)),
 			'InboxDocGroupDev' => array('icon' => 'fa-code', 'pages' => array(
 				'dev_principles' => array('icon' => 'fa-balance-scale', 'version' => '1.113.0', 'files' => array('en_US' => 'dev/principles.md')),

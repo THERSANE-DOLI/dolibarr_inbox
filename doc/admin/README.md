@@ -9,4 +9,5 @@
 - [Blocked senders and anti-spam](anti-spam.md): blocked senders, Sieve, Rspamd beside Dolibarr
 - [New customer from a mail](new-customer.md)
 - [Modules subscribed to the mailboxes](module-subscriptions.md): which module may react to the mails of which mailbox
+- [Emails removed by another software](gone-mails.md): what leaves the list, links kept, forgotten after a delay
 

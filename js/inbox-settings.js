@@ -5006,7 +5006,7 @@
 		const m = s.master;
 		main.innerHTML = '<div class="ibx-page"><div class="ibx-page__head"><h1 class="ibx-page__title">' + th('InboxNavServer') + '</h1></div><p class="ibx-page__intro">' + th('InboxServerIntro') + '</p>'
 			+ '<nav class="ibx-subchips" aria-label="' + th('InboxNavServer') + '">' + sectionLinks('server', SERVER_SECTIONS, 'ibx-subchip') + '</nav>'
-			+ '<section class="ibx-section" data-section="keep">' + title('keep') + '<div class="ibx-form">' + ['INBOX_CACHE_DAYS', 'INBOX_LOG_DAYS', 'INBOX_ACCOUNT_LOG_DAYS'].map(number).join('') + '</div></section>'
+			+ '<section class="ibx-section" data-section="keep">' + title('keep') + '<div class="ibx-form">' + ['INBOX_CACHE_DAYS', 'INBOX_LOG_DAYS', 'INBOX_ACCOUNT_LOG_DAYS', 'INBOX_GONE_LINKED_DAYS'].map(number).join('') + '</div></section>'
 			+ '<section class="ibx-section" data-section="imap">' + title('imap') + '<div class="ibx-form">' + ['INBOX_IMAP_TIMEOUT', 'INBOX_TEST_TIMEOUT'].map(number).join('') + '</div></section>'
 			// Master user: one form (the four values go together), the password never shown again
 			+ '<section class="ibx-section" data-section="master">' + title('master') + '<p class="ibx-section__help">' + th('InboxMasterUserHelp') + '</p>'

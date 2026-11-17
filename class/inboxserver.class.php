@@ -57,6 +57,8 @@ class InboxServer
 			'INBOX_CACHE_DAYS' => array('unit' => 'days', 'min' => 1, 'max' => 3650, 'default' => 30),
 			'INBOX_LOG_DAYS' => array('unit' => 'days', 'min' => 1, 'max' => 3650, 'default' => 365),
 			'INBOX_ACCOUNT_LOG_DAYS' => array('unit' => 'days', 'min' => 30, 'max' => 3650, 'default' => 730),
+			// Links, notes and assignments of a mail gone from the server (1.114.0); 0: kept
+			'INBOX_GONE_LINKED_DAYS' => array('unit' => 'days', 'min' => 0, 'max' => 36500, 'default' => 730),
 			'INBOX_IMAP_TIMEOUT' => array('unit' => 'seconds', 'min' => 5, 'max' => 120, 'default' => 20),
 			'INBOX_TEST_TIMEOUT' => array('unit' => 'seconds', 'min' => 3, 'max' => 60, 'default' => 15),
 		);

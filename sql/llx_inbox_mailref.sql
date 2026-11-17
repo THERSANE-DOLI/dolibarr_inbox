@@ -28,5 +28,6 @@ CREATE TABLE llx_inbox_mailref(
 	last_account integer DEFAULT NULL,
 	last_folder varchar(255) DEFAULT NULL,
 	thread_detached smallint DEFAULT 0 NOT NULL,
+	date_gone datetime DEFAULT NULL,
 	date_creation datetime NOT NULL
 ) ENGINE=innodb;

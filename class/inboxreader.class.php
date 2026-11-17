@@ -201,8 +201,12 @@ class InboxReader
 			// Removed or moved by another client since the last pass: the index row goes
 			$this->errorCode = $connector->notFound() || $raw === '' || $this->error === 'UIDVALIDITY changed' ? 'gone' : 'error';
 			if ($this->errorCode === 'gone') {
+				require_once __DIR__.'/inboxmail.class.php';
+				$index = new InboxMail($this->db);
+				$gone = $index->keyRows("rowid = ".((int) $this->row->rowid));
 				$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail_address WHERE fk_mail = ".((int) $this->row->rowid));
 				$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail WHERE rowid = ".((int) $this->row->rowid));
+				$index->markGone($gone);
 			}
 			return null;
 		}

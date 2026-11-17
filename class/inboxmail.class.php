@@ -161,6 +161,9 @@ class InboxMail
 		}
 		$this->lastNewIds = $newIds;
 		if ($newIds) {
+			// A mail gone that comes back (moved back, restored from a backup): its links, notes and assignments again
+			require_once __DIR__.'/inboxmailref.class.php';
+			(new InboxMailRef($this->db))->markBack($this->keyRows("rowid IN (".implode(',', array_map('intval', $newIds)).")"));
 			// Conversation of each new mail (and threads merged when it links them)
 			$threader = new InboxThreader($this->db);
 			$threader->assign((int) $accountId, $newIds);
@@ -237,9 +240,11 @@ class InboxMail
 			$in = implode(',', array_map(function ($r) {
 				return "'".$this->db->escape((string) $r)."'";
 			}, $chunk));
+			$gone = $this->keyRows("fk_folder = ".((int) $folderId)." AND remote_id IN (".$in.")");
 			$this->db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId)." AND remote_id IN (".$in."))");
 			if ($this->db->query("DELETE FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId)." AND remote_id IN (".$in.")")) {
 				$n += (int) $this->db->affected_rows(true);
+				$this->markGone($gone);
 			}
 		}
 
@@ -247,16 +252,49 @@ class InboxMail
 	}
 
 	/**
+	 * What the mailrefs need of rows of the index (their key), read before the rows leave
+	 *
+	 * @param string $where Condition on inbox_mail
+	 * @return object[]
+	 */
+	public function keyRows($where)
+	{
+		$rows = $this->db->getRows("SELECT rowid, message_id, date_mail, from_email, subject, size FROM ".$this->db->prefix()."inbox_mail WHERE ".$where." LIMIT 100000");
+
+		return is_array($rows) ? $rows : array();
+	}
+
+	/**
+	 * Rows removed from the index because their mail left the server: the mails found nowhere else are gone (1.114.0)
+	 *
+	 * @param object[] $rows Rows read by keyRows() before they were removed
+	 * @return int           Mailrefs marked gone
+	 */
+	public function markGone(array $rows)
+	{
+		if (!$rows) {
+			return 0;
+		}
+		require_once __DIR__.'/inboxmailref.class.php';
+
+		return (new InboxMailRef($this->db))->markGone($rows);
+	}
+
+	/**
 	 * Empty the index of a folder (UIDVALIDITY changed, folder gone, rebuild)
 	 *
-	 * @param int $folderId Folder
+	 * @param int  $folderId Folder
+	 * @param bool $gone     The mails left the server with the folder (removed, emptied): their mailrefs marked gone.
+	 *                       False when they stay there (rebuild, folder no longer followed, UIDVALIDITY changed)
 	 * @return void
 	 */
-	public function clearFolder($folderId)
+	public function clearFolder($folderId, $gone = false)
 	{
 		$p = $this->db->prefix();
+		$rows = $gone ? $this->keyRows("fk_folder = ".((int) $folderId)) : array();
 		$this->db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId).")");
 		$this->db->query("DELETE FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId));
+		$this->markGone($rows);
 	}
 
 	/**
