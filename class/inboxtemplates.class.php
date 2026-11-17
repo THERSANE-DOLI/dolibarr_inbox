@@ -118,7 +118,10 @@ class InboxTemplates
 			." AND (NOT EXISTS (SELECT 1 FROM ".$p."inbox_template_account as ta WHERE ta.fk_template = t.rowid)"
 			." OR EXISTS (SELECT 1 FROM ".$p."inbox_template_account as ta2 WHERE ta2.fk_template = t.rowid AND ta2.fk_account = ".((int) $accountId)."))"
 			." ORDER BY t.private, t.position, t.label LIMIT 200");
-		$groups[] = array('type' => self::TYPE, 'kind' => $langs->transnoentities('InboxTemplatesOfMailbox'), 'templates' => self::rowsView($rows), 'pieces' => array_values($linked));
+		$whole = $this->wholeOf(array_map(function ($r) {
+			return (int) $r->rowid;
+		}, is_array($rows) ? $rows : array()));
+		$groups[] = array('type' => self::TYPE, 'kind' => $langs->transnoentities('InboxTemplatesOfMailbox'), 'templates' => self::rowsView($rows, $whole), 'pieces' => array_values($linked));
 		// Templates of Dolibarr for every type (1.26.0): offered in every writing, with the variables of a linked piece
 		$rows = $this->db->getRows("SELECT t.rowid, t.label, t.lang, t.private, t.module FROM ".$p."c_email_templates as t WHERE t.type_template = 'all'"
 			." AND t.active = 1".$this->visibleSql($user)." ORDER BY t.position, t.lang, t.label LIMIT 200");
@@ -149,17 +152,58 @@ class InboxTemplates
 	}
 
 	/**
-	 * @param mixed $rows Rows
-	 * @return array<int,array{id:int,label:string,lang:string,private:int}>
+	 * @param mixed         $rows  Rows
+	 * @param array<int,int>|null $whole Complete mail by template (wholeOf()), null: every one is a complete mail (the
+	 *                                   templates of Dolibarr for a piece take the whole text, as on the card of the piece)
+	 * @return array<int,array{id:int,label:string,lang:string,private:int,whole:int}>
 	 */
-	protected static function rowsView($rows)
+	protected static function rowsView($rows, $whole = null)
 	{
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			$out[] = array('id' => (int) $r->rowid, 'label' => (string) $r->label, 'lang' => (string) $r->lang, 'private' => (int) $r->private);
+			$out[] = array('id' => (int) $r->rowid, 'label' => (string) $r->label, 'lang' => (string) $r->lang, 'private' => (int) $r->private,
+				'whole' => $whole === null ? 1 : (int) ($whole[(int) $r->rowid] ?? 0));
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Templates of inbox that are a complete mail (1.118.0): it takes the place of the text, a piece of text goes at the
+	 * cursor. No row = a piece of text (the templates written before 1.118.0, those written in Dolibarr)
+	 *
+	 * @param int[] $ids Templates
+	 * @return array<int,int> Template => 1 complete mail, 0 piece of text
+	 */
+	public function wholeOf(array $ids)
+	{
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+		$out = array_fill_keys($ids, 0);
+		if (!$ids) {
+			return $out;
+		}
+		$rows = $this->db->getRows("SELECT fk_template, whole FROM ".$this->db->prefix()."inbox_template_option WHERE fk_template IN (".implode(',', $ids).") LIMIT ".(count($ids) + 1));
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$out[(int) $r->fk_template] = (int) $r->whole ? 1 : 0;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param int $id    Template
+	 * @param int $whole 1 complete mail, 0 piece of text
+	 * @return bool
+	 */
+	protected function setWhole($id, $whole)
+	{
+		$p = $this->db->prefix();
+		$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_template_option WHERE fk_template = ".((int) $id));
+		if (is_object($row)) {
+			return (bool) $this->db->query("UPDATE ".$p."inbox_template_option SET whole = ".($whole ? 1 : 0)." WHERE rowid = ".((int) $row->rowid));
+		}
+
+		return (bool) $this->db->query("INSERT INTO ".$p."inbox_template_option (fk_template, whole) VALUES (".((int) $id).", ".($whole ? 1 : 0).")");
 	}
 
 	/**
@@ -488,14 +532,16 @@ class InboxTemplates
 	 *
 	 * @param object               $template Row of the template (usable())
 	 * @param array<string,string> $values   Values (values())
-	 * @return array{id:int,label:string,subject:string,subject_raw:string,html:string,joinfiles:int}
+	 * @return array{id:int,label:string,subject:string,subject_raw:string,html:string,joinfiles:int,whole:int}
 	 */
 	public function render($template, array $values)
 	{
 		$topic = (string) $template->topic;
 
+		$whole = (string) $template->type_template === self::TYPE ? ($this->wholeOf(array((int) $template->rowid))[(int) $template->rowid] ?? 0) : 1;
+
 		return array('id' => (int) $template->rowid, 'label' => (string) $template->label, 'subject_raw' => $topic, 'subject' => self::fill($topic, $values),
-			'html' => self::toEditor((string) $template->content, $values), 'joinfiles' => (int) (!empty($template->joinfiles)));
+			'html' => self::toEditor((string) $template->content, $values), 'joinfiles' => (int) (!empty($template->joinfiles)), 'whole' => (int) $whole);
 	}
 
 	/**
@@ -677,10 +723,14 @@ class InboxTemplates
 			." OR EXISTS (SELECT 1 FROM ".$p."inbox_template_account as ta2 WHERE ta2.fk_template = t.rowid AND ta2.fk_account = ".((int) $accountId)."))"
 			." ORDER BY t.private, t.position, t.label LIMIT 500");
 		$out = array();
+		$whole = $this->wholeOf(array_map(function ($r) {
+			return (int) $r->rowid;
+		}, is_array($rows) ? $rows : array()));
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$accounts = $this->accountsOf((int) $r->rowid);
 			$out[] = array('id' => (int) $r->rowid, 'label' => (string) $r->label, 'subject' => (string) $r->topic, 'lang' => (string) $r->lang, 'private' => (int) $r->private,
-				'active' => (int) $r->active, 'accounts' => $accounts, 'editable' => $this->canChange($user, (int) $r->private, (int) $r->fk_user, $accounts) ? 1 : 0);
+				'active' => (int) $r->active, 'accounts' => $accounts, 'editable' => $this->canChange($user, (int) $r->private, (int) $r->fk_user, $accounts) ? 1 : 0,
+				'whole' => (int) ($whole[(int) $r->rowid] ?? 0));
 		}
 
 		return $out;
@@ -710,14 +760,15 @@ class InboxTemplates
 		}
 
 		return array('id' => (int) $t->rowid, 'label' => (string) $t->label, 'subject' => (string) $t->topic, 'html' => self::toEditor((string) $t->content, null), 'lang' => (string) $t->lang,
-			'private' => (int) $t->private, 'active' => (int) $t->active, 'accounts' => $accounts, 'editable' => $this->canChange($user, (int) $t->private, (int) $t->fk_user, $accounts) ? 1 : 0);
+			'private' => (int) $t->private, 'active' => (int) $t->active, 'accounts' => $accounts, 'editable' => $this->canChange($user, (int) $t->private, (int) $t->fk_user, $accounts) ? 1 : 0,
+			'whole' => (int) ($this->wholeOf(array((int) $t->rowid))[(int) $t->rowid] ?? 0));
 	}
 
 	/**
 	 * Create or change a template of inbox
 	 *
 	 * @param User                $user User
-	 * @param array<string,mixed> $data id, label, subject, html, private, accounts, active
+	 * @param array<string,mixed> $data id, label, subject, html, private, accounts, active, whole (absent: unchanged)
 	 * @return int Id, 0 on error
 	 */
 	public function save(User $user, array $data)
@@ -771,6 +822,9 @@ class InboxTemplates
 		foreach ($accounts as $a) {
 			$ok = $ok && $this->db->query("INSERT INTO ".$p."inbox_template_account (fk_template, fk_account) VALUES (".$id.", ".((int) $a).")");
 		}
+		if ($ok && array_key_exists('whole', $data)) {
+			$ok = $this->setWhole($id, !empty($data['whole']) ? 1 : 0);
+		}
 		if (!$ok) {
 			$this->db->rollback();
 			$this->fail('error', $this->db->lasterror());
@@ -797,6 +851,9 @@ class InboxTemplates
 			return (bool) $this->fail('no_right');
 		}
 		$this->db->query("DELETE FROM ".$p."inbox_template_account WHERE fk_template = ".((int) $id));
+		$this->db->query("DELETE FROM ".$p."inbox_template_option WHERE fk_template = ".((int) $id));
+		require_once __DIR__.'/inboxtemplatedefaults.class.php';
+		(new InboxTemplateDefaults($this->db))->forgetTemplate((int) $id);
 
 		return (bool) $this->db->query("DELETE FROM ".$p."c_email_templates WHERE rowid = ".((int) $id));
 	}

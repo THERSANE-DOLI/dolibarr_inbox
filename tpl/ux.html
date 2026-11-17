@@ -14,7 +14,7 @@
 	<h2>Réglages (lot W1)</h2>
 	<a href="#settings">Réglages : navigation, page</a><a href="#form">Formulaire</a><a href="#switch">Interrupteur</a><a href="#tabs">Onglets</a><a href="#table">Tableau de données</a><a href="#checklist">Liste de contrôle</a><a href="#notice">Avis</a><a href="#dialog">Dialogue</a><a href="#dolibanner">Bandeau Dolibarr</a>
 	<h2>Lecture (lot W3)</h2>
-	<a href="#readhead">En-tête de lecture, bandeaux</a><a href="#attbar">Barre des pièces jointes</a><a href="#viewer">Aperçu</a><a href="#columns">Colonnes, notes, nouveaux mails</a>
+	<a href="#readhead">En-tête de lecture, bandeaux</a><a href="#attbar">Barre des pièces jointes</a><a href="#viewer">Aperçu</a><a href="#columns">Colonnes, notes, nouveaux mails</a><a href="#tdefaults">Modèles par défaut</a>
 </nav>
 <main class="ibx-doc-main">
 	<div class="ibx-doc-themebar">
@@ -330,6 +330,17 @@
 			<tbody><tr class="ibx-mailrow is-unread"><td><input type="checkbox" aria-label="Sélectionner"></td><td>Jean Dupont</td><td>Demande de prix</td><td class="ibx-mailrow__date">10:12</td></tr></tbody></table>
 			<ul class="ibx-tree" style="margin-top:12px;max-width:280px"><li><div class="ibx-tree__row ibx-tree__row--account" style="--ibx-depth:0"><button class="ibx-tree__twisty"></button><svg class="ibx-icon ibx-tree__icon" aria-hidden="true"><use href="__ICONS__#ibx-i-account"/></svg><span class="ibx-tree__label">devis@example.com</span></div><div class="ibx-tree__note ibx-tree__note--warning"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-warning"/></svg> Boîte presque pleine : 92 %</div><div class="ibx-tree__note">Indexation 40 %</div></li></ul>
 			<div style="position:relative;height:40px"><button type="button" class="ibx-newpill" style="top:4px">2 nouveau(x) mail(s)</button></div>
+		</div>
+	</section>
+
+	<section class="ibx-doc-section" id="tdefaults">
+		<h2>Modèles par défaut <code>ibx-tdefaults__table</code></h2>
+		<div class="ibx-doc-rules"><ul><li>Niveaux groupés par portée (cette boîte, toutes les boîtes), dans l'ordre de priorité 1 à 4 ; une colonne par type de mail.</li><li>La case qui donne le modèle porte « Utilisé » ; une case réglée mais masquée par un niveau au-dessus est grisée et barrée, avec « Masqué par le niveau N ».</li><li>Les niveaux « Pour tous » disent qui ils touchent. Chaque choix est enregistré tout de suite ; sur téléphone les colonnes s'empilent.</li></ul></div>
+		<div class="ibx-doc-example ibx-doc-example--block" style="max-width:640px">
+			<table class="ibx-tdefaults__table"><thead><tr><th scope="col"><span class="ibx-sr-only">Niveau</span></th><th scope="col">Nouveau mail</th><th scope="col">Réponse</th></tr></thead>
+			<tbody><tr class="ibx-tdefaults__group"><th scope="rowgroup" colspan="3">Dans devis@example.com</th></tr>
+			<tr><th scope="row" class="ibx-tdefaults__level"><span class="ibx-tdefaults__who"><span class="ibx-tdefaults__num">1</span><span>Pour moi</span></span></th><td class="ibx-tdefaults__cell"><select class="ibx-field ibx-tdefaults__field"><option>Merci réponse</option></select><span class="ibx-badge ibx-badge--accent ibx-tdefaults__state">Utilisé</span></td><td class="ibx-tdefaults__cell is-unset"><select class="ibx-field ibx-tdefaults__field"><option>Non défini (niveau suivant)</option></select></td></tr>
+			<tr><th scope="row" class="ibx-tdefaults__level"><span class="ibx-tdefaults__who"><span class="ibx-tdefaults__num">2</span><span>Pour tous<small class="ibx-muted">Concerne tous les utilisateurs de la boîte</small></span></span></th><td class="ibx-tdefaults__cell is-masked"><select class="ibx-field ibx-tdefaults__field"><option>Devis standard</option></select><span class="ibx-tdefaults__state ibx-muted">Masqué par le niveau 1</span></td><td class="ibx-tdefaults__cell is-unset"><select class="ibx-field ibx-tdefaults__field"><option>Non défini (niveau suivant)</option></select></td></tr></tbody></table>
 		</div>
 	</section>
 </main>

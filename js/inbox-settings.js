@@ -2436,7 +2436,7 @@
 			html += '<table class="ibx-table ibx-js-tpls"><thead><tr><th></th><th>' + th('InboxTemplateLabel') + '</th><th>' + th('InboxTemplateFor') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 				+ data.templates.map((tp, n) => '<tr class="' + (tp.editable ? 'ibx-dragrow' : '') + '" data-tpl="' + tp.id + '">'
 					+ '<td>' + (tp.editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
-					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + esc(tp.subject) + '</div></td>'
+					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + (tp.whole ? ' <span class="ibx-badge">' + th('InboxTemplateWholeShort') + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + esc(tp.subject) + '</div></td>'
 					+ '<td class="ibx-muted">' + forWho(tp) + '</td>'
 					+ '<td>' + (tp.active ? th('InboxAccountStatusActive') : '<span class="ibx-status">' + th('InboxInactive') + '</span>') + '</td>'
 					+ '<td class="ibx-table__actions">' + (tp.editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
@@ -2446,10 +2446,16 @@
 				+ '</tbody></table>';
 		}
 		html += '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-add">' + ic('plus') + ' ' + th('InboxTemplateNew') + '</button>'
+			// Default templates of the mailbox (1.118.0), the dialog of the writing
+			+ (I.templateDefaults ? ' <button type="button" class="ibx-btn ibx-js-tdefaults">' + ic('star') + ' ' + th('InboxTemplateDefaults') + '</button>' : '')
 			+ (data.core_url ? '<span class="ibx-formfoot__spacer"></span><a class="ibx-btn ibx-btn--ghost" href="' + esc(data.core_url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxTemplatesInDolibarr') + '</a>' : '') + '</div>';
 		box.innerHTML = html;
 		const reload = () => tabTemplates(box, account);
 		$('.ibx-js-add', box).addEventListener('click', () => templateDialog(account, data, null, reload));
+		const defBtn = $('.ibx-js-tdefaults', box);
+		if (defBtn) {
+			defBtn.addEventListener('click', () => I.templateDefaults(account.id, account.label || account.email));
+		}
 		const order = () => $$('[data-tpl]', box).map(tr => +tr.dataset.tpl);
 		const saveOrder = async ids => {
 			try {
@@ -2523,7 +2529,7 @@
 	 * @param {Function} done
 	 */
 	async function templateDialog(account, list, id, done) {
-		let tp = { id: 0, label: '', subject: '', html: '', private: 0, active: 1, accounts: [account.id] };
+		let tp = { id: 0, label: '', subject: '', html: '', private: 0, active: 1, accounts: [account.id], whole: 0 };
 		let keys;
 		let langs = [];
 		try {
@@ -2546,6 +2552,7 @@
 			+ opt('me', th('InboxTemplateMine')) + opt('boxes', th('InboxTemplateSomeMailboxes')) + opt('all', th('InboxTemplateAllMailboxes'), !list.admin) + '</div>'
 			+ '<div class="ibx-tpledit__boxes ibx-js-boxes"' + (who === 'boxes' ? '' : ' hidden') + '>' + list.accounts.map(a => '<label class="ibx-check"><input type="checkbox" name="acc" value="' + a.id + '"' + (tp.accounts.includes(a.id) ? ' checked' : '') + '> ' + esc(a.label) + '</label>').join('') + '</div></div></div>'
 			+ field('subject', t('InboxSubject'), tp.subject, { autocomplete: 'off', help: t('InboxTemplateSubjectHelp') })
+			+ (I.templateWholeRow ? I.templateWholeRow(tp.whole) : '')
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label" id="ibx-tpl-body-label">' + th('InboxTemplateBody') + '</span><div>'
 			+ '<div class="ibx-tpledit__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '">' + tools.map(x => '<button type="button" class="ibx-tbtn" data-cmd="' + x[0] + '" title="' + th(x[2]) + '" aria-label="' + th(x[2]) + '">' + ic(x[1], 'ibx-tbtn__icon') + '</button>').join('')
 			+ '<span class="ibx-compose__sep" aria-hidden="true"></span><button type="button" class="ibx-tbtn ibx-js-var" title="' + th('InboxVarInsert') + '" aria-label="' + th('InboxVarInsert') + '" aria-haspopup="listbox" aria-expanded="false">' + ic('variable', 'ibx-tbtn__icon') + '</button></div>'
@@ -2580,7 +2587,8 @@
 					return false;
 				}
 				try {
-					await post('template', 'save', { template: tp.id, label, subject: f.elements.subject.value, html: editor ? editor.getHtml() : tp.html, private: w === 'me' ? 1 : 0, accounts, active: f.elements.active.checked ? 1 : 0, lang: f.elements.lang.value });
+					await post('template', 'save', { template: tp.id, label, subject: f.elements.subject.value, html: editor ? editor.getHtml() : tp.html, private: w === 'me' ? 1 : 0, accounts, active: f.elements.active.checked ? 1 : 0, lang: f.elements.lang.value,
+						...(f.querySelector('[name="whole"]:checked') ? { whole: f.querySelector('[name="whole"]:checked').value === '1' ? 1 : 0 } : {}) });
 				} catch (err) {
 					toast(err.message, { error: true });
 					return false;

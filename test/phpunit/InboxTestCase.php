@@ -115,6 +115,12 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%' OR from_email LIKE '%inbox-test.invalid'");
 		// Templates (1.18.0): named ZzTpl, contacts of the tests
 		$db->query("DELETE FROM ".$p."inbox_template_account WHERE fk_template IN (SELECT rowid FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%')");
+		// Default templates and options (1.118.0): of the test templates, test users, test mailboxes
+		if ($db->DDLDescTable($p.'inbox_template_default')) {
+			$db->query("DELETE FROM ".$p."inbox_template_default WHERE fk_template IN (SELECT rowid FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%')"
+				." OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%') OR fk_account IN (SELECT rowid FROM ".$p."inbox_account WHERE email LIKE '%@inbox-test.invalid')");
+			$db->query("DELETE FROM ".$p."inbox_template_option WHERE fk_template IN (SELECT rowid FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%')");
+		}
 		$db->query("DELETE FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%'");
 		$db->query("DELETE FROM ".$p."socpeople WHERE lastname LIKE 'inboxtest_%'");
 		$db->query("DELETE FROM ".$p."societe WHERE nom LIKE 'inboxtest_%'");

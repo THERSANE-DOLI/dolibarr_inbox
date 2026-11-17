@@ -23,9 +23,10 @@
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxtemplates.class.php');
+dol_include_once('/inbox/class/inboxtemplatedefaults.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('save', 'delete', 'order', 'preview'), true));
+inboxAjaxStart(in_array($action, array('save', 'delete', 'order', 'preview', 'setdefault'), true));
 $templates = new InboxTemplates($db);
 
 /**
@@ -98,7 +99,7 @@ switch ($action) {
 		// no break
 	case 'save':
 		$accounts = inboxAjaxParam('accounts', 'none');
-		$id = $templates->save($user, array(
+		$data = array(
 			'id' => (int) inboxAjaxParam('template', 'int'),
 			'label' => (string) inboxAjaxParam('label'),
 			'subject' => (string) inboxAjaxParam('subject', 'none'),
@@ -108,7 +109,12 @@ switch ($action) {
 			'active' => inboxAjaxHas('active') ? (int) inboxAjaxParam('active', 'int') : 1,
 			'lang' => (string) inboxAjaxParam('lang', 'aZ09'),
 			'accounts' => is_array($accounts) ? $accounts : array(),
-		));
+		);
+		// Complete mail or piece of text (1.118.0): unchanged when not given
+		if (inboxAjaxHas('whole')) {
+			$data['whole'] = (int) inboxAjaxParam('whole', 'int');
+		}
+		$id = $templates->save($user, $data);
 		if (!$id) {
 			inboxTemplateFail($templates);
 		}
@@ -130,6 +136,31 @@ switch ($action) {
 		$ids = inboxAjaxParam('ids', 'none');
 		$templates->order($user, is_array($ids) ? $ids : array());
 		inboxAjaxReply(array('ok' => 1));
+		// no break
+	case 'defaults':
+		// Default templates of a mailbox (1.118.0): the four levels, those the user may change, the one used
+		$defaults = new InboxTemplateDefaults($db);
+		$res = $defaults->view($user, (int) inboxAjaxParam('account', 'int'));
+		if ($res === false) {
+			inboxAjaxNotFound();
+		}
+		inboxAjaxReply($res);
+		// no break
+	case 'setdefault':
+		$defaults = new InboxTemplateDefaults($db);
+		$accountId = (int) inboxAjaxParam('account', 'int');
+		if ($defaults->view($user, $accountId) === false) {
+			inboxAjaxNotFound();
+		}
+		// value: '' not set (the next level answers), 0 no template on purpose, else a template
+		$value = (string) inboxAjaxParam('value', 'alphanohtml');
+		if (!$defaults->set($user, $accountId, (string) inboxAjaxParam('level', 'aZ09'), (string) inboxAjaxParam('usage', 'aZ09'), $value === '' ? null : (int) $value)) {
+			$codes = array('no_right' => array(403, 'InboxTemplateNoRight'), 'bad_template' => array(422, 'InboxTemplateDefaultBad'), 'bad_value' => array(400, 'InboxTemplateFailed'));
+			$c = $codes[$defaults->errorCode] ?? array(500, 'InboxTemplateFailed');
+			dol_syslog('inbox template default '.$defaults->errorCode.' '.$defaults->error, LOG_WARNING);
+			inboxAjaxReply(array('error' => $langs->transnoentities($c[1]), 'code' => $defaults->errorCode), $c[0]);
+		}
+		inboxAjaxReply($defaults->view($user, $accountId));
 		// no break
 	default:
 		inboxAjaxError('Unknown action', 400);

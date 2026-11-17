@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: default templates on four levels, and templates that are a complete mail :   1.118.0
+  - a new mail or an answer receives its template by itself: me in the mailbox, the mailbox, me, everyone.
+  - « No template » at a level stops there; a level not set lets the next one answer.
+  - a complete mail takes the place of the text: when a text is written, « Replace » (with Undo) or « Add after ».
+
 - FIX: the dots of the tags show their names in a clean bubble :   1.117.1
   - on hover, every tag of the mail as its badge (colour, border, full name), instead of the native title.
 
