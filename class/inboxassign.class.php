@@ -192,6 +192,11 @@ class InboxAssign
 			if (!$added && !$removed) {
 				continue;
 			}
+			// The assignment lives in its own table: the date of change of the mails is set, so the stamp of their
+			// folders changes and the lists open by the other users show it at their next refresh
+			$this->db->query("UPDATE ".$p."inbox_mail SET tms = CURRENT_TIMESTAMP WHERE rowid IN (".implode(',', array_map(function ($r) {
+				return (int) $r->rowid;
+			}, $list)).")");
 			$out['count'] += count($list);
 			$first = $list[0];
 			foreach ($added as $uid) {

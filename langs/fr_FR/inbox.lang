@@ -713,6 +713,7 @@ InboxSizeUnits = o|Ko|Mo|Go|To
 InboxMailboxFolder = Boîte / dossier
 InboxColumns = Colonnes…
 InboxColumnsDefault = Colonnes par défaut
+InboxColumnsDragHint = Glisser un en-tête pour déplacer la colonne
 InboxQuota = Espace de la boîte
 InboxQuotaUsed = %s Mo utilisés sur %s Mo (%s %%)
 InboxQuotaAlmostFull = Boîte presque pleine : %s %%
@@ -931,6 +932,7 @@ InboxErrorLookSave = La couleur et l'icône n'ont pas pu être enregistrées
 
 # Affectation et cloche (1.9.0)
 InboxAssigned = Affecté
+InboxIndicators = Indicateurs
 InboxAssignedTo = Affecté à : %s
 InboxAssignedToLabel = Affecté à
 InboxAssignedNobody = Non affecté
