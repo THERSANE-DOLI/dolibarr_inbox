@@ -93,27 +93,33 @@ switch ($action) {
 		$q = trim((string) inboxAjaxParam('q'));
 		$like = $db->escape($db->escapeforlike($q));
 		$out = array();
-		$sql = "SELECT rowid, firstname, lastname, login FROM ".$db->prefix()."user WHERE statut = 1 AND (fk_soc IS NULL OR fk_soc = 0)";
-		$sql .= " AND entity IN (0, ".((int) $conf->entity).")";
+		$where = " WHERE statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".((int) $conf->entity).")";
 		if ($q !== '') {
 			// Full name as shown in the list (« John BOTELLA »), in both orders, or a part of it
-			$sql .= " AND (firstname LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR login LIKE '%".$like."%' OR email LIKE '%".$like."%'";
-			$sql .= " OR CONCAT(firstname, ' ', lastname) LIKE '%".$like."%' OR CONCAT(lastname, ' ', firstname) LIKE '%".$like."%')";
+			$where .= " AND (firstname LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR login LIKE '%".$like."%' OR email LIKE '%".$like."%'";
+			$where .= " OR CONCAT(firstname, ' ', lastname) LIKE '%".$like."%' OR CONCAT(lastname, ' ', firstname) LIKE '%".$like."%')";
 		}
-		$sql .= " ORDER BY lastname, firstname LIMIT 30";
-		foreach ((array) $db->getRows($sql) as $row) {
+		$users = (array) $db->getRows("SELECT rowid, firstname, lastname, login, photo, entity FROM ".$db->prefix()."user".$where." ORDER BY lastname, firstname LIMIT 30");
+		// How many more than shown: the list says to type more instead of seeming complete
+		$total = $db->getRow("SELECT COUNT(*) as nb FROM ".$db->prefix()."user".$where);
+		$moreUsers = max(0, (is_object($total) ? (int) $total->nb : 0) - count($users));
+		foreach ($users as $row) {
 			$name = trim($row->firstname.' '.$row->lastname);
-			$out[] = array('kind' => 'user', 'id' => (int) $row->rowid, 'name' => $name !== '' ? $name : (string) $row->login);
+			// Login and photo: two people of the same name told apart, the right one recognized
+			$out[] = array('kind' => 'user', 'id' => (int) $row->rowid, 'name' => $name !== '' ? $name : (string) $row->login, 'login' => (string) $row->login,
+				'photo' => InboxAccess::userPhotoUrl((int) $row->rowid, (string) $row->photo, (int) $row->entity));
 		}
-		$sql = "SELECT rowid, nom FROM ".$db->prefix()."usergroup WHERE entity IN (0, ".((int) $conf->entity).")";
-		if ($q !== '') {
-			$sql .= " AND nom LIKE '%".$like."%'";
+		// Groups: their colour and how many active internal users they hold (a group gives the access to all of them)
+		$sql = "SELECT g.rowid, g.nom, g.color, (SELECT COUNT(*) FROM ".$db->prefix()."usergroup_user as gu INNER JOIN ".$db->prefix()."user as u ON u.rowid = gu.fk_user"
+			." AND u.statut = 1 AND (u.fk_soc IS NULL OR u.fk_soc = 0) WHERE gu.fk_usergroup = g.rowid) as members";
+		$where = " WHERE g.entity IN (0, ".((int) $conf->entity).")".($q !== '' ? " AND g.nom LIKE '%".$like."%'" : "");
+		$groups = (array) $db->getRows($sql." FROM ".$db->prefix()."usergroup as g".$where." ORDER BY g.nom LIMIT 20");
+		$total = $db->getRow("SELECT COUNT(*) as nb FROM ".$db->prefix()."usergroup as g".$where);
+		$moreGroups = max(0, (is_object($total) ? (int) $total->nb : 0) - count($groups));
+		foreach ($groups as $row) {
+			$out[] = array('kind' => 'group', 'id' => (int) $row->rowid, 'name' => (string) $row->nom, 'color' => (string) $row->color, 'members' => (int) $row->members);
 		}
-		$sql .= " ORDER BY nom LIMIT 20";
-		foreach ((array) $db->getRows($sql) as $row) {
-			$out[] = array('kind' => 'group', 'id' => (int) $row->rowid, 'name' => (string) $row->nom);
-		}
-		inboxAjaxReply(array('results' => $out));
+		inboxAjaxReply(array('results' => $out, 'more_users' => $moreUsers, 'more_groups' => $moreGroups));
 		// no break
 
 	default:

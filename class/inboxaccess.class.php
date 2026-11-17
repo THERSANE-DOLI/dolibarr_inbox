@@ -263,7 +263,7 @@ class InboxAccess
 	{
 		$out = array();
 		$prefix = $this->db->prefix();
-		$sql = "SELECT aa.rowid, aa.fk_user, aa.fk_usergroup, aa.level, aa.date_creation, u.firstname, u.lastname, u.login, g.nom as groupname";
+		$sql = "SELECT aa.rowid, aa.fk_user, aa.fk_usergroup, aa.level, aa.date_creation, u.firstname, u.lastname, u.login, u.photo, u.entity as user_entity, g.nom as groupname, g.color as groupcolor";
 		$sql .= " FROM ".$prefix."inbox_account_access as aa";
 		$sql .= " LEFT JOIN ".$prefix."user as u ON u.rowid = aa.fk_user AND aa.fk_user > 0";
 		$sql .= " LEFT JOIN ".$prefix."usergroup as g ON g.rowid = aa.fk_usergroup AND aa.fk_usergroup > 0";
@@ -279,6 +279,9 @@ class InboxAccess
 				'name' => $name !== '' ? $name : (string) $row->login,
 				'level' => (string) $row->level,
 				'date' => (int) $this->db->jdate($row->date_creation),
+				// Picture of the row: the photo of the user, the colour of the group
+				'photo' => (int) $row->fk_user > 0 ? self::userPhotoUrl((int) $row->fk_user, (string) $row->photo, (int) $row->user_entity) : '',
+				'color' => (int) $row->fk_usergroup > 0 ? (string) $row->groupcolor : '',
 			);
 		}
 

@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: people and groups chosen from a real list, with their picture :   1.120.0
+  - accesses and owner of a mailbox: photo or initials of a user, a group in its colour with its members.
+  - who already has an access is greyed with its level; « n more, type to narrow » when the list is cut.
+
 - NEW: order of the list shown and changed at hand, an answer of the fil read without leaving the mail :   1.119.0
   - the order is a chip with its arrow: the arrow turns it, its words (or a right click) choose another order.
   - orders chosen as a key (date, correspondent, subject, size) then a direction in its own words.

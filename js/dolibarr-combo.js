@@ -36,6 +36,13 @@
  *   <option data-color="#3b82f6">                colour of the option (a dot in the list, the colour of its chip)
  *   <option data-depth="1" data-path="Sales > Wholesale">
  *                                                 place in a tree: indented, searched on its whole path
+ *   <option data-avatar-img="/viewimage.php?..." data-avatar-text="JB" data-avatar-color="#8a2b6e"
+ *           data-avatar-shape="square" data-avatar-icon="group">
+ *                                                 picture on the left of the option and of the choice: a photo, else
+ *                                                 its letters, or a built-in icon (user, group); round, or square
+ *                                                 (a group); a source gives it as avatar: {img, text, color, shape, icon}
+ *   an item of a source with disabled: true       shown greyed, its sub says why
+ *   a source answering {results: [...], more: n}  n items not given: « n more, type to narrow » under the list
  *
  *   Dolibarr.tools.combo.attach(select, {source: async (term, signal) => items, minLength, delay, placeholder,
  *                                        clear, nativeOnTouch})  => {open, close, refresh, destroy}
@@ -57,6 +64,10 @@
 	};
 	const CHEVRON = '<svg class="dol-combo__chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 	const CHECK = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12l5 5L20 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+	const ICONS = {
+		user: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+		group: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.8.7 3 2.6 3 5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+	};
 	let seq = 0;
 	let current = null;
 
@@ -65,7 +76,16 @@
 	const fmt = (s, v) => String(s).replace('%s', v);
 	/** A colour #rgb / #rrggbb (else ''), and the text that reads on it */
 	const color = v => (/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v || '').trim()) ? '#' + String(v).trim().replace(/^#/, '') : '');
+	/** Colour of a picture: #rgb, #rrggbb or hsl(h s% l%) (a hue drawn from a name), else '' */
+	const avatarColor = v => {
+		const hsl = /^hsl\(\s*\d{1,3}(\.\d+)?(deg)?[\s,]+\d{1,3}(\.\d+)?%[\s,]+\d{1,3}(\.\d+)?%\s*\)$/i.test(String(v || '').trim());
+		return hsl ? String(v).trim() : color(v);
+	};
 	const ink = hex => {
+		if (hex.indexOf('hsl') === 0) {
+			const l = +(hex.match(/(\d+(\.\d+)?)%\s*\)$/) || [0, 50])[1];
+			return l > 60 ? '#1f2328' : '#ffffff';
+		}
 		let h = hex.slice(1);
 		if (h.length === 3) {
 			h = h.split('').map(x => x + x).join('');
@@ -74,11 +94,42 @@
 		return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#1f2328' : '#ffffff';
 	};
 
+	/** Picture of an item: {img, text, color, shape, icon} kept when it says something, else null */
+	function avatarOf(a) {
+		if (!a || typeof a !== 'object') {
+			return null;
+		}
+		const img = typeof a.img === 'string' && /^(https?:\/\/|\/|\.{0,2}\/|[\w-]+\.php)/i.test(a.img) ? a.img : '';
+		const out = { img, text: String(a.text || '').slice(0, 3), color: avatarColor(a.color), shape: a.shape === 'square' ? 'square' : 'circle', icon: ICONS[a.icon] ? a.icon : '' };
+		return out.img || out.text || out.icon ? out : null;
+	}
+	function avatarHtml(a, cls) {
+		if (!a) {
+			return '';
+		}
+		return '<span class="dol-combo__avatar' + (a.shape === 'square' ? ' dol-combo__avatar--square' : '') + (cls ? ' ' + cls : '') + '"'
+			+ (a.color ? ' style="background:' + esc(a.color) + ';color:' + ink(a.color) + '"' : '') + ' aria-hidden="true">'
+			+ (a.icon ? ICONS[a.icon] : '<span>' + esc(a.text) + '</span>')
+			// A photo that does not load leaves its letters (the listener is put after the drawing)
+			+ (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy" decoding="async">' : '') + '</span>';
+	}
+	function avatarData(opt) {
+		const d = opt.dataset;
+		return avatarOf({ img: d.avatarImg, text: d.avatarText, color: d.avatarColor, shape: d.avatarShape, icon: d.avatarIcon });
+	}
+	function dropBroken(root) {
+		root.querySelectorAll('.dol-combo__avatar img:not([data-watched])').forEach(img => {
+			img.dataset.watched = '1';
+			img.addEventListener('error', () => img.remove());
+		});
+	}
+
 	/** Items of an answer of a server, whatever its usual shape */
 	function normalize(data) {
 		const list = Array.isArray(data) ? data : (data && Array.isArray(data.results) ? data.results : null);
 		if (list) {
-			return list.map(x => (x && typeof x === 'object' ? { value: String(x.value ?? x.id ?? x.key ?? ''), label: String(x.label ?? x.text ?? x.value ?? ''), sub: x.sub ? String(x.sub) : '', group: x.group ? String(x.group) : '' }
+			return list.map(x => (x && typeof x === 'object' ? { value: String(x.value ?? x.id ?? x.key ?? ''), label: String(x.label ?? x.text ?? x.value ?? ''), sub: x.sub ? String(x.sub) : '', group: x.group ? String(x.group) : '',
+				avatar: avatarOf(x.avatar), disabled: !!x.disabled }
 				: { value: String(x), label: String(x), sub: '', group: '' })).filter(x => x.value !== '');
 		}
 		return data && typeof data === 'object' ? Object.keys(data).map(k => ({ value: k, label: String(data[k]), sub: '', group: '' })) : [];
@@ -143,7 +194,7 @@
 		btn.id = (sel.id || 'dol-combo' + n) + '-combo';
 		btn.setAttribute('aria-haspopup', 'listbox');
 		btn.setAttribute('aria-expanded', 'false');
-		btn.innerHTML = '<span class="dol-combo__val"></span>' + CHEVRON;
+		btn.innerHTML = '<span class="dol-combo__face"></span><span class="dol-combo__val"></span>' + CHEVRON;
 		const label = sel.id ? document.querySelector('label[for="' + CSS.escape(sel.id) + '"]') : null;
 		const name = sel.getAttribute('aria-label') || (label ? label.textContent.trim() : '');
 		if (label) {
@@ -177,7 +228,7 @@
 		sel.classList.add('dol-combo__native');
 		const tabIndex = sel.getAttribute('tabindex');
 		sel.tabIndex = -1;
-		const c = { n, sel, btn, wrap, val: btn.firstChild, pop: null, abort: null };
+		const c = { n, sel, btn, wrap, face: btn.firstChild, val: btn.children[1], pop: null, abort: null };
 		sel._dolCombo = c;
 
 		const paint = () => {
@@ -205,6 +256,9 @@
 			}
 			c.val.textContent = text;
 			c.val.classList.toggle('is-empty', empty);
+			// The picture of the single choice, before its name
+			c.face.innerHTML = !sel.multiple && chosen.length ? avatarHtml(avatarData(chosen[0]), 'dol-combo__avatar--sm') : '';
+			dropBroken(c.face);
 			btn.disabled = sel.disabled;
 			if (clearBtn) {
 				clearBtn.hidden = empty || sel.disabled;
@@ -221,6 +275,10 @@
 				opt = new Option(it.label, it.value);
 				if (it.sub) {
 					opt.dataset.sub = it.sub;
+				}
+				if (it.avatar) {
+					const a = it.avatar;
+					Object.assign(opt.dataset, { avatarImg: a.img, avatarText: a.text, avatarColor: a.color, avatarShape: a.shape, avatarIcon: a.icon });
 				}
 				sel.appendChild(opt);
 			}
@@ -292,6 +350,7 @@
 						+ (depth ? ' style="padding-left:' + (0.5 + depth * 1.1) + 'rem"' : '') + (it.path ? ' title="' + esc(it.path) + '"' : '') + '>'
 						+ (sel.multiple ? '<span class="dol-combo__check" aria-hidden="true">' + (it.selected ? CHECK : '') + '</span>' : '')
 						+ (it.color ? '<span class="dol-combo__dot" style="background:' + it.color + '" aria-hidden="true"></span>' : '')
+						+ avatarHtml(it.avatar, it.sub ? '' : 'dol-combo__avatar--sm')
 						+ '<span class="dol-combo__text"><span>' + esc(it.label || L.none) + '</span>' + (sub ? '<span class="dol-combo__sub">' + esc(sub) + '</span>' : '') + '</span></li>';
 				});
 				const extra = more + Math.max(0, items.length - shown.length);
@@ -301,12 +360,13 @@
 					html += '<li class="dol-combo__note" role="presentation">' + esc(fmt(L.typeMore, extra)) + '</li>';
 				}
 				list.innerHTML = html;
-				const cur = shown.findIndex(x => x.selected);
+				dropBroken(list);
+				const cur = shown.findIndex(x => x.selected && !x.disabled);
 				setActive(input.value.trim() ? 0 : Math.max(0, cur));
 			};
 			const local = () => Array.from(sel.options).filter(x => !x.hidden && !(sel.multiple && x.value === '')).map(x => ({
 				value: x.value, label: x.textContent.trim(), sub: x.dataset.sub || '', group: x.parentElement && x.parentElement.tagName === 'OPTGROUP' ? x.parentElement.label : '',
-				selected: x.selected, disabled: x.disabled, opt: x, color: color(x.dataset.color), depth: +(x.dataset.depth || 0), path: x.dataset.path || '',
+				selected: x.selected, disabled: x.disabled, opt: x, color: color(x.dataset.color), depth: +(x.dataset.depth || 0), path: x.dataset.path || '', avatar: avatarData(x),
 			}));
 			const filter = () => {
 				const words = fold(input.value).split(/\s+/).filter(Boolean);
@@ -340,7 +400,8 @@
 							return;
 						}
 						const sel2 = new Set(Array.from(sel.selectedOptions).map(x => x.value));
-						draw(normalize(items).map(it => Object.assign(it, { selected: sel2.has(it.value), disabled: false })), 0);
+						const more = items && !Array.isArray(items) ? Math.max(0, +items.more || 0) : 0;
+						draw(normalize(items).map(it => Object.assign(it, { selected: sel2.has(it.value), disabled: !!it.disabled })), more);
 					} catch (err) {
 						if (err && err.name !== 'AbortError' && current === c) {
 							note(L.noResult);
