@@ -63,6 +63,8 @@ class InboxUserParam
 			// Display (lot W3): table or cards for all the folders, as Thunderbird
 			'view' => array('cards', array('table', 'cards')),
 			'list_columns' => array('', 'json'),
+			// Tags in the table: names (badges) or dots (colour and initial, the name on hover and for screen readers)
+			'list_tags_view' => array('names', array('names', 'dots')),
 			'pane_widths' => array('', 'json'),
 			'density' => array('normal', array('compact', 'normal', 'comfortable')),
 			'text_size' => array('100', 'int:90:150'),

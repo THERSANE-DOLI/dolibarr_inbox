@@ -65,7 +65,7 @@ switch ($action) {
 		// no break
 
 	case 'create':
-		$result = $tags->create($user, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), $listId, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'));
+		$result = $tags->create($user, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), $listId, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'), inboxAjaxParam('tint', 'int') ? 1 : 0);
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($tags->error), 422);
 		}
@@ -80,7 +80,9 @@ switch ($action) {
 			inboxAjaxNotFound();
 		}
 		$result = $action === 'update'
-			? $tags->update($user, $tagId, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), inboxAjaxParam('status', 'int') ? 1 : 0, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'))
+			// Colour of the rows: changed only when sent (a call without it keeps the choice)
+			? $tags->update($user, $tagId, (string) inboxAjaxParam('label'), (string) inboxAjaxParam('color'), inboxAjaxParam('status', 'int') ? 1 : 0, (string) (inboxAjaxParam('border', 'aZ09') ?: 'none'),
+				inboxAjaxHas('tint') ? (inboxAjaxParam('tint', 'int') ? 1 : 0) : null)
 			: $tags->delete($tagId);
 		if ($result < 0) {
 			inboxAjaxError($langs->transnoentities($tags->error), 422);

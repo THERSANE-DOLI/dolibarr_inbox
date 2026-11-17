@@ -3193,7 +3193,7 @@
 					+ '</div></div></div>';
 			}
 		}
-		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
+		html += '<table class="ibx-table ibx-js-tags" style="margin-top:1rem"><thead><tr><th>' + th('InboxTagKey') + '</th><th>' + th('InboxTagLabel') + '</th><th>' + th('InboxTagKeyword') + '</th><th>' + th('InboxTagColor') + '</th><th>' + th('InboxTagBorder') + '</th><th>' + th('InboxTagTint') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 			+ data.tags.map((tg, n) => '<tr class="' + (editable ? 'ibx-dragrow' : '') + '" data-tag="' + tg.id + '">'
 				// Drag handle and key in one cell, under the head « Key », to save a column
 				+ '<td class="ibx-tagkey">' + (editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + (tg.key ? '<span class="ibx-kbd">' + esc(tg.key) + '</span>' : '') + '</td>'
@@ -3201,6 +3201,7 @@
 				+ '<td><code class="ibx-tagkeyword">' + esc(tg.keyword) + '</code></td>'
 				+ '<td>' + (editable ? '<input type="color" class="ibx-color" data-f="color" value="' + esc(tg.color || '#888888') + '" aria-label="' + th('InboxTagColor') + '">' : '') + '<span class="ibx-tagrisk" data-risk hidden title="' + th('InboxTagsCvdRow') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxTagsCvdRow') + '</span></span></td>'
 				+ '<td>' + (editable ? borderSelect(tg.border, 'data-f="border"') : th('InboxTagBorder_' + (tg.border || 'none'))) + '</td>'
+				+ '<td>' + (editable ? '<button type="button" class="ibx-switch" role="switch" data-f="tint" aria-checked="' + (tg.tint ? 'true' : 'false') + '" aria-label="' + th('InboxTagTint') + '"></button>' : (tg.tint ? ic('check') + '<span class="ibx-sr-only">' + th('InboxTagTint') + '</span>' : '')) + '</td>'
 				+ '<td>' + (editable ? '<button type="button" class="ibx-switch" role="switch" data-f="status" aria-checked="' + (tg.status ? 'true' : 'false') + '" aria-label="' + th('InboxTagActive') + '"></button>' : (tg.status ? th('InboxAccountStatusActive') : th('InboxInactive'))) + '</td>'
 				+ '<td class="ibx-table__actions">' + (editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
 					+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="1" title="' + th('InboxMoveDown') + '" aria-label="' + th('InboxMoveDown') + '"' + (n === data.tags.length - 1 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-down') + '</button>'
@@ -3213,13 +3214,13 @@
 				+ '<td><span class="ibx-tagprev-wrap"><input class="ibx-field" name="label" form="' + formId + '" placeholder="' + th('InboxNewTag') + '" aria-label="' + th('InboxNewTag') + '" maxlength="128"><span class="ibx-tagprev" aria-hidden="true" hidden></span></span></td>'
 				+ '<td></td>'
 				+ '<td><input type="color" class="ibx-color" name="color" form="' + formId + '" value="#0072b2" aria-label="' + th('InboxTagColor') + '"></td>'
-				+ '<td>' + borderSelect('none', 'name="border" form="' + formId + '"') + '</td><td></td>'
+				+ '<td>' + borderSelect('none', 'name="border" form="' + formId + '"') + '</td><td></td><td></td>'
 				+ '<td class="ibx-table__actions"><button type="submit" form="' + formId + '" class="ibx-btn ibx-btn--primary ibx-btn--sm">' + ic('plus') + ' ' + th('InboxAddTag') + '</button></td></tr></tfoot>';
 		}
 		html += '</table>';
 		if (editable) {
 			html += '<form class="ibx-js-addtag" id="' + formId + '"></form>';
-			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + ' ' + th('InboxTagsAliasHelp') + '</p>';
+			html += '<p class="ibx-formrow__help">' + th('InboxTagsKeysHelp') + ' ' + th('InboxTagBorderHelp') + ' ' + th('InboxTagTintHelp') + ' ' + th('InboxTagsAliasHelp') + '</p>';
 		}
 		html += '<div class="ibx-js-cvd" aria-live="polite"></div>';
 		html += thunderbirdTags(data.tags);
@@ -3237,10 +3238,12 @@
 			const col = $('[data-f="color"]', row);
 			const lab = $('[data-f="label"]', row);
 			const bor = $('[data-f="border"]', row);
+			const tin = $('[data-f="tint"]', row);
 			return Object.assign({}, tg, {
 				label: lab ? lab.value : tg.label,
 				color: col ? col.value.toUpperCase() : tg.color,
 				border: bor ? bor.value : tg.border,
+				tint: tin ? (tin.getAttribute('aria-checked') === 'true' ? 1 : 0) : tg.tint,
 				status: sw ? (sw.getAttribute('aria-checked') === 'true' ? 1 : 0) : tg.status,
 			});
 		});
@@ -3250,7 +3253,7 @@
 			try {
 				for (let i = 0; i < list.length; i++) {
 					const tg = list[i];
-					await post('tag', 'update', Object.assign({ tag_id: tg.id, label: tg.label, color: colors[i % colors.length], status: tg.status, border: tg.border || 'none' }, params));
+					await post('tag', 'update', Object.assign({ tag_id: tg.id, label: tg.label, color: colors[i % colors.length], status: tg.status, border: tg.border || 'none', tint: tg.tint ? 1 : 0 }, params));
 				}
 				toast(t('InboxTagsPaletteApplied'));
 			} catch (err) {
@@ -3291,8 +3294,9 @@
 			const color = $('[data-f="color"]', row).value;
 			const border = $('[data-f="border"]', row).value;
 			const status = $('[data-f="status"]', row).getAttribute('aria-checked') === 'true' ? 1 : 0;
+			const tint = $('[data-f="tint"]', row).getAttribute('aria-checked') === 'true' ? 1 : 0;
 			try {
-				await post('tag', 'update', Object.assign({ tag_id: row.dataset.tag, label, color, status, border }, params));
+				await post('tag', 'update', Object.assign({ tag_id: row.dataset.tag, label, color, status, border, tint }, params));
 				I.changed('tag', account ? account.id : 0);
 			} catch (err) {
 				toast(err.message, { error: true });
@@ -3360,6 +3364,12 @@
 				const sw = e.currentTarget;
 				sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
 				saveRow(row).then(reload);
+			});
+			// Colour of the rows: saved at once (optimistic switch), the lists take it at their next display
+			$('[data-f="tint"]', row).addEventListener('click', e => {
+				const sw = e.currentTarget;
+				sw.setAttribute('aria-checked', sw.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
+				saveRow(row);
 			});
 		});
 		const order = () => $$('[data-tag]', box).map(r => +r.dataset.tag);

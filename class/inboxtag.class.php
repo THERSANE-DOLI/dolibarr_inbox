@@ -55,14 +55,14 @@ class InboxTag
 	 *
 	 * @param int  $accountId  0 = global list
 	 * @param bool $activeOnly Only the active tags
-	 * @return array<int,array{id:int,fk_account:int,keyword:string,label:string,color:string,border:string,position:int,status:int,key:string}>
+	 * @return array<int,array{id:int,fk_account:int,keyword:string,label:string,color:string,border:string,tint:int,position:int,status:int,key:string}>
 	 */
 	public function listTags($accountId = 0, $activeOnly = false)
 	{
 		global $conf;
 
 		$out = array();
-		$sql = "SELECT rowid, fk_account, keyword, label, color, border, position, status FROM ".$this->db->prefix()."inbox_tag";
+		$sql = "SELECT rowid, fk_account, keyword, label, color, border, tint, position, status FROM ".$this->db->prefix()."inbox_tag";
 		$sql .= " WHERE entity = ".((int) $conf->entity)." AND fk_account = ".((int) $accountId);
 		$sql .= $activeOnly ? " AND status = 1" : '';
 		$sql .= " ORDER BY position, rowid LIMIT 500";
@@ -79,6 +79,8 @@ class InboxTag
 				'label' => (string) $row->label,
 				'color' => (string) $row->color,
 				'border' => self::isBorder((string) $row->border) ? (string) $row->border : 'none',
+				// 1: the rows of its mails take a light background of its colour in the list
+				'tint' => (int) $row->tint ? 1 : 0,
 				'position' => (int) $row->position,
 				'status' => (int) $row->status,
 				// Key of the keyboard: the 9 first active tags
@@ -197,9 +199,10 @@ class InboxTag
 	 * @param string $color     #RRGGBB
 	 * @param int    $accountId 0 = global list
 	 * @param string $border    none, solid, dashed, dotted or double
+	 * @param int    $tint      1: the rows of its mails take a light background of its colour in the list
 	 * @return int               Id, < 0 if KO
 	 */
-	public function create(User $user, $label, $color, $accountId = 0, $border = 'none')
+	public function create(User $user, $label, $color, $accountId = 0, $border = 'none', $tint = 0)
 	{
 		global $conf;
 
@@ -218,9 +221,9 @@ class InboxTag
 		}
 		$prefix = $this->db->prefix();
 		$max = $this->db->getRow("SELECT MAX(position) AS p FROM ".$prefix."inbox_tag WHERE entity = ".((int) $conf->entity)." AND fk_account = ".((int) $accountId));
-		$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, position, status, date_creation, fk_user_creat)";
+		$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, tint, position, status, date_creation, fk_user_creat)";
 		$sql .= " VALUES (".((int) $conf->entity).", ".((int) $accountId).", '".$this->db->escape($this->makeKeyword($label, $accountId))."',";
-		$sql .= " '".$this->db->escape($label)."', '".$this->db->escape(strtoupper($color))."', ".($border === 'none' ? 'NULL' : "'".$this->db->escape($border)."'").", ".((is_object($max) ? (int) $max->p : 0) + 1).", 1,";
+		$sql .= " '".$this->db->escape($label)."', '".$this->db->escape(strtoupper($color))."', ".($border === 'none' ? 'NULL' : "'".$this->db->escape($border)."'").", ".($tint ? 1 : 0).", ".((is_object($max) ? (int) $max->p : 0) + 1).", 1,";
 		$sql .= " '".$this->db->idate(dol_now())."', ".((int) $user->id).")";
 		if (!$this->db->query($sql)) {
 			$this->error = $this->db->lasterror();
@@ -239,9 +242,10 @@ class InboxTag
 	 * @param string $color  #RRGGBB
 	 * @param int    $status 1 active, 0 not
 	 * @param string $border none, solid, dashed, dotted or double
+	 * @param ?int   $tint   1: the rows of its mails take a light background of its colour; null = unchanged
 	 * @return int            > 0 if OK, < 0 if KO
 	 */
-	public function update(User $user, $id, $label, $color, $status = 1, $border = 'none')
+	public function update(User $user, $id, $label, $color, $status = 1, $border = 'none', $tint = null)
 	{
 		global $conf;
 
@@ -260,6 +264,7 @@ class InboxTag
 		}
 		$sql = "UPDATE ".$this->db->prefix()."inbox_tag SET label = '".$this->db->escape($label)."', color = '".$this->db->escape(strtoupper($color))."',";
 		$sql .= " border = ".($border === 'none' ? 'NULL' : "'".$this->db->escape($border)."'").",";
+		$sql .= $tint === null ? '' : " tint = ".($tint ? 1 : 0).",";
 		$sql .= " status = ".($status ? 1 : 0).", fk_user_modif = ".((int) $user->id);
 		$sql .= " WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity);
 
@@ -326,8 +331,8 @@ class InboxTag
 		$prefix = $this->db->prefix();
 		$this->db->begin();
 		if ($mode === 'own' && !$this->listTags((int) $account->id)) {
-			$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, position, status, date_creation, fk_user_creat)";
-			$sql .= " SELECT entity, ".((int) $account->id).", keyword, label, color, border, position, status, '".$this->db->idate(dol_now())."', ".((int) $user->id);
+			$sql = "INSERT INTO ".$prefix."inbox_tag (entity, fk_account, keyword, label, color, border, tint, position, status, date_creation, fk_user_creat)";
+			$sql .= " SELECT entity, ".((int) $account->id).", keyword, label, color, border, tint, position, status, '".$this->db->idate(dol_now())."', ".((int) $user->id);
 			$sql .= " FROM ".$prefix."inbox_tag WHERE entity = ".((int) $conf->entity)." AND fk_account = 0";
 			if (!$this->db->query($sql)) {
 				$this->error = $this->db->lasterror();

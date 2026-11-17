@@ -236,5 +236,25 @@
 		return '<span class="ibx-tag' + border + (darkText(c) ? ' ibx-tag--dark' : '') + '"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + '>' + esc(tag.label) + '</span>';
 	}
 
-	Dolibarr.defineTool('inboxColors', { THRESHOLD, PALETTES, BORDERS, VISIONS, SETTING_VISIONS, PANE, distance, risks, adapt, userVisions, darkText, badge, isColor, contrast, readable });
+	/**
+	 * HTML of a tag as a dot: its colour and the initial of its name (not the colour alone, P28), its border, the
+	 * name in the title and for the screen readers
+	 *
+	 * @param {{label:string,color:string,border?:string}} tag   Tag
+	 * @param {string}                                      color Colour to show (adapted), else the one of the tag
+	 * @return {string}
+	 */
+	function dot(tag, color) {
+		const c = isColor(color) ? color : (isColor(tag.color) ? tag.color : '');
+		const esc = Dolibarr.tools.inbox.esc;
+		const border = BORDERS.includes(tag.border) && tag.border !== 'none' ? ' ibx-tag--b-' + tag.border : '';
+		// First grapheme (a flag or an emoji of several code points stays whole), upper case when it stays one
+		const text = String(tag.label || '').trim().normalize('NFC');
+		const first = (typeof Intl !== 'undefined' && Intl.Segmenter ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), x => x.segment)[0] : Array.from(text)[0]) || '?';
+		const initial = first.toUpperCase().length === first.length ? first.toUpperCase() : first;
+		return '<span class="ibx-tag ibx-tag--dot' + border + (darkText(c) ? ' ibx-tag--dark' : '') + '"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + ' title="' + esc(tag.label) + '">'
+			+ '<span aria-hidden="true">' + esc(initial) + '</span><span class="ibx-sr-only">' + esc(tag.label) + '</span></span>';
+	}
+
+	Dolibarr.defineTool('inboxColors', { THRESHOLD, PALETTES, BORDERS, VISIONS, SETTING_VISIONS, PANE, distance, risks, adapt, userVisions, darkText, badge, dot, isColor, contrast, readable });
 })();

@@ -160,7 +160,7 @@ switch ($action) {
 					'away' => $aways[(int) $account->id] ?? null,
 					'marks' => (object) array(),
 					'tags' => array_values(array_map(function ($t) {
-						return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border']);
+						return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border'], 'tint' => (int) $t['tint']);
 					}, array_filter($tagHelper->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), function ($t) {
 						return (int) $t['status'] === 1;
 					}))),
@@ -198,9 +198,9 @@ switch ($action) {
 				'fulltext' => isset($ftStates[(int) $account->id]) ? (string) $ftStates[(int) $account->id]->state : '',
 				'away' => $aways[(int) $account->id] ?? null,
 				'marks' => (object) $marks,
-				// Tags of the mailbox (its own list or the global one): keyword => label, color and border
+				// Tags of the mailbox (its own list or the global one): keyword => label, color, border and colour of the rows
 				'tags' => array_values(array_map(function ($t) {
-					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border']);
+					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border'], 'tint' => (int) $t['tint']);
 				}, array_filter($tagHelper->listTags($account->tags_mode === 'own' ? (int) $account->id : 0), function ($t) {
 					return (int) $t['status'] === 1;
 				}))),
