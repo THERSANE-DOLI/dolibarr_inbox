@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: an assignment shows in the lists open by the other users :   1.114.1
+  - added or removed, it now appears at their next refresh, without reloading the page.
+
 - NEW: the links of an email removed from the server wait for it, then are forgotten after a delay :   1.114.0
   - a linked email removed or moved by another software shows « Removed from the server on » on its record.
   - its links, notes and assignments come back with it (moved back, restored from a backup).

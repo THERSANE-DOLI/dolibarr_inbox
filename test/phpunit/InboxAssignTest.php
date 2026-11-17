@@ -91,6 +91,49 @@ class InboxAssignTest extends InboxTestCase
 	}
 
 	/**
+	 * An assignment added or removed changes the date of change of the mail: the stamp of its folder changes, the
+	 * lists open by the other users are refreshed
+	 *
+	 * @return void
+	 */
+	public function testAssignChangesTheMail()
+	{
+		$alice = $this->user('alice');
+		$bob = $this->user('bob');
+		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$acc = new InboxAccess($this->db);
+		$acc->grant($this->admin, $devis->id, $alice->id, 0, 'read');
+		$acc->grant($this->admin, $devis->id, $bob->id, 0, 'read');
+		InboxAssign::clearCache();
+		$inbox = $this->folder($devis->id, 'INBOX', 'inbox');
+		$m1 = $this->mail($devis->id, $inbox, '<t1@inbox-test.invalid>');
+		$m2 = $this->mail($devis->id, $inbox, '<t2@inbox-test.invalid>');
+		$p = $this->db->prefix();
+		$old = function () use ($p, $m1, $m2) {
+			$this->db->query("UPDATE ".$p."inbox_mail SET tms = '2020-01-01 00:00:00' WHERE rowid IN (".$m1.", ".$m2.")");
+		};
+		$changed = function ($id) use ($p) {
+			$row = $this->db->getRow("SELECT tms FROM ".$p."inbox_mail WHERE rowid = ".((int) $id));
+
+			return (int) $this->db->jdate($row->tms) > dol_mktime(0, 0, 0, 1, 1, 2021);
+		};
+		$assign = new InboxAssign($this->db);
+
+		$old();
+		$this->assertTrue($assign->set($alice, array($m1), array($bob->id), array())['ok']);
+		$this->assertTrue($changed($m1), 'assignment added');
+		$this->assertFalse($changed($m2), 'the other mails are not touched');
+
+		$old();
+		$assign->set($alice, array($m1), array($bob->id), array());
+		$this->assertFalse($changed($m1), 'nothing changed, the date stays');
+
+		$old();
+		$assign->set($alice, array($m1), array(), array($bob->id));
+		$this->assertTrue($changed($m1), 'assignment removed');
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testAssignFollowsTheMail()
