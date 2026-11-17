@@ -2809,6 +2809,8 @@ InboxBankCheckedSave = Anotar la verificación
 InboxBankCheckedMissing = Indique el número llamado y la persona contactada.
 InboxBankCheckedNote = Datos bancarios verificados por teléfono en el %s, con %s.
 InboxBankCheckedDone = Verificación anotada en el correo
+InboxBankFold = Reducir
+InboxBankUnfold = Mostrar los consejos
 # Shared domains (lot A7, 1.76.0)
 InboxNavDomains = Dominios públicos y compartidos
 InboxDomainsHelp = Los correos públicos, los proveedores de acceso y las direcciones desechables reúnen a personas que no se conocen: su dominio nunca designa a un tercero. El dominio de una empresa es un buen indicio, salvo si varios de sus terceros lo comparten.

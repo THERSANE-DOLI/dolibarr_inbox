@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the box about bank details took the reading pane, the mail was left a few lines to read :   1.120.3
+  - « Collapse » leaves only its title line, remembered per mail; it folds itself once the check is written.
+  - red box: only the title in red, the advice in the text colour to be readable.
+
 - FIX: a recipient chosen from the proposals also left the text typed, as a red chip and in the field :   1.120.2
   - the field is emptied and the list closed before the chip is added.
   - the automatic save of the draft keeps the address being typed without making a chip of it.
