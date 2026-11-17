@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a recipient chosen from the proposals also left the text typed, as a red chip and in the field :   1.120.2
+  - the field is emptied and the list closed before the chip is added.
+  - the automatic save of the draft keeps the address being typed without making a chip of it.
+
 - FIX: the journal of the changes of a mailbox stopped at 100 lines without saying it :   1.120.1
   - tab Access: the last 10 changes, then « More lines » loads the next ones.
 
