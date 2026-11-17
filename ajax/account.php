@@ -303,7 +303,10 @@ switch ($action) {
 	case 'log':
 		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
 		$log = new InboxAccountLog($db);
-		inboxAjaxReply(array('log' => $log->listForAccount((int) $account->id, 100, max(0, (int) inboxAjaxParam('offset', 'int')))));
+		// A page of the journal: the last lines first, the next ones on demand (limit 1 to 100, 100 by default)
+		$limit = (int) inboxAjaxParam('limit', 'int');
+		$limit = $limit > 0 ? min(100, $limit) : 100;
+		inboxAjaxReply(array('log' => $log->listForAccount((int) $account->id, $limit, max(0, (int) inboxAjaxParam('offset', 'int')))));
 		// no break
 
 	case 'folders':
