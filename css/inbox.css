@@ -2646,7 +2646,16 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 }
 
 /* Bank details in a mail (lot A6, 1.75.0): a lesson, never a green light */
-.ibx-bank .ibx-banner__text > p { margin: var(--ibx-s1) 0; }
+.ibx-bank .ibx-banner__text > p, .ibx-bank__body > p { margin: var(--ibx-s1) 0; }
+.ibx-bank__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); justify-content: space-between; }
+.ibx-bank__fold { flex: none; margin-left: auto; }
+/* The icon of the box beside its title, not in the middle of a long box */
+.ibx-bank > .ibx-icon { align-self: flex-start; margin-top: 0.45rem; }
+.ibx-bank.is-folded { padding-block: var(--ibx-s1); }
+/* Red box: only the title in red, the advice in the text colour to stay readable on the red background */
+.ibx-bank.ibx-banner--danger { color: var(--ibx-text); font-weight: 400; }
+.ibx-bank.ibx-banner--danger > .ibx-icon, .ibx-bank.ibx-banner--danger .ibx-bank__head b, .ibx-bank.ibx-banner--danger .ibx-bank__head .ibx-mono { color: var(--ibx-danger); font-weight: 600; }
+.ibx-bank.ibx-banner--danger .ibx-bank__body b, .ibx-bank.ibx-banner--danger summary { font-weight: 600; }
 .ibx-bank__block { margin-top: var(--ibx-s2); }
 .ibx-bank__block > summary { cursor: pointer; font-weight: 600; }
 .ibx-bank__call { display: flex; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); padding: 0; margin: var(--ibx-s1) 0; list-style: none; }

@@ -2809,6 +2809,8 @@ InboxBankCheckedSave = Write the check
 InboxBankCheckedMissing = Give the number called and the person reached.
 InboxBankCheckedNote = Bank details checked by phone at %s, with %s.
 InboxBankCheckedDone = Check written on the email
+InboxBankFold = Collapse
+InboxBankUnfold = Show the advice
 # Shared domains (lot A7, 1.76.0)
 InboxNavDomains = Public and shared domains
 InboxDomainsHelp = Public email services, access providers and disposable addresses gather people who do not know each other: their domain never designates a thirdparty. The domain of a company is a good clue, unless several of your thirdparties share it.

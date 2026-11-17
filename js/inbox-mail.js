@@ -8833,9 +8833,15 @@
 		const call = b.call.length
 			? '<ul class="ibx-bank__call">' + b.call.map(c => '<li><a class="ibx-btn ibx-btn--sm" href="tel:' + esc(c.number.replace(/[^\d+]/g, '')) + '">' + ic('phone') + ' ' + esc(c.number) + '</a> <span class="ibx-muted">' + esc(c.who) + (c.mobile ? ' · ' + th('InboxBankMobile') : '') + '</span></li>').join('') + '</ul>'
 			: '<p>' + th(b.known ? 'InboxBankNoNumber' : 'InboxBankNoCard') + '</p>';
-		return '<div class="ibx-banner ibx-banner--' + b.level + ' ibx-bank" role="' + (b.level === 'danger' ? 'alert' : 'status') + '">' + ic(b.level === 'danger' ? 'spoof' : 'warning')
+		// Folded once read (UX fix series): only the title line stays, the mail gets back its height; remembered per mail
+		const folded = bankFolded(m.id);
+		const bodyId = 'ibx-bank-body-' + m.id;
+		return '<div class="ibx-banner ibx-banner--' + b.level + ' ibx-bank' + (folded ? ' is-folded' : '') + '" role="' + (b.level === 'danger' ? 'alert' : 'status') + '">' + ic(b.level === 'danger' ? 'spoof' : 'warning')
 			+ '<div class="ibx-banner__text">'
-			+ '<b>' + th('InboxBankTitle') + '</b>' + (b.ibans.length ? ' <span class="ibx-mono">' + esc(b.ibans.join(', ')) + '</span>' : '')
+			+ '<div class="ibx-bank__head"><span><b>' + th('InboxBankTitle') + '</b>' + (b.ibans.length ? ' <span class="ibx-mono">' + esc(b.ibans.join(', ')) + '</span>' : '') + '</span>'
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-bank__fold ibx-js-bankfold" aria-expanded="' + !folded + '" aria-controls="' + bodyId + '">'
+			+ ic(folded ? 'chevron-down' : 'chevron-up') + ' <span>' + th(folded ? 'InboxBankUnfold' : 'InboxBankFold') + '</span></button></div>'
+			+ '<div class="ibx-bank__body" id="' + bodyId + '"' + (folded ? ' hidden' : '') + '>'
 			+ '<p>' + th(b.level === 'danger' ? 'InboxBankLeadDanger' : 'InboxBankLead') + '</p>'
 			+ '<div class="ibx-bank__block"><b>' + th('InboxBankCallTitle') + '</b>' + call + '<p class="ibx-muted">' + th('InboxBankCallWhy') + '</p></div>'
 			+ '<details class="ibx-bank__block"' + (b.warnings ? ' open' : '') + '><summary>' + th('InboxBankSeen', b.warnings) + '</summary><ul class="ibx-bank__signals">' + signals + '</ul>'
@@ -8843,7 +8849,40 @@
 			+ '<details class="ibx-bank__block"><summary>' + th('InboxBankWhyTitle') + '</summary><p>' + th('InboxBankWhyText') + '</p><ol class="ibx-bank__steps">'
 			+ ['1', '2', '3', '4', '5'].map(n => '<li>' + th('InboxBankStep' + n) + '</li>').join('') + '</ol></details>'
 			+ '<div class="ibx-bank__foot"><button type="button" class="ibx-btn ibx-btn--sm ibx-js-bankchecked">' + ic('note') + ' ' + th('InboxBankChecked') + '</button></div>'
-			+ '</div></div>';
+			+ '</div></div></div>';
+	}
+	/** Mails whose bank box was folded, per browser (a convenience: lost storage only shows the box again) */
+	const BANK_FOLD_MAX = 300;
+	function bankFoldList() {
+		try {
+			const list = JSON.parse(localStorage.getItem(I.scope('inbox-bankfold')) || '[]');
+			return Array.isArray(list) ? list : [];
+		} catch (e) {
+			return [];
+		}
+	}
+	function bankFolded(id) {
+		return bankFoldList().includes(+id);
+	}
+	function setBankFolded(id, folded) {
+		const list = bankFoldList().filter(x => x !== +id);
+		if (folded) {
+			list.push(+id);
+		}
+		try {
+			localStorage.setItem(I.scope('inbox-bankfold'), JSON.stringify(list.slice(-BANK_FOLD_MAX)));
+		} catch (e) {
+			// Storage refused: folded for this display only
+		}
+	}
+	/** Folds or unfolds the bank box of a reading pane, without rendering the mail again */
+	function foldBank(box, m, folded) {
+		const btn = $('.ibx-js-bankfold', box);
+		box.classList.toggle('is-folded', folded);
+		$('.ibx-bank__body', box).hidden = folded;
+		btn.setAttribute('aria-expanded', String(!folded));
+		btn.innerHTML = ic(folded ? 'chevron-down' : 'chevron-up') + ' <span>' + th(folded ? 'InboxBankUnfold' : 'InboxBankFold') + '</span>';
+		setBankFolded(m.id, folded);
 	}
 	/** « I checked by phone »: the number called (one of the cards) and the person, written as a note of the mail */
 	function bankCheckedDialog(m) {
@@ -8871,6 +8910,11 @@
 					return false;
 				}
 				toast(t('InboxBankCheckedDone'));
+				// Checked: the box folds, the mail is what is left to read
+				const bank = $('.ibx-bank', mailRoot(m));
+				if (bank) {
+					foldBank(bank, m, true);
+				}
 				const box = $('.ibx-dolibar', mailRoot(m));
 				if (box) {
 					loadDolibar(box);
@@ -8972,6 +9016,10 @@
 		const bankChecked = $('.ibx-js-bankchecked', pane);
 		if (bankChecked) {
 			bankChecked.addEventListener('click', () => bankCheckedDialog(m));
+		}
+		const bankFold = $('.ibx-js-bankfold', pane);
+		if (bankFold) {
+			bankFold.addEventListener('click', () => foldBank(bankFold.closest('.ibx-bank'), m, bankFold.getAttribute('aria-expanded') === 'true'));
 		}
 		const notJunk = $('.ibx-js-notjunk', pane);
 		if (notJunk) {

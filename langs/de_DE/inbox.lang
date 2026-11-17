@@ -2809,6 +2809,8 @@ InboxBankCheckedSave = Prüfung notieren
 InboxBankCheckedMissing = Geben Sie die angerufene Nummer und die erreichte Person an.
 InboxBankCheckedNote = Bankverbindung telefonisch unter %s bei %s geprüft.
 InboxBankCheckedDone = Prüfung an der Mail notiert
+InboxBankFold = Einklappen
+InboxBankUnfold = Hinweise anzeigen
 # Shared domains (lot A7, 1.76.0)
 InboxNavDomains = Öffentliche und geteilte Domains
 InboxDomainsHelp = Öffentliche Maildienste, Internetanbieter und Wegwerfadressen vereinen Menschen, die sich nicht kennen: ihre Domain bezeichnet nie einen Partner. Die Domain einer Firma ist ein guter Hinweis, außer mehrere Ihrer Partner teilen sie.
