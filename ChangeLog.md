@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the journal of the changes of a mailbox stopped at 100 lines without saying it :   1.120.1
+  - tab Access: the last 10 changes, then « More lines » loads the next ones.
+
 - NEW: people and groups chosen from a real list, with their picture :   1.120.0
   - accesses and owner of a mailbox: photo or initials of a user, a group in its colour with its members.
   - who already has an access is greyed with its level; « n more, type to narrow » when the list is cut.

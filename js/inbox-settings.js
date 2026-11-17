@@ -2623,12 +2623,16 @@
 	}
 
 	// ----- Tab Access -----
+	// Journal of the changes under the accesses: its last lines, then pages asked on demand
+	const LOG_FIRST = 10;
+	const LOG_PAGE = 50;
 	async function tabAccess(box, account) {
 		box.innerHTML = skeleton(4);
 		let data;
 		let log;
 		try {
-			[data, log] = await Promise.all([api('access', 'list', { id: account.id }), api('account', 'log', { id: account.id })]);
+			// The journal: its last lines, one more asked to know if there are others
+			[data, log] = await Promise.all([api('access', 'list', { id: account.id }), api('account', 'log', { id: account.id, limit: LOG_FIRST + 1 })]);
 		} catch (err) {
 			box.replaceChildren(errorBox(err, () => tabAccess(box, account)));
 			return;
@@ -2655,8 +2659,31 @@
 			+ '<button type="submit" class="ibx-btn ibx-btn--primary">' + ic('user-plus') + ' ' + th('InboxGiveAccess') + '</button></form>'
 			// What the level chosen gives, and what it does not (1.91.0)
 			+ '<p class="ibx-formrow__help ibx-js-levelhint" aria-live="polite">' + th('InboxAccessHint_read') + '</p>';
-		html += '<section class="ibx-section" style="margin-top:2rem"><h2 class="ibx-section__title">' + th('InboxJournal') + '</h2>' + journalHtml(log.log) + '</section>';
+		html += '<section class="ibx-section" style="margin-top:2rem"><h2 class="ibx-section__title">' + th('InboxJournal') + '</h2><div class="ibx-js-acclog"></div></section>';
 		box.innerHTML = html;
+		// Journal of the changes (UX fix series): the last ones, then « More lines » asks the next page to the server
+		const logBox = $('.ibx-js-acclog', box);
+		let logLines = log.log.slice(0, LOG_FIRST);
+		const paintLog = more => {
+			logBox.innerHTML = journalHtml(logLines)
+				+ (more ? '<div class="ibx-formfoot"><button type="button" class="ibx-btn ibx-js-logmore">' + th('InboxJournalMore') + '</button></div>' : '');
+		};
+		paintLog(log.log.length > LOG_FIRST);
+		logBox.addEventListener('click', async e => {
+			const btn = e.target.closest('.ibx-js-logmore');
+			if (!btn || btn.getAttribute('aria-disabled') === 'true') {
+				return;
+			}
+			btn.setAttribute('aria-disabled', 'true');
+			try {
+				const next = (await api('account', 'log', { id: account.id, offset: logLines.length, limit: LOG_PAGE + 1 })).log;
+				logLines = logLines.concat(next.slice(0, LOG_PAGE));
+				paintLog(next.length > LOG_PAGE);
+			} catch (err) {
+				btn.removeAttribute('aria-disabled');
+				toast(err.message, { error: true });
+			}
+		});
 		// A photo that does not load leaves the letters
 		$$('.ibx-who__pic img', box).forEach(img => img.addEventListener('error', () => img.remove()));
 
