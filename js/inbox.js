@@ -449,7 +449,8 @@
 				dlg.close();
 				return;
 			}
-			const b = e.target.closest('[data-i]');
+			// The buttons of the foot only: the options of a searchable list (combo) carry data-i too
+			const b = e.target.closest('.ibx-dialog__foot [data-i]');
 			if (!b || b.getAttribute('aria-disabled') === 'true') {
 				return;
 			}

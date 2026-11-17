@@ -228,6 +228,14 @@ switch ($action) {
 		}
 		inboxAjaxReply($res);
 		break;
+	case 'defaulttemplate':
+		// Default template of the writing (1.118.0), put by the browser when the text is still empty
+		$res = $composer->defaultTemplate($user, $token, (int) inboxAjaxParam('identity', 'int'), (string) inboxAjaxParam('to', 'alphanohtml'));
+		if ($res === null) {
+			inboxComposeFail($composer);
+		}
+		inboxAjaxReply($res);
+		break;
 	case 'values':
 		$res = $composer->templateValues($user, $token, (int) inboxAjaxParam('identity', 'int'), (string) inboxAjaxParam('piece', 'alphanohtml'), (string) inboxAjaxParam('to', 'alphanohtml'),
 			(string) inboxAjaxParam('lang', 'aZ09'));

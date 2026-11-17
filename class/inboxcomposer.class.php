@@ -814,6 +814,43 @@ class InboxComposer
 	}
 
 	/**
+	 * Default template of the writing (1.118.0): the one of its kind (new mail, answer) for the user in the mailbox of
+	 * the identity, filled as applyTemplate() does; nothing for the other kinds (forward, draft...)
+	 *
+	 * @param User   $user       User
+	 * @param string $token      Writing
+	 * @param int    $identityId Identity chosen
+	 * @param string $to         First recipient
+	 * @return array<string,mixed>|null Template filled, or array('none' => 1, 'level' => ...)
+	 */
+	public function defaultTemplate(User $user, $token, $identityId, $to)
+	{
+		$dir = $this->held($user, $token);
+		$identity = $this->identityOf($user, $identityId);
+		if ($dir === null || !$identity) {
+			return $this->fail('not_found');
+		}
+		$state = self::readState($dir);
+		require_once __DIR__.'/inboxtemplatedefaults.class.php';
+		$usage = InboxTemplateDefaults::usageOfMode((string) ($state['mode'] ?? ''));
+		$found = $usage !== '' ? (new InboxTemplateDefaults($this->db))->resolve($user, (int) $identity['account'], $usage) : array('id' => 0, 'level' => '');
+		if ($found['id'] <= 0) {
+			return array('none' => 1, 'level' => $found['level'], 'usage' => $usage);
+		}
+		// The variables of the newest piece linked to the mail answered, as a template chosen by hand
+		$linked = array_values((array) ($state['linked'] ?? array()));
+		$piece = $linked ? ((string) $linked[0]['type']).':'.((int) $linked[0]['id']) : '';
+		$out = $this->applyTemplate($user, $token, $found['id'], $identityId, $piece, $to);
+		if ($out === null) {
+			return null;
+		}
+		$out['level'] = $found['level'];
+		$out['usage'] = $usage;
+
+		return $out;
+	}
+
+	/**
 	 * Values of the variables again (the recipient or the piece changed)
 	 *
 	 * @param User   $user       User

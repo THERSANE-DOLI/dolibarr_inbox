@@ -464,7 +464,11 @@
 		};
 	}
 	function hasContent(w) {
-		return w.to.count() + w.cc.count() + w.bcc.count() > 0 || $('.ibx-js-subject', w.dlg).value.trim() !== '' || (w.sourceMode ? $('.ibx-compose__source', w.dlg).value.trim() !== '' : !w.editor.isEmpty()) || w.attachments.length > 0;
+		// The default template not changed (1.118.0) is no content: such a writing closes without a draft
+		const dflt = !!(w.defaultTpl && w.defaultTpl.id && untouched(w));
+		const subject = $('.ibx-js-subject', w.dlg).value.trim();
+		return w.to.count() + w.cc.count() + w.bcc.count() > 0 || (subject !== '' && !(dflt && w.tpl && subject === w.tpl.subject.trim()))
+			|| (w.sourceMode ? $('.ibx-compose__source', w.dlg).value.trim() !== '' : !w.editor.isEmpty() && !dflt) || w.attachments.length > 0;
 	}
 
 	async function save(w, force) {
@@ -1995,15 +1999,25 @@
 				return;
 			}
 			items.push({ header: g.type === 'inbox_send' ? t('InboxTemplatesOfMailbox') : (g.type === 'all' ? t('InboxTemplatesAllTypes') : t('InboxTemplatesOfPiece', g.kind)) });
-			g.templates.forEach(tp => items.push({ label: tp.label + (tp.lang ? ' (' + tp.lang.slice(0, 2) + ')' : ''), icon: tp.private ? 'user-circle' : 'template', run: () => useTemplate(w, g, tp) }));
+			g.templates.forEach(tp => items.push({ label: tp.label + (tp.lang ? ' (' + tp.lang.slice(0, 2) + ')' : '') + (tp.whole ? ' · ' + t('InboxTemplateWholeShort') : ''), icon: tp.private ? 'user-circle' : 'template', run: () => useTemplate(w, g, tp) }));
 		});
 		if (!items.length) {
 			items.push({ note: t('InboxTemplatesNone') });
 		}
-		items.push({ sep: true }, { label: t('InboxTemplateSaveAs'), icon: 'plus', run: () => saveAsTemplate(w) });
+		const box = identityOf(w);
+		items.push({ sep: true }, { label: t('InboxTemplateSaveAs'), icon: 'plus', run: () => saveAsTemplate(w) },
+			{ label: t('InboxTemplateDefaults'), icon: 'star', run: () => templateDefaults(box.account, box.mailbox_label || box.mailbox || box.email) });
 		popMenu(anchor, items);
 	}
 	async function useTemplate(w, g, tp) {
+		// A complete mail over a text already written (1.118.0): asked before anything is fetched or attached
+		let how = 'cursor';
+		if (tp.whole) {
+			how = untouched(w) ? 'replace' : await askWhole(tp);
+			if (!how) {
+				return;
+			}
+		}
 		// The variables of a piece: the only one of the type, else the newest (« Variables of » lets choose)
 		const piece = g.pieces.length ? g.pieces[0].type + ':' + g.pieces[0].id : '';
 		let res;
@@ -2013,30 +2027,165 @@
 			toast(err.message, { error: true });
 			return;
 		}
+		putTemplate(w, res, g.pieces, g.kind, how);
+		w.changed();
+		w.editor.focus();
+	}
+	/**
+	 * A template filled by the server put in the writing
+	 * @param {object} w
+	 * @param {object} res    Answer of compose/template
+	 * @param {Array} pieces  Pieces whose variables it may take
+	 * @param {string} kind
+	 * @param {string} how    cursor (piece of text), replace (the text written goes, Undo takes it back), append (after the text)
+	 */
+	function putTemplate(w, res, pieces, kind, how) {
 		if (w.sourceMode) {
 			toggleSource(w);
 		}
-		if (w.editor.isEmpty()) {
-			w.editor.setHtml(res.html);
-		} else {
-			w.editor.insertHtml(res.html);
-		}
 		const subj = $('.ibx-js-subject', w.dlg);
+		const before = { html: w.editor.getHtml(), subject: subj.value, tpl: w.tpl, pristine: w.pristine };
+		const written = !untouched(w);
+		if (how === 'cursor') {
+			if (w.editor.isEmpty()) {
+				w.editor.setHtml(res.html);
+			} else {
+				w.editor.insertHtml(res.html);
+			}
+		} else {
+			// The signature changed for this mail stays at the end; the quote and the signature of the identity are apart
+			const parts = splitBody(before.html);
+			w.editor.setHtml((how === 'append' ? parts.body : '') + res.html + parts.signature);
+		}
 		const old = subj.value.trim();
-		if (res.subject && (old === '' || (w.tpl && old === w.tpl.subject))) {
+		// The subject of the template: on an empty subject or the one of the previous template; a complete mail in place
+		// of the text of a new mail takes the subject too (never the « Re: » of an answer)
+		if (res.subject && (old === '' || (w.tpl && old === w.tpl.subject) || (how === 'replace' && !w.source))) {
 			subj.value = res.subject;
 			subj.closest('.ibx-cfield').toggleAttribute('data-filled', true);
 			$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
 		}
-		w.tpl = { id: res.id, lang: res.lang, piece: res.piece, pieces: g.pieces, kind: g.kind, subjectRaw: res.subject_raw, subject: subj.value, to: refTo(w), identity: +$('.ibx-js-from', w.dlg).value };
+		w.tpl = { id: res.id, lang: res.lang, piece: res.piece, pieces, kind, subjectRaw: res.subject_raw, subject: subj.value, to: refTo(w), identity: +$('.ibx-js-from', w.dlg).value };
+		// A complete mail put alone is « untouched »: another complete mail takes its place without asking
+		w.pristine = how === 'replace' ? bodyPrint(w) : null;
 		if (res.attached) {
 			w.attachments.push(res.attached);
 			paintAttachments(w);
 		}
 		paintVars(w);
-		w.changed();
-		w.editor.focus();
+		if (how === 'replace' && written) {
+			toast(t('InboxTemplateReplaced', res.label || ''), { action: t('InboxUndo'), onAction: () => {
+				w.editor.setHtml(before.html);
+				subj.value = before.subject;
+				subj.closest('.ibx-cfield').toggleAttribute('data-filled', before.subject !== '');
+				$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
+				w.tpl = before.tpl;
+				w.pristine = before.pristine;
+				paintVars(w);
+				w.changed();
+			} });
+		}
 	}
+
+	// ---------- Default template and complete mails (1.118.0) ----------
+	/**
+	 * Text of the writing and the signature changed for this mail (div.inbox-signature-edited, kept at the end)
+	 * @param {string} html
+	 * @returns {{body: string, signature: string}}
+	 */
+	function splitBody(html) {
+		const box = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html').body;
+		const sig = box.querySelector(':scope > div.inbox-signature-edited');
+		const signature = sig ? sig.outerHTML : '';
+		if (sig) {
+			sig.remove();
+		}
+		return { body: box.innerHTML, signature };
+	}
+	/** Print of the text: without what changes by itself (values of the variables, signature changed, empty lines) */
+	function bodyPrint(w) {
+		const box = new DOMParser().parseFromString('<body>' + splitBody(w.editor.getHtml()).body + '</body>', 'text/html').body;
+		box.querySelectorAll('[data-inbox-var]').forEach(v => v.replaceWith('__' + v.getAttribute('data-inbox-var') + '__'));
+		box.querySelectorAll('p').forEach(p => {
+			if (!p.textContent.trim() && !p.querySelector('img, br + br')) {
+				p.remove();
+			}
+		});
+		return box.innerHTML.trim();
+	}
+	/** The text is still the one given: empty, or a complete mail (the default template) not changed since */
+	function untouched(w) {
+		if (w.sourceMode || !w.editor) {
+			return false;
+		}
+		return w.editor.isEmpty() || (typeof w.pristine === 'string' && bodyPrint(w) === w.pristine);
+	}
+	/**
+	 * A complete mail chosen over a text already written: replace it (Undo takes it back) or add after it
+	 * @param {object} tp Template of the menu
+	 * @returns {Promise<string|null>} replace, append, null (cancelled)
+	 */
+	function askWhole(tp) {
+		return new Promise(resolve => {
+			let answer = null;
+			const dd = dialog({
+				title: t('InboxTemplateWholeTitle'),
+				body: I.html`<p>${t('InboxTemplateWholeText', tp.label)}</p><p class="ibx-muted">${t('InboxTemplateWholeKept')}</p>`,
+				actions: [
+					{ label: t('InboxTemplateWholeAppend'), run: () => {
+						answer = 'append';
+					} },
+					{ label: t('InboxTemplateWholeReplace'), primary: true, run: () => {
+						answer = 'replace';
+					} },
+				],
+			});
+			dd.addEventListener('close', () => resolve(answer));
+		});
+	}
+	/**
+	 * Default template of a new mail or of an answer (four levels, see InboxTemplateDefaults), put while the text is
+	 * empty; the mailbox changed while the text is untouched: the default of the new mailbox in its place
+	 * @param {object} w
+	 * @param {boolean} again The identity changed
+	 */
+	async function applyDefault(w, again) {
+		let res;
+		try {
+			res = await post('compose', 'defaulttemplate', { compose: w.token, identity: +$('.ibx-js-from', w.dlg).value, to: refTo(w) });
+		} catch (err) {
+			// Without its default template the writing stays usable: nothing said
+			return;
+		}
+		// The user wrote meanwhile, or closed the writing: his text wins
+		if (w.closed || !untouched(w)) {
+			return;
+		}
+		const prev = w.defaultTpl;
+		if (res.none) {
+			if (again && prev) {
+				// The new mailbox has no default template: the previous one goes, as its subject
+				const subj = $('.ibx-js-subject', w.dlg);
+				w.editor.setHtml(splitBody(w.editor.getHtml()).signature);
+				if (w.tpl && subj.value === w.tpl.subject && !w.source) {
+					subj.value = '';
+					subj.closest('.ibx-cfield').toggleAttribute('data-filled', false);
+					$('.ibx-js-wtitle', w.dlg).textContent = titleOf(w);
+				}
+				w.tpl = null;
+				paintVars(w);
+			}
+			w.defaultTpl = { id: 0, level: res.level };
+			w.pristine = bodyPrint(w);
+			return;
+		}
+		if (again && prev && prev.id === res.id) {
+			return;
+		}
+		putTemplate(w, res, w.data.linked || [], '', 'replace');
+		w.defaultTpl = { id: res.id, level: res.level };
+	}
+
 	/** Subject of the template with values: the keys known replaced, the others kept (warned at the sending) */
 	function fillSubject(raw, values) {
 		return String(raw || '').replace(/__([A-Z0-9_]+)__/g, (m, k) => (k === 'CHECK_READ' ? '' : (Object.prototype.hasOwnProperty.call(values, k) ? String(values[k]).replace(/<[^>]*>/g, '').trim() : m)));
@@ -2116,6 +2265,7 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxTemplateFor') + '</span><div class="ibx-seg" role="radiogroup">'
 			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="1" checked><span>' + th('InboxTemplateMine') + '</span></label>'
 			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="0"><span>' + th('InboxTemplateShared', identityOf(w).mailbox || identityOf(w).email) + '</span></label></div></div>'
+			+ wholeRow(1)
 			+ '<p class="ibx-formrow__help">' + th('InboxTemplateSaveHelp') + '</p></form>';
 		dialog({
 			title: t('InboxTemplateSaveAs'),
@@ -2129,7 +2279,8 @@
 				}
 				const priv = f.querySelector('[name="private"]:checked').value === '1';
 				try {
-					await post('template', 'save', { label, subject, html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(), private: priv ? 1 : 0, accounts: priv ? [] : [identityOf(w).account] });
+					await post('template', 'save', { label, subject, html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(), private: priv ? 1 : 0, accounts: priv ? [] : [identityOf(w).account],
+						whole: f.querySelector('[name="whole"]:checked').value === '1' ? 1 : 0 });
 				} catch (err) {
 					toast(err.message, { error: true });
 					return false;
@@ -2139,6 +2290,143 @@
 			} }],
 		});
 	}
+
+	/**
+	 * Choice « complete mail / piece of text » of a template (1.118.0), for its editors
+	 * @param {number} whole 1 complete mail
+	 * @returns {string} HTML
+	 */
+	function wholeRow(whole) {
+		return I.html`<div class="ibx-formrow"><span class="ibx-formrow__label">${t('InboxTemplateWhole')}</span><div><div class="ibx-seg" role="radiogroup" aria-label="${t('InboxTemplateWhole')}">`
+			+ I.html`<label class="ibx-seg__opt"><input type="radio" name="whole" value="0"${whole ? '' : I.raw(' checked')}><span>${t('InboxTemplateWholePiece')}</span></label>`
+			+ I.html`<label class="ibx-seg__opt"><input type="radio" name="whole" value="1"${whole ? I.raw(' checked') : ''}><span>${t('InboxTemplateWholeMail')}</span></label></div>`
+			+ I.html`<div class="ibx-formrow__help">${t('InboxTemplateWholeHelp')}</div></div></div>`;
+	}
+	I.templateWholeRow = wholeRow;
+
+	/**
+	 * Default templates of a mailbox (1.118.0): four levels, the most precise first (me in this mailbox, every one in
+	 * this mailbox, me everywhere, every one everywhere), for a new mail and for an answer. Saved at each change
+	 * @param {number} accountId
+	 * @param {string} boxName
+	 */
+	async function templateDefaults(accountId, boxName) {
+		let data;
+		try {
+			data = await I.api('template', 'defaults', { account: accountId });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const usages = ['new', 'reply'];
+		// Grouped by reach (this mailbox, every mailbox), in the order of priority: the numbers 1 to 4 stay readable
+		const groups = [['user_box', 'box'], ['user', 'all']];
+		const order = data.levels.map(lv => lv.level);
+		const valueName = id => (id === null ? t('InboxTemplateDefaultUnset') : (id === 0 ? t('InboxTemplateDefaultNone') : (data.labels[id] || t('InboxTemplateDefaultHidden'))));
+		/**
+		 * State of a cell: used (it gives the template), masked (set, a level above wins), skipped (set, template no
+		 * longer usable), '' (not set, or nothing to say)
+		 */
+		const stateOf = (lv, u) => {
+			const v = lv.values[u];
+			if (v === null) {
+				return { s: '' };
+			}
+			const win = data.effective[u].level;
+			const wi = order.indexOf(win);
+			const li = order.indexOf(lv.level);
+			if (win === lv.level) {
+				return { s: 'used' };
+			}
+			if (wi >= 0 && li > wi) {
+				return { s: 'masked', by: wi + 1 };
+			}
+			return { s: 'skipped' };
+		};
+		const stateHtml = st => {
+			if (st.s === 'used') {
+				return I.html`<span class="ibx-badge ibx-badge--accent ibx-tdefaults__state">${t('InboxTemplateDefaultUsed')}</span>`;
+			}
+			if (st.s === 'masked') {
+				return I.html`<span class="ibx-tdefaults__state ibx-muted">${t('InboxTemplateDefaultMasked', st.by)}</span>`;
+			}
+			if (st.s === 'skipped') {
+				return I.html`<span class="ibx-badge ibx-badge--warning ibx-tdefaults__state">${t('InboxTemplateDefaultSkipped')}</span>`;
+			}
+			return '';
+		};
+		const cell = (lv, u) => {
+			const v = lv.values[u];
+			const id = 'ibx-tdef-' + lv.level + '-' + u;
+			const st = stateOf(lv, u);
+			let control;
+			if (!lv.editable) {
+				control = I.html`<span id="${id}">${valueName(v)}</span>`;
+			} else {
+				const opts = [['', t('InboxTemplateDefaultUnset')], ['0', t('InboxTemplateDefaultNone')]].concat(lv.choices.map(c => [String(c.id), c.label + (c.lang ? ' (' + c.lang.slice(0, 2) + ')' : '')]));
+				// A template set but no longer offered here (removed from the mailbox...): still shown, the next level answers
+				if (v && !lv.choices.some(c => c.id === v)) {
+					opts.push([String(v), valueName(v)]);
+				}
+				const cur = v === null ? '' : String(v);
+				control = I.html`<select class="ibx-field ibx-tdefaults__field" id="${id}" data-combo data-level="${lv.level}" data-usage="${u}" aria-labelledby="ibx-tdef-${lv.level} ibx-tdef-h-${u}">`
+					+ opts.map(([val, label]) => I.html`<option value="${val}"${val === cur ? I.raw(' selected') : ''}>${label}</option>`).join('') + '</select>';
+			}
+			return I.html`<td class="ibx-tdefaults__cell${v === null ? ' is-unset' : ''}${st.s === 'masked' ? ' is-masked' : ''}" data-label="${t('InboxTemplateDefaultFor_' + u)}">${I.raw(control)}${I.raw(String(stateHtml(st)))}</td>`;
+		};
+		const row = lv => {
+			const n = order.indexOf(lv.level) + 1;
+			const who = lv.level === 'user_box' || lv.level === 'user' ? t('InboxTemplateDefaultForMe') : t('InboxTemplateDefaultForAll');
+			const reach = lv.level === 'box' ? t('InboxTemplateDefaultReachBox') : (lv.level === 'all' ? t('InboxTemplateDefaultReachAll') : '');
+			return I.html`<tr><th scope="row" class="ibx-tdefaults__level" id="ibx-tdef-${lv.level}"><span class="ibx-tdefaults__who"><span class="ibx-tdefaults__num">${n}</span><span>${who}${reach ? I.html`<small class="ibx-muted">${reach}</small>` : ''}</span></span></th>`
+				+ usages.map(u => cell(lv, u)).join('') + '</tr>';
+		};
+		/** Under the table, when no level gives the template: nothing, or the default of Dolibarr */
+		const footer = () => usages.map(u => {
+			const e = data.effective[u];
+			if (e.level === 'core') {
+				return I.html`<li>${t('InboxTemplateDefaultFootCore', t('InboxTemplateDefaultFor_' + u), data.labels[e.id] || '')}</li>`;
+			}
+			if (e.level === '') {
+				return I.html`<li>${t('InboxTemplateDefaultFootNone', t('InboxTemplateDefaultFor_' + u))}</li>`;
+			}
+			return '';
+		}).join('');
+		const table = () => I.html`<table class="ibx-tdefaults__table"><thead><tr><th scope="col"><span class="ibx-sr-only">${t('InboxTemplateDefaultLevelCol')}</span></th>`
+			+ usages.map(u => I.html`<th scope="col" id="ibx-tdef-h-${u}">${t('InboxTemplateDefaultFor_' + u)}</th>`).join('') + '</tr></thead>'
+			+ groups.map((g, i) => I.html`<tbody><tr class="ibx-tdefaults__group"><th scope="rowgroup" colspan="3">${i === 0 ? t('InboxTemplateDefaultGroupBox', boxName) : t('InboxTemplateDefaultGroupAll')}</th></tr>`
+				+ data.levels.filter(lv => g.includes(lv.level)).map(row).join('') + '</tbody>').join('') + '</table>'
+			+ I.html`<ul class="ibx-tdefaults__foot ibx-muted" role="status">${I.raw(footer())}</ul>`;
+		const body = I.html`<p class="ibx-formrow__help">${t('InboxTemplateDefaultsHelp')}</p><div class="ibx-js-tdeftable">${I.raw(table())}</div>`;
+		const dd = dialog({ title: t('InboxTemplateDefaultsTitle', boxName), body, wide: true });
+		dd.classList.add('ibx-tdefaults');
+		dd.addEventListener('change', async e => {
+			const sel = e.target.closest('select[data-level]');
+			if (!sel) {
+				return;
+			}
+			sel.disabled = true;
+			try {
+				data = await post('template', 'setdefault', { account: accountId, level: sel.dataset.level, usage: sel.dataset.usage, value: sel.value });
+				toast(t('InboxSaved'), { key: 'tdef' });
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			// Painted again: which cell is used or masked follows; the focus goes back to the list changed
+			const focusId = sel.id;
+			const box = $('.ibx-js-tdeftable', dd);
+			box.innerHTML = table();
+			I.mount(box);
+			// After the searchable lists are built (and after the old list gave its focus back)
+			setTimeout(() => {
+				const again = document.getElementById(focusId);
+				const cellBox = again && again.closest('td');
+				const btn = cellBox && cellBox.querySelector('.dol-combo__btn');
+				(btn || again || dd).focus();
+			}, 0);
+		});
+	}
+	I.templateDefaults = templateDefaults;
 
 	// ---------- Documents of the linked pieces (lot W6 1.18.0) ----------
 	/**
@@ -2511,6 +2799,10 @@
 			// The templates offered follow the mailbox of the identity; the variables its name and address
 			w.templates = null;
 			varsFollow(w, true);
+			// Its default template (1.118.0), while the text is untouched
+			if (w.defaultTpl && untouched(w)) {
+				applyDefault(w, true);
+			}
 		});
 		dlg.addEventListener('click', e => {
 			const show = e.target.closest('.ibx-js-showrow');
@@ -2955,6 +3247,11 @@
 				w.changed();
 			}
 		});
+		// Default template of a new mail or of an answer (1.118.0): only on an empty text (not a mailto: body)
+		if (!o.restore && ['new', 'reply', 'replyall', 'replylist'].includes(w.mode) && w.editor.isEmpty()) {
+			w.defaultTpl = { id: 0, level: '' };
+			applyDefault(w, false);
+		}
 		// The cursor where the user writes: the first empty field, else the text
 		if (!d.to.length && mode !== 'draft' && mode !== 'editnew') {
 			w.to.focus();
