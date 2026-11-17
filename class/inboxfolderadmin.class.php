@@ -230,7 +230,7 @@ class InboxFolderAdmin
 				$this->refreshTree();
 				return -1;
 			}
-			$mails->clearFolder((int) $row->rowid);
+			$mails->clearFolder((int) $row->rowid, true);
 			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".((int) $row->rowid));
 		}
 		$this->refreshTree();
@@ -309,7 +309,7 @@ class InboxFolderAdmin
 			return -1;
 		}
 		$mails = new InboxMail($this->db);
-		$mails->clearFolder((int) $f->rowid);
+		$mails->clearFolder((int) $f->rowid, true);
 		$p = $this->db->prefix();
 		$this->db->query("UPDATE ".$p."inbox_folder SET total = 0, unread = 0 WHERE rowid = ".((int) $f->rowid));
 		foreach (array_reverse($subs) as $s) {
@@ -319,7 +319,7 @@ class InboxFolderAdmin
 				$this->refreshTree();
 				return -1;
 			}
-			$mails->clearFolder((int) $s->rowid);
+			$mails->clearFolder((int) $s->rowid, true);
 			$this->db->query("DELETE FROM ".$p."inbox_folder WHERE rowid = ".((int) $s->rowid));
 		}
 		$this->refreshTree();

@@ -23,6 +23,7 @@
 
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/connector/inboximapresponse.class.php');
+dol_include_once('/inbox/class/inboxlink.class.php');
 
 /**
  * Tests of InboxSync, InboxFolder, InboxMail, InboxContactMatcher
@@ -404,5 +405,177 @@ class InboxSyncTest extends InboxTestCase
 		$this->assertSame(1000, (int) $a->getConnectorConfig()['trash_days_since'], 'a longer delay keeps its start');
 		InboxRetention::set($a, 7, 0);
 		$this->assertGreaterThan(1000, (int) $a->getConnectorConfig()['trash_days_since'], 'a shorter delay starts again');
+	}
+
+	/**
+	 * A mail of the INBOX marked \Deleted by another client, without expunge (hidden there until then)
+	 *
+	 * @param string $msgid   Message-ID
+	 * @param bool   $expunge Expunge too (removed for good)
+	 * @return void
+	 */
+	protected function markDeleted($msgid, $expunge = false)
+	{
+		$p = $this->other();
+		$p->selectFolder('INBOX');
+		foreach ((array) $p->search(array('HEADER', 'Message-ID', '"'.$msgid.'"'), true) as $u) {
+			$p->requestAndResponse('UID STORE', array((string) $u, '+FLAGS.SILENT', '(\\Deleted)'));
+		}
+		if ($expunge) {
+			$p->expunge();
+		}
+	}
+
+	/**
+	 * Mails marked \Deleted elsewhere: never indexed, and leave the index at the next pass (1.113.2)
+	 *
+	 * @return void
+	 */
+	public function testDeletedFlagElsewhere()
+	{
+		$this->needDovecot();
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$this->sync($a);
+		$this->append('sync-del-a@inbox-test.invalid');
+		$this->markDeleted('sync-del-a@inbox-test.invalid');
+		$this->append('sync-del-b@inbox-test.invalid');
+		$this->sync($a);
+		$this->assertNull($this->row($a, 'sync-del-a@inbox-test.invalid'), 'a new mail already marked \Deleted is not indexed');
+		$this->assertNotNull($this->row($a, 'sync-del-b@inbox-test.invalid'));
+		$this->markDeleted('sync-del-b@inbox-test.invalid');
+		$this->sync($a);
+		$this->assertNull($this->row($a, 'sync-del-b@inbox-test.invalid'), 'marked \Deleted elsewhere: out of the index before the expunge');
+		$this->markDeleted('sync-del-b@inbox-test.invalid', true);
+	}
+
+	/**
+	 * A mail removed while another one is missing from the index: equal counts, found by the hourly comparison
+	 *
+	 * @return void
+	 */
+	public function testCompareWhenCountsMatch()
+	{
+		$this->needDovecot();
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$this->append('sync-cmp-a@inbox-test.invalid');
+		$this->append('sync-cmp-b@inbox-test.invalid');
+		$this->sync($a);
+		$this->sync($a);
+		$b = $this->row($a, 'sync-cmp-b@inbox-test.invalid');
+		$this->assertNotNull($b);
+		// b leaves the index (as a failed indexing), a leaves the server: same number on both sides
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail WHERE rowid = ".((int) $b->rowid));
+		$this->remove('sync-cmp-a@inbox-test.invalid');
+		$this->append('sync-cmp-c@inbox-test.invalid');
+		$this->sync($a);
+		$this->assertNotNull($this->row($a, 'sync-cmp-a@inbox-test.invalid'), 'compared at most every hour: still there');
+		$folderId = (int) $b->fk_folder;
+		$f = $this->db->getRow("SELECT sync_cursor FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".$folderId);
+		$c = json_decode((string) $f->sync_cursor, true);
+		$c['cmp'] = dol_now() - 7200;
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_cursor = '".$this->db->escape(json_encode($c))."' WHERE rowid = ".$folderId);
+		$this->append('sync-cmp-d@inbox-test.invalid');
+		$this->sync($a);
+		$this->assertNull($this->row($a, 'sync-cmp-a@inbox-test.invalid'), 'an hour later: compared mail by mail');
+		// A cursor written before 1.113.2 (no cmp) compares once even when nothing changed on the server
+		$this->remove('sync-cmp-c@inbox-test.invalid');
+		$this->sync($a);
+		$f = $this->db->getRow("SELECT sync_cursor FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".$folderId);
+		$c = json_decode((string) $f->sync_cursor, true);
+		unset($c['cmp']);
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_cursor = '".$this->db->escape(json_encode($c))."' WHERE rowid = ".$folderId);
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail WHERE fk_folder = ".$folderId." AND message_id = 'sync-cmp-d@inbox-test.invalid'");
+		$this->sync($a);
+		$this->assertIsObject($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".$folderId." AND sync_cursor LIKE '%\"cmp\"%'"), 'old cursor: compared once');
+		foreach (array('b', 'd') as $k) {
+			$this->remove('sync-cmp-'.$k.'@inbox-test.invalid');
+		}
+	}
+
+	/**
+	 * A linked mail removed elsewhere: its mailref is gone, its link stays; back with the same Message-ID, gone no more
+	 *
+	 * @return void
+	 */
+	public function testGoneMailKeepsLinks()
+	{
+		$this->needDovecot();
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$raw = "Message-ID: <sync-gone@inbox-test.invalid>\r\nFrom: Client Test <client.sync@example.invalid>\r\nTo: ".self::BOX
+			."\r\nSubject: Test gone\r\nDate: Mon, 16 Nov 2026 10:00:00 +0100\r\n\r\nCorps\r\n";
+		$this->other()->appendMessage('INBOX', $raw);
+		$this->sync($a);
+		$row = $this->row($a, 'sync-gone@inbox-test.invalid');
+		$this->assertNotNull($row);
+		$refs = new InboxMailRef($this->db);
+		$refId = $refs->fetchOrCreate($row);
+		$this->assertGreaterThan(0, $refId);
+		$p = $this->db->prefix();
+		$this->db->query("INSERT INTO ".$p."inbox_link (entity, fk_mailref, element_type, fk_element, date_creation) VALUES (1, ".$refId.", 'societe', 1, '".$this->db->idate(dol_now())."')");
+		$this->markDeleted('sync-gone@inbox-test.invalid', true);
+		$this->sync($a);
+		$this->assertNull($this->row($a, 'sync-gone@inbox-test.invalid'));
+		$ref = $this->db->getRow("SELECT date_gone FROM ".$p."inbox_mailref WHERE rowid = ".$refId);
+		$this->assertNotEmpty($ref->date_gone, 'last copy gone: mailref marked');
+		$this->assertIsObject($this->db->getRow("SELECT rowid FROM ".$p."inbox_link WHERE fk_mailref = ".$refId), 'the link stays');
+		// Restored (from a backup) with the same Message-ID
+		$this->other()->appendMessage('INBOX', $raw);
+		$this->sync($a);
+		$this->assertNotNull($this->row($a, 'sync-gone@inbox-test.invalid'));
+		$ref = $this->db->getRow("SELECT date_gone FROM ".$p."inbox_mailref WHERE rowid = ".$refId);
+		$this->assertEmpty($ref->date_gone, 'back: no longer gone');
+		$this->assertNotEmpty($refs->copies($refId), 'the link finds the mail again');
+		// Rebuilt index: the mail stays on the server, never marked gone
+		(new InboxMail($this->db))->clearFolder((int) $this->row($a, 'sync-gone@inbox-test.invalid')->fk_folder);
+		$ref = $this->db->getRow("SELECT date_gone FROM ".$p."inbox_mailref WHERE rowid = ".$refId);
+		$this->assertEmpty($ref->date_gone, 'index emptied, mail still there: not gone');
+		$this->markDeleted('sync-gone@inbox-test.invalid', true);
+	}
+
+	/**
+	 * Nightly job: bare mailrefs forgotten after 90 days, linked ones after the setting (730 days, 0 = kept)
+	 *
+	 * @return void
+	 */
+	public function testShedGoneMailrefs()
+	{
+		global $conf;
+
+		$p = $this->db->prefix();
+		$now = dol_now();
+		$make = function ($key, $daysGone, $linked) use ($p, $now) {
+			$this->db->query("INSERT INTO ".$p."inbox_mailref (entity, message_id, subject, from_email, date_gone, date_creation) VALUES (1, '".$key."@inbox-test.invalid', 'x', 'a@example.invalid', '"
+				.$this->db->idate($now - $daysGone * 86400)."', '".$this->db->idate($now)."')");
+			$id = (int) $this->db->last_insert_id($p.'inbox_mailref');
+			if ($linked) {
+				$this->db->query("INSERT INTO ".$p."inbox_link (entity, fk_mailref, element_type, fk_element, date_creation) VALUES (1, ".$id.", 'societe', 1, '".$this->db->idate($now)."')");
+				$this->db->query("INSERT INTO ".$p."inbox_note (entity, fk_mailref, note, date_creation) VALUES (1, ".$id.", 'n', '".$this->db->idate($now)."')");
+			}
+			return $id;
+		};
+		$exists = function ($id) use ($p) {
+			return is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_mailref WHERE rowid = ".((int) $id)));
+		};
+		$bareRecent = $make('shed-bare-recent', 30, false);
+		$bareOld = $make('shed-bare-old', 100, false);
+		$linkedMid = $make('shed-linked-mid', 400, true);
+		$linkedOld = $make('shed-linked-old', 800, true);
+		dolibarr_del_const($this->db, 'INBOX_GONE_LINKED_DAYS', $conf->entity);
+		unset($conf->global->INBOX_GONE_LINKED_DAYS);
+		$refs = new InboxMailRef($this->db);
+		$this->assertSame(2, $refs->shed());
+		$this->assertTrue($exists($bareRecent), 'bare, gone 30 days: kept');
+		$this->assertFalse($exists($bareOld), 'bare, gone 100 days: forgotten');
+		$this->assertTrue($exists($linkedMid), 'linked, gone 400 days: kept (730 by default)');
+		$this->assertFalse($exists($linkedOld), 'linked, gone 800 days: forgotten');
+		$this->assertFalse(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_link WHERE fk_mailref = ".$linkedOld)), 'its link with it');
+		$this->assertFalse(is_object($this->db->getRow("SELECT rowid FROM ".$p."inbox_note WHERE fk_mailref = ".$linkedOld)), 'its note with it');
+		$conf->global->INBOX_GONE_LINKED_DAYS = '0';
+		$keptOld = $make('shed-linked-never', 5000, true);
+		$this->assertSame(0, $refs->shed());
+		$this->assertTrue($exists($keptOld), '0: linked mailrefs kept for ever');
+		$conf->global->INBOX_GONE_LINKED_DAYS = '365';
+		$this->assertSame(2, $refs->shed(), 'a shorter delay');
+		unset($conf->global->INBOX_GONE_LINKED_DAYS);
 	}
 }

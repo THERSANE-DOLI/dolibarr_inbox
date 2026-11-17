@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the links of an email removed from the server wait for it, then are forgotten after a delay :   1.114.0
+  - a linked email removed or moved by another software shows « Removed from the server on » on its record.
+  - its links, notes and assignments come back with it (moved back, restored from a backup).
+  - forgotten after 2 years by default, setting in Settings > Server > Keeping (0: kept).
+
+- FIX: emails removed or moved by another software no longer stay in the list :   1.113.2
+  - an email marked as deleted (Thunderbird, a phone) leaves the list at the next synchronisation.
+  - the folders are compared with the server at least every hour, even when the counts match.
+
 - FIX: anti-spam engine on Rspamd 4 :   1.113.1
   - dev/rspamd moves to Rspamd 4.2.3 and Redis 8; verdicts, learning and counters unchanged for inbox.
   - its new list of equivalent domains read from the image, never from maps.rspamd.com.

@@ -798,8 +798,12 @@ class InboxActions
 		$p = $this->db->prefix();
 		$rowIds = array_map('intval', array_column($list, 'rowid'));
 		InboxActionLog::add($this->db, $user, (int) $first->fk_account, 'destroy', $list, (string) $first->path);
+		$index = new InboxMail($this->db);
+		$gone = $index->keyRows("rowid IN (".implode(',', $rowIds).")");
 		$this->db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (".implode(',', $rowIds).")");
 		$this->db->query("DELETE FROM ".$p."inbox_mail WHERE rowid IN (".implode(',', $rowIds).")");
+		// Removed for good: the links of the mails found nowhere else wait for the mail to come back (1.114.0)
+		$index->markGone($gone);
 		$this->counters((int) $first->fk_folder, 0, $list);
 		$this->trigger($user, 'INBOX_MAIL_DELETE', (int) $first->fk_account, array('folder' => (string) $first->path,
 			'message_ids' => array_values(array_filter(array_map('strval', array_column($list, 'message_id'))))));
