@@ -238,7 +238,7 @@
 
 	/**
 	 * HTML of a tag as a dot: its colour and the initial of its name (not the colour alone, P28), its border, the
-	 * name in the title and for the screen readers
+	 * name for the screen readers (on screen, the list shows the tags of the mail in a bubble over the dots)
 	 *
 	 * @param {{label:string,color:string,border?:string}} tag   Tag
 	 * @param {string}                                      color Colour to show (adapted), else the one of the tag
@@ -252,7 +252,7 @@
 		const text = String(tag.label || '').trim().normalize('NFC');
 		const first = (typeof Intl !== 'undefined' && Intl.Segmenter ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), x => x.segment)[0] : Array.from(text)[0]) || '?';
 		const initial = first.toUpperCase().length === first.length ? first.toUpperCase() : first;
-		return '<span class="ibx-tag ibx-tag--dot' + border + (darkText(c) ? ' ibx-tag--dark' : '') + '"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + ' title="' + esc(tag.label) + '">'
+		return '<span class="ibx-tag ibx-tag--dot' + border + (darkText(c) ? ' ibx-tag--dark' : '') + '"' + (c ? ' style="--ibx-tag-color:' + c + '"' : '') + '>'
 			+ '<span aria-hidden="true">' + esc(initial) + '</span><span class="ibx-sr-only">' + esc(tag.label) + '</span></span>';
 	}
 
