@@ -714,6 +714,7 @@ InboxMailboxFolder = Postfach / Ordner
 InboxColumns = Spalten…
 InboxColumnsDefault = Standardspalten
 InboxColumnsDragHint = Eine Spaltenüberschrift ziehen, um die Spalte zu verschieben
+InboxColumnsRightClickHint = Rechtsklick: Spalten auswählen
 InboxQuota = Speicherplatz des Postfachs
 InboxQuotaUsed = %s MB von %s MB belegt (%s %%)
 InboxQuotaAlmostFull = Postfach fast voll: %s %%
