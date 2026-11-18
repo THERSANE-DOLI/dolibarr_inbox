@@ -99,14 +99,17 @@ switch ($action) {
 			$where .= " AND (firstname LIKE '%".$like."%' OR lastname LIKE '%".$like."%' OR login LIKE '%".$like."%' OR email LIKE '%".$like."%'";
 			$where .= " OR CONCAT(firstname, ' ', lastname) LIKE '%".$like."%' OR CONCAT(lastname, ' ', firstname) LIKE '%".$like."%')";
 		}
-		$users = (array) $db->getRows("SELECT rowid, firstname, lastname, login, photo, entity FROM ".$db->prefix()."user".$where." ORDER BY lastname, firstname LIMIT 30");
+		$users = (array) $db->getRows("SELECT rowid, firstname, lastname, login, photo, entity, email FROM ".$db->prefix()."user".$where." ORDER BY lastname, firstname LIMIT 30");
 		// How many more than shown: the list says to type more instead of seeming complete
 		$total = $db->getRow("SELECT COUNT(*) as nb FROM ".$db->prefix()."user".$where);
 		$moreUsers = max(0, (is_object($total) ? (int) $total->nb : 0) - count($users));
 		foreach ($users as $row) {
 			$name = trim($row->firstname.' '.$row->lastname);
 			// Login and photo: two people of the same name told apart, the right one recognized
+			// Found by the address only: the address is shown, the search never answers on something hidden
+			$byName = $q === '' || stripos($name.' '.$row->lastname.' '.$row->firstname.' '.$row->login, $q) !== false;
 			$out[] = array('kind' => 'user', 'id' => (int) $row->rowid, 'name' => $name !== '' ? $name : (string) $row->login, 'login' => (string) $row->login,
+				'email' => !$byName && stripos((string) $row->email, $q) !== false ? (string) $row->email : '',
 				'photo' => InboxAccess::userPhotoUrl((int) $row->rowid, (string) $row->photo, (int) $row->entity));
 		}
 		// Groups: their colour and how many active internal users they hold (a group gives the access to all of them)

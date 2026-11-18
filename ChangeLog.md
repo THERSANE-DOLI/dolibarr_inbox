@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: people search of the accesses shows the address when it is what matched :   1.126.5
+  - a search by address answers with the address, never on something hidden.
+
 - FIX: push service never makes the user wait, DMARC encodings, links of mails shown in a window :   1.126.4
   - delivery after the answer (PHP-FPM), 2 s at most, 50 changes and 4 connections, 30 s pause after a failure.
   - DMARC report in another encoding than UTF-8 / ASCII / Latin 1 refused; a DOCTYPE refused by the reader too.

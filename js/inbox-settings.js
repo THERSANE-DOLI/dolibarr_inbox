@@ -2794,7 +2794,8 @@
 				const results = res.results.filter(x => o.groups || x.kind === 'user').map(x => {
 					const key = (x.kind === 'group' ? 'g:' : 'u:') + x.id;
 					const level = o.has ? o.has.get(key) : '';
-					const sub = x.kind === 'group' ? t('InboxGroupMembers', x.members) : (x.login || t('InboxUser'));
+					// The address when it is what matched (the search never answers on something hidden)
+					const sub = x.kind === 'group' ? t('InboxGroupMembers', x.members) : [x.login || t('InboxUser'), x.email || ''].filter(Boolean).join(' · ');
 					return {
 						value: o.ids ? String(x.id) : key, label: x.name, avatar: whoAvatar(x), disabled: !!level,
 						sub: level ? sub + ' · ' + (level === 'owner' ? t('InboxAccessIsOwner') : t('InboxAccessAlready', levelLabel(level))) : sub,
