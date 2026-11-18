@@ -983,7 +983,8 @@
 			if (!ok) {
 				return;
 			}
-			await post('protect', 'level', { id: account.id, level: to });
+			// The address typed in the dialog (checked there), checked again by the server for « content »
+			await post('protect', 'level', { id: account.id, level: to, confirm_email: to === 'content' ? account.email : '' });
 			await P.refresh();
 			again();
 		});

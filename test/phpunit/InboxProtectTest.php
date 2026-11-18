@@ -84,6 +84,24 @@ class InboxProtectTest extends InboxTestCase
 	}
 
 	/**
+	 * A logout of Dolibarr locks the protected mailboxes unlocked (trigger USER_LOGOUT)
+	 *
+	 * @return void
+	 */
+	public function testLogoutLocksAll()
+	{
+		global $langs, $conf;
+
+		require_once __DIR__.'/../../core/triggers/interface_95_modInbox_InboxTriggers.class.php';
+		$_SESSION[InboxProtect::SESSION_KEY] = array(1 => array(5 => array('k' => 'x')));
+		$_SESSION[InboxProtect::SESSION_KEY.'_data'] = array('x' => 1);
+		$trigger = new InterfaceInboxTriggers($this->db);
+		$this->assertSame(0, $trigger->runTrigger('USER_LOGOUT', $this->admin, $this->admin, $langs, $conf));
+		$this->assertArrayNotHasKey(InboxProtect::SESSION_KEY, $_SESSION);
+		$this->assertArrayNotHasKey(InboxProtect::SESSION_KEY.'_data', $_SESSION);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testKeysAndCopies()

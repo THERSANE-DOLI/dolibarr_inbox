@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: protected mailboxes locked at the logout, address typed again checked by the server for « content » :   1.128.1
+  - the logout of Dolibarr locks the mailboxes unlocked and removes their cookie.
+  - change to the level « content »: the address of the mailbox is checked on the server, as to protect or reset.
+
 - FIX: protected mailboxes in a second entity of the user: the browser can be registered there :   1.128.0
   - one device per entity for the same key of the browser, approved and revoked in each entity.
   - a clear message when it cannot be registered; activate the module again (index of the devices).
