@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: push service never makes the user wait, DMARC encodings, links of mails shown in a window :   1.126.4
+  - delivery after the answer (PHP-FPM), 2 s at most, 50 changes and 4 connections, 30 s pause after a failure.
+  - DMARC report in another encoding than UTF-8 / ASCII / Latin 1 refused; a DOCTYPE refused by the reader too.
+  - links of an answer sent or a mail attached follow the rules of the reading; list pictures from this site only.
+
 - FIX: invitations, DMARC archives and default templates :   1.126.3
   - an invitation is recognized in the agendas of this entity only; answering it needs the right on own events.
   - an unreadable DMARC zip is refused cleanly (was a server error), its temporary file always removed.

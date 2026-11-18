@@ -214,6 +214,15 @@ class InboxDmarcTest extends InboxTestCase
 		$this->assertSame('InboxDmarcNotReport', InboxDmarc::analyze('r.xml', '<html><body>x</body></html>')['error']);
 		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.xml', '<feedback><record>')['error']);
 		$this->assertSame('InboxDmarcUnknownFormat', InboxDmarc::analyze('r.pdf', '%PDF-1.4')['error']);
+		// Another encoding would hide a DTD from the check of the bytes (UTF-7 « +ADw-!DOCTYPE », EBCDIC)
+		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.xml', '<?xml version="1.0" encoding="UTF-7"?>'."\n".'+ADw-!DOCTYPE feedback +AFs-+AD4-<feedback></feedback>')['error']);
+		$limit = 10;
+		$error = '';
+		$this->assertNull(InboxDmarc::parse("\x4C\x6F\xA7\x94\x93\x40\x4C\x6F", $limit, $error), 'EBCDIC (guessed by libxml from its first bytes)');
+		$this->assertSame('InboxDmarcUnreadable', $error);
+		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.xml', "<?xml version='1.0' encoding='EBCDIC-CP-US'?><feedback/>")['error']);
+		$ok = InboxDmarc::analyze('r.xml', "\xEF\xBB\xBF<?xml version=\"1.0\" encoding=\"utf-8\"?>".substr($xml, strpos($xml, '<feedback')));
+		$this->assertArrayNotHasKey('error', $ok, 'UTF-8 with its mark and declaration: read');
 		// A zip that does not open: refused as unreadable (never a fatal error), its temporary file gone
 		$before = glob(sys_get_temp_dir().'/ibxdm*') ?: array();
 		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.zip', "PK\x03\x04".str_repeat('x', 200))['error']);

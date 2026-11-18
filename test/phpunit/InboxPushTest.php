@@ -142,6 +142,7 @@ class InboxPushTest extends InboxTestCase
 		parent::setUp();
 		$this->mode = getDolGlobalString('INBOX_REACTIVITY');
 		$conf->global->INBOX_REACTIVITY = 'instant';
+		@unlink(InboxPush::pauseFile());
 	}
 
 	/**
@@ -152,6 +153,7 @@ class InboxPushTest extends InboxTestCase
 		global $conf;
 
 		$conf->global->INBOX_REACTIVITY = $this->mode;
+		@unlink(InboxPush::pauseFile());
 		InboxPush::reset();
 		parent::tearDown();
 	}
@@ -217,6 +219,14 @@ class InboxPushTest extends InboxTestCase
 		$json = json_encode($fake->published);
 		$this->assertStringNotContainsString('@', $json);
 		$this->assertStringNotContainsString('Secret', $json);
+
+		// Many events in one request: MAX_EVENTS delivered, the rest caught up by the light call
+		for ($i = 1; $i <= InboxPush::MAX_EVENTS + 10; $i++) {
+			InboxPush::queue('account/'.$box->id, array('id' => 1000 + $i, 'type' => 'flag'));
+		}
+		$this->assertTrue(InboxPush::flush());
+		$this->assertCount(InboxPush::MAX_EVENTS, $fake->published[1]);
+		$this->assertSame(array(), InboxPush::pending());
 	}
 
 	/**
@@ -258,8 +268,18 @@ class InboxPushTest extends InboxTestCase
 		$last = InboxPush::lastError();
 		$this->assertSame('down', $last['message'], 'kept without the database (closed at the end of the request)');
 		$fake->fail = false;
+		// A failure a moment ago: the next requests do not try (they never wait for a hub that is down)
+		$this->assertTrue(InboxPush::paused());
+		$sent = count($fake->published);
 		InboxPush::queue('account/1', array('id' => 2, 'type' => 'flag'));
+		$this->assertFalse(InboxPush::flush());
+		$this->assertCount($sent, $fake->published, 'nothing tried during the pause');
+		// After the pause: delivered, failure and pause cleared
+		touch(InboxPush::pauseFile(), time() - InboxPush::PAUSE - 1);
+		$this->assertFalse(InboxPush::paused());
+		InboxPush::queue('account/1', array('id' => 3, 'type' => 'flag'));
 		$this->assertTrue(InboxPush::flush());
+		$this->assertFalse(is_file(InboxPush::pauseFile()));
 		$this->assertNull(InboxPush::lastError(), 'cleared by the next success');
 	}
 

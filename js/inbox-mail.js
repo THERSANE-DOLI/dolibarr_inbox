@@ -9217,7 +9217,7 @@
 				return;
 			}
 			// Only web addresses leave the mail (never javascript:, data:, file:...: audit INBX-001)
-			if (!/^(https?:\/\/|tel:|#)/i.test(href)) {
+			if (!SAFE_LINK.test(href)) {
 				e.preventDefault();
 				return;
 			}
@@ -9424,6 +9424,43 @@
 		});
 	}
 
+	/**
+	 * Clicks on the links of a mail shown elsewhere than the reading pane (an answer sent, a mail attached): the rules
+	 * of the reading, without its warnings on the domains (no verdicts there). A mailto: written in inbox, web and phone
+	 * addresses only, anything else refused (javascript:, data:, file:...)
+	 * @param {HTMLIFrameElement} frame Frame of body.php
+	 */
+	function guardFrameLinks(frame) {
+		frame.addEventListener('load', () => {
+			let doc;
+			try {
+				doc = frame.contentDocument;
+			} catch (e) {
+				return;
+			}
+			if (!doc) {
+				return;
+			}
+			doc.addEventListener('click', e => {
+				const a = e.target.closest ? e.target.closest('a[href]') : null;
+				if (!a) {
+					return;
+				}
+				const href = a.getAttribute('href') || '';
+				if (/^mailto:/i.test(href)) {
+					if (I.ctx('INBOX_CAN_SEND', false) && I.composeMailto) {
+						e.preventDefault();
+						I.composeMailto(href);
+					}
+					return;
+				}
+				if (!SAFE_LINK.test(href)) {
+					e.preventDefault();
+				}
+			});
+		});
+	}
+
 	function hostOf(url) {
 		try {
 			return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
@@ -9447,6 +9484,9 @@
 	 * A mail of the fil (an answer sent) read in a dialog: its head and its body with the same protections as the
 	 * reading (body.php, sandbox, remote pictures as chosen for its sender); « Go to the email » opens it for good
 	 */
+	/** Addresses a link of a mail may open (audit INBX-001) */
+	const SAFE_LINK = /^(https?:\/\/|tel:|#)/i;
+
 	async function sentMailDialog(folder, id) {
 		let m;
 		try {
@@ -9470,6 +9510,12 @@
 			actions: [{ label: t('InboxActivityGoToMail'), primary: true, run: () => {
 				Dolibarr.executeHook('inbox:mail:goto', { folder, mail: id });
 			} }],
+			onOpen: dlg => {
+				const f = $('.ibx-sentview__frame', dlg);
+				if (f) {
+					guardFrameLinks(f);
+				}
+			},
 		});
 	}
 
@@ -10163,6 +10209,8 @@
 		} else if (a.kind === 'mail' && !m.compose) {
 			body.innerHTML = top + '<iframe class="ibx-viewer__frame ibx-viewer__frame--mail" title="' + esc(a.name) + '" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" src="'
 				+ I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=' + a.part + '"></iframe>';
+			// A mail attached comes from outside: its links follow the rules of the reading
+			guardFrameLinks($('.ibx-viewer__frame--mail', body));
 		} else if (a.kind === 'text' || a.kind === 'csv') {
 			try {
 				const res = await attApi(m, a.part, 'text', force);

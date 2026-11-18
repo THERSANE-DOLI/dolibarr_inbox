@@ -42,6 +42,12 @@ class InboxPush
 	/** A failure is written again for the administrator at most every 10 minutes */
 	const ERROR_EVERY = 600;
 
+	/** Seconds without delivery after a failure (the hub slow or down): the requests no longer wait for it */
+	const PAUSE = 30;
+
+	/** Events delivered by one request at most; beyond, the browsers catch up by the light call (journal) */
+	const MAX_EVENTS = 50;
+
 	/** @var array<string,array{class:string,file:string,label:string,doc:string}>|null */
 	protected static $drivers = null;
 
@@ -311,16 +317,47 @@ class InboxPush
 	 */
 	public static function flush()
 	{
-		$messages = self::$queue;
+		$messages = array_slice(self::$queue, 0, self::MAX_EVENTS);
 		self::$queue = array();
 		$driver = self::active();
 		if (!$messages || !$driver) {
 			return true;
 		}
+		// A failure a moment ago: nothing tried, the journal stays the reference (the browsers ask it)
+		if (self::paused()) {
+			return false;
+		}
+		// The answer goes to the browser first: the user never waits for the hub (PHP-FPM). The session is written
+		// before, else the next request of the user would wait for its lock
+		if (function_exists('fastcgi_finish_request') && !defined('INBOX_PUSH_NO_FINISH')) {
+			if (session_status() === PHP_SESSION_ACTIVE) {
+				session_write_close();
+			}
+			fastcgi_finish_request();
+		}
 		$ok = $driver->publish($messages);
 		self::noteResult($ok, $ok ? '' : $driver->error());
 
 		return $ok;
+	}
+
+	/**
+	 * @return string File whose date is the last failure of a delivery (pause)
+	 */
+	public static function pauseFile()
+	{
+		return DOL_DATA_ROOT.'/inbox/push-pause';
+	}
+
+	/**
+	 * @return bool A delivery failed less than PAUSE seconds ago
+	 */
+	public static function paused()
+	{
+		$file = self::pauseFile();
+		clearstatcache(true, $file);
+
+		return is_file($file) && time() - (int) @filemtime($file) < self::PAUSE;
 	}
 
 	/**
@@ -385,9 +422,16 @@ class InboxPush
 	{
 		if ($ok) {
 			self::clearError();
+			if (is_file(self::pauseFile())) {
+				@unlink(self::pauseFile());
+			}
 			return;
 		}
 		dol_syslog(__METHOD__.' '.$error, LOG_WARNING);
+		if (!is_dir(dirname(self::pauseFile()))) {
+			dol_mkdir(dirname(self::pauseFile()));
+		}
+		@touch(self::pauseFile());
 		$last = self::lastError();
 		if (!$last || dol_now() - $last['at'] >= self::ERROR_EVERY) {
 			$dir = dirname(self::errorFile());

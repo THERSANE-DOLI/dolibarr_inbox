@@ -20,6 +20,9 @@ Without a push service, or when it does not answer, the lists follow at the rhyt
   address of the server.
 - Every change stays written in the journal of inbox first: the service only delivers it sooner, a browser that
   missed something catches up by the light call.
+- The user never waits for the service: with PHP-FPM the answer goes to the browser before the delivery; without it,
+  2 seconds at most for all the changes of a request (50 at most, 4 connections). A failed delivery pauses the
+  deliveries for 30 seconds: the browsers follow the journal meanwhile.
 
 ## Install Mercure
 

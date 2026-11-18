@@ -94,12 +94,29 @@
 		return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#1f2328' : '#ffffff';
 	};
 
+	/**
+	 * A picture of this Dolibarr only (viewimage.php, a file of a module): never a remote address, that would tell
+	 * another server who looks at the list
+	 * @param {string} src Address
+	 * @returns {string} The address, '' when refused
+	 */
+	function localImage(src) {
+		if (!/^(https?:\/\/|\/|\.{0,2}\/|[\w-]+\.php)/i.test(src) || /^\/\//.test(src)) {
+			return '';
+		}
+		try {
+			return new URL(src, location.href).origin === location.origin ? src : '';
+		} catch (e) {
+			return '';
+		}
+	}
+
 	/** Picture of an item: {img, text, color, shape, icon} kept when it says something, else null */
 	function avatarOf(a) {
 		if (!a || typeof a !== 'object') {
 			return null;
 		}
-		const img = typeof a.img === 'string' && /^(https?:\/\/|\/|\.{0,2}\/|[\w-]+\.php)/i.test(a.img) ? a.img : '';
+		const img = typeof a.img === 'string' ? localImage(a.img) : '';
 		const out = { img, text: String(a.text || '').slice(0, 3), color: avatarColor(a.color), shape: a.shape === 'square' ? 'square' : 'circle', icon: ICONS[a.icon] ? a.icon : '' };
 		return out.img || out.text || out.icon ? out : null;
 	}

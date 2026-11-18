@@ -40,6 +40,9 @@ class InboxPushMercure implements InboxPushDriverInterface
 	/** Seconds to reach the hub when publishing: the end of the request never waits long */
 	const TIMEOUT = 2;
 
+	/** Connections to the hub at the same time for the updates of one request */
+	const CONNECTIONS = 4;
+
 	/** Type of the grants of Mercure 1 */
 	const GRANT = 'https://mercure.rocks/authorization-detail';
 
@@ -164,7 +167,7 @@ class InboxPushMercure implements InboxPushDriverInterface
 		$jwt = $this->publisherToken(array(array('match' => $this->topicBase().'*', 'match_type' => 'urlpattern')), dol_now() + 300);
 		foreach ($this->send($this->serverUrl(), $jwt, $bodies) as $r) {
 			if ($r['code'] < 200 || $r['code'] >= 300) {
-				$this->error = 'Mercure: '.($r['code'] ? 'HTTP '.$r['code'] : $r['error']);
+				$this->error = 'Mercure: '.($r['code'] ? 'HTTP '.$r['code'] : ($r['error'] !== '' ? $r['error'] : 'timeout'));
 				return false;
 			}
 		}
@@ -203,6 +206,10 @@ class InboxPushMercure implements InboxPushDriverInterface
 	protected function send($url, $jwt, array $bodies)
 	{
 		$mh = curl_multi_init();
+		// A few connections to the hub, kept and used again for the next updates (never one per update)
+		if (defined('CURLMOPT_MAX_TOTAL_CONNECTIONS')) {
+			curl_multi_setopt($mh, CURLMOPT_MAX_TOTAL_CONNECTIONS, self::CONNECTIONS);
+		}
 		$handles = array();
 		foreach ($bodies as $body) {
 			$ch = curl_init($url);
@@ -219,12 +226,14 @@ class InboxPushMercure implements InboxPushDriverInterface
 			curl_multi_add_handle($mh, $ch);
 			$handles[] = $ch;
 		}
+		// TIMEOUT for all of them together, the ones waiting for a connection too (without PHP-FPM the user waits)
+		$deadline = microtime(true) + self::TIMEOUT;
 		do {
 			$status = curl_multi_exec($mh, $running);
 			if ($running) {
 				curl_multi_select($mh, 0.2);
 			}
-		} while ($running && $status === CURLM_OK);
+		} while ($running && $status === CURLM_OK && microtime(true) < $deadline);
 		// The error of each transfer (curl_error() stays empty with the multi interface)
 		$errors = array();
 		while ($info = curl_multi_info_read($mh)) {
