@@ -40,6 +40,12 @@ class InboxCreate
 	/** Intents kept (s) */
 	const INTENT_TTL = 7200;
 
+	/** Seconds an intent may be used without its token (the page of creation shown again after an error) */
+	const INTENT_UNTOKEN_TTL = 900;
+
+	/** Parameter of the address of the page of creation that carries the token of its intent */
+	const INTENT_PARAM = 'inboxintent';
+
 	/**
 	 * Pieces that can be created from a mail: page of creation, trigger of the creation, label of the menu
 	 */
@@ -130,11 +136,13 @@ class InboxCreate
 		$intents = $this->intents($user);
 		$contact = (int) ($known['contact'] ?? 0);
 		$contactAfter = isset(self::CONTACT_AFTER[$type]) && $this->isContactOf($contact, (int) ($known['soc'] ?? 0)) ? $contact : 0;
+		$url = $this->createUrl($type, $row, $known);
+		$token = bin2hex(random_bytes(8));
 		$intents[] = array('type' => $type, 'mailref' => $refId, 'mail' => (int) $row->rowid, 'subject' => (string) $row->subject, 'file' => $file, 'at' => dol_now(),
-			'contactid' => $contactAfter);
+			'contactid' => $contactAfter, 'token' => $token, 'path' => (string) parse_url($url, PHP_URL_PATH));
 		$this->saveIntents($user, array_slice($intents, -10));
 
-		return $this->createUrl($type, $row, $known);
+		return self::withToken($url, $token);
 	}
 
 	/**
@@ -159,11 +167,67 @@ class InboxCreate
 			return '';
 		}
 		$intents = $this->intents($user);
+		$token = bin2hex(random_bytes(8));
 		$intents[] = array('type' => 'societe', 'mailref' => $refId, 'mail' => (int) $reader->row->rowid, 'subject' => (string) $reader->row->subject, 'file' => '', 'at' => dol_now(),
-			'lead' => 1, 'contact' => is_array($contact) ? $contact : null);
+			'lead' => 1, 'contact' => is_array($contact) ? $contact : null, 'token' => $token, 'path' => (string) parse_url($url, PHP_URL_PATH));
 		$this->saveIntents($user, array_slice($intents, -10));
 
-		return $url;
+		return self::withToken($url, $token);
+	}
+
+	/**
+	 * @param string $url   Page of creation
+	 * @param string $token Token of its intent
+	 * @return string
+	 */
+	protected static function withToken($url, $token)
+	{
+		$cut = strpos($url, '#');
+		$hash = $cut === false ? '' : substr($url, $cut);
+		$url = $cut === false ? $url : substr($url, 0, $cut);
+
+		return $url.(strpos($url, '?') === false ? '?' : '&').self::INTENT_PARAM.'='.$token.$hash;
+	}
+
+	/**
+	 * The intent a creation belongs to: the one whose token is in the page that sent the form (Referer: the page of
+	 * creation opened from the mail). A creation made elsewhere (another page, the panel, a module) uses none. Without
+	 * the token: the page shown again after an error of the form (its address without parameters) or a browser that
+	 * sends no Referer, the last intent of this type and this page, of the last minutes only.
+	 *
+	 * @param array<int,array<string,mixed>> $intents Intents of the user
+	 * @param string                         $type    Type created
+	 * @param string                         $referer Page that sent the form
+	 * @return int|null                               Key of the intent
+	 */
+	public static function intentOf(array $intents, $type, $referer)
+	{
+		$referer = (string) $referer;
+		$query = array();
+		parse_str((string) parse_url($referer, PHP_URL_QUERY), $query);
+		$token = isset($query[self::INTENT_PARAM]) && is_string($query[self::INTENT_PARAM]) ? $query[self::INTENT_PARAM] : '';
+		$path = (string) parse_url($referer, PHP_URL_PATH);
+		foreach (array_reverse(array_keys($intents)) as $k) {
+			$i = $intents[$k];
+			if ($i['type'] !== $type) {
+				continue;
+			}
+			if ($token !== '') {
+				if (hash_equals((string) ($i['token'] ?? ''), $token)) {
+					return $k;
+				}
+				continue;
+			}
+			$fresh = (int) ($i['at'] ?? 0) > dol_now() - self::INTENT_UNTOKEN_TTL;
+			$shownAgain = $referer !== '' && (string) parse_url($referer, PHP_URL_QUERY) === '' && $path !== '' && $path === (string) ($i['path'] ?? '');
+			if ($fresh && ($referer === '' || $shownAgain)) {
+				return $k;
+			}
+			// The newest intent of this type only, never an older one
+			return null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -264,8 +328,8 @@ class InboxCreate
 	}
 
 	/**
-	 * Trigger of a creation: the last intent of this user for this type links the new piece to its mail (and puts the
-	 * .eml in its documents when asked)
+	 * Trigger of a creation: the intent of the page that sent the form (intentOf) links the new piece to its mail (and
+	 * puts the .eml in its documents when asked)
 	 *
 	 * @param User   $user   User who created
 	 * @param string $code   Trigger
@@ -284,17 +348,12 @@ class InboxCreate
 			return 0;
 		}
 		$intents = $this->intents($user);
-		$found = null;
-		foreach (array_reverse(array_keys($intents)) as $k) {
-			if ($intents[$k]['type'] === $type) {
-				$found = $intents[$k];
-				unset($intents[$k]);
-				break;
-			}
-		}
-		if (!$found) {
+		$k = self::intentOf($intents, $type, (string) ($_SERVER['HTTP_REFERER'] ?? ''));
+		if ($k === null) {
 			return 0;
 		}
+		$found = $intents[$k];
+		unset($intents[$k]);
 		$this->saveIntents($user, array_values($intents));
 		$linker = new InboxLink($this->db);
 		$linker->link((int) $found['mailref'], $type, (int) $object->id, $user, 'inbox');

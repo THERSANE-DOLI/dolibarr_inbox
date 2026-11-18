@@ -22,7 +22,8 @@
  *          analysis for the dialog of the reading, DNS checks of the domain (1.111.0)
  *
  * A report can be forged by anybody (whoever writes to the rua address): its content is hostile.
- * - No DOCTYPE nor ENTITY, XMLReader without the network (no XXE, no « billion laughs »).
+ * - No DOCTYPE nor ENTITY (in the bytes, and as a node of the reader), UTF-8, ASCII or Latin 1 only (another
+ *   encoding would hide them), XMLReader without the network (no XXE, no « billion laughs »).
  * - gzip and zip unpacked by pieces with ceilings (no bomb), no archive inside an archive.
  * - Every value typed: IP by filter_var, domains and selectors as DNS names, counters as integers, results and
  *   dispositions from closed lists; anything else becomes « ? ». The only free texts (organization, contact, id of the
@@ -47,7 +48,10 @@ class InboxDmarc
 	const MAX_ZIP_ENTRIES = 20;
 
 	/** Records read (the totals beyond it are not counted: the analysis says it is partial) */
-	const MAX_RECORDS = 100000;
+	const MAX_RECORDS = 20000;
+
+	/** Memory the records of one analysis may take at most (less when PHP has less left), then partial */
+	const MAX_MEMORY = 67108864;
 
 	/** Rows sent to the dialog (the totals count all the records read) */
 	const MAX_ROWS = 2000;
@@ -236,17 +240,24 @@ class InboxDmarc
 			return array();
 		}
 		$tmp = tempnam(sys_get_temp_dir(), 'ibxdm');
-		if ($tmp === false || file_put_contents($tmp, $data) === false) {
+		if ($tmp === false) {
 			$error = 'InboxDmarcUnreadable';
 			return array();
 		}
 		$out = array();
 		$zip = new ZipArchive();
+		$opened = false;
+		// Written inside the try: a failed write (disk full) never leaves the file behind
 		try {
+			if (file_put_contents($tmp, $data) === false) {
+				$error = 'InboxDmarcUnreadable';
+				return array();
+			}
 			if ($zip->open($tmp, defined('ZipArchive::RDONLY') ? ZipArchive::RDONLY : 0) !== true) {
 				$error = 'InboxDmarcUnreadable';
 				return array();
 			}
+			$opened = true;
 			if ($zip->numFiles > self::MAX_ZIP_ENTRIES) {
 				$error = 'InboxDmarcTooManyFiles';
 				return array();
@@ -299,7 +310,10 @@ class InboxDmarc
 				}
 			}
 		} finally {
-			@$zip->close();
+			// close() of an archive not opened throws (PHP 8), the @ does not stop it
+			if ($opened) {
+				$zip->close();
+			}
 			@unlink($tmp);
 		}
 		if (!$out && $error === '') {
@@ -331,7 +345,18 @@ class InboxDmarc
 			$error = 'InboxDmarcUnreadable';
 			return null;
 		}
-		// No DTD at all: no external entity, no expansion bomb
+		// The bytes are the text: UTF-8 (or ASCII, Latin 1) only. Another encoding declared (UTF-7) or guessed by libxml
+		// (EBCDIC, no « < » first) would hide a DTD from the check below
+		$head = ltrim(substr($xml, 0, 512), "\xEF\xBB\xBF \t\r\n");
+		if ($head === '' || $head[0] !== '<') {
+			$error = 'InboxDmarcUnreadable';
+			return null;
+		}
+		if (preg_match('/^<\?xml[^>]*\bencoding\s*=\s*["\']([^"\']*)["\']/i', $head, $m) && !in_array(strtolower($m[1]), array('utf-8', 'utf8', 'us-ascii', 'ascii', 'iso-8859-1', 'latin1'), true)) {
+			$error = 'InboxDmarcUnreadable';
+			return null;
+		}
+		// No DTD at all: no external entity, no expansion bomb (and the reader refuses a DOCTYPE node below)
 		if (preg_match('/<!(DOCTYPE|ENTITY)/i', $xml)) {
 			$error = 'InboxDmarcDoctype';
 			return null;
@@ -353,6 +378,10 @@ class InboxDmarc
 			// next() goes to the following sibling: read() only when the node was not expanded
 			$more = @$reader->read();
 			while ($more) {
+				if ($reader->nodeType === XMLReader::DOC_TYPE) {
+					$error = 'InboxDmarcDoctype';
+					return null;
+				}
 				if ($reader->nodeType !== XMLReader::ELEMENT) {
 					$more = @$reader->read();
 					continue;
@@ -390,7 +419,8 @@ class InboxDmarc
 					} elseif ($name === 'policy_published') {
 						$out['policy'] = self::policyOf($node);
 					} else {
-						if ($limit <= 0) {
+						// Records count, and so does the memory: a report of repeated records stays partial, never fatal
+						if ($limit <= 0 || ($limit % 500 === 0 && memory_get_usage() > self::memoryCeiling())) {
 							$out['cut'] = true;
 							break;
 						}
@@ -420,6 +450,53 @@ class InboxDmarc
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Memory used beyond which no more record is read: the one in use at the first call plus MAX_MEMORY, at most
+	 * half of what memory_limit leaves (the rest of the analysis and the answer need some)
+	 *
+	 * @return int Bytes
+	 */
+	public static function memoryCeiling()
+	{
+		static $ceiling = 0;
+		if (!$ceiling) {
+			$used = memory_get_usage();
+			$room = self::MAX_MEMORY;
+			$limit = self::bytes((string) ini_get('memory_limit'));
+			if ($limit > 0) {
+				$room = min($room, max(0, (int) (($limit - $used) / 2)));
+			}
+			$ceiling = $used + $room;
+		}
+
+		return $ceiling;
+	}
+
+	/**
+	 * @param string $value Value of php.ini (« 128M », « -1 »)
+	 * @return int          Bytes, 0 = no limit
+	 */
+	public static function bytes($value)
+	{
+		$value = trim($value);
+		if ($value === '' || (int) $value <= 0) {
+			return 0;
+		}
+		$n = (int) $value;
+		switch (strtolower(substr($value, -1))) {
+			case 'g':
+				$n *= 1024;
+				// no break
+			case 'm':
+				$n *= 1024;
+				// no break
+			case 'k':
+				$n *= 1024;
+		}
+
+		return $n;
 	}
 
 	/**
@@ -866,7 +943,13 @@ class InboxDmarc
 					$checks[] = array('ok', 'dmarc_rua_ok', array($email));
 					continue;
 				}
-				// RFC 7489 §7.1: an external destination publishes <domain>._report._dmarc.<destination>
+				// RFC 7489 §7.1: an external destination publishes <domain>._report._dmarc.<destination>. The
+				// destination comes from the live DNS of the domain: a domain of the internet only (never a name of
+				// an internal zone asked by the server)
+				if (self::publicDomainOrEmpty($dest) === '') {
+					$checks[] = array('warn', 'dmarc_rua_unknown', array($email));
+					continue;
+				}
 				$authName = $policyDomain.'._report._dmarc.'.$dest;
 				$auth = self::txt($authName);
 				if ($auth === null) {
@@ -1013,6 +1096,34 @@ class InboxDmarc
 	}
 
 	/**
+	 * A public address: neither private, reserved nor shared (100.64.0.0/10), and an IPv4 written as IPv6
+	 * (::ffff:a.b.c.d, ::a.b.c.d) judged as the IPv4 it holds (audit INBX-096: ::ffff:10.0.0.1 passed the filter of PHP)
+	 *
+	 * @param string $ip IP
+	 * @return bool
+	 */
+	public static function publicIp($ip)
+	{
+		$bin = @inet_pton(trim($ip));
+		if ($bin === false) {
+			return false;
+		}
+		if (strlen($bin) === 16 && (substr($bin, 0, 12) === str_repeat("\0", 10)."\xff\xff" || substr($bin, 0, 12) === str_repeat("\0", 12))) {
+			$bin = substr($bin, 12);
+		}
+		$ip = (string) inet_ntop($bin);
+		if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+			return false;
+		}
+		// Shared address space of the operators (carrier-grade NAT)
+		if (strlen($bin) === 4 && (ord($bin[0]) === 100 && (ord($bin[1]) & 0xc0) === 64)) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Name of an IP (reverse DNS)
 	 *
 	 * @param string $ip IP
@@ -1021,7 +1132,7 @@ class InboxDmarc
 	public static function ptr($ip)
 	{
 		// Public addresses only: the names of the private networks of the server are not given to the users
-		if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) || !function_exists('gethostbyaddr')) {
+		if (!self::publicIp((string) $ip) || !function_exists('gethostbyaddr')) {
 			return null;
 		}
 		$name = @gethostbyaddr($ip);
@@ -1051,10 +1162,11 @@ class InboxDmarc
 		$file = $dir.'/dmarc-dns-'.((int) $userId).'.json';
 		$hour = (int) floor(time() / 3600);
 		$fh = @fopen($file, 'c+');
+		// The counter cannot be opened: refused (never queries without a limit)
 		if ($fh === false) {
-			return true;
+			return false;
 		}
-		$ok = true;
+		$ok = false;
 		if (flock($fh, LOCK_EX)) {
 			$data = json_decode((string) stream_get_contents($fh), true);
 			$used = is_array($data) && (int) ($data['hour'] ?? 0) === $hour ? (int) ($data['used'] ?? 0) : 0;
@@ -1069,6 +1181,55 @@ class InboxDmarc
 		fclose($fh);
 
 		return $ok;
+	}
+
+	/**
+	 * Queries of one check at most: DMARC of the domain and of its organisation, 5 external destinations, SPF, one per
+	 * selector (the budget is taken for the worst case, before the queries)
+	 *
+	 * @param int $selectors Selectors kept (10 at most)
+	 * @return int
+	 */
+	public static function dnsCost($selectors)
+	{
+		return 2 + 5 + 1 + min(10, max(0, (int) $selectors));
+	}
+
+	/**
+	 * Signature of a domain of a report analyzed for a user: the check of the DNS accepts the domains of the reports
+	 * he opened only (never a domain typed), today or yesterday
+	 *
+	 * @param int    $userId User
+	 * @param string $domain Domain
+	 * @param int    $day    Day (tests), 0 = today
+	 * @return string
+	 */
+	public static function domainSignature($userId, $domain, $day = 0)
+	{
+		global $conf;
+
+		$day = $day ?: (int) floor(time() / 86400);
+		$key = (string) (!empty($conf->file->instance_unique_id) ? $conf->file->instance_unique_id : DOL_DOCUMENT_ROOT);
+
+		return substr(hash_hmac('sha256', 'inbox-dmarc-dns|'.((int) $conf->entity).'|'.((int) $userId).'|'.strtolower((string) $domain).'|'.$day, $key), 0, 32);
+	}
+
+	/**
+	 * @param int    $userId    User
+	 * @param string $domain    Domain
+	 * @param string $signature Signature given with the report
+	 * @return bool
+	 */
+	public static function domainSigned($userId, $domain, $signature)
+	{
+		$today = (int) floor(time() / 86400);
+		foreach (array($today, $today - 1) as $day) {
+			if (hash_equals(self::domainSignature($userId, $domain, $day), (string) $signature)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// ---------- Values ----------

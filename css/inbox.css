@@ -3087,3 +3087,15 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 @media (max-width: 63.9375rem) {
 	.ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { display: flex; position: fixed; inset: 0; width: auto; z-index: 60; border: 0; box-shadow: none; }
 }
+
+/* Load of the server with the settings shown (Settings > Server, refresh of the lists, 1.124.0): each figure says
+   in its label which setting it comes from, the comparison with the standard mode set apart */
+.ibx-load { margin-top: var(--ibx-s3); padding: var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg-pane); }
+.ibx-load__head { display: flex; align-items: center; gap: var(--ibx-s2); font-weight: 600; }
+.ibx-load__who, .ibx-load__note { margin: var(--ibx-s1) 0 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-load__figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--ibx-s2); margin: var(--ibx-s3) 0 var(--ibx-s2); }
+.ibx-load__fig { margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border-radius: var(--ibx-radius); background: var(--ibx-accent-softer); }
+.ibx-load__fig--ref { background: var(--ibx-bg-sunken); }
+.ibx-load__label { font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-load__value { margin: var(--ibx-s1) 0 0; font-size: var(--ibx-fs-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ibx-load__cpu { margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }

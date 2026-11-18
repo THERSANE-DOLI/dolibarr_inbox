@@ -21,3 +21,10 @@ It reads the native agenda
 of Dolibarr only (`llx_actioncomm`, the user owner or attendee who did not decline), without the automatic events
 (type `systemauto`) nor the records of mails (`AC_EMAIL`, `AC_EMAIL_IN`, `AC_FAX`, `AC_INBOX_BOUNCE`). Right
 « read his events » of the Agenda module; « create his events » for the case « done ».
+
+## Pages of modules opened from a mail
+
+A module opens its pages from a mail (actions of the mail, panel) with a token of one use (`{ctx}`, 1.127.0): the
+page reads the mail on the server, nothing of the mail is in its address. The old markers that put the subject and
+the addresses in the address are removed. A module not yet moved to `{ctx}` gets them back with the hidden constant
+`INBOX_LEGACY_MAIL_MARKERS` = `1` (Setup > Other setup); remove it once the module is updated.

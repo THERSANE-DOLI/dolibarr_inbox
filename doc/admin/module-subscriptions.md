@@ -41,6 +41,10 @@ Each module that declares itself is listed with what it is for. « Allow » open
 
 The test mode is offered the first time: look in the journal at what the module would do, then change it to Active.
 
+A module allowed on a **personal** mailbox, or given more (an event, an action), by someone else than its owner: the
+owner and the administrators of Dolibarr are told (notification « Module allowed on a personal mailbox »), as when a
+manager gives himself an access. The owner who sets his own mailbox is not told.
+
 What a module may never do: delete a mail for good, empty the trash, create or remove folders, change the accesses,
 the rules or the identities of the mailbox, send a mail by itself (sending will come later, with protections
 against loops between automatic answers).

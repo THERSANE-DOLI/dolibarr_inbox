@@ -18,6 +18,8 @@
  * Notification centre of inbox, the bell of the rail (lot W4 1.9.0, webmail §5.4 sexies).
  * - The count comes with the call of state of the Mail space (every 20 s, hook inbox:notif:state); in another space,
  *   or when that call is paused, the bell asks it every 60 s (never after 30 min without activity).
+ * - Fast or instant refresh (1.125.0): a notification made or removed for this user comes as an event « notif »
+ *   (js/inbox-live.js); the bell asks its count at once, in any space, and the leader tab tells the browser too.
  * - A click on a notification opens its mail where it is now (found by its mailref), in any mailbox the user reads.
  * - Other modules: InboxNotification::add() on the server; inbox:notification:new tells them a new one came.
  */
@@ -304,6 +306,9 @@
 		if (n.type === 'access_self') {
 			return t('InboxNotifAccessSelf', who);
 		}
+		if (n.type === 'consumer_grant') {
+			return t('InboxNotifConsumerGrant', who, n.detail || '');
+		}
 		if (n.type === 'rule_redirect') {
 			return t('InboxNotifRuleRedirect', who);
 		}
@@ -565,6 +570,21 @@
 	}
 
 	Dolibarr.on('inbox:notif:state', c => apply(c));
+	// A notification made or removed for this user (fast or instant refresh): the count at once, gathered when several
+	// come together; the notification of the browser too (leader tab only, as its own rhythm)
+	let ringTimer = 0;
+	Dolibarr.on('inbox:live:events', p => {
+		if (!(p && (p.reset || (p.events || []).some(e => e.type === 'notif')))) {
+			return;
+		}
+		clearTimeout(ringTimer);
+		ringTimer = setTimeout(() => {
+			refresh();
+			if (browserReady() && !B.busy) {
+				fresh();
+			}
+		}, 300);
+	});
 	Dolibarr.on('inbox:app:ready', () => {
 		setBrowser(I.ctxJson('INBOX_PARAMS_JSON', {}));
 		const b = bell();

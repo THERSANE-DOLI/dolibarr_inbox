@@ -18,14 +18,15 @@
 /**
  * \file    inbox/ajax/mail.php
  * \ingroup inbox
- * \brief   A mail of the index (pane 3): open, read / unread, source, remote pictures of a sender
+ * \brief   A mail of the index (pane 3): open, read / unread, source, remote pictures of a sender, token of the mail for
+ *          the page of a module ({ctx})
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
 dol_include_once('/inbox/class/inboxreader.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('seen', 'images', 'unsubscribe'), true));
+inboxAjaxStart(in_array($action, array('seen', 'images', 'unsubscribe', 'context'), true));
 $reader = new InboxReader($db);
 
 /**
@@ -170,6 +171,17 @@ switch ($action) {
 			inboxAjaxReply(array('error' => $langs->transnoentities($key, $reader->error), 'code' => $key, 'page' => $reader->unsubscribePage), $codes[$key] ?? 502);
 		}
 		inboxAjaxReply(array('done' => 1));
+		// no break
+
+	case 'context':
+		// Token of one use for the page of a module opened from this mail (marker {ctx}): kept in the session (POST,
+		// the session is written), the page reads the mail by InboxMailContext::take()
+		dol_include_once('/inbox/class/inboxmailcontext.class.php');
+		$token = InboxMailContext::make($db, $user, (int) $reader->row->rowid);
+		if ($token === '') {
+			inboxAjaxNotFound();
+		}
+		inboxAjaxReply(array('token' => $token, 'life' => InboxMailContext::LIFE));
 		// no break
 
 	default:

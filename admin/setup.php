@@ -136,6 +136,11 @@ if ($pending) {
 	print info_admin($langs->trans('InboxUpdatePending', $pending['from'], $pending['to']).' '.$langs->trans('InboxUpdatePendingAdmin')
 		.' <a href="'.DOL_URL_ROOT.'/admin/modules.php?search_keyword=inbox">'.$langs->trans('InboxUpdatePendingGo').'</a>', 0, 0, 'warning');
 }
+// Advice (not required): without the extension intl of PHP, the domains written with accents or other alphabets
+// (the most deceptive lookalikes) are neither recognized nor told
+if (!function_exists('idn_to_ascii') || !class_exists('Normalizer')) {
+	print info_admin($langs->trans('InboxIntlMissing'), 0, 0, 'warning');
+}
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
 // The webmail settings live in the application, not here (analyse-lot-w1 §5)
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupAppHelp').'</span> <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxOpenSettings').'</a><br><br>';

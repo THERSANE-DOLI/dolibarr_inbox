@@ -1063,13 +1063,105 @@
 		$('.ibx-js-outboxopen', bar).onclick = () => outboxDialog();
 	}
 	Dolibarr.on('inbox:folder:open', ctx => outboxBar(ctx));
+
+	/*
+	 * mailto: links opened in inbox (1.123.0). Three ways in: the address index.php?mailto= (handler of the browser
+	 * asked from My account or from the offer below, or first start of the installed application), and launchQueue:
+	 * with launch_handler focus-existing, Chrome brings the open window of the application forward without loading
+	 * the address again, the link comes only there.
+	 */
+	const MAILTO_OFFER_KEY = 'inbox-mailto-offer:' + I.ctx('INBOX_URL', location.pathname);
+	const mailtoOf = url => {
+		try {
+			return new URL(url, location.href).searchParams.get('mailto') || '';
+		} catch (e) {
+			return '';
+		}
+	};
+	const openMailto = mt => {
+		if (mt && I.ctx('INBOX_CAN_SEND', false)) {
+			I.composeMailto(/^mailto:/i.test(mt) ? mt : 'mailto:' + mt);
+		}
+	};
+	const mailtoRemember = value => {
+		try {
+			localStorage.setItem(MAILTO_OFFER_KEY, value);
+		} catch (e) {
+			// private window: offered again next time, harmless
+		}
+	};
+	/** Ask the browser to send the mailto: links here (a click of the user is needed); the offer is not shown again */
+	I.registerMailto = () => {
+		navigator.registerProtocolHandler('mailto', location.origin + location.pathname + '?mailto=%s');
+		mailtoRemember('asked');
+		toast(t('InboxMailtoAsked'));
+	};
+	/**
+	 * Offer, once per browser, to open the mailto: links in inbox: without it nobody finds the button of My account,
+	 * and the browser never asks by itself. Not in the installed application (its manifest has the handler, Chrome
+	 * asks at the first link), not without a place to remember the answer (it would come back at every start)
+	 */
+	function mailtoOffer() {
+		if (!I.ctx('INBOX_CAN_SEND', false) || !window.isSecureContext || !navigator.registerProtocolHandler
+			|| (window.matchMedia && window.matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay)').matches)
+			|| $('.ibx-updatebar')) {
+			return;
+		}
+		try {
+			if (localStorage.getItem(MAILTO_OFFER_KEY)) {
+				return;
+			}
+		} catch (e) {
+			return;
+		}
+		const bar = document.createElement('div');
+		bar.className = 'ibx-updatebar';
+		bar.setAttribute('role', 'status');
+		bar.innerHTML = I.html`${I.raw(ic('mail'))}<span>${t('InboxMailtoOffer')}</span>`
+			+ I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-mailtoyes">${t('InboxMailtoRegister')}</button>`
+			+ I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--icon ibx-js-mailtono" aria-label="${t('InboxMailtoOfferNo')}" title="${t('InboxMailtoOfferNo')}">${I.raw(ic('close'))}</button>`;
+		$('.ibx-js-mailtoyes', bar).addEventListener('click', () => {
+			bar.remove();
+			try {
+				I.registerMailto();
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+		});
+		$('.ibx-js-mailtono', bar).addEventListener('click', () => {
+			bar.remove();
+			mailtoRemember('no');
+			toast(t('InboxMailtoOfferLater'));
+		});
+		document.body.appendChild(bar);
+	}
+
 	// After a reload: the mails still in their delay get their bar back
 	Dolibarr.on('inbox:app:ready', async () => {
-		// A mailto: link given to inbox by the browser (index.php?mailto=..., see My account): written here
-		const mt = new URLSearchParams(location.search).get('mailto');
-		if (mt && I.ctx('INBOX_CAN_SEND', false)) {
+		// A mailto: link given to inbox by the browser (index.php?mailto=...): written here
+		const first = mailtoOf(location.href);
+		if (first) {
 			history.replaceState(null, '', location.pathname + location.hash);
-			I.composeMailto(/^mailto:/i.test(mt) ? mt : 'mailto:' + mt);
+			openMailto(first);
+		}
+		if ('launchQueue' in window && !I.mailtoQueued) {
+			I.mailtoQueued = true;
+			// The first launch of the application also comes here with the same address: written once
+			let skip = first;
+			setTimeout(() => {
+				skip = '';
+			}, 10000);
+			window.launchQueue.setConsumer(p => {
+				const mt = p && p.targetURL ? mailtoOf(p.targetURL) : '';
+				if (skip && mt === skip) {
+					skip = '';
+					return;
+				}
+				openMailto(mt);
+			});
+		}
+		if (!first) {
+			mailtoOffer();
 		}
 		try {
 			const items = (await post('compose', 'outbox', {})).items || [];
@@ -2275,6 +2367,9 @@
 			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="1" checked><span>' + th('InboxTemplateMine') + '</span></label>'
 			+ '<label class="ibx-seg__opt"><input type="radio" name="private" value="0"><span>' + th('InboxTemplateShared', identityOf(w).mailbox || identityOf(w).email) + '</span></label></div></div>'
 			+ wholeRow(1)
+			// The subject of an answer or a forward belongs to that mail: not kept by default
+			+ (subject.trim() ? I.html`<div class="ibx-formrow"><span class="ibx-formrow__label">${t('InboxSubject')}</span><div><label class="ibx-check"><input type="checkbox" name="keepsubject"${['new', 'draft'].includes(w.mode) ? I.raw(' checked') : ''}> ${t('InboxTemplateKeepSubject')}</label>`
+				+ I.html`<div class="ibx-formrow__help">${t('InboxTemplateKeepSubjectHelp')}</div></div></div>` : '')
 			+ '<p class="ibx-formrow__help">' + th('InboxTemplateSaveHelp') + '</p></form>';
 		dialog({
 			title: t('InboxTemplateSaveAs'),
@@ -2288,7 +2383,8 @@
 				}
 				const priv = f.querySelector('[name="private"]:checked').value === '1';
 				try {
-					await post('template', 'save', { label, subject, html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(), private: priv ? 1 : 0, accounts: priv ? [] : [identityOf(w).account],
+					const keep = f.elements.keepsubject && f.elements.keepsubject.checked;
+					await post('template', 'save', { label, subject: keep ? subject : '', html: w.sourceMode ? $('.ibx-compose__source', w.dlg).value : w.editor.getHtml(), private: priv ? 1 : 0, accounts: priv ? [] : [identityOf(w).account],
 						whole: f.querySelector('[name="whole"]:checked').value === '1' ? 1 : 0 });
 				} catch (err) {
 					toast(err.message, { error: true });
@@ -3296,7 +3392,14 @@
 		if (!m) {
 			return Promise.resolve(null);
 		}
-		const o = { mode: 'new', to: decodeURIComponent(m[1] || '') };
+		let to = '';
+		try {
+			to = decodeURIComponent(m[1] || '');
+		} catch (e) {
+			// Badly encoded address: the writing opens without it
+			to = '';
+		}
+		const o = { mode: 'new', to };
 		new URLSearchParams(m[2] || '').forEach((v, k) => {
 			k = k.toLowerCase();
 			if (k === 'to') {
@@ -3306,6 +3409,13 @@
 				o[k] = v;
 			}
 		});
+		// Addresses only: a name written by the page or the mail of the link (« boss@company.com » <someone@else>)
+		// would be the only thing shown in the chip (audit INBX-102)
+		const bare = list => parseList(list).map(a => a.email).filter(Boolean).join(', ');
+		o.to = bare(o.to);
+		if (o.cc) {
+			o.cc = bare(o.cc);
+		}
 		return compose(o);
 	};
 	/** Mail answered in the writing in front (presence « is writing an answer », lot W3 call of state) */

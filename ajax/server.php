@@ -19,22 +19,30 @@
  * \file    inbox/ajax/server.php
  * \ingroup inbox
  * \brief   Settings > Server of the application (1.54.0): admins of Dolibarr only (master password of the mail
- *          server, scheduled jobs)
+ *          server, scheduled jobs, refresh of the lists and push service 1.124.0)
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
 require_once __DIR__.'/../class/inboxserver.class.php';
+require_once __DIR__.'/../class/inboxreactivity.class.php';
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('set', 'master', 'job'), true));
+inboxAjaxStart(in_array($action, array('set', 'master', 'job', 'reactivity', 'push', 'pushtest'), true));
 if (empty($user->admin)) {
+	inboxAjaxNotFound();
+}
+// Refresh of the lists and push service: settings of the whole instance (entity 0), for the administrator of the
+// instance only; an administrator of one entity of a multicompany would else point the browsers of every entity to a
+// hub of his (audit INBX-093)
+$instanceAdmin = InboxReactivity::canSet($user);
+if (in_array($action, array('reactivity', 'push', 'pushtest'), true) && !$instanceAdmin) {
 	inboxAjaxNotFound();
 }
 
 $server = new InboxServer($db);
 switch ($action) {
 	case 'get':
-		inboxAjaxReply($server->get() + array('cron' => $server->cronJobs()));
+		inboxAjaxReply($server->get() + array('cron' => $server->cronJobs(), 'reactivity' => $instanceAdmin ? (new InboxReactivity($db))->data() : null));
 		// no break
 
 	case 'set':
@@ -51,6 +59,33 @@ switch ($action) {
 			inboxAjaxError($langs->transnoentities($server->error, $separator), 422);
 		}
 		inboxAjaxReply($server->get());
+		// no break
+
+	case 'reactivity':
+		// Mode and rhythm, global; given back as saved (the idle interval follows the active one)
+		$react = new InboxReactivity($db);
+		$saved = $react->save((string) inboxAjaxParam('mode', 'aZ09'), (int) inboxAjaxParam('interval', 'int'), (int) inboxAjaxParam('idle', 'int'));
+		if ($saved === null) {
+			inboxAjaxError($react->error, 422);
+		}
+		inboxAjaxReply($saved + array('push_ready' => (bool) InboxPush::ready()));
+		// no break
+
+	case 'push':
+		// Driver and its settings; the secrets raw (encrypted by the server, never given back), empty = kept
+		$react = new InboxReactivity($db);
+		$values = inboxAjaxParam('values', 'none');
+		$values = is_string($values) ? json_decode($values, true) : $values;
+		if (!$react->savePush((string) inboxAjaxParam('driver', 'aZ09'), is_array($values) ? array_map('strval', array_filter($values, 'is_scalar')) : array())) {
+			inboxAjaxError($react->error, 422);
+		}
+		inboxAjaxReply(array('push' => $react->pushData(), 'push_ready' => (bool) InboxPush::ready()));
+		// no break
+
+	case 'pushtest':
+		$react = new InboxReactivity($db);
+		$test = $react->testPush();
+		inboxAjaxReply(array('test' => $test, 'push' => $react->pushData(), 'push_ready' => (bool) InboxPush::ready()));
 		// no break
 
 	case 'job':

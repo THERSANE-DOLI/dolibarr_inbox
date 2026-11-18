@@ -298,7 +298,7 @@ class InboxAgendaPanel
 	 */
 	private function select()
 	{
-		return "SELECT a.id, a.label, a.datep, a.datep2, a.fulldayevent, a.percent, a.location, a.fk_soc, a.email_msgid, a.fk_user_action,"
+		return "SELECT a.id, a.label, a.datep, a.datep2, a.fulldayevent, a.percent, a.location, a.fk_soc, a.email_msgid, a.fk_user_action, a.fk_user_author,"
 			." c.code as type_code, c.color as type_color, s.nom as socname, r.answer_status";
 	}
 
@@ -353,8 +353,26 @@ class InboxAgendaPanel
 			'messageId' => trim((string) $o->email_msgid, " <>\t"),
 			// Answer of the user: 1 accepted, 2 maybe; the owner has none
 			'answer' => $own ? 1 : (int) $o->answer_status,
-			'canDone' => $canDone && (int) $o->percent >= 0,
+			'canDone' => $canDone && (int) $o->percent >= 0 && self::mayChange($o, $user),
 		);
+	}
+
+	/**
+	 * The user may change this event as in Dolibarr (comm/action/card.php): every event with « create all », else
+	 * the ones he owns or wrote with « create his » ; an attendee only may not (audit INBX-094)
+	 *
+	 * @param object $o    Row (fk_user_action, fk_user_author)
+	 * @param User   $user User
+	 * @return bool
+	 */
+	public static function mayChange($o, User $user)
+	{
+		if ($user->hasRight('agenda', 'allactions', 'create')) {
+			return true;
+		}
+		$mine = (int) $o->fk_user_action === (int) $user->id || (int) $o->fk_user_author === (int) $user->id;
+
+		return $mine && $user->hasRight('agenda', 'myactions', 'create');
 	}
 
 	/**
@@ -405,8 +423,8 @@ class InboxAgendaPanel
 		if (!self::nativeReadable($user) || !$user->hasRight('agenda', 'myactions', 'create') || $percent < 0 || $percent > 100) {
 			return -1;
 		}
-		$row = $this->db->getRow("SELECT a.id".$this->baseSql($user)." AND a.id = ".((int) $id)." AND a.percent >= 0");
-		if (!is_object($row)) {
+		$row = $this->db->getRow("SELECT a.id, a.fk_user_action, a.fk_user_author".$this->baseSql($user)." AND a.id = ".((int) $id)." AND a.percent >= 0");
+		if (!is_object($row) || !self::mayChange($row, $user)) {
 			return -1;
 		}
 		require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';

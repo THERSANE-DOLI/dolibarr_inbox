@@ -1709,7 +1709,7 @@
 		e.folder.new = 0;
 		const body = { action: 'set', token: I.ctx('INBOX_TOKEN', ''), id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) };
 		if (keepalive) {
-			fetch(I.ctx('INBOX_AJAX_URL', '') + 'userparam.php', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+			fetch(I.ctx('INBOX_AJAX_URL', '') + 'userparam.php', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: Object.assign(I.headers(), { 'Content-Type': 'application/json' }), body: JSON.stringify(body) }).catch(() => {});
 		} else {
 			post('userparam', 'set', { id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) }).catch(() => {});
 		}
@@ -1845,7 +1845,7 @@
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r, S.tagsDots) + '</td>' },
 		assign: { label: 'InboxAssigned', icon: 'user-circle', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees, '', 2) + '</td>' },
-		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
+		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(socName(r.soc)) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
 		box: { label: 'InboxMailboxFolder', width: '12rem', cell: r => '<td class="ibx-muted">' + boxHtml(r) + '</td>' },
 		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
@@ -2233,7 +2233,7 @@
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
 						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
 					// The people assigned last: pushed to the right (margin-left: auto), they never move the rest
-					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
+					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis"' + (r.soc.hidden ? ' title="' + th('InboxSocHiddenHelp') + '"' : '') + '>' + ic('company') + ' ' + esc(socName(r.soc)) + '</span>' : '')
 					+ (S.scope === 'all' || S.scope === 'view' ? ' ' + boxHtml(r) : '')
 					+ assigneesHtml(r.assignees, 'ibx-mailcard__assign')
 					+ '</span>'
@@ -3543,7 +3543,9 @@
 	/**
 	 * Address of a page of a module filled with the markers of inbox (1.108.0): {id}, {socid}, {contactids},
 	 * {projectid}, {elements}, {start} anywhere; {subject}, {messageid}, {emails} only after the « # », a part that
-	 * the browser never sends to the server (no mail address nor subject in its logs), emptied before it
+	 * the browser never sends to the server (no mail address nor subject in its logs), emptied before it. Removed in
+	 * 1.127.0 for {ctx} (I.moduleUrlCtx): always emptied, unless the hidden constant INBOX_LEGACY_MAIL_MARKERS
+	 * gives them back (modules not yet moved to {ctx})
 	 * @param {string} url Address declared by the module
 	 * @param {object|null} mail Context of the mail (I.mailContext())
 	 * @param {object} extra Other values ({id, start})
@@ -3565,10 +3567,38 @@
 		const safe = /\{(id|socid|contactids|projectid|elements|start)\}/g;
 		const all = /\{(id|socid|contactids|projectid|elements|start|subject|messageid|emails)\}/g;
 		const text = String(url);
+		if (!I.ctx('INBOX_LEGACY_MAIL_MARKERS', false)) {
+			return text.replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails|ctx)\}/g, '');
+		}
 		const cut = text.indexOf('#');
-		const head = (cut < 0 ? text : text.slice(0, cut)).replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails)\}/g, '');
+		const head = (cut < 0 ? text : text.slice(0, cut)).replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails|ctx)\}/g, '');
 		return cut < 0 ? head : head + '#' + text.slice(cut + 1).replace(all, (x, k) => encodeURIComponent(String(values[k] ?? '')));
 	};
+	/**
+	 * Same as I.moduleUrl, with the marker {ctx} (1.127.0): a token of one use of the mail open, drawn now on the
+	 * server and kept in the session; the page of the module reads the mail by InboxMailContext::take() in PHP. Nothing
+	 * of the mail in the address. Without a mail open, or refused: emptied.
+	 * @param {string} url Address declared by the module
+	 * @param {object|null} mail Context of the mail (I.mailContext())
+	 * @param {object} extra Other values ({id, start})
+	 * @returns {Promise<string>}
+	 */
+	I.moduleUrlCtx = async (url, mail, extra) => {
+		let text = String(url);
+		if (text.indexOf('{ctx}') >= 0) {
+			let token = '';
+			if (mail && +mail.id > 0) {
+				try {
+					token = (await post('mail', 'context', { id: +mail.id })).token || '';
+				} catch (e) {
+					token = '';
+				}
+			}
+			text = text.split('{ctx}').join(encodeURIComponent(token));
+		}
+		return I.moduleUrl(text, mail, extra);
+	};
+
 	/**
 	 * A page of this site in a window of inbox, outside of a mail (the agenda panel): closed, onClose is called
 	 * @param {object} o {key, url, title, onClose}
@@ -6701,7 +6731,7 @@
 				loadDolibar(box);
 			} else {
 				const res = await post('domain', 'request', { domain, category });
-				toast(res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager'));
+				toast(res.limited ? t(res.limited === 'already' ? 'InboxDomainsRequestAlready' : 'InboxDomainsRequestTooMany', domain) : (res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager')));
 			}
 		} catch (err) {
 			toast(err.message, { error: true });
@@ -6733,7 +6763,8 @@
 			// The thirdparty and the contact as cards (1.67.0): reach them, situation by the usage of the mailbox
 			const sender = [];
 			if (d.sender.soc) {
-				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0))
+				// A thirdparty he may not read: what to do, rather than creating it again (never who could give it)
+				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0) + '<span class="ibx-muted ibx-soccard__by">' + th('InboxSocHiddenHelp') + '</span>')
 					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
 			}
 			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
@@ -6809,7 +6840,7 @@
 					// In a window of inbox (1.108.0) or a new tab; the markers are filled on click, with the mail as it is then
 					+ d.actions.map((a, i) => a.window
 						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
-						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(I.moduleUrl(a.url, null)) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
+						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
@@ -7013,9 +7044,37 @@
 		}
 		const modAction = e.target.closest('.ibx-js-modaction');
 		const action = modAction && box._data && (box._data.actions || [])[+modAction.dataset.i];
+		if (action && String(action.url).indexOf('{ctx}') >= 0) {
+			// A token of the mail first (a call to the server): the new tab is opened at once (else the browser blocks
+			// it), its address set when the token is there
+			e.preventDefault();
+			const tab = action.window ? null : window.open('', '_blank');
+			if (tab) {
+				tab.opener = null;
+			}
+			const url = await I.moduleUrlCtx(action.url, I.mailContext());
+			if (!insideUrl(url)) {
+				if (tab) {
+					tab.close();
+				}
+				return;
+			}
+			if (tab) {
+				tab.location.href = url;
+			} else if (action.window) {
+				openModuleWindow({ mailId, box, url, title: action.label, panel: 'action:' + modAction.dataset.i });
+			}
+			return;
+		}
 		if (action) {
 			const url = I.moduleUrl(action.url, I.mailContext());
 			if (!action.window) {
+				// The new tab too stays inside Dolibarr: the subject and the correspondents are in its address (audit
+				// INBX-101)
+				if (!insideUrl(url)) {
+					e.preventDefault();
+					return;
+				}
 				modAction.href = url;
 				return;
 			}
@@ -7231,11 +7290,20 @@
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],
 		});
-		dlg.addEventListener('click', e => {
+		dlg.addEventListener('click', async e => {
 			const b = e.target.closest('.ibx-js-createtype');
-			if (b) {
-				createPiece(box, b.dataset.type, $('.ibx-js-createattach', dlg).checked, dlg);
+			if (!b) {
+				return;
 			}
+			const attach = $('.ibx-js-createattach', dlg).checked;
+			// A thirdparty already known for this sender (readable or not): asked before a second one is made
+			if (b.dataset.type === 'societe' && d.sender && d.sender.soc) {
+				const ok = await I.confirmDialog({ title: t('InboxCreateSocExistsTitle'), text: t(d.sender.soc.readable ? 'InboxCreateSocExists' : 'InboxCreateSocExistsHidden'), confirm: t('InboxCreateSocAnyway') });
+				if (!ok) {
+					return;
+				}
+			}
+			createPiece(box, b.dataset.type, attach, dlg);
 		});
 	}
 	/** The page of creation of a type, in a new tab; the piece saved there is linked to the mail */
@@ -9211,7 +9279,7 @@
 				return;
 			}
 			// Only web addresses leave the mail (never javascript:, data:, file:...: audit INBX-001)
-			if (!/^(https?:\/\/|tel:|#)/i.test(href)) {
+			if (!SAFE_LINK.test(href)) {
 				e.preventDefault();
 				return;
 			}
@@ -9418,6 +9486,53 @@
 		});
 	}
 
+	/**
+	 * Clicks on the links of a mail shown elsewhere than the reading pane (an answer sent, a mail attached): the rules
+	 * of the reading, without its warnings on the domains (no verdicts there). A mailto: written in inbox, web and phone
+	 * addresses only, anything else refused (javascript:, data:, file:...)
+	 * @param {HTMLIFrameElement} frame Frame of body.php
+	 */
+	function guardFrameLinks(frame) {
+		frame.addEventListener('load', () => {
+			let doc;
+			try {
+				doc = frame.contentDocument;
+			} catch (e) {
+				return;
+			}
+			if (!doc) {
+				return;
+			}
+			doc.addEventListener('click', e => {
+				const a = e.target.closest ? e.target.closest('a[href]') : null;
+				if (!a) {
+					return;
+				}
+				const href = a.getAttribute('href') || '';
+				if (/^mailto:/i.test(href)) {
+					if (I.ctx('INBOX_CAN_SEND', false) && I.composeMailto) {
+						e.preventDefault();
+						I.composeMailto(href);
+					}
+					return;
+				}
+				if (!SAFE_LINK.test(href)) {
+					e.preventDefault();
+				}
+			});
+		});
+	}
+
+	/**
+	 * Name of the thirdparty of a line: a thirdparty the user may not read says only that it exists (ask an access
+	 * rather than create it again)
+	 * @param {object} soc {id, name, hidden}
+	 * @returns {string}
+	 */
+	function socName(soc) {
+		return soc.hidden ? t('InboxSocHidden') : String(soc.name || '');
+	}
+
 	function hostOf(url) {
 		try {
 			return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
@@ -9441,6 +9556,9 @@
 	 * A mail of the fil (an answer sent) read in a dialog: its head and its body with the same protections as the
 	 * reading (body.php, sandbox, remote pictures as chosen for its sender); « Go to the email » opens it for good
 	 */
+	/** Addresses a link of a mail may open (audit INBX-001) */
+	const SAFE_LINK = /^(https?:\/\/|tel:|#)/i;
+
 	async function sentMailDialog(folder, id) {
 		let m;
 		try {
@@ -9464,6 +9582,12 @@
 			actions: [{ label: t('InboxActivityGoToMail'), primary: true, run: () => {
 				Dolibarr.executeHook('inbox:mail:goto', { folder, mail: id });
 			} }],
+			onOpen: dlg => {
+				const f = $('.ibx-sentview__frame', dlg);
+				if (f) {
+					guardFrameLinks(f);
+				}
+			},
 		});
 	}
 
@@ -10078,7 +10202,7 @@
 		const body = $('.ibx-window__body', w.dlg);
 		if (w.source) {
 			try {
-				const res = await fetch(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=source', { credentials: 'same-origin' });
+				const res = await fetch(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=source', { credentials: 'same-origin', headers: I.headers() });
 				if (!res.ok) {
 					throw new Error(res.statusText);
 				}
@@ -10157,6 +10281,8 @@
 		} else if (a.kind === 'mail' && !m.compose) {
 			body.innerHTML = top + '<iframe class="ibx-viewer__frame ibx-viewer__frame--mail" title="' + esc(a.name) + '" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" src="'
 				+ I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=' + a.part + '"></iframe>';
+			// A mail attached comes from outside: its links follow the rules of the reading
+			guardFrameLinks($('.ibx-viewer__frame--mail', body));
 		} else if (a.kind === 'text' || a.kind === 'csv') {
 			try {
 				const res = await attApi(m, a.part, 'text', force);
@@ -11332,6 +11458,41 @@
 	});
 	['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, activity, { passive: true, capture: true }));
 
+	/**
+	 * Quicker refresh of the lists (1.121.0, js/inbox-live.js): while it runs, the regular refresh is only a safety net
+	 * (60 s, 5 min after 2 minutes without activity); the changes of the others come as events, and the usual call of state is asked at once (gathered: at
+	 * most one per second), so what is shown is always read through the calls that check the rights
+	 */
+	const live = { on: false, timer: 0, at: 0 };
+	function pollDelay() {
+		if (!live.on) {
+			return 20000;
+		}
+		return Date.now() - lastSeen() > 2 * 60 * 1000 ? 300000 : 60000;
+	}
+	Dolibarr.on('inbox:live:state', p => {
+		live.on = !!(p && p.on);
+	});
+	Dolibarr.on('inbox:live:events', p => {
+		if (!S.el) {
+			return;
+		}
+		// The bell has its own count (js/inbox-notify.js): nothing to read again in the list for it
+		const events = ((p && p.events) || []).filter(e => e.type !== 'notif');
+		if (!(p && p.reset) && !events.length) {
+			return;
+		}
+		// Mailboxes given or taken, a whole folder to read again: the tree too
+		if ((p && p.reset) || events.some(e => e.type === 'access')) {
+			refreshTree();
+		}
+		clearTimeout(live.timer);
+		live.timer = setTimeout(() => {
+			live.at = Date.now();
+			poll();
+		}, Math.max(150, 1000 - (Date.now() - live.at)));
+	});
+
 	async function poll() {
 		clearTimeout(S.pollTimer);
 		if (pauseIfIdle()) {
@@ -11339,7 +11500,7 @@
 			return;
 		}
 		if (document.hidden || !S.el || S.el.closest('[hidden]')) {
-			S.pollTimer = setTimeout(poll, 20000);
+			S.pollTimer = setTimeout(poll, pollDelay());
 			return;
 		}
 		try {
@@ -11390,7 +11551,7 @@
 		} catch (err) {
 			// Network lost: next try
 		}
-		S.pollTimer = setTimeout(poll, 20000);
+		S.pollTimer = setTimeout(poll, pollDelay());
 	}
 
 	/** « Marie reads this mail » in the head of the mail open (shared mailboxes) */
@@ -12270,7 +12431,7 @@
 					poll();
 				}
 			});
-			S.pollTimer = setTimeout(poll, 20000);
+			S.pollTimer = setTimeout(poll, pollDelay());
 			if (I.isLeader()) {
 				pumpSoon(1500);
 			}

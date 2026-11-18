@@ -1,0 +1,6 @@
+# Texts of the module never served by the web server: its exact version, the history of its fixes, notes and lists
+# read by PHP only (audit INBX-083). Same directive as the folders dev/, test/ and lib/vendor/ of the module, and as
+# conf/.htaccess of Dolibarr. Files of the application (php, js, css, images, fonts) are not concerned.
+<FilesMatch "\.(md|txt|json|sh|yml|yaml|lock|dist|log)$">
+	Require all denied
+</FilesMatch>

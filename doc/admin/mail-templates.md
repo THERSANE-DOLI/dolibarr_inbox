@@ -17,6 +17,16 @@ Each template has a kind, chosen in its editor:
 The templates of Dolibarr for a linked piece (proposal, order, invoice...) and for every type count as complete
 mails, as on the card of the piece.
 
+## Template without subject
+
+The subject of a template may stay empty: the subject of the writing is then never changed, whatever the kind of the
+template. It suits a template for a new mail whose subject depends on each mail, or an answer. « Save as a template »
+keeps the subject of a new mail by default, not the one of an answer or a forward (box « Also keep the subject »).
+The list of the tab « Templates » shows « (no subject) » for them.
+
+The setup page of Dolibarr (Setup > Emails > Email templates) may ask for a subject, depending on the version of
+Dolibarr: write such a template in inbox.
+
 ## Default templates
 
 A template may be put by itself in a **new mail** or in an **answer** (reply, reply to all, reply to the list) while

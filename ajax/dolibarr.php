@@ -359,11 +359,16 @@ switch ($action) {
 		}
 		// Actions of the other modules (« Fill the proposal »...): a label and an address inside Dolibarr, opened in a
 		// new tab, or in a window of inbox (« window », 1.108.0); the browser fills the markers of the mail
+		// An address inside Dolibarr: one starting slash, never « // » nor « /\ » (another host for the browsers), no
+		// space, control character, backslash nor quote (audit INBX-101, as INBX-084)
+		$localUrl = function ($u) {
+			return strlen($u) <= 1000 && $u !== '' && $u[0] === '/' && !(isset($u[1]) && ($u[1] === '/' || $u[1] === '\\')) && !preg_match('/[\s\x00-\x1f\\\\<>"\']/', $u);
+		};
 		$actions = array();
 		if ($hookmanager->executeHooks('inboxMailActions', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['actions'] ?? null)) {
 			foreach ($hookmanager->resArray['actions'] as $x) {
 				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
-				if ($url !== '' && !empty($x['label']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
+				if ($url !== '' && !empty($x['label']) && $localUrl($url)) {
 					$actions[] = array('label' => dol_trunc((string) $x['label'], 80, 'right', 'UTF-8', 1), 'url' => $url, 'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic',
 						'window' => !empty($x['window']));
 				}
@@ -382,7 +387,7 @@ switch ($action) {
 		if ($hookmanager->executeHooks('inboxMailPanels', $hookParams, $hookObject) >= 0 && is_array($hookmanager->resArray['panels'] ?? null)) {
 			foreach (array_slice($hookmanager->resArray['panels'], 0, 3) as $x) {
 				$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
-				if ($url !== '' && preg_match('/^[a-z0-9_-]{1,40}$/', (string) ($x['id'] ?? '')) && !empty($x['title']) && (strpos($url, DOL_URL_ROOT.'/') === 0 || strpos($url, '/') === 0) && strpos($url, '//') !== 0) {
+				if ($url !== '' && preg_match('/^[a-z0-9_-]{1,40}$/', (string) ($x['id'] ?? '')) && !empty($x['title']) && $localUrl($url)) {
 					$panels[] = array('id' => (string) $x['id'], 'title' => dol_trunc((string) $x['title'], 60, 'right', 'UTF-8', 1), 'url' => $url,
 						'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic');
 				}

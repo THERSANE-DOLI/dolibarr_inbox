@@ -36,7 +36,7 @@ class InboxNotification
 	const MERGE_DELAY = 60;
 
 	/** Types of inbox, listed in Settings > Notifications; the types of other modules follow the defaults */
-	const TYPES = array('assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self');
+	const TYPES = array('assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self', 'consumer_grant');
 
 	/** A notification still unread after this time (s) goes in the summary by mail */
 	const MAIL_AFTER = 900;
@@ -98,6 +98,7 @@ class InboxNotification
 		$old = $this->db->getRow("SELECT rowid FROM ".$p."inbox_notification".$same." ORDER BY rowid DESC");
 		if (is_object($old)) {
 			$this->db->query("UPDATE ".$p."inbox_notification SET date_creation = '".$this->db->idate($now)."', date_read = NULL, payload = '".$this->db->escape((string) $payload)."' WHERE rowid = ".((int) $old->rowid));
+			$this->ring($fkUser);
 			return (int) $old->rowid;
 		}
 		$sql = "INSERT INTO ".$p."inbox_notification (entity, fk_user, type, fk_mailref, fk_account, fk_user_actor, payload, url, date_creation) VALUES (".((int) $conf->entity).","
@@ -107,8 +108,26 @@ class InboxNotification
 			$this->error = $this->db->lasterror();
 			return -1;
 		}
+		$id = (int) $this->db->last_insert_id($p.'inbox_notification');
+		$this->ring($fkUser);
 
-		return (int) $this->db->last_insert_id($p.'inbox_notification');
+		return $id;
+	}
+
+	/**
+	 * Tell the bell of a user at once (1.125.0): an event « notif » on his own topic of the journal, so his bell
+	 * asks its count wherever he is in inbox (fast or instant refresh; nothing in standard mode). Numbers only: the
+	 * bell reads the notification itself with its usual call
+	 *
+	 * @param int $fkUser User
+	 * @return void
+	 */
+	protected function ring($fkUser)
+	{
+		require_once __DIR__.'/inboxevent.class.php';
+		if (InboxEvent::enabled()) {
+			(new InboxEvent($this->db))->emitUsers(array((int) $fkUser), 'notif');
+		}
 	}
 
 	/**
@@ -127,6 +146,10 @@ class InboxNotification
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_notification WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $fkUser)
 			." AND type = '".$this->db->escape((string) $type)."' AND fk_mailref = ".((int) $mailref)." AND fk_user_actor = ".((int) $actor)
 			." AND date_read IS NULL AND date_creation > '".$this->db->idate(dol_now() - self::MERGE_DELAY)."'");
+		if ($this->db->affected_rows(true) > 0) {
+			// The counter of his bell goes down at once too
+			$this->ring($fkUser);
+		}
 	}
 
 	/**
@@ -172,7 +195,10 @@ class InboxNotification
 				// Neither its text nor its detail (the recipients of a mail not delivered, audit INBX-045)
 				$payload['subject'] = '';
 				$payload['text'] = '';
-				$payload['detail'] = '';
+				// The name of a module allowed is no data of the mailbox: kept (the administrators are told it)
+				if ((string) $r->type !== 'consumer_grant') {
+					$payload['detail'] = '';
+				}
 			}
 			$actor = trim($r->firstname.' '.$r->lastname);
 			$items[] = array(
@@ -586,6 +612,9 @@ class InboxNotification
 		}
 		if ($n['type'] === 'access_self') {
 			return $langs->transnoentities('InboxNotifAccessSelf', $n['actor'] ? $n['actor']['name'] : '');
+		}
+		if ($n['type'] === 'consumer_grant') {
+			return $langs->transnoentities('InboxNotifConsumerGrant', $n['actor'] ? $n['actor']['name'] : '', (string) ($n['detail'] ?? ''));
 		}
 		if ($n['type'] === 'rule_redirect') {
 			return $langs->transnoentities('InboxNotifRuleRedirect', $n['actor'] ? $n['actor']['name'] : '');

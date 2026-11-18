@@ -13,5 +13,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
-ALTER TABLE llx_inbox_device ADD UNIQUE INDEX uk_inbox_device_key (fk_user, fingerprint);
+-- One device per entity for the same key of a browser (its storage is the one of the site, not of the entity)
+ALTER TABLE llx_inbox_device ADD UNIQUE INDEX uk_inbox_device_entity_key (entity, fk_user, fingerprint);
 ALTER TABLE llx_inbox_device ADD INDEX idx_inbox_device_user (entity, fk_user, status);

@@ -64,17 +64,27 @@ switch ($action) {
 		// A report can be forged: said when its sender is not proven (DMARC or DKIM of its domain)
 		$result['proven'] = InboxReader::authPass(InboxReader::authResults(InboxReader::headers($raw)), (string) $message->fromEmail);
 		$result['name'] = InboxSafe::line((string) $a['name'], 255);
+		// The domains of the report may be checked in the DNS (signed for this user), no other one
+		$result['dns_sign'] = array();
+		foreach ($result['reports'] as $rep) {
+			$d = InboxDmarc::publicDomainOrEmpty((string) ($rep['policy']['domain'] ?? ''));
+			if ($d !== '') {
+				$result['dns_sign'][$d] = InboxDmarc::domainSignature((int) $user->id, $d);
+			}
+		}
+		$result['dns_sign'] = (object) $result['dns_sign'];
 		inboxAjaxReply($result);
 		// no break
 
 	case 'dns':
 		$domain = InboxDmarc::publicDomainOrEmpty((string) inboxAjaxParam('domain', 'alphanohtml'));
-		if ($domain === '') {
+		// A domain of a report the user analyzed only (signed by « analyze »): never a domain typed
+		if ($domain === '' || !InboxDmarc::domainSigned((int) $user->id, $domain, (string) inboxAjaxParam('sign', 'alphanohtml'))) {
 			inboxAjaxError($langs->transnoentities('InboxDmarcBadDomain'), 422);
 		}
 		$selectors = array_slice(array_filter(array_map('trim', explode(',', (string) inboxAjaxParam('selectors', 'alphanohtml')))), 0, 10);
-		// Up to 4 names for DMARC (inherited policy, external destinations), 1 for SPF, 1 per selector
-		if (!InboxDmarc::dnsAllowed((int) $user->id, 5 + count($selectors))) {
+		// The worst case taken before the queries (DMARC and its organisation, external destinations, SPF, selectors)
+		if (!InboxDmarc::dnsAllowed((int) $user->id, InboxDmarc::dnsCost(count($selectors)))) {
 			inboxAjaxError($langs->transnoentities('InboxDmarcDnsLimit'), 429);
 		}
 		inboxAjaxReply(array('domain' => $domain) + InboxDmarc::dnsChecks($domain, $selectors));

@@ -103,11 +103,16 @@ switch ($action) {
 		if (!InboxDomains::valid($domain) || !in_array($category, InboxDomains::CATEGORIES, true)) {
 			inboxAjaxError($langs->transnoentities('InboxDomainsBadCategory'), 422);
 		}
+		// One request per domain and per user a day, a few domains an hour: the bell of the managers is never flooded
+		$limit = InboxDomains::requestLimit($db, (int) $user->id, $domain);
+		if ($limit !== '') {
+			inboxAjaxReply(array('told' => 0, 'limited' => $limit));
+		}
 		$notif = new InboxNotification($db);
 		$n = 0;
 		foreach ($domains->managers() as $uid) {
 			if ($uid !== (int) $user->id && $notif->add($uid, 'domain_request', array('actor' => (int) $user->id, 'url' => '#/settings/domains',
-				'payload' => array('text' => $langs->transnoentities('InboxDomainsRequestText', trim($user->firstname.' '.$user->lastname) ?: $user->login, $domain, $langs->transnoentities('InboxDomainsCat_'.$category))))) > 0) {
+				'payload' => array('detail' => $domain, 'text' => $langs->transnoentities('InboxDomainsRequestText', trim($user->firstname.' '.$user->lastname) ?: $user->login, $domain, $langs->transnoentities('InboxDomainsCat_'.$category))))) > 0) {
 				$n++;
 			}
 		}

@@ -1,5 +1,91 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: texts of the module (version, history, notes, lists) never served by the web server :   1.128.4
+  - a .htaccess at the root of the module refuses md, txt, json, sh, yml, lock; the rule for nginx in the install doc.
+
+- FIX: requests of domains limited, more lookalike letters, advice when the PHP extension intl is missing :   1.128.3
+  - one request of a domain per user a day, 5 domains an hour; the managers told are the ones of this entity.
+  - lookalikes: more letters of other alphabets read as Latin ones (Cyrillic, Greek, Armenian, phonetic letters).
+  - setup: a warning when intl is missing (domains with accents or other alphabets are then not judged).
+
+- FIX: thirdparty of the list lines, new customer and pieces created from a mail checked as in Dolibarr :   1.128.2
+  - thirdparty of a line with the right to read it, else « Thirdparty not accessible » and how to get an access.
+  - a thirdparty created from a mail whose sender is already one is asked first; new customer: lists offered only.
+  - a piece created elsewhere no longer uses the intent of a mail: token of the page of creation.
+
+- FIX: protected mailboxes locked at the logout, address typed again checked by the server for « content » :   1.128.1
+  - the logout of Dolibarr locks the mailboxes unlocked and removes their cookie.
+  - change to the level « content »: the address of the mailbox is checked on the server, as to protect or reset.
+
+- FIX: protected mailboxes in a second entity of the user: the browser can be registered there :   1.128.0
+  - one device per entity for the same key of the browser, approved and revoked in each entity.
+  - a clear message when it cannot be registered; activate the module again (index of the devices).
+
+- FIX: DNS check of the DMARC reports and number of the tabs of the quick refresh :   1.127.1
+  - DNS check for the domains of a report analyzed only, destinations of the domain of the internet only, limit kept.
+  - the number of a tab is given back to its own user only, and a change is left out only when he made it.
+
+- NEW: marker {ctx} for the pages of modules opened from a mail: a token of one use instead of its values :   1.127.0
+  - the page reads the mail in PHP (InboxMailContext::take), rights checked again; nothing of the mail in its address.
+  - the markers {subject}, {messageid} and {emails} after the « # » are removed; hidden constant
+    INBOX_LEGACY_MAIL_MARKERS to give them back to a module not yet moved.
+
+- FIX: owner of a personal mailbox told when a module is allowed on it by someone else :   1.126.6
+  - bell (and the chosen channels) for the owner and the administrators of Dolibarr, as for an access given to oneself.
+
+- FIX: people search of the accesses shows the address when it is what matched :   1.126.5
+  - a search by address answers with the address, never on something hidden.
+
+- FIX: push service never makes the user wait, DMARC encodings, links of mails shown in a window :   1.126.4
+  - delivery after the answer (PHP-FPM), 2 s at most, 50 changes and 4 connections, 30 s pause after a failure.
+  - DMARC report in another encoding than UTF-8 / ASCII / Latin 1 refused; a DOCTYPE refused by the reader too.
+  - links of an answer sent or a mail attached follow the rules of the reading; list pictures from this site only.
+
+- FIX: invitations, DMARC archives and default templates :   1.126.3
+  - an invitation is recognized in the agendas of this entity only; answering it needs the right on own events.
+  - an unreadable DMARC zip is refused cleanly (was a server error), its temporary file always removed.
+  - default templates: a negative number refused, a mailbox of another entity refused for the administrator.
+
+- FIX: entity of Dolibarr changed in another tab while Inbox is open :   1.126.2
+  - Inbox notices it at once, reads and writes nothing more and asks to be reloaded in the new entity.
+  - the tabs of two entities no longer share their coordination; a dialog that must be answered stays open.
+
+- FIX: security of the quick refresh, push service, DMARC and pictures :   1.126.1
+  - light call checked again at each call (user, mailboxes), token of 5 minutes, bounded read of the journal;
+    https address for the browsers of the push service, keys asked again when its address changes.
+  - pictures always shown without a proven sender: only for a mail sent by Inbox; DMARC analysis bounded in memory.
+
+- FIX: security, from the audit of 1.125.0 :   1.126.0
+  - refresh and push service of the whole instance set by its administrator only (not the one of an entity);
+    progress of an agenda event changed by its owner or author only, as in Dolibarr.
+  - a failed search of the mail server no longer empties the index; private addresses refused in DMARC names;
+    module authorizations deleted with their mailbox; addresses of module actions kept inside Dolibarr; a mailto
+    link shows the real addresses; release secrets for one step only, SourceForge host key checked.
+
+- NEW: the bell follows at once the notifications made or removed for the user, in any space of Inbox :   1.125.0
+  - with the fast or instant refresh: an assignment by another user rings the bell within seconds, even in Agenda.
+  - the notification of the browser goes at the same time; nothing changes in standard mode.
+
+- NEW: instant refresh of the lists through a push service installed beside Dolibarr (Mercure first) :   1.124.0
+  - Settings > Server of the application: refresh of the lists (moved from the setup of the module) with the load
+    of the settings under them, push service with its keys kept encrypted, button Test, installation guide.
+  - numbers only, each user receives his own mailboxes (signed token); without answer, the fast refresh goes on.
+  - examples to install Mercure with Docker or systemd in dev/mercure, other drivers through a hook.
+
+- NEW: the email links (mailto) clicked in Dolibarr, in a site or in another program open a new email in Inbox :   1.123.0
+  - a bar offers it once per browser at the start, the button of My account stays.
+  - the installed application declares itself to the system (Windows, Linux) and writes the link in its open window.
+
+- NEW: fast refresh of the lists, the changes made by the other users show within a few seconds :   1.122.0
+  - setting « Refresh of the lists » in the setup of the module: standard (20 s) or fast, an interval while the user
+    is active and one after 2 minutes without activity, with the load they bring computed as they are typed.
+  - one tab per browser asks, stopped after 30 minutes without activity.
+
+- NEW: journal of the changes, so that the lists open by the other users can follow at once :   1.121.0
+  - assignments, tags, flags, moves and new mails written by numbers only, never a subject, a text or an address.
+  - light call live.php: a signed token, each user reads only the mailboxes he can read, Dolibarr not started.
+  - written only when the quicker refresh is turned on (setting INBOX_REACTIVITY, its page comes next).
+
 - FIX: the box about bank details took the reading pane, the mail was left a few lines to read :   1.120.3
   - « Collapse » leaves only its title line, remembered per mail; it folds itself once the check is written.
   - red box: only the title in red, the advice in the text colour to be readable.

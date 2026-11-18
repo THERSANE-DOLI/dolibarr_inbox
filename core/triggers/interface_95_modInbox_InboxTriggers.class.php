@@ -42,7 +42,8 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 
 	/**
 	 * A contact or a thirdparty created, changed or deleted: the mails of its address (old and new) are matched again.
-	 * A user or a group deleted: what inbox kept for it is removed (settings, accesses, images allowed)
+	 * A user or a group deleted: what inbox kept for it is removed (settings, accesses, images allowed). A logout locks
+	 * the protected mailboxes
 	 *
 	 * @param string    $action Code
 	 * @param Object    $object Object
@@ -54,6 +55,13 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 	public function runTrigger($action, $object, User $user, Translate $langs, Conf $conf)
 	{
 		if (!isModEnabled('inbox')) {
+			return 0;
+		}
+		// Logout: the protected mailboxes unlocked are locked, their cookie removed (the session goes anyway, the cookie
+		// stayed until its end)
+		if ($action === 'USER_LOGOUT') {
+			dol_include_once('/inbox/class/inboxprotect.class.php');
+			InboxProtect::lockAll();
 			return 0;
 		}
 		// Protected mailboxes (1.89.0): a user disabled loses his devices, so the encrypted copies of the passwords

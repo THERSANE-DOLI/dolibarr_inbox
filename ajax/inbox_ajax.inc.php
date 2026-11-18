@@ -230,6 +230,7 @@ function inboxAjaxStart($write)
 	if (!isModEnabled('inbox') || empty($user->id) || !empty($user->socid) || !$user->hasRight('inbox', 'webmail', 'use')) {
 		inboxAjaxError($langs->transnoentities('InboxErrorForbidden'), 403);
 	}
+	inboxAjaxSameEntity();
 	if ($write) {
 		if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 			inboxAjaxError('POST required', 405);
@@ -247,6 +248,29 @@ function inboxAjaxStart($write)
 	if (!$write && empty($_SESSION['inbox_unlocked']) && session_status() === PHP_SESSION_ACTIVE) {
 		session_write_close();
 	}
+}
+
+/**
+ * The page was loaded in another entity (multicompany: the entity is the one of the session, changed in another tab
+ * of Dolibarr): nothing is read nor written, the page is told to load again (409 entity_changed). The page sends the
+ * entity it was loaded in (header X-Inbox-Entity); a call without it is not checked (another page, a link).
+ *
+ * @return void
+ */
+function inboxAjaxSameEntity()
+{
+	global $conf, $db;
+
+	$sent = (string) ($_SERVER['HTTP_X_INBOX_ENTITY'] ?? '');
+	if ($sent === '' || !ctype_digit($sent) || (int) $sent === (int) $conf->entity) {
+		return;
+	}
+	$label = '';
+	if (isModEnabled('multicompany')) {
+		$row = $db->getRow("SELECT label FROM ".$db->prefix()."entity WHERE rowid = ".((int) $conf->entity));
+		$label = is_object($row) ? dol_trunc((string) $row->label, 100) : '';
+	}
+	inboxAjaxReply(array('error' => 'entity_changed', 'entity' => (int) $conf->entity, 'label' => $label), 409);
 }
 
 /**

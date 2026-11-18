@@ -21,6 +21,7 @@ Pages:
 - [New customer: hook for modules](new-customer.md)
 - [Subscribe a module to the mailboxes](consumers.md): react to the mails of the mailboxes where the managers allow it
 - [Searchable lists (tool combo)](combo.md)
+- [Push drivers (instant refresh)](push.md)
 - [Data of a mail: one door](mail-data.md): the cleaning of every value of a mail
 - [Development](development.md): icons, test mail server, tests, catalogue, copies of Dolibarr
 

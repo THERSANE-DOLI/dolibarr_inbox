@@ -30,10 +30,29 @@ Markers: `{id}` (the event), `{socid}`, `{contactids}`, `{projectid}` (recognize
 `propal:12,facture:34`), `{start}` (empty for now). Your page may close its window with
 `parent.postMessage({source: 'inbox-panel', action: 'close'}, location.origin)`.
 
-Markers of the mail open, **after the `#` only** (the browser never sends this part to the server, so no subject
-nor address of a mail lands in the logs of the web server; read it with `location.hash`): `{subject}`, `{messageid}`
-(without angle brackets), `{emails}` (the sender and the recipients, without the mailboxes of the user, separated by
-commas). Before the `#` they are emptied.
+**The mail open: marker `{ctx}`** (1.127.0). Put `inboxctx={ctx}` in the query of your address: when the user
+clicks, inbox draws a token of one use (5 minutes, kept in his session with the number of the mail only) and your page
+reads the mail in PHP. The values are read again at that moment, with the rights of the user: a mailbox he no longer
+reads, another user, another entity, a token already used or expired give `null`. Nothing of the mail is in the
+address, the history of the browser or the logs of the web server.
+
+```php
+require_once DOL_DOCUMENT_ROOT.'/custom/inbox/class/inboxmailcontext.class.php';
+$mail = InboxMailContext::take(GETPOST('inboxctx', 'alpha'));
+if ($mail !== null) {
+	// mail, account (numbers), subject, messageid (without angle brackets), from, emails (the sender and the
+	// recipients, without the mailboxes of the user): values written by the sender, escape them as any other value
+	print dol_escape_htmltag($mail['subject']);
+}
+```
+
+A mail of a protected mailbox gives no token (its index holds nothing): `{ctx}` is emptied, as without a mail open.
+
+**Removed in 1.127.0**: the markers `{subject}`, `{messageid}`, `{emails}` that gave the values themselves after the
+`#`. They are now always emptied. For a module not yet moved to `{ctx}`, the hidden constant
+`INBOX_LEGACY_MAIL_MARKERS` = `1` (Setup > Other setup) gives them back, after the `#` only (emptied before it), read
+with `location.hash`. The values come from the sender of the mail: never put them in the page without escaping them
+(`textContent`, never `innerHTML`), and they stay in the history of the browser.
 
 **Actions of a mail**: hook `inboxMailActions`, context `inbox`, called with the mail open (`mail`, `account`,
 `message_id`, `from`, `subject`, and `socid`, `contactid` recognized, 0 when the user may not read them). Each action
@@ -47,7 +66,7 @@ public function inboxMailActions($parameters, &$object, &$action, $hookmanager)
 	global $user;
 	if ($user->hasRight('mymodule', 'write')) {
 		$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true,
-			'url' => dol_buildpath('/mymodule/meeting.php', 1).'?socid={socid}#subject={subject}&emails={emails}');
+			'url' => dol_buildpath('/mymodule/meeting.php', 1).'?socid={socid}&inboxctx={ctx}');
 	}
 	return 0;
 }

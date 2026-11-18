@@ -2261,6 +2261,12 @@ class InboxImapConnector extends InboxConnector
 					if ($expected !== count($present) || empty($c['cmp']) || (int) $c['cmp'] < dol_now() - self::COMPARE_SECONDS) {
 						$c['cmp'] = dol_now();
 						$known = call_user_func($options['known']);
+						// Nothing found while the folder says it holds mails: the answer is not believed, nothing is
+						// removed (audit INBX-095); compared again at the next pass
+						if (!$present && $known && (int) $status['total'] > 0) {
+							$known = array();
+							$c['cmp'] = 0;
+						}
 						$here = array_flip(array_map(function ($u) use ($v) {
 							return $v.':'.$u;
 						}, $present));
@@ -2297,6 +2303,11 @@ class InboxImapConnector extends InboxConnector
 	protected function searchUids(array $criteria)
 	{
 		$response = $this->client->getConnection()->requestAndResponse('UID SEARCH', $criteria);
+		// Refused (NO: false) or not understood (BAD: null): an error, never « no mail » (audit INBX-095: a failed
+		// search read as an empty folder removed every mail of the index and forgot their links)
+		if (!is_array($response)) {
+			throw new Exception('UID SEARCH refused by the server');
+		}
 		$uids = array();
 		foreach (is_array($response) ? $response : array() as $line) {
 			if (is_array($line) && isset($line[0]) && $line[0] === 'SEARCH') {

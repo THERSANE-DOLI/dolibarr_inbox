@@ -97,6 +97,42 @@ class InboxActions
 	}
 
 	/**
+	 * Journal of the changes (1.121.0): the lists open by the other users follow at once. Numbers only.
+	 *
+	 * @param User                $user     User
+	 * @param string              $action   Action run
+	 * @param int                 $folderId Folder of the mails
+	 * @param object[]            $list     Rows of the mails (one folder)
+	 * @param array<int,int>      $newIds   Rows after a move (old => new)
+	 * @return void
+	 */
+	protected function emitEvent(User $user, $action, $folderId, array $list, array $newIds)
+	{
+		require_once __DIR__.'/inboxevent.class.php';
+		if (!InboxEvent::enabled() || !$list || !empty($list[0]->live)) {
+			// Protected mailbox (numbers of the session only): nothing in the journal
+			return;
+		}
+		$types = array('seen' => 'seen', 'flag' => 'flag', 'tag' => 'tag', 'delete' => 'delete');
+		$type = $types[$action] ?? 'move';
+		$events = new InboxEvent($this->db);
+		$accountId = (int) $list[0]->fk_account;
+		$events->emit($accountId, $type, array_map(function ($r) {
+			return (int) $r->rowid;
+		}, $list), (int) $folderId, $user);
+		// A move (archive, junk, trash): the folders where the mails arrived are read again
+		$newIds = array_values(array_filter(array_map('intval', $newIds)));
+		if ($newIds) {
+			$rows = $this->db->getRows("SELECT DISTINCT fk_account, fk_folder FROM ".$this->db->prefix()."inbox_mail WHERE rowid IN (".implode(',', $newIds).") LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				if ((int) $r->fk_folder !== (int) $folderId) {
+					$events->emit((int) $r->fk_account, 'folder', array(), (int) $r->fk_folder, $user);
+				}
+			}
+		}
+	}
+
+	/**
 	 * Run an action
 	 *
 	 * @param User                $user    User
@@ -187,6 +223,9 @@ class InboxActions
 				return $out;
 			}
 			$out['count'] += $res['count'];
+			if ($res['count'] > 0) {
+				$this->emitEvent($user, $action, (int) $folderId, $list, $res['ids'] ?? array());
+			}
 			$out['undo'] = array_merge($out['undo'], $res['undo']);
 			$out['ids'] += $res['ids'] ?? array();
 			if (!empty($res['rest'])) {

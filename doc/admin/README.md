@@ -2,6 +2,9 @@
 
 - [Installation](install.md): zip or git, which branch for which instance, requirements
 - [Inbox application](application.md): the application, the cache of the mails read
+- [Email links (mailto)](mailto-links.md): mailto links of the browser and of the system opened in Inbox, Windows and Linux
+- [Refresh of the lists](reactivity.md): standard or fast refresh of the changes made by the other users, load on the server
+- [Instant refresh (push service)](push.md): Mercure (Docker or systemd) beside Dolibarr, what it receives, its test
 - [Writing editor](writing-editor.md): Inbox editor or CKEditor, small screens, signature
 - [Mail templates](mail-templates.md): complete mail or piece of text, default templates on four levels
 - [Agenda panel](agenda-panel.md)

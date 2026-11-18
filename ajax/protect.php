@@ -279,7 +279,13 @@ switch ($action) {
 	case 'level':
 		// Level of the protection (password / content), who decides the mode
 		$account = inboxProtectAccount((int) inboxAjaxParam('id', 'int'), 'decide');
-		if (!$protect->setLevel($user, $account, (string) inboxAjaxParam('level', 'aZ09'))) {
+		$level = (string) inboxAjaxParam('level', 'aZ09');
+		// To « content » the index of the mailbox is emptied: its address typed again, checked here as for protect
+		// and reset (never on the page only)
+		if ($level === 'content' && strtolower(trim((string) inboxAjaxParam('confirm_email'))) !== $account->email) {
+			inboxAjaxError($langs->transnoentities('InboxProtectErrorConfirm'), 422, array('confirm_email' => 1));
+		}
+		if (!$protect->setLevel($user, $account, $level)) {
 			inboxProtectFail($protect);
 		}
 		InboxAccess::clearCache();
