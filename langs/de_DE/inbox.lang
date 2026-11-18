@@ -3307,6 +3307,7 @@ InboxProtectErrorConnector = Nur ein per IMAP gelesenes Postfach kann geschützt
 InboxProtectErrorAuthMode = Nur ein Postfach, das mit eigenem Login und Passwort geöffnet wird, kann geschützt werden (nicht der Master-Benutzer und nicht OAuth).
 InboxProtectErrorKey = Schlüssel des Browsers ungültig.
 InboxProtectErrorRevoked = Der Schlüssel dieses Browsers wurde widerrufen.
+InboxProtectErrorDeviceRegister = Dieser Browser konnte für diese Entität nicht registriert werden. Bitten Sie einen Administrator, das Modul Inbox erneut zu aktivieren (Aktualisierung nicht abgeschlossen), und laden Sie dann neu.
 InboxProtectErrorTooManyDevices = Zu viele Geräte: Widerrufen Sie die nicht mehr genutzten unter Mein Konto > Meine Geräte.
 InboxProtectErrorDevice = Dieses Gerät ist nicht bekannt oder wurde widerrufen.
 InboxProtectErrorBlob = Verschlüsselter Zugang ungültig.

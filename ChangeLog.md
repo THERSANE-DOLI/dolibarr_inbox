@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: protected mailboxes in a second entity of the user: the browser can be registered there :   1.128.0
+  - one device per entity for the same key of the browser, approved and revoked in each entity.
+  - a clear message when it cannot be registered; activate the module again (index of the devices).
+
 - FIX: DNS check of the DMARC reports and number of the tabs of the quick refresh :   1.127.1
   - DNS check for the domains of a report analyzed only, destinations of the domain of the internet only, limit kept.
   - the number of a tab is given back to its own user only, and a change is left out only when he made it.

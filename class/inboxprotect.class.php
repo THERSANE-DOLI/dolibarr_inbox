@@ -488,7 +488,9 @@ class InboxProtect
 		}
 		$fp = self::fingerprint($key);
 		$prefix = $this->db->prefix();
-		$row = $this->db->getRow("SELECT rowid, status FROM ".$prefix."inbox_device WHERE fk_user = ".((int) $user->id)." AND fingerprint = '".$this->db->escape($fp)."'");
+		// One device per entity: the browser keeps one key for the whole site, registered again in each entity of the
+		// user (approved there, revoked there)
+		$row = $this->db->getRow("SELECT rowid, status FROM ".$prefix."inbox_device WHERE entity = ".((int) $conf->entity)." AND fk_user = ".((int) $user->id)." AND fingerprint = '".$this->db->escape($fp)."'");
 		if (is_object($row)) {
 			if ((int) $row->status !== 1) {
 				// A revoked key is never taken again: the browser makes a new one
@@ -496,7 +498,11 @@ class InboxProtect
 				return null;
 			}
 			$this->db->query("UPDATE ".$prefix."inbox_device SET date_last_use = '".$this->db->idate(dol_now())."' WHERE rowid = ".((int) $row->rowid));
-			return $this->device((int) $row->rowid);
+			$device = $this->device((int) $row->rowid);
+			if ($device === null) {
+				$this->error = 'InboxProtectErrorDeviceRegister';
+			}
+			return $device;
 		}
 		$count = $this->db->getRow("SELECT COUNT(rowid) AS n FROM ".$prefix."inbox_device WHERE fk_user = ".((int) $user->id)." AND entity = ".((int) $conf->entity)." AND status = 1");
 		if (is_object($count) && (int) $count->n >= self::MAX_DEVICES) {
@@ -508,11 +514,18 @@ class InboxProtect
 		$sql .= " VALUES (".((int) $conf->entity).", ".((int) $user->id).", '".$this->db->escape((string) json_encode($key))."', '".$this->db->escape($fp)."',";
 		$sql .= " ".($label === '' ? 'NULL' : "'".$this->db->escape($label)."'").", 1, '".$this->db->idate(dol_now())."', '".$this->db->idate(dol_now())."')";
 		if (!$this->db->query($sql)) {
-			$this->error = $this->db->lasterror();
+			// Never the text of the database to the browser; the module not activated again since 1.128.0 (unique
+			// index without the entity) ends here in a second entity
+			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
+			$this->error = 'InboxProtectErrorDeviceRegister';
 			return null;
 		}
+		$device = $this->device((int) $this->db->last_insert_id($prefix.'inbox_device'));
+		if ($device === null) {
+			$this->error = 'InboxProtectErrorDeviceRegister';
+		}
 
-		return $this->device((int) $this->db->last_insert_id($prefix.'inbox_device'));
+		return $device;
 	}
 
 	/**

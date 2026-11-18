@@ -3307,6 +3307,7 @@ InboxProtectErrorConnector = Solo una casella letta in IMAP può essere protetta
 InboxProtectErrorAuthMode = Solo una casella aperta con il proprio login e la propria password può essere protetta (non l'utente master né OAuth).
 InboxProtectErrorKey = Chiave del browser non valida.
 InboxProtectErrorRevoked = La chiave di questo browser è stata revocata.
+InboxProtectErrorDeviceRegister = Questo browser non è stato registrato per questa entità. Chiedere a un amministratore di riattivare il modulo Inbox (aggiornamento non terminato), poi ricaricare.
 InboxProtectErrorTooManyDevices = Troppi dispositivi: revocate quelli che non usate più in Il mio account > I miei dispositivi.
 InboxProtectErrorDevice = Questo dispositivo non è noto o è stato revocato.
 InboxProtectErrorBlob = Accesso cifrato non valido.

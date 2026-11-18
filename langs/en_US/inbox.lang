@@ -3307,6 +3307,7 @@ InboxProtectErrorConnector = Only a mailbox read by IMAP can be protected.
 InboxProtectErrorAuthMode = Only a mailbox opened with its own login and password can be protected (not the master user nor OAuth).
 InboxProtectErrorKey = Key of the browser not valid.
 InboxProtectErrorRevoked = The key of this browser was revoked.
+InboxProtectErrorDeviceRegister = This browser could not be registered for this entity. Ask an administrator to activate the Inbox module again (update not finished), then reload.
 InboxProtectErrorTooManyDevices = Too many devices: revoke the ones you do not use any more in My account > My devices.
 InboxProtectErrorDevice = This device is not known or was revoked.
 InboxProtectErrorBlob = Encrypted access not valid.

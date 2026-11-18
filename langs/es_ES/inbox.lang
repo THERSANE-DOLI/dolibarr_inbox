@@ -3307,6 +3307,7 @@ InboxProtectErrorConnector = Solo un buzón leído por IMAP puede protegerse.
 InboxProtectErrorAuthMode = Solo un buzón abierto con su propio usuario y contraseña puede protegerse (no el usuario maestro ni OAuth).
 InboxProtectErrorKey = Clave del navegador no válida.
 InboxProtectErrorRevoked = La clave de este navegador fue revocada.
+InboxProtectErrorDeviceRegister = Este navegador no se ha podido registrar para esta entidad. Pida a un administrador que vuelva a activar el módulo Inbox (actualización no terminada) y luego recargue.
 InboxProtectErrorTooManyDevices = Demasiados dispositivos: revoque los que ya no usa en Mi cuenta > Mis dispositivos.
 InboxProtectErrorDevice = Este dispositivo no es conocido o fue revocado.
 InboxProtectErrorBlob = Acceso cifrado no válido.

@@ -289,6 +289,24 @@ class InboxProtectTest extends InboxTestCase
 		$this->assertNotNull($dAlice);
 		$this->assertSame($dCarol['id'], $protect->registerDevice($carol, $jwkCarol, 'other')['id'], 'same key, same device');
 
+		// The same browser (one key for the whole site) in a second entity of the user: a device of its own there,
+		// revoked there only
+		global $conf;
+		$entity = $conf->entity;
+		$conf->entity = 2;
+		try {
+			$dCarol2 = $protect->registerDevice($carol, $jwkCarol, 'ZzDevice carol 2');
+			$this->assertNotNull($dCarol2, 'registered in the second entity: '.$protect->error);
+			$this->assertNotSame($dCarol['id'], $dCarol2['id']);
+			$this->assertSame($dCarol2['id'], $protect->registerDevice($carol, $jwkCarol, 'again')['id']);
+			$this->assertSame(1, $protect->revokeDevice($this->admin, $dCarol2['id']) ? 1 : 0);
+			$this->assertNull($protect->registerDevice($carol, $jwkCarol, 'again'));
+			$this->assertSame('InboxProtectErrorRevoked', $protect->error);
+		} finally {
+			$conf->entity = $entity;
+		}
+		$this->assertSame($dCarol['id'], $protect->registerDevice($carol, $jwkCarol, 'other')['id'], 'still valid in the first entity');
+
 		// Protected by hand (the flow with the mail server is in testProtectWithServer)
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET protected = 1 WHERE rowid = ".((int) $shared->id));
 		$shared->fetch($shared->id);
