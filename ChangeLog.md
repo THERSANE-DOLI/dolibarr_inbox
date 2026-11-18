@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: texts of the module (version, history, notes, lists) never served by the web server :   1.128.4
+  - a .htaccess at the root of the module refuses md, txt, json, sh, yml, lock; the rule for nginx in the install doc.
+
 - FIX: requests of domains limited, more lookalike letters, advice when the PHP extension intl is missing :   1.128.3
   - one request of a domain per user a day, 5 domains an hour; the managers told are the ones of this entity.
   - lookalikes: more letters of other alphabets read as Latin ones (Cyrillic, Greek, Armenian, phonetic letters).

@@ -21,3 +21,12 @@ Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolconte
 Advised: the PHP extension `intl` (package php-intl). Without it the domains written with accents or letters of other
 alphabets, the most deceptive imitations of a known domain, are neither recognized nor told; the setup page of the
 module says so.
+
+Files never served: the `.htaccess` of the module refuses its texts (`ChangeLog.md`, notes, lists read by PHP: `md`,
+`txt`, `json`, `sh`, `yml`, `lock`...) and the folders `dev/`, `test/`, `lib/vendor/` (Apache with `AllowOverride` that
+allows `Require`, as `conf/.htaccess` of Dolibarr). With nginx, write the same in the server block:
+
+```nginx
+location ~ ^/custom/inbox/(dev|test|lib/vendor)/ { deny all; }
+location ~ ^/custom/inbox/.*\.(md|txt|json|sh|yml|yaml|lock|dist|log)$ { deny all; }
+```
