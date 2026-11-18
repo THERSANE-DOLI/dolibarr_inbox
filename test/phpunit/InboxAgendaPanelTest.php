@@ -202,6 +202,40 @@ class InboxAgendaPanelTest extends InboxTestCase
 	}
 
 	/**
+	 * Who may change an event (audit INBX-094): as Dolibarr, never an attendee only
+	 *
+	 * @return void
+	 */
+	public function testMayChangeAsDolibarr()
+	{
+		$u = new class ($this->db) extends User {
+			/** @var string[] */
+			public $granted = array();
+			/**
+			 * @param string $module Module
+			 * @param string $perm   Permission
+			 * @param string $sub    Sub permission
+			 * @return int
+			 */
+			public function hasRight($module, $perm, $sub = '')
+			{
+				return in_array($module.'.'.$perm.'.'.$sub, $this->granted, true) ? 1 : 0;
+			}
+		};
+		$u->id = 42;
+		$owner = (object) array('fk_user_action' => 42, 'fk_user_author' => 7);
+		$author = (object) array('fk_user_action' => 7, 'fk_user_author' => 42);
+		$attendee = (object) array('fk_user_action' => 7, 'fk_user_author' => 7);
+		$this->assertFalse(InboxAgendaPanel::mayChange($owner, $u), 'no right');
+		$u->granted = array('agenda.myactions.create');
+		$this->assertTrue(InboxAgendaPanel::mayChange($owner, $u));
+		$this->assertTrue(InboxAgendaPanel::mayChange($author, $u));
+		$this->assertFalse(InboxAgendaPanel::mayChange($attendee, $u), 'attendee only');
+		$u->granted = array('agenda.allactions.create');
+		$this->assertTrue(InboxAgendaPanel::mayChange($attendee, $u), 'every event');
+	}
+
+	/**
 	 * What a module gives: known fields only, an address of this site only, never ticked by inbox
 	 *
 	 * @return void

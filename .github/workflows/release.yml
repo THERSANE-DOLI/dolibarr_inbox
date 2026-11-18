@@ -22,21 +22,23 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-      MODULE: inbox
-      DESCRIPTOR: core/modules/modInbox.class.php
-      TITLE: Inbox
-      # Copy of the zip on SourceForge (download stats), skipped while the secret SF_SSH_KEY is not set
-      SF_PROJECT: ${{ secrets.SF_SSH_KEY != '' && 'inbox-for-dolibarr' || '' }}
-      SF_USER: ${{ vars.SF_USER }}
-      SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
-      SF_API_KEY: ${{ secrets.SF_API_KEY }}
     steps:
+      # Pinned by commit (v7.0.1), Dependabot proposes the next ones
       - name: Source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
+      # The secrets are given to this step only, never to the actions before it (audit INBX-108)
       - name: Tag, zip, release and branch X.Y
         run: bash .github/release.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE: inbox
+          DESCRIPTOR: core/modules/modInbox.class.php
+          TITLE: Inbox
+          # Copy of the zip on SourceForge (download stats), skipped while the secret SF_SSH_KEY is not set
+          SF_PROJECT: ${{ secrets.SF_SSH_KEY != '' && 'inbox-for-dolibarr' || '' }}
+          SF_USER: ${{ vars.SF_USER }}
+          SF_SSH_KEY: ${{ secrets.SF_SSH_KEY }}
+          SF_API_KEY: ${{ secrets.SF_API_KEY }}

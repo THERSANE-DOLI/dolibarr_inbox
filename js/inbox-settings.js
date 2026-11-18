@@ -5070,8 +5070,9 @@
 			+ '<section class="ibx-section" data-section="keep">' + title('keep') + '<div class="ibx-form">' + ['INBOX_CACHE_DAYS', 'INBOX_LOG_DAYS', 'INBOX_ACCOUNT_LOG_DAYS', 'INBOX_GONE_LINKED_DAYS'].map(number).join('') + '</div></section>'
 			+ '<section class="ibx-section" data-section="imap">' + title('imap') + '<div class="ibx-form">' + ['INBOX_IMAP_TIMEOUT', 'INBOX_TEST_TIMEOUT'].map(number).join('') + '</div></section>'
 			// Refresh of the lists and push service (1.124.0): global settings, the load next to them
-			+ '<section class="ibx-section" data-section="refresh">' + title('refresh') + '<p class="ibx-section__help">' + th('InboxReactivitySetupHelp') + '</p></section>'
-			+ '<section class="ibx-section" data-section="push">' + title('push') + '<p class="ibx-section__help">' + th('InboxPushSetupHelp') + '</p></section>'
+			// (administrator of the whole instance only: the server gives them to him only)
+			+ (s.reactivity ? '<section class="ibx-section" data-section="refresh">' + title('refresh') + '<p class="ibx-section__help">' + th('InboxReactivitySetupHelp') + '</p></section>'
+				+ '<section class="ibx-section" data-section="push">' + title('push') + '<p class="ibx-section__help">' + th('InboxPushSetupHelp') + '</p></section>' : '')
 			// Master user: one form (the four values go together), the password never shown again
 			+ '<section class="ibx-section" data-section="master">' + title('master') + '<p class="ibx-section__help">' + th('InboxMasterUserHelp') + '</p>'
 			+ '<form class="ibx-form ibx-js-master" autocomplete="off">'
@@ -5113,9 +5114,12 @@
 			btn.disabled = false;
 		});
 		paintCron($('.ibx-js-cron', main), s.cron);
-		let refreshView = null;
-		const pushView = paintPush($('[data-section="push"]', main), s.reactivity.push, s.reactivity.mode, ready => refreshView && refreshView.setReady(ready));
-		refreshView = paintReactivity($('[data-section="refresh"]', main), s.reactivity, m2 => pushView.setMode(m2));
+		if (s.reactivity) {
+			let refreshView = null;
+			const pushView = paintPush($('[data-section="push"]', main), s.reactivity.push, s.reactivity.mode, ready => refreshView && refreshView.setReady(ready));
+			refreshView = paintReactivity($('[data-section="refresh"]', main), s.reactivity, m2 => pushView.setMode(m2));
+		}
+		syncSectionLinks(main);
 		spySections(main, SERVER_SECTIONS.map(x => x[0]));
 		if (parts && parts[0]) {
 			requestAnimationFrame(() => pointSection(main, parts[0]));

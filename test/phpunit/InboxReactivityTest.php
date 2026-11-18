@@ -171,4 +171,21 @@ class InboxReactivityTest extends InboxTestCase
 		$this->assertSame('instant', $r->save('instant', 10, 60)['mode'], 'already instant: the intervals can still change');
 		$this->assertFalse($r->data()['push_ready']);
 	}
+
+	/**
+	 * Settings of the whole instance: an administrator; with multicompany, the one of the instance only (audit INBX-093)
+	 *
+	 * @return void
+	 */
+	public function testCanSetIsTheAdministratorOfTheInstance()
+	{
+		$u = new User($this->db);
+		$u->admin = 0;
+		$u->entity = 0;
+		$this->assertFalse(InboxReactivity::canSet($u), 'not an administrator');
+		$u->admin = 1;
+		$this->assertTrue(InboxReactivity::canSet($u));
+		$u->entity = 1;
+		$this->assertSame(!isModEnabled('multicompany'), InboxReactivity::canSet($u), 'administrator of one entity: only without multicompany');
+	}
 }

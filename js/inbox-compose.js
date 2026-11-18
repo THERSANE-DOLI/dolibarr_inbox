@@ -3392,7 +3392,14 @@
 		if (!m) {
 			return Promise.resolve(null);
 		}
-		const o = { mode: 'new', to: decodeURIComponent(m[1] || '') };
+		let to = '';
+		try {
+			to = decodeURIComponent(m[1] || '');
+		} catch (e) {
+			// Badly encoded address: the writing opens without it
+			to = '';
+		}
+		const o = { mode: 'new', to };
 		new URLSearchParams(m[2] || '').forEach((v, k) => {
 			k = k.toLowerCase();
 			if (k === 'to') {
@@ -3402,6 +3409,13 @@
 				o[k] = v;
 			}
 		});
+		// Addresses only: a name written by the page or the mail of the link (« boss@company.com » <someone@else>)
+		// would be the only thing shown in the chip (audit INBX-102)
+		const bare = list => parseList(list).map(a => a.email).filter(Boolean).join(', ');
+		o.to = bare(o.to);
+		if (o.cc) {
+			o.cc = bare(o.cc);
+		}
 		return compose(o);
 	};
 	/** Mail answered in the writing in front (presence « is writing an answer », lot W3 call of state) */

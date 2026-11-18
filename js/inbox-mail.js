@@ -6809,7 +6809,7 @@
 					// In a window of inbox (1.108.0) or a new tab; the markers are filled on click, with the mail as it is then
 					+ d.actions.map((a, i) => a.window
 						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
-						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(I.moduleUrl(a.url, null)) + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
+						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
@@ -7016,6 +7016,12 @@
 		if (action) {
 			const url = I.moduleUrl(action.url, I.mailContext());
 			if (!action.window) {
+				// The new tab too stays inside Dolibarr: the subject and the correspondents are in its address (audit
+				// INBX-101)
+				if (!insideUrl(url)) {
+					e.preventDefault();
+					return;
+				}
 				modAction.href = url;
 				return;
 			}

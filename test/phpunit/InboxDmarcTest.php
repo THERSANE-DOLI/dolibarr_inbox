@@ -164,6 +164,22 @@ class InboxDmarcTest extends InboxTestCase
 	}
 
 	/**
+	 * Names asked for public addresses only, an IPv4 written as IPv6 judged as itself (audit INBX-096)
+	 *
+	 * @return void
+	 */
+	public function testPublicIp()
+	{
+		foreach (array('8.8.8.8', '2001:4860:4860::8888', '::ffff:8.8.8.8') as $ip) {
+			$this->assertTrue(InboxDmarc::publicIp($ip), $ip);
+		}
+		foreach (array('10.0.0.1', '127.0.0.1', '192.168.1.2', '::ffff:10.0.0.1', '::ffff:127.0.0.1', '::ffff:192.168.1.2', '::10.0.0.1', '::1', 'fe80::1', 'fd00::1', '100.64.1.1', '::ffff:100.100.0.1', '169.254.169.254', 'nope', '') as $ip) {
+			$this->assertFalse(InboxDmarc::publicIp($ip), $ip);
+		}
+		$this->assertNull(InboxDmarc::ptr('::ffff:127.0.0.1'));
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testRefused()

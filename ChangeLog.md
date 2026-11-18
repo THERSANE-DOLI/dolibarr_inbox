@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security, from the audit of 1.125.0 :   1.126.0
+  - refresh and push service of the whole instance set by its administrator only (not the one of an entity);
+    progress of an agenda event changed by its owner or author only, as in Dolibarr.
+  - a failed search of the mail server no longer empties the index; private addresses refused in DMARC names;
+    module authorizations deleted with their mailbox; addresses of module actions kept inside Dolibarr; a mailto
+    link shows the real addresses; release secrets for one step only, SourceForge host key checked.
+
 - NEW: the bell follows at once the notifications made or removed for the user, in any space of Inbox :   1.125.0
   - with the fast or instant refresh: an assignment by another user rings the bell within seconds, even in Agenda.
   - the notification of the browser goes at the same time; nothing changes in standard mode.

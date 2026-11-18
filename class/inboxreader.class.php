@@ -198,8 +198,9 @@ class InboxReader
 		$connector->disconnect();
 		if ($raw === null || $raw === '') {
 			$this->error = $connector->getError();
-			// Removed or moved by another client since the last pass: the index row goes
-			$this->errorCode = $connector->notFound() || $raw === '' || $this->error === 'UIDVALIDITY changed' ? 'gone' : 'error';
+			// Removed or moved by another client since the last pass: the index row goes. An empty answer alone is an
+			// error, not a removal (audit INBX-095): the server must have said the mail is not there
+			$this->errorCode = $connector->notFound() || $this->error === 'UIDVALIDITY changed' ? 'gone' : 'error';
 			if ($this->errorCode === 'gone') {
 				require_once __DIR__.'/inboxmail.class.php';
 				$index = new InboxMail($this->db);

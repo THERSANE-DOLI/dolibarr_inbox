@@ -128,13 +128,17 @@ sf_publish() {
 		return 1
 	fi
 	(umask 077 && printf '%s\n' "$SF_SSH_KEY" > "$key") || return 1
-	rsync -e "ssh -i $key -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$work/known_hosts" \
+	# The host key of SourceForge is the one kept in the repository: never accepted unseen (audit INBX-109)
+	rsync -e "ssh -i $key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$(cd "$(dirname "$0")" && pwd)/sourceforge_known_hosts" \
 		"$zip" "$SF_USER@frs.sourceforge.net:$dest" || return 1
 	if [ "$latest" = true ] && [ -n "${SF_API_KEY:-}" ]; then
+		# The API key read from a file, never on the command line (seen in the list of the processes, audit INBX-110)
+		(umask 077 && printf '%s' "$SF_API_KEY" > "$work/sf_api") || return 1
 		curl -fsS -X PUT -H 'Accept: application/json' \
 			-d default=windows -d default=mac -d default=linux -d default=bsd -d default=solaris -d default=others \
-			--data-urlencode "api_key=$SF_API_KEY" \
-			"https://sourceforge.net/projects/$SF_PROJECT/files/$v/$(basename "$zip")" >/dev/null || return 1
+			--data-urlencode "api_key@$work/sf_api" \
+			"https://sourceforge.net/projects/$SF_PROJECT/files/$v/$(basename "$zip")" >/dev/null || { rm -f "$work/sf_api"; return 1; }
+		rm -f "$work/sf_api"
 	fi
 }
 if [ "$branch" = stable ] && [ -n "${SF_PROJECT:-}" ]; then
@@ -144,4 +148,4 @@ if [ "$branch" = stable ] && [ -n "${SF_PROJECT:-}" ]; then
 		echo "::warning::SourceForge copy failed, replay by hand: rsync $(basename "$zip") <user>@frs.sourceforge.net:/home/frs/project/$SF_PROJECT/$v/"
 	fi
 fi
-rm -f "$work/sf_key"
+rm -f "$work/sf_key" "$work/sf_api"

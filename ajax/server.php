@@ -31,11 +31,18 @@ inboxAjaxStart(in_array($action, array('set', 'master', 'job', 'reactivity', 'pu
 if (empty($user->admin)) {
 	inboxAjaxNotFound();
 }
+// Refresh of the lists and push service: settings of the whole instance (entity 0), for the administrator of the
+// instance only; an administrator of one entity of a multicompany would else point the browsers of every entity to a
+// hub of his (audit INBX-093)
+$instanceAdmin = InboxReactivity::canSet($user);
+if (in_array($action, array('reactivity', 'push', 'pushtest'), true) && !$instanceAdmin) {
+	inboxAjaxNotFound();
+}
 
 $server = new InboxServer($db);
 switch ($action) {
 	case 'get':
-		inboxAjaxReply($server->get() + array('cron' => $server->cronJobs(), 'reactivity' => (new InboxReactivity($db))->data()));
+		inboxAjaxReply($server->get() + array('cron' => $server->cronJobs(), 'reactivity' => $instanceAdmin ? (new InboxReactivity($db))->data() : null));
 		// no break
 
 	case 'set':

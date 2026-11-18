@@ -1013,6 +1013,34 @@ class InboxDmarc
 	}
 
 	/**
+	 * A public address: neither private, reserved nor shared (100.64.0.0/10), and an IPv4 written as IPv6
+	 * (::ffff:a.b.c.d, ::a.b.c.d) judged as the IPv4 it holds (audit INBX-096: ::ffff:10.0.0.1 passed the filter of PHP)
+	 *
+	 * @param string $ip IP
+	 * @return bool
+	 */
+	public static function publicIp($ip)
+	{
+		$bin = @inet_pton(trim($ip));
+		if ($bin === false) {
+			return false;
+		}
+		if (strlen($bin) === 16 && (substr($bin, 0, 12) === str_repeat("\0", 10)."\xff\xff" || substr($bin, 0, 12) === str_repeat("\0", 12))) {
+			$bin = substr($bin, 12);
+		}
+		$ip = (string) inet_ntop($bin);
+		if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+			return false;
+		}
+		// Shared address space of the operators (carrier-grade NAT)
+		if (strlen($bin) === 4 && (ord($bin[0]) === 100 && (ord($bin[1]) & 0xc0) === 64)) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Name of an IP (reverse DNS)
 	 *
 	 * @param string $ip IP
@@ -1021,7 +1049,7 @@ class InboxDmarc
 	public static function ptr($ip)
 	{
 		// Public addresses only: the names of the private networks of the server are not given to the users
-		if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) || !function_exists('gethostbyaddr')) {
+		if (!self::publicIp((string) $ip) || !function_exists('gethostbyaddr')) {
 			return null;
 		}
 		$name = @gethostbyaddr($ip);

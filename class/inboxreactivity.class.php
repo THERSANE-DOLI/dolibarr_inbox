@@ -54,6 +54,20 @@ class InboxReactivity
 	}
 
 	/**
+	 * The settings are the ones of the whole instance: its administrator only (not the administrator of one entity of
+	 * a multicompany, audit INBX-093)
+	 *
+	 * @param User $user User
+	 * @return bool
+	 */
+	public static function canSet(User $user)
+	{
+		// Without multicompany every administrator is the one of the instance (an administrator made after the
+		// installation has entity 1); with it, the superadministrator only (entity 0), as in Dolibarr
+		return !empty($user->admin) && (!isModEnabled('multicompany') || empty($user->entity));
+	}
+
+	/**
 	 * @return string Mode of the settings
 	 */
 	public static function mode()
