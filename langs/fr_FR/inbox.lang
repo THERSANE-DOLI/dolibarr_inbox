@@ -23,6 +23,7 @@ Permission14193003 = Gérer les boîtes mail (serveurs, accès, identités ; ne 
 #
 InboxSetup = Configuration d'Inbox
 InboxSetupHelp = Un mail n'est lu que si son Message-ID complet est fourni : pas de liste, pas de recherche par expéditeur ou par sujet. Chaque lecture est enregistrée dans le journal.
+InboxIntlMissing = L'extension PHP intl n'est pas installée sur ce serveur. Inbox fonctionne sans elle, mais les domaines écrits avec des accents ou des lettres d'autres alphabets (les imitations les plus trompeuses d'un domaine connu) ne sont alors ni reconnus ni signalés. Conseillé : l'installer (paquet php-intl), puis redémarrer le serveur web.
 InboxMailboxes = Boîtes mail
 InboxMailboxesHelp = %s boîte(s) active(s), gérée(s) dans les Réglages de l'application inbox. Un autre module peut fournir la boîte d'une adresse inconnue d'inbox.
 INBOX_CACHE_DAYS = Garder les mails lus en cache pendant
@@ -2890,6 +2891,8 @@ InboxDomainsFix_shared = Plusieurs sociétés l'utilisent ?
 InboxDomainsMarked = %s noté « %s »
 InboxDomainsRequested = Demande envoyée aux gestionnaires des réglages pour %s
 InboxDomainsNoManager = Personne ne gère les réglages pour recevoir la demande
+InboxDomainsRequestAlready = Déjà demandé aujourd'hui pour %s : les gestionnaires ont votre demande
+InboxDomainsRequestTooMany = Trop de demandes cette heure-ci : réessayez plus tard
 InboxDomainsRequestText = %s demande de noter %s comme « %s »
 # Shared domains: recognition by the domain (1.76.0)
 InboxDomainsMatch = Reconnaissance

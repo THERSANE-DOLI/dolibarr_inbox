@@ -18,3 +18,6 @@ server. As after any update of a module, disable and enable the module again whe
 database updates run.
 
 Requirements: Dolibarr 23+, PHP 7.4+; on Dolibarr 23 the module backportdolcontext (JavaScript context of Dolibarr 24).
+Advised: the PHP extension `intl` (package php-intl). Without it the domains written with accents or letters of other
+alphabets, the most deceptive imitations of a known domain, are neither recognized nor told; the setup page of the
+module says so.

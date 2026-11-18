@@ -110,6 +110,25 @@ class InboxTrustedDomainTest extends InboxTestCase
 	}
 
 	/**
+	 * Skeleton of a name: letters of other alphabets that look like Latin ones read as them
+	 *
+	 * @return void
+	 */
+	public function testSkeletonOfOtherAlphabets()
+	{
+		$this->assertSame('paypal', InboxTrustedDomain::skeleton('раураl'), 'Cyrillic');
+		$this->assertSame('google', InboxTrustedDomain::skeleton('ɡооɡlе'), 'Latin script g, Cyrillic o and e');
+		$this->assertSame('orange', InboxTrustedDomain::skeleton('օrange'), 'Armenian o');
+		$this->assertSame('ovh', InboxTrustedDomain::skeleton('ᴏvհ'), 'small capital o, Armenian h');
+		$this->assertSame('cloud', InboxTrustedDomain::skeleton('ϲłoud'), 'Greek lunate sigma, l with a bar');
+		$this->assertSame('thersane', InboxTrustedDomain::skeleton('thersane'), 'a plain name untouched');
+		$list = array(array('domain' => 'paypal.com', 'label' => 'PayPal', 'category' => 'supplier'));
+		if (function_exists('idn_to_ascii')) {
+			$this->assertNotNull(InboxTrustedDomain::lookalike(InboxTrustedDomain::normalize('раураl.com'), $list, true), 'a Cyrillic paypal.com is a lookalike');
+		}
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testLookalikes()

@@ -23,6 +23,7 @@ Permission14193003 = Manage the mailboxes (servers, accesses, identities; does n
 #
 InboxSetup = Inbox setup
 InboxSetupHelp = An email is read only when its complete Message-ID is given: no listing, no search by sender or subject. Every reading is recorded in the journal.
+InboxIntlMissing = The PHP extension intl is not installed on this server. Inbox works without it, but the domains written with accents or with letters of other alphabets (the most deceptive imitations of a known domain) are then neither recognized nor told. Advised: install it (package php-intl), then restart the web server.
 InboxMailboxes = Mailboxes
 InboxMailboxesHelp = %s active mailbox(es), managed in the Settings of the inbox application. Another module can give the mailbox of an address unknown to inbox.
 INBOX_CACHE_DAYS = Keep the emails read in the cache for
@@ -2890,6 +2891,8 @@ InboxDomainsFix_shared = Several companies use it?
 InboxDomainsMarked = %s marked « %s »
 InboxDomainsRequested = Request sent to the managers of the settings for %s
 InboxDomainsNoManager = Nobody manages the settings to receive the request
+InboxDomainsRequestAlready = Already asked today for %s: the managers have your request
+InboxDomainsRequestTooMany = Too many requests this hour: try again later
 InboxDomainsRequestText = %s asks to mark %s as « %s »
 # Shared domains: recognition by the domain (1.76.0)
 InboxDomainsMatch = Recognition

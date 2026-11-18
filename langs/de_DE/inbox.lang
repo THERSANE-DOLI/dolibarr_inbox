@@ -23,6 +23,7 @@ Permission14193003 = Postfächer verwalten (Server, Zugriffe, Identitäten; gibt
 #
 InboxSetup = Inbox-Einstellungen
 InboxSetupHelp = Eine E-Mail wird nur gelesen, wenn ihre vollständige Message-ID angegeben wird: keine Liste, keine Suche nach Absender oder Betreff. Jeder Lesevorgang wird im Protokoll erfasst.
+InboxIntlMissing = Die PHP-Erweiterung intl ist auf diesem Server nicht installiert. Inbox funktioniert ohne sie, aber Domains mit Akzenten oder Buchstaben anderer Alphabete (die täuschendsten Nachahmungen einer bekannten Domain) werden dann weder erkannt noch gemeldet. Empfohlen: installieren (Paket php-intl), dann den Webserver neu starten.
 InboxMailboxes = Postfächer
 InboxMailboxesHelp = %s aktive(s) Postfach/Postfächer, verwaltet in den Einstellungen der inbox-Anwendung. Ein anderes Modul kann das Postfach einer inbox unbekannten Adresse liefern.
 INBOX_CACHE_DAYS = Gelesene E-Mails im Cache behalten für
@@ -2890,6 +2891,8 @@ InboxDomainsFix_shared = Mehrere Firmen nutzen sie?
 InboxDomainsMarked = %s als « %s » markiert
 InboxDomainsRequested = Anfrage an die Verwalter der Einstellungen für %s gesendet
 InboxDomainsNoManager = Niemand verwaltet die Einstellungen, um die Anfrage zu erhalten
+InboxDomainsRequestAlready = Heute bereits für %s angefragt: die Verantwortlichen haben Ihre Anfrage
+InboxDomainsRequestTooMany = Zu viele Anfragen in dieser Stunde: versuchen Sie es später erneut
 InboxDomainsRequestText = %s bittet, %s als « %s » zu markieren
 # Shared domains: recognition by the domain (1.76.0)
 InboxDomainsMatch = Erkennung

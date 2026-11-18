@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: requests of domains limited, more lookalike letters, advice when the PHP extension intl is missing :   1.128.3
+  - one request of a domain per user a day, 5 domains an hour; the managers told are the ones of this entity.
+  - lookalikes: more letters of other alphabets read as Latin ones (Cyrillic, Greek, Armenian, phonetic letters).
+  - setup: a warning when intl is missing (domains with accents or other alphabets are then not judged).
+
 - FIX: thirdparty of the list lines, new customer and pieces created from a mail checked as in Dolibarr :   1.128.2
   - thirdparty of a line with the right to read it, else « Thirdparty not accessible » and how to get an access.
   - a thirdparty created from a mail whose sender is already one is asked first; new customer: lists offered only.

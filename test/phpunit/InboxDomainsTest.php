@@ -24,12 +24,38 @@
 
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxdomains.class.php');
+dol_include_once('/inbox/class/inboxnotification.class.php');
 
 /**
  * Local entries of the tests: domains of inbox-test.invalid (removed by InboxTestCase::cleanup())
  */
 class InboxDomainsTest extends InboxTestCase
 {
+	/**
+	 * Requests to the managers: one per domain a day, a few domains an hour (the bell is never flooded)
+	 *
+	 * @return void
+	 */
+	public function testRequestsLimited()
+	{
+		$asker = $this->user('domasker');
+		$manager = $this->user('dommanager');
+		$p = $this->db->prefix();
+		$notif = new InboxNotification($this->db);
+		$this->assertSame('', InboxDomains::requestLimit($this->db, (int) $asker->id, 'first.example'));
+		$notif->add((int) $manager->id, 'domain_request', array('actor' => (int) $asker->id, 'payload' => array('detail' => 'first.example', 'text' => 'x')));
+		$this->assertSame('already', InboxDomains::requestLimit($this->db, (int) $asker->id, 'first.example'), 'the same domain today');
+		$this->assertSame('', InboxDomains::requestLimit($this->db, (int) $asker->id, 'other.example'));
+		$this->assertSame('', InboxDomains::requestLimit($this->db, (int) $manager->id, 'first.example'), 'another user');
+		for ($i = 2; $i <= InboxDomains::REQUESTS_PER_HOUR; $i++) {
+			$this->db->query("INSERT INTO ".$p."inbox_notification (entity, fk_user, type, fk_user_actor, payload, date_creation) VALUES (1, ".((int) $manager->id).", 'domain_request', ".((int) $asker->id).","
+				." '".$this->db->escape(json_encode(array('detail' => 'd'.$i.'.example')))."', '".$this->db->idate(dol_now())."')");
+		}
+		$this->assertSame('hour', InboxDomains::requestLimit($this->db, (int) $asker->id, 'other.example'), 'too many domains this hour');
+		$this->db->query("UPDATE ".$p."inbox_notification SET date_creation = '".$this->db->idate(dol_now() - 2 * 86400)."' WHERE fk_user_actor = ".((int) $asker->id));
+		$this->assertSame('', InboxDomains::requestLimit($this->db, (int) $asker->id, 'first.example'), 'the next days again');
+	}
+
 	/**
 	 * @return void
 	 */

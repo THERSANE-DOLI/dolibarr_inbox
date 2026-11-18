@@ -35,6 +35,9 @@ require_once __DIR__.'/inboxtrusteddomain.class.php';
  */
 class InboxDomains
 {
+	/** Domains a user may ask the managers to mark in one hour (bell of the managers) */
+	const REQUESTS_PER_HOUR = 5;
+
 	const PUBLIC = 'public';
 	const DISPOSABLE = 'disposable';
 	const SHARED = 'shared';
@@ -447,15 +450,47 @@ class InboxDomains
 	 *
 	 * @return int[]
 	 */
+	/**
+	 * Requests of a user to the managers (bell): one per domain a day, REQUESTS_PER_HOUR domains an hour
+	 *
+	 * @param DoliDB $db     Database handler
+	 * @param int    $userId User asking
+	 * @param string $domain Domain asked
+	 * @return string        '' allowed, 'already' (this domain today), 'hour' (too many this hour)
+	 */
+	public static function requestLimit($db, $userId, $domain)
+	{
+		global $conf;
+
+		$p = $db->prefix();
+		$where = " WHERE entity = ".((int) $conf->entity)." AND type = 'domain_request' AND fk_user_actor = ".((int) $userId);
+		$day = $db->getRow("SELECT COUNT(rowid) AS n FROM ".$p."inbox_notification".$where." AND date_creation > '".$db->idate(dol_now() - 86400)."'"
+			." AND payload LIKE '%".$db->escape($db->escapeforlike(substr(json_encode(array('detail' => (string) $domain)), 1, -1)))."%'");
+		if (is_object($day) && (int) $day->n > 0) {
+			return 'already';
+		}
+		$rows = $db->getRows("SELECT payload FROM ".$p."inbox_notification".$where." AND date_creation > '".$db->idate(dol_now() - 3600)."' LIMIT 1000");
+		$asked = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$d = json_decode((string) $r->payload, true);
+			$asked[is_array($d) ? (string) ($d['detail'] ?? '') : ''] = true;
+		}
+
+		return count($asked) >= self::REQUESTS_PER_HOUR ? 'hour' : '';
+	}
+
 	public function managers()
 	{
 		global $conf;
 
 		$p = $this->db->prefix();
-		$right = "SELECT id FROM ".$p."rights_def WHERE module = 'inbox' AND perms = 'account' AND subperms = 'admin' AND entity = ".((int) $conf->entity);
-		$rows = $this->db->getRows("SELECT DISTINCT u.rowid FROM ".$p."user as u WHERE u.statut = 1 AND u.entity IN (0, ".((int) $conf->entity).") AND (u.admin = 1"
-			." OR u.rowid IN (SELECT fk_user FROM ".$p."user_rights WHERE fk_id IN (".$right."))"
-			." OR u.rowid IN (SELECT gu.fk_user FROM ".$p."usergroup_user as gu INNER JOIN ".$p."usergroup_rights as gr ON gr.fk_usergroup = gu.fk_usergroup WHERE gr.fk_id IN (".$right.")))"
+		$e = (int) $conf->entity;
+		// The right given in this entity (a user of several entities who manages another one is not told)
+		$right = "SELECT id FROM ".$p."rights_def WHERE module = 'inbox' AND perms = 'account' AND subperms = 'admin' AND entity = ".$e;
+		$rows = $this->db->getRows("SELECT DISTINCT u.rowid FROM ".$p."user as u WHERE u.statut = 1 AND u.entity IN (0, ".$e.") AND (u.admin = 1"
+			." OR u.rowid IN (SELECT fk_user FROM ".$p."user_rights WHERE fk_id IN (".$right.") AND entity = ".$e.")"
+			." OR u.rowid IN (SELECT gu.fk_user FROM ".$p."usergroup_user as gu INNER JOIN ".$p."usergroup_rights as gr ON gr.fk_usergroup = gu.fk_usergroup"
+			." WHERE gr.fk_id IN (".$right.") AND gr.entity = ".$e." AND gu.entity IN (0, ".$e.")))"
 			." LIMIT 50");
 
 		return array_map(function ($r) {

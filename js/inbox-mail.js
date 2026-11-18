@@ -6731,7 +6731,7 @@
 				loadDolibar(box);
 			} else {
 				const res = await post('domain', 'request', { domain, category });
-				toast(res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager'));
+				toast(res.limited ? t(res.limited === 'already' ? 'InboxDomainsRequestAlready' : 'InboxDomainsRequestTooMany', domain) : (res.told ? t('InboxDomainsRequested', domain) : t('InboxDomainsNoManager')));
 			}
 		} catch (err) {
 			toast(err.message, { error: true });

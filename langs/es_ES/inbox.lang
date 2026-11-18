@@ -23,6 +23,7 @@ Permission14193003 = Gestionar los buzones (servidores, accesos, identidades; no
 #
 InboxSetup = Configuración de Inbox
 InboxSetupHelp = Un correo solo se lee si se indica su Message-ID completo: sin lista, sin búsqueda por remitente o asunto. Cada lectura queda registrada en el registro.
+InboxIntlMissing = La extensión PHP intl no está instalada en este servidor. Inbox funciona sin ella, pero los dominios escritos con acentos o con letras de otros alfabetos (las imitaciones más engañosas de un dominio conocido) no se reconocen ni se señalan. Aconsejado: instalarla (paquete php-intl) y reiniciar el servidor web.
 InboxMailboxes = Buzones
 InboxMailboxesHelp = %s buzón(es) activo(s), gestionado(s) en los Ajustes de la aplicación inbox. Otro módulo puede proporcionar el buzón de una dirección desconocida para inbox.
 INBOX_CACHE_DAYS = Conservar en caché los correos leídos durante
@@ -2890,6 +2891,8 @@ InboxDomainsFix_shared = ¿Varias empresas lo usan?
 InboxDomainsMarked = %s marcado « %s »
 InboxDomainsRequested = Solicitud enviada a los gestores de los ajustes para %s
 InboxDomainsNoManager = Nadie gestiona los ajustes para recibir la solicitud
+InboxDomainsRequestAlready = Ya solicitado hoy para %s: los responsables tienen su solicitud
+InboxDomainsRequestTooMany = Demasiadas solicitudes en esta hora: inténtelo más tarde
 InboxDomainsRequestText = %s pide marcar %s como « %s »
 # Shared domains: recognition by the domain (1.76.0)
 InboxDomainsMatch = Reconocimiento
