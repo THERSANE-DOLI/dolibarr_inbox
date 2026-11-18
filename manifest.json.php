@@ -80,6 +80,11 @@ $manifest = array(
 		array('src' => dol_buildpath('/inbox/img/app-512.png', 1), 'sizes' => '512x512', 'type' => 'image/png'),
 		array('src' => dol_buildpath('/inbox/img/app-maskable-512.png', 1), 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'),
 	),
+	// mailto: links opened in the installed application (1.123.0): Chrome registers it with the system (Windows,
+	// Linux, macOS) at the installation and asks the user at the first link. Read by index.php?mailto= and launchQueue
+	'protocol_handlers' => array(
+		array('protocol' => 'mailto', 'url' => dol_buildpath('/inbox/index.php', 1).'?mailto=%s'),
+	),
 	'shortcuts' => array(
 		array('name' => $langs->transnoentitiesnoconv('InboxSettings'), 'url' => dol_buildpath('/inbox/index.php', 1).'#/settings'),
 	),

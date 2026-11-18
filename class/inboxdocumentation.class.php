@@ -52,6 +52,7 @@ class InboxDocumentation
 				'application' => array('icon' => 'fa-inbox', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/application.md')),
 				'reactivity' => array('icon' => 'fa-bolt', 'version' => '1.122.0', 'files' => array('en_US' => 'admin/reactivity.md')),
 				'push' => array('icon' => 'fa-broadcast-tower', 'version' => '1.124.0', 'files' => array('en_US' => 'admin/push.md')),
+				'mailto_links' => array('icon' => 'fa-at', 'version' => '1.123.0', 'files' => array('en_US' => 'admin/mailto-links.md')),
 			)),
 			'InboxDocGroupWork' => array('icon' => 'fa-pen', 'pages' => array(
 				'writing_editor' => array('icon' => 'fa-edit', 'version' => '1.94.0', 'files' => array('en_US' => 'admin/writing-editor.md')),

@@ -2410,7 +2410,7 @@
 			html += '<table class="ibx-table ibx-js-tpls"><thead><tr><th></th><th>' + th('InboxTemplateLabel') + '</th><th>' + th('InboxTemplateFor') + '</th><th>' + th('InboxStatus') + '</th><th></th></tr></thead><tbody>'
 				+ data.templates.map((tp, n) => '<tr class="' + (tp.editable ? 'ibx-dragrow' : '') + '" data-tpl="' + tp.id + '">'
 					+ '<td>' + (tp.editable ? '<span class="ibx-draghandle" aria-hidden="true">' + ic('more-v') + '</span>' : '') + '</td>'
-					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + (tp.whole ? ' <span class="ibx-badge">' + th('InboxTemplateWholeShort') + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + esc(tp.subject) + '</div></td>'
+					+ '<td><b>' + esc(tp.label) + '</b>' + (tp.lang ? ' <span class="ibx-badge">' + esc(tp.lang) + '</span>' : '') + (tp.whole ? ' <span class="ibx-badge">' + th('InboxTemplateWholeShort') + '</span>' : '') + '<div class="ibx-muted ibx-ellipsis">' + (tp.subject ? esc(tp.subject) : '<i>' + th('InboxNoSubject') + '</i>') + '</div></td>'
 					+ '<td class="ibx-muted">' + forWho(tp) + '</td>'
 					+ '<td>' + (tp.active ? th('InboxAccountStatusActive') : '<span class="ibx-status">' + th('InboxInactive') + '</span>') + '</td>'
 					+ '<td class="ibx-table__actions">' + (tp.editable ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-btn--icon" data-move="-1" title="' + th('InboxMoveUp') + '" aria-label="' + th('InboxMoveUp') + '"' + (n === 0 ? ' aria-disabled="true"' : '') + '>' + ic('chevron-up') + '</button>'
@@ -2610,7 +2610,7 @@
 				return;
 			}
 			// Cleaned by the allow list of the mails on the server (no script, no event, no remote style)
-			prevBox.innerHTML = '<div class="ibx-tpledit__prevsubject"><span class="ibx-muted">' + th('InboxSubject') + ' :</span> <b>' + esc(r.subject) + '</b></div><div class="ibx-tpledit__prevbody"></div>';
+			prevBox.innerHTML = '<div class="ibx-tpledit__prevsubject"><span class="ibx-muted">' + th('InboxSubject') + ' :</span> ' + (r.subject ? '<b>' + esc(r.subject) + '</b>' : '<i class="ibx-muted">' + th('InboxNoSubject') + '</i>') + '</div><div class="ibx-tpledit__prevbody"></div>';
 			$('.ibx-tpledit__prevbody', prevBox).innerHTML = r.html;
 		};
 		$('.ibx-js-tplprev', dlg).addEventListener('click', runPreview);
@@ -5944,8 +5944,8 @@
 		if (mailto) {
 			mailto.addEventListener('click', () => {
 				try {
-					navigator.registerProtocolHandler('mailto', location.origin + location.pathname + '?mailto=%s');
-					toast(t('InboxMailtoAsked'));
+					// The offer of the start (js/inbox-compose.js) is then not shown again
+					I.registerMailto();
 				} catch (err) {
 					toast(err.message, { error: true });
 				}

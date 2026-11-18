@@ -6,6 +6,10 @@
   - numbers only, each user receives his own mailboxes (signed token); without answer, the fast refresh goes on.
   - examples to install Mercure with Docker or systemd in dev/mercure, other drivers through a hook.
 
+- NEW: the email links (mailto) clicked in Dolibarr, in a site or in another program open a new email in Inbox :   1.123.0
+  - a bar offers it once per browser at the start, the button of My account stays.
+  - the installed application declares itself to the system (Windows, Linux) and writes the link in its open window.
+
 - NEW: fast refresh of the lists, the changes made by the other users show within a few seconds :   1.122.0
   - setting « Refresh of the lists » in the setup of the module: standard (20 s) or fast, an interval while the user
     is active and one after 2 minutes without activity, with the load they bring computed as they are typed.
