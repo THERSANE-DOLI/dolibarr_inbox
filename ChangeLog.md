@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: marker {ctx} for the pages of modules opened from a mail: a token of one use instead of its values :   1.127.0
+  - the page reads the mail in PHP (InboxMailContext::take), rights checked again; nothing of the mail in its address.
+  - the markers {subject}, {messageid} and {emails} after the « # » are removed; hidden constant
+    INBOX_LEGACY_MAIL_MARKERS to give them back to a module not yet moved.
+
 - FIX: owner of a personal mailbox told when a module is allowed on it by someone else :   1.126.6
   - bell (and the chosen channels) for the owner and the administrators of Dolibarr, as for an access given to oneself.
 

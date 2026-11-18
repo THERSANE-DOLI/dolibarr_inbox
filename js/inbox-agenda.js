@@ -426,7 +426,12 @@
 			return;
 		}
 		if (urls[action] && (action !== 'open' || native)) {
-			openPage(action, fill(urls[action], event, mail), CONF.provider.label || t('InboxAgendaPanel'));
+			// {ctx}: a token of the mail open, asked to the server first (I.moduleUrlCtx)
+			if (String(urls[action]).indexOf('{ctx}') >= 0 && I.moduleUrlCtx) {
+				I.moduleUrlCtx(urls[action], mail, { id: event ? event.id : '' }).then(u => openPage(action, u, CONF.provider.label || t('InboxAgendaPanel')));
+			} else {
+				openPage(action, fill(urls[action], event, mail), CONF.provider.label || t('InboxAgendaPanel'));
+			}
 			return;
 		}
 		if (action === 'create' && CONF.native) {

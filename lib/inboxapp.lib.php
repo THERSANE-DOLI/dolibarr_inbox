@@ -201,6 +201,9 @@ function inboxAppContextVars(User $user)
 		'INBOX_REACTIVITY' => getDolGlobalString('INBOX_REACTIVITY'),
 		// Associated data of the encrypted copies of the protected mailboxes (1.89.0): entity | mailbox | user | device
 		'INBOX_ENTITY' => (int) $conf->entity,
+		// Markers {subject}, {messageid}, {emails} after the « # » of the pages of modules: removed in 1.127.0 for
+		// {ctx}, given back by the hidden constant (doc/dev/agenda.md)
+		'INBOX_LEGACY_MAIL_MARKERS' => (bool) getDolGlobalInt('INBOX_LEGACY_MAIL_MARKERS'),
 		'INBOX_USER_NAME' => $user->getFullName($GLOBALS['langs']),
 		'INBOX_RIGHT_WEBMAIL' => (bool) $user->hasRight('inbox', 'webmail', 'use'),
 		'INBOX_RIGHT_ACCOUNT_ADMIN' => (bool) $user->hasRight('inbox', 'account', 'admin'),

@@ -3543,7 +3543,9 @@
 	/**
 	 * Address of a page of a module filled with the markers of inbox (1.108.0): {id}, {socid}, {contactids},
 	 * {projectid}, {elements}, {start} anywhere; {subject}, {messageid}, {emails} only after the « # », a part that
-	 * the browser never sends to the server (no mail address nor subject in its logs), emptied before it
+	 * the browser never sends to the server (no mail address nor subject in its logs), emptied before it. Removed in
+	 * 1.127.0 for {ctx} (I.moduleUrlCtx): always emptied, unless the hidden constant INBOX_LEGACY_MAIL_MARKERS
+	 * gives them back (modules not yet moved to {ctx})
 	 * @param {string} url Address declared by the module
 	 * @param {object|null} mail Context of the mail (I.mailContext())
 	 * @param {object} extra Other values ({id, start})
@@ -3565,10 +3567,38 @@
 		const safe = /\{(id|socid|contactids|projectid|elements|start)\}/g;
 		const all = /\{(id|socid|contactids|projectid|elements|start|subject|messageid|emails)\}/g;
 		const text = String(url);
+		if (!I.ctx('INBOX_LEGACY_MAIL_MARKERS', false)) {
+			return text.replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails|ctx)\}/g, '');
+		}
 		const cut = text.indexOf('#');
-		const head = (cut < 0 ? text : text.slice(0, cut)).replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails)\}/g, '');
+		const head = (cut < 0 ? text : text.slice(0, cut)).replace(safe, (x, k) => encodeURIComponent(String(values[k] ?? ''))).replace(/\{(subject|messageid|emails|ctx)\}/g, '');
 		return cut < 0 ? head : head + '#' + text.slice(cut + 1).replace(all, (x, k) => encodeURIComponent(String(values[k] ?? '')));
 	};
+	/**
+	 * Same as I.moduleUrl, with the marker {ctx} (1.127.0): a token of one use of the mail open, drawn now on the
+	 * server and kept in the session; the page of the module reads the mail by InboxMailContext::take() in PHP. Nothing
+	 * of the mail in the address. Without a mail open, or refused: emptied.
+	 * @param {string} url Address declared by the module
+	 * @param {object|null} mail Context of the mail (I.mailContext())
+	 * @param {object} extra Other values ({id, start})
+	 * @returns {Promise<string>}
+	 */
+	I.moduleUrlCtx = async (url, mail, extra) => {
+		let text = String(url);
+		if (text.indexOf('{ctx}') >= 0) {
+			let token = '';
+			if (mail && +mail.id > 0) {
+				try {
+					token = (await post('mail', 'context', { id: +mail.id })).token || '';
+				} catch (e) {
+					token = '';
+				}
+			}
+			text = text.split('{ctx}').join(encodeURIComponent(token));
+		}
+		return I.moduleUrl(text, mail, extra);
+	};
+
 	/**
 	 * A page of this site in a window of inbox, outside of a mail (the agenda panel): closed, onClose is called
 	 * @param {object} o {key, url, title, onClose}
@@ -7013,6 +7043,28 @@
 		}
 		const modAction = e.target.closest('.ibx-js-modaction');
 		const action = modAction && box._data && (box._data.actions || [])[+modAction.dataset.i];
+		if (action && String(action.url).indexOf('{ctx}') >= 0) {
+			// A token of the mail first (a call to the server): the new tab is opened at once (else the browser blocks
+			// it), its address set when the token is there
+			e.preventDefault();
+			const tab = action.window ? null : window.open('', '_blank');
+			if (tab) {
+				tab.opener = null;
+			}
+			const url = await I.moduleUrlCtx(action.url, I.mailContext());
+			if (!insideUrl(url)) {
+				if (tab) {
+					tab.close();
+				}
+				return;
+			}
+			if (tab) {
+				tab.location.href = url;
+			} else if (action.window) {
+				openModuleWindow({ mailId, box, url, title: action.label, panel: 'action:' + modAction.dataset.i });
+			}
+			return;
+		}
 		if (action) {
 			const url = I.moduleUrl(action.url, I.mailContext());
 			if (!action.window) {
