@@ -3,9 +3,10 @@
 When a user assigns an email, changes its tags, flags it, moves it, or when new emails arrive, the other users who
 have the same mailbox open see it at the next refresh of their list. This page sets how soon.
 
-## Two modes
+## Three modes
 
-Home > Setup > Modules > Inbox > Settings, block « Refresh of the lists » (administrators of Dolibarr only):
+Inbox > Settings > Server, section « Refresh of the lists » (administrators of Dolibarr only; the setup of the module
+links to it). The mode is saved at once, an interval when the field is left:
 
 - **Standard** (default): the lists ask the server every 20 seconds, as before. Nothing more is written on the
   server.
@@ -13,6 +14,9 @@ Home > Setup > Modules > Inbox > Settings, block « Refresh of the lists » (adm
   - while the user is active: 5 seconds by default, between 3 and 60;
   - after 2 minutes without activity: 60 seconds by default, from the active interval up to 300 (never quicker
     than the active one: it follows when the active one goes above it).
+- **Instant** (1.124.0): a push service installed beside Dolibarr gives the changes at once, the light call only
+  catches up once a minute. See [Instant refresh (push service)](push.md). Without an answer from the service, the
+  lists follow at the rhythm of the fast mode.
 
 The setting is the same for every entity: it is about the load of the server.
 
@@ -33,10 +37,14 @@ The setting is the same for every entity: it is about the load of the server.
 
 ## Load on the server
 
-Under the setting, a table shows the load for the users reaching a mailbox who logged in during the last 7 days,
-counted as if they were all connected at once: all active, all without activity for 2 minutes, and the standard mode
-for comparison. It gives the light calls and the full calls per second, and the processor they take. While the
-intervals are typed, the table follows.
+Under the intervals, « Load of the server with these settings » gives, for the users reaching a mailbox who logged
+in during the last 7 days (counted as if all were connected at once), the calls per second and the processor they
+take. Each figure says in its label the setting it comes from (« every 5 s »), and follows as the intervals are
+typed:
+
+- fast: all in front of the screen (active interval), all away for 2 minutes (idle interval);
+- instant: with the push service (catch up every minute), and if it does not answer (active interval);
+- the standard mode beside, for comparison.
 
 Measured on a development computer (12 cores):
 

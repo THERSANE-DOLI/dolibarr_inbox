@@ -133,6 +133,12 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-lead.js').'" defe
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-notify.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-live.js').'" defer></script>'."\n";
+// Instant refresh (1.124.0): the adapter of the push driver of the settings only (inbox's or another module's)
+dol_include_once('/inbox/class/inboxpush.class.php');
+$pushDriver = InboxPush::active();
+if ($pushDriver && preg_match('#^/[a-z0-9_]+/[A-Za-z0-9_/.-]+\.js$#', $pushDriver->jsFile()) && strpos($pushDriver->jsFile(), '..') === false) {
+	print '<script nonce="'.getNonce().'" src="'.dol_buildpath($pushDriver->jsFile(), 1).'?v='.$version.'" defer></script>'."\n";
+}
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-editor.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-dictation.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-compose.js').'" defer></script>'."\n";

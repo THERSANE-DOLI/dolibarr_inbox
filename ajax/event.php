@@ -22,12 +22,15 @@
  * \brief   Journal of the changes (1.121.0): the token of the light call (live.php), asked again before its end
  *
  * The token holds the user, the entity and the mailboxes he can read now, signed with the key of the instance: the
- * light call reads only his events without starting Dolibarr. It is given in « Rapide » (fast) mode only.
+ * light call reads only his events without starting Dolibarr. It is given in « Rapide » (fast) and « Instantané »
+ * (instant, 1.124.0) modes; in instant mode the answer also holds what the adapter of the push driver needs to
+ * receive the same mailboxes only (no secret of publication).
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
 
 dol_include_once('/inbox/class/inboxevent.class.php');
+dol_include_once('/inbox/class/inboxpush.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(true);
@@ -51,6 +54,8 @@ switch ($action) {
 			'idle' => $rhythm['idle'],
 			'url' => dol_buildpath('/inbox/live.php', 1),
 			'last' => InboxEvent::cursor($db),
+			// Same mailboxes as the token, same end; null: no driver configured, the light call alone
+			'push' => InboxPush::subscriber((int) $user->id, $t['accounts'], $t['expires']),
 		));
 		// no break
 	default:

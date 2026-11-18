@@ -343,5 +343,14 @@
 			<tr><th scope="row" class="ibx-tdefaults__level"><span class="ibx-tdefaults__who"><span class="ibx-tdefaults__num">2</span><span>Pour tous<small class="ibx-muted">Concerne tous les utilisateurs de la boîte</small></span></span></th><td class="ibx-tdefaults__cell is-masked"><select class="ibx-field ibx-tdefaults__field"><option>Devis standard</option></select><span class="ibx-tdefaults__state ibx-muted">Masqué par le niveau 1</span></td><td class="ibx-tdefaults__cell is-unset"><select class="ibx-field ibx-tdefaults__field"><option>Non défini (niveau suivant)</option></select></td></tr></tbody></table>
 		</div>
 	</section>
+	<section class="ibx-doc-section" id="load">
+		<h2>Charge d'un réglage <code>ibx-load</code></h2>
+		<div class="ibx-doc-rules"><ul><li>Sous les champs qui la règlent, jamais dans un tableau à part : chaque chiffre dit dans son libellé de quel réglage il vient (« toutes les 5 s »), recalculé pendant la saisie.</li><li>La comparaison (le mode par défaut) est mise à part, fond neutre ; les chiffres en chiffres tabulaires.</li><li>Une phrase dit ce qui est compté et la note dit d'où viennent les temps.</li></ul></div>
+		<div class="ibx-doc-example ibx-doc-example--block" style="max-width:640px">
+			<div class="ibx-load"><div class="ibx-load__head"><svg class="ibx-icon" aria-hidden="true"><use href="__ICONS__#ibx-i-load"/></svg> Charge du serveur avec ces réglages</div><p class="ibx-load__who">42 utilisateurs ont accès à une boîte et se sont connectés ces 7 derniers jours.</p>
+			<dl class="ibx-load__figs"><div class="ibx-load__fig"><dt class="ibx-load__label">Tous devant l'écran (toutes les 5 s)</dt><dd class="ibx-load__value">9,1 appels par seconde</dd><dd class="ibx-load__cpu">0,03 cœur</dd></div><div class="ibx-load__fig"><dt class="ibx-load__label">Tous absents depuis 2 minutes (toutes les 60 s)</dt><dd class="ibx-load__value">0,8 appel par seconde</dd><dd class="ibx-load__cpu">&lt; 0,01 cœur</dd></div><div class="ibx-load__fig ibx-load__fig--ref"><dt class="ibx-load__label">Standard, pour comparer (toutes les 20 s)</dt><dd class="ibx-load__value">2,1 appels par seconde</dd><dd class="ibx-load__cpu">0,04 cœur</dd></div></dl>
+			<p class="ibx-load__note">Mesuré sur un ordinateur de développement.</p></div>
+		</div>
+	</section>
 </main>
 </div>

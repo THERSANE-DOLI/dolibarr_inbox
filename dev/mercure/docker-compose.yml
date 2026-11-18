@@ -1,0 +1,22 @@
+# Mercure hub beside Dolibarr for the instant refresh of inbox (1.124.0). Start with ./run.sh (it writes .env with
+# random keys first), or « docker compose up -d » once .env exists. Plain HTTP on 127.0.0.1:3001: put nginx (or the
+# TLS of Mercure itself, see README.md) in front of it for the browsers. Restarted with the server.
+name: inbox-mercure
+
+services:
+  mercure:
+    image: dunglas/mercure:v1.1.6
+    container_name: inbox-mercure
+    environment:
+      # HTTP only, TLS done by the proxy in front (README.md for Mercure on its own name with automatic HTTPS)
+      SERVER_NAME: ':80'
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_PUBLISHER_JWT_KEY:?run ./run.sh first}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_SUBSCRIBER_JWT_KEY:?run ./run.sh first}
+      MERCURE_TRUSTED_ISSUERS: ${MERCURE_TRUSTED_ISSUERS:?run ./run.sh first}
+      # The address of Dolibarr may read the stream (CORS); no history (inbox catches up by its journal)
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins ${DOLIBARR_ORIGIN:?run ./run.sh first}
+        transport local
+    ports:
+      - "127.0.0.1:3001:80"
+    restart: unless-stopped

@@ -67,11 +67,12 @@ class InboxEvent
 	}
 
 	/**
-	 * @return bool The journal is written (Settings > Reactivity is not « Standard »)
+	 * @return bool The journal is written (Settings > Reactivity is not « Standard »): fast, or instant (1.124.0,
+	 *              the journal stays the reference, the push driver only delivers it sooner)
 	 */
 	public static function enabled()
 	{
-		return in_array(getDolGlobalString('INBOX_REACTIVITY'), array('fast'), true);
+		return in_array(getDolGlobalString('INBOX_REACTIVITY'), array('fast', 'instant'), true);
 	}
 
 	/**
@@ -179,8 +180,37 @@ class InboxEvent
 			return 0;
 		}
 		$this->written++;
+		$id = (int) $this->db->last_insert_id($this->db->prefix().'inbox_event');
+		if (getDolGlobalString('INBOX_REACTIVITY') === 'instant') {
+			// Delivered at the end of the request to the subscribers of this mailbox (or of this user) only
+			require_once __DIR__.'/inboxpush.class.php';
+			InboxPush::queue($accountId > 0 ? 'account/'.((int) $accountId) : 'user/'.((int) $target), self::format((object) array(
+				'rowid' => $id, 'type' => $type, 'fk_account' => $accountId, 'fk_folder' => max(0, (int) $folderId), 'ids' => $ids,
+				'fk_user_author' => $author instanceof User ? (int) $author->id : 0, 'origin' => $origin, 'fk_user_target' => $target,
+			)));
+		}
 
-		return (int) $this->db->last_insert_id($this->db->prefix().'inbox_event');
+		return $id;
+	}
+
+	/**
+	 * An event as the browser receives it, from live.php or from a push driver: numbers only
+	 *
+	 * @param object $r Row of the journal
+	 * @return array{id:int,type:string,account:int,folder:int,ids:int[]|null,author:int,origin:string,mine:bool}
+	 */
+	public static function format($r)
+	{
+		return array(
+			'id' => (int) $r->rowid,
+			'type' => (string) $r->type,
+			'account' => (int) $r->fk_account,
+			'folder' => (int) $r->fk_folder,
+			'ids' => $r->ids === null || $r->ids === '' ? null : array_map('intval', explode(',', (string) $r->ids)),
+			'author' => (int) $r->fk_user_author,
+			'origin' => (string) $r->origin,
+			'mine' => (int) $r->fk_user_target > 0,
+		);
 	}
 
 	/**
@@ -253,16 +283,7 @@ class InboxEvent
 			$out['reset'] = true;
 		} else {
 			foreach ($rows as $r) {
-				$out['events'][] = array(
-					'id' => (int) $r->rowid,
-					'type' => (string) $r->type,
-					'account' => (int) $r->fk_account,
-					'folder' => (int) $r->fk_folder,
-					'ids' => $r->ids === null || $r->ids === '' ? null : array_map('intval', explode(',', (string) $r->ids)),
-					'author' => (int) $r->fk_user_author,
-					'origin' => (string) $r->origin,
-					'mine' => (int) $r->fk_user_target > 0,
-				);
+				$out['events'][] = self::format($r);
 			}
 		}
 		// The cursor goes to the last event of the journal (those of the other mailboxes too): never read again

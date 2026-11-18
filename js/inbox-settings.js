@@ -156,7 +156,7 @@
 		['permailbox', 'mark-read', 'InboxReadPerMailbox', true], ['unified', 'multi', 'InboxUnifiedSection', true], ['dictation', 'mic', 'InboxDictationSection', true],
 		['devices', 'lock', 'InboxProtectMyDevices', true], ['display', 'view-cards', 'InboxSectionDisplay'], ['actions', 'tools', 'InboxSectionActions']];
 	/** Sections of Settings > Server (1.54.0) */
-	const SERVER_SECTIONS = [['keep', 'keep', 'InboxServerKeep'], ['imap', 'plug', 'InboxServerImap'], ['master', 'key', 'InboxMasterUser'], ['cron', 'cron', 'InboxServerCron']];
+	const SERVER_SECTIONS = [['keep', 'keep', 'InboxServerKeep'], ['imap', 'plug', 'InboxServerImap'], ['refresh', 'reactivity', 'InboxReactivitySetupTitle'], ['push', 'push', 'InboxPushSetupTitle'], ['master', 'key', 'InboxMasterUser'], ['cron', 'cron', 'InboxServerCron']];
 	const PAGE_SECTIONS = { general: GENERAL_SECTIONS, server: SERVER_SECTIONS, me: ME_SECTIONS };
 
 	/** Links to the sections of a page: under its link in the menu, or the row of chips of the phone */
@@ -5069,6 +5069,9 @@
 			+ '<nav class="ibx-subchips" aria-label="' + th('InboxNavServer') + '">' + sectionLinks('server', SERVER_SECTIONS, 'ibx-subchip') + '</nav>'
 			+ '<section class="ibx-section" data-section="keep">' + title('keep') + '<div class="ibx-form">' + ['INBOX_CACHE_DAYS', 'INBOX_LOG_DAYS', 'INBOX_ACCOUNT_LOG_DAYS', 'INBOX_GONE_LINKED_DAYS'].map(number).join('') + '</div></section>'
 			+ '<section class="ibx-section" data-section="imap">' + title('imap') + '<div class="ibx-form">' + ['INBOX_IMAP_TIMEOUT', 'INBOX_TEST_TIMEOUT'].map(number).join('') + '</div></section>'
+			// Refresh of the lists and push service (1.124.0): global settings, the load next to them
+			+ '<section class="ibx-section" data-section="refresh">' + title('refresh') + '<p class="ibx-section__help">' + th('InboxReactivitySetupHelp') + '</p></section>'
+			+ '<section class="ibx-section" data-section="push">' + title('push') + '<p class="ibx-section__help">' + th('InboxPushSetupHelp') + '</p></section>'
 			// Master user: one form (the four values go together), the password never shown again
 			+ '<section class="ibx-section" data-section="master">' + title('master') + '<p class="ibx-section__help">' + th('InboxMasterUserHelp') + '</p>'
 			+ '<form class="ibx-form ibx-js-master" autocomplete="off">'
@@ -5110,6 +5113,9 @@
 			btn.disabled = false;
 		});
 		paintCron($('.ibx-js-cron', main), s.cron);
+		let refreshView = null;
+		const pushView = paintPush($('[data-section="push"]', main), s.reactivity.push, s.reactivity.mode, ready => refreshView && refreshView.setReady(ready));
+		refreshView = paintReactivity($('[data-section="refresh"]', main), s.reactivity, m2 => pushView.setMode(m2));
 		spySections(main, SERVER_SECTIONS.map(x => x[0]));
 		if (parts && parts[0]) {
 			requestAnimationFrame(() => pointSection(main, parts[0]));
@@ -5166,6 +5172,267 @@
 				toast(err.message, { error: true });
 			}
 		}));
+	}
+
+	// ---------- Refresh of the lists (1.122.0) and push service (1.124.0): Settings > Server ----------
+
+	/** Version of Mercure tested with inbox, in the examples of the installation guide */
+	const MERCURE_VERSION = 'v1.1.6';
+
+	/**
+	 * Load of the server with the settings shown: each figure says which setting it comes from (the intervals typed
+	 * are in its label), computed again as they are typed. Calls counted for every user reaching a mailbox, as if all
+	 * were connected at once
+	 * @param {HTMLElement} box Zone of the load
+	 * @param {object} r Data of the server (users, light_ms, full_ms)
+	 * @param {string} mode Mode chosen
+	 * @param {{interval:number, idle:number}} rhythm Intervals typed
+	 */
+	function paintLoad(box, r, mode, rhythm) {
+		const n = r.users;
+		const num = (v, digits) => {
+			const floor = Math.pow(10, -digits);
+			return v > 0 && v < floor ? '< ' + floor.toLocaleString(I.locale()) : v.toLocaleString(I.locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
+		};
+		const fig = (label, light, full, mod) => {
+			const calls = light + full;
+			const cores = (light * r.light_ms + full * r.full_ms) / 1000;
+			return I.html`<div class="ibx-load__fig${mod ? ' ibx-load__fig--' + mod : ''}"><dt class="ibx-load__label">${label}</dt>`
+				+ I.html`<dd class="ibx-load__value">${t(calls < 2 ? 'InboxReactivityLoadCall' : 'InboxReactivityLoadCalls', num(calls, 1))}</dd>`
+				+ I.html`<dd class="ibx-load__cpu">${t(cores < 2 ? 'InboxReactivityLoadCore' : 'InboxReactivityLoadCores', num(cores, 2))}</dd></div>`;
+		};
+		const standard = (label, mod) => fig(label, 0, n / 20, mod);
+		let figs;
+		if (mode === 'fast') {
+			figs = fig(t('InboxReactivityLoadActive', rhythm.interval), n / rhythm.interval, n / 60)
+				+ fig(t('InboxReactivityLoadIdle', rhythm.idle), n / rhythm.idle, n / 300)
+				+ standard(t('InboxReactivityLoadStandard'), 'ref');
+		} else if (mode === 'instant') {
+			figs = fig(t('InboxReactivityLoadPush'), n / 60, n / 60)
+				+ fig(t('InboxReactivityLoadPushDown', rhythm.interval), n / rhythm.interval, n / 60)
+				+ standard(t('InboxReactivityLoadStandard'), 'ref');
+		} else {
+			figs = standard(t('InboxReactivityLoadStandardOnly'));
+		}
+		box.innerHTML = I.html`<div class="ibx-load__head">${I.raw(ic('load'))} ${t('InboxReactivityLoadTitle')}</div>`
+			+ I.html`<p class="ibx-load__who">${t('InboxReactivityLoadWho', n)}</p><dl class="ibx-load__figs">${I.raw(figs)}</dl>`
+			+ I.html`<p class="ibx-load__note">${t('InboxReactivityLoadNote')}</p>`;
+	}
+
+	/**
+	 * Section « Refresh of the lists »: the mode (saved at once), the two intervals (saved when left, the idle one
+	 * follows the active one), the load just under them
+	 * @param {HTMLElement} box Section
+	 * @param {object} r Data of the server
+	 * @param {Function} onMode Called with the mode saved (the section of the push service shows it)
+	 */
+	function paintReactivity(box, r, onMode) {
+		const modes = ['standard', 'fast', 'instant'];
+		const label = { standard: 'InboxReactivityStandard', fast: 'InboxReactivityFast', instant: 'InboxReactivityInstant' };
+		const numberRow = (name, key, min, max, value) => I.html`<div class="ibx-formrow"><label class="ibx-formrow__label" for="rx-${name}">${t(key)}</label><div><div class="ibx-inline">`
+			+ I.html`<input class="ibx-field ibx-field--narrow" type="number" inputmode="numeric" id="rx-${name}" name="${name}" min="${min}" max="${max}" value="${value}"> ${t('InboxSeconds')}</div>`
+			+ I.html`<div class="ibx-formrow__help">${t(key + 'Help')}</div></div></div>`;
+		box.insertAdjacentHTML('beforeend', I.html`<div class="ibx-form">`
+			+ I.html`<div class="ibx-formrow"><span class="ibx-formrow__label" id="rx-mode-label">${t('InboxReactivityMode')}</span><div class="ibx-stack" role="radiogroup" aria-labelledby="rx-mode-label">`
+			+ I.raw(modes.map(m => I.html`<label class="ibx-radio ibx-radio--block"><input type="radio" name="rx-mode" value="${m}"${I.raw(r.mode === m ? ' checked' : '')}> <span><b>${t(label[m])}</b><span class="ibx-formrow__help">${t(label[m] + 'Help')}</span>${I.raw(m === 'instant' ? '<span class="ibx-formrow__help ibx-js-rxneed"></span>' : '')}</span></label>`).join(''))
+			+ '</div></div>'
+			+ I.html`<div class="ibx-js-rxintervals">${I.raw(numberRow('interval', 'InboxReactivityInterval', 3, 60, r.rhythm.interval) + numberRow('idle', 'InboxReactivityIdle', 3, 300, r.rhythm.idle))}</div>`
+			+ '</div><div class="ibx-js-rxstate"></div><div class="ibx-load ibx-js-rxload" aria-live="polite"></div>');
+		const active = $('[name="interval"]', box);
+		const idle = $('[name="idle"]', box);
+		const intervals = $('.ibx-js-rxintervals', box);
+		const load = $('.ibx-js-rxload', box);
+		const clamp = (v, min, max, def) => Math.min(max, Math.max(min, parseInt(v, 10) || def));
+		const mode = () => ($('[name="rx-mode"]:checked', box) || {}).value || 'standard';
+		/** What is typed, the idle interval never quicker than the active one */
+		const typed = fromActive => {
+			const a = clamp(active.value, 3, 60, 5);
+			idle.min = String(a);
+			if (fromActive && (parseInt(idle.value, 10) || 0) < a) {
+				idle.value = String(a);
+			}
+			return { interval: a, idle: clamp(idle.value, a, 300, 60) };
+		};
+		const instant = $('[name="rx-mode"][value="instant"]', box);
+		const show = fromActive => {
+			const m = mode();
+			// Instant: only with a push service tested with its present settings (kept when already chosen: the
+			// lists follow at the fast rhythm meanwhile, said just under)
+			instant.disabled = !r.push_ready && r.mode !== 'instant';
+			$('.ibx-js-rxneed', box).textContent = r.push_ready ? '' : t('InboxReactivityInstantNeedsTest');
+			$('.ibx-js-rxneed', box).hidden = r.push_ready;
+			$('.ibx-js-rxstate', box).innerHTML = m === 'instant' && !r.push_ready
+				? I.html`<div class="ibx-notice ibx-notice--warning">${I.raw(ic('warning'))}<div class="ibx-notice__text">${t('InboxReactivityInstantNotTested')}</div></div>` : '';
+			// The intervals: the fast mode, and the instant one when its service does not answer
+			intervals.hidden = m === 'standard';
+			$('.ibx-formrow__help', active.closest('.ibx-formrow')).textContent = t(m === 'instant' ? 'InboxReactivityIntervalInstantHelp' : 'InboxReactivityIntervalHelp');
+			// Instant not usable: the lists follow at the fast rhythm, the load is the one of the fast mode
+			paintLoad(load, r, m === 'instant' && !r.push_ready ? 'fast' : m, typed(fromActive));
+		};
+		const save = async () => {
+			const rhythm = typed(false);
+			try {
+				const res = await post('server', 'reactivity', { mode: mode(), interval: rhythm.interval, idle: rhythm.idle });
+				r.mode = res.mode;
+				r.rhythm = res.rhythm;
+				r.push_ready = !!res.push_ready;
+				active.value = String(res.rhythm.interval);
+				idle.value = String(res.rhythm.idle);
+				show(false);
+				onMode(res.mode);
+				toast(t('InboxSaved'));
+			} catch (err) {
+				// Refused: the values of the server back
+				$$('[name="rx-mode"]', box).forEach(x => {
+					x.checked = x.value === r.mode;
+				});
+				active.value = String(r.rhythm.interval);
+				idle.value = String(r.rhythm.idle);
+				show(false);
+				toast(err.message, { error: true });
+			}
+		};
+		$$('[name="rx-mode"]', box).forEach(x => x.addEventListener('change', () => {
+			show(false);
+			save();
+		}));
+		active.addEventListener('input', () => show(true));
+		idle.addEventListener('input', () => show(false));
+		[active, idle].forEach(f => f.addEventListener('change', save));
+		show(false);
+		return {
+			/** The push service passed (or failed) its test, or its settings changed */
+			setReady(ready) {
+				r.push_ready = !!ready;
+				show(false);
+			},
+		};
+	}
+
+	/**
+	 * Section « Push service »: the driver, its settings (one form: they go together; a secret is never shown again,
+	 * left empty it is kept), the button Test, the last failure, the installation guide of Mercure
+	 * @param {HTMLElement} box Section
+	 * @param {object} push Data of the server
+	 * @param {string} mode Mode of the refresh
+	 */
+	function paintPush(box, push, mode, onReady) {
+		let current = push.driver;
+		const driverOf = code => push.drivers.find(d => d.code === code) || push.drivers[0];
+		const fieldRow = f => {
+			const id = 'px-' + f.key;
+			const help = f.help ? I.html`<div class="ibx-formrow__help">${f.help}</div>` : '';
+			if (f.type === 'secret') {
+				return I.html`<div class="ibx-formrow"><label class="ibx-formrow__label" for="${id}">${f.label}</label><div>`
+					+ I.html`<input class="ibx-field ibx-field--medium" type="password" id="${id}" name="${f.key}" autocomplete="new-password" spellcheck="false" placeholder="${f.saved ? t('InboxPushSecretKept') : ''}"${I.raw(f.required && !f.saved ? ' required' : '')}>${I.raw(help)}</div></div>`;
+			}
+			return I.html`<div class="ibx-formrow"><label class="ibx-formrow__label" for="${id}">${f.label}</label><div>`
+				+ I.html`<input class="ibx-field ibx-field--medium" type="${f.type === 'url' ? 'url' : 'text'}" id="${id}" name="${f.key}" autocomplete="off" spellcheck="false" value="${f.value}"${I.raw(f.required ? ' required' : '')}>${I.raw(help)}</div></div>`;
+		};
+		const paint = () => {
+			const d = driverOf(current);
+			const err = push.last_error;
+			box.querySelector('.ibx-js-pxbody').innerHTML = (mode !== 'instant' ? I.html`<div class="ibx-notice ibx-notice--info">${I.raw(ic('info'))}<div class="ibx-notice__text">${t('InboxPushOnlyInstant')}</div></div>` : '')
+				+ (err && mode === 'instant' ? I.html`<div class="ibx-notice ibx-notice--warning">${I.raw(ic('warning'))}<div class="ibx-notice__text">${t('InboxPushLastError', new Date(err.at * 1000).toLocaleString(I.locale()), err.message)}</div></div>` : '')
+				+ I.html`<form class="ibx-form ibx-js-pxform" autocomplete="off">`
+				// The driver is always a choice (one driver today, others from modules); its guide follows it: the one of
+				// Mercure here, the documentation a module declares for its own
+				+ I.html`<div class="ibx-formrow"><label class="ibx-formrow__label" for="px-driver">${t('InboxPushDriver')}</label><div><div class="ibx-inline">`
+				+ I.html`<select class="ibx-field ibx-field--medium" id="px-driver" name="driver">${I.raw(push.drivers.map(x => I.html`<option value="${x.code}"${I.raw(x.code === d.code ? ' selected' : '')}>${x.label}</option>`).join(''))}</select>`
+				+ (d.code === 'mercure' ? I.html` <button type="button" class="ibx-linkbtn ibx-js-pxguide">${t('InboxPushGuideLink')}</button>`
+					: (d.doc ? I.html` <a class="ibx-linkbtn" href="${d.doc}" target="_blank" rel="noopener noreferrer">${t('InboxPushDriverDoc')} ${I.raw(ic('external', 'ibx-faint'))}</a>` : ''))
+				+ I.html`</div><div class="ibx-formrow__help">${t('InboxPushDriverHelp')}</div></div></div>`
+				+ I.raw(d.fields.map(fieldRow).join(''))
+				+ I.html`<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div class="ibx-inline"><button type="submit" class="ibx-btn ibx-btn--primary">${t('InboxSave')}</button>`
+				+ I.html`<button type="button" class="ibx-btn ibx-js-pxtest"${I.raw(d.configured ? '' : ' disabled')}>${I.raw(ic('check'))} ${t('InboxPushTest')}</button></div></div>`
+				// Where the test stands: needed to choose « Instant », lost when a setting changes
+				+ I.html`<div class="ibx-formrow"><span class="ibx-formrow__label"></span><div>${I.raw(!d.configured
+					? '<div class="ibx-formrow__help">' + th('InboxPushNotConfigured') + '</div>'
+					: (d.tested ? '<span class="ibx-status ibx-status--ok">' + th('InboxPushTested') + '</span>' : '<span class="ibx-status ibx-status--warning">' + th('InboxPushNotTested') + '</span>'))}</div></div>`
+				+ '</form>';
+			const form = $('.ibx-js-pxform', box);
+			const sel = $('[name="driver"]', form);
+			if (sel) {
+				sel.addEventListener('change', () => {
+					current = sel.value;
+					paint();
+				});
+			}
+			const guide = $('.ibx-js-pxguide', box);
+			if (guide) {
+				guide.addEventListener('click', mercureGuide);
+			}
+			form.addEventListener('submit', async e => {
+				e.preventDefault();
+				const btn = $('[type="submit"]', form);
+				btn.disabled = true;
+				const values = {};
+				d.fields.forEach(f => {
+					values[f.key] = form.elements[f.key].value;
+				});
+				try {
+					const res = await post('server', 'push', { driver: d.code, values });
+					push = res.push;
+					onReady(res.push_ready);
+					current = push.driver;
+					paint();
+					toast(t('InboxSaved'));
+				} catch (err) {
+					// What was typed stays
+					btn.disabled = false;
+					toast(err.message, { error: true });
+				}
+			});
+			$('.ibx-js-pxtest', form).addEventListener('click', async ev => {
+				const btn = ev.currentTarget;
+				btn.disabled = true;
+				btn.textContent = t('InboxPushTesting');
+				try {
+					const res = await post('server', 'pushtest', {});
+					push = res.push;
+					onReady(res.push_ready);
+					paint();
+					toast(res.test.message, { error: !res.test.ok });
+				} catch (err) {
+					btn.disabled = false;
+					btn.innerHTML = ic('check') + ' ' + th('InboxPushTest');
+					toast(err.message, { error: true });
+				}
+			});
+		};
+		box.insertAdjacentHTML('beforeend', '<div class="ibx-js-pxbody"></div>');
+		paint();
+		return {
+			setMode(m) {
+				mode = m;
+				paint();
+			},
+		};
+	}
+
+	/**
+	 * Installation guide of Mercure (1.124.0): Docker Compose, binary and systemd, nginx in front; then what to type
+	 * in this page. The address of this Dolibarr already in the commands (allowed origin, trusted issuer)
+	 */
+	function mercureGuide() {
+		const v = MERCURE_VERSION;
+		const origin = location.origin;
+		const keys = 'PUB=$(openssl rand -base64 48 | tr -d \'/+=\\n\' | cut -c1-48)\nSUB=$(openssl rand -base64 48 | tr -d \'/+=\\n\' | cut -c1-48)';
+		guideDialog(t('InboxPushGuideTitle'), I.html`<p>${t('InboxPushGuideIntro')}</p>`
+			+ guidePart('InboxPushGuideDocker', true, '<ol class="ibx-guide__steps">'
+				+ guideStep('InboxPushGuideStepKeys', 'sudo mkdir -p /opt/mercure && cd /opt/mercure\n' + keys + '\nprintf \'MERCURE_PUBLISHER_JWT_KEY=%s\\nMERCURE_SUBSCRIBER_JWT_KEY=%s\\nMERCURE_TRUSTED_ISSUERS=' + origin + '\\nDOLIBARR_ORIGIN=' + origin + '\\n\' "$PUB" "$SUB" | sudo tee .env >/dev/null\nsudo chmod 600 .env')
+				+ guideStep('InboxPushGuideStepCompose', '# /opt/mercure/docker-compose.yml\nservices:\n  mercure:\n    image: dunglas/mercure:' + v + '\n    restart: unless-stopped\n    environment:\n      SERVER_NAME: ":80"\n      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_PUBLISHER_JWT_KEY:?}\n      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_SUBSCRIBER_JWT_KEY:?}\n      MERCURE_TRUSTED_ISSUERS: ${MERCURE_TRUSTED_ISSUERS:?}\n      MERCURE_EXTRA_DIRECTIVES: |\n        cors_origins ${DOLIBARR_ORIGIN:?}\n        transport local\n    ports:\n      - "127.0.0.1:3001:80"   # this server only, nginx in front')
+				+ guideStep('InboxPushGuideStepStart', 'cd /opt/mercure\nsudo docker compose up -d\ncurl -s -o /dev/null -w \'%{http_code}\\n\' \'http://127.0.0.1:3001/.well-known/mercure?match=x\'   # 401: the hub answers\nsudo cat .env   # the keys, for this page')
+				+ '</ol>' + I.html`<p class="ibx-guide__note">${t('InboxPushGuideVersion', v)}</p>`)
+			+ guidePart('InboxPushGuideSystemd', false, I.html`<p>${t('InboxPushGuideSystemdText')}</p>` + '<ol class="ibx-guide__steps">'
+				+ guideStep('InboxPushGuideStepUser', '# Binary of a release (Linux x86_64 or other): github.com/dunglas/mercure/releases\nsudo useradd --system --home-dir /var/lib/mercure --create-home mercure\nsudo install -m 755 mercure /usr/local/bin/mercure\nsudo mkdir -p /etc/mercure && sudo cp Caddyfile /etc/mercure/')
+				+ guideStep('InboxPushGuideStepEnv', keys + '\nprintf \'MERCURE_PUBLISHER_JWT_KEY=%s\\nMERCURE_SUBSCRIBER_JWT_KEY=%s\\nMERCURE_TRUSTED_ISSUERS=' + origin + '\\nSERVER_NAME=127.0.0.1:3001\\nMERCURE_EXTRA_DIRECTIVES="cors_origins ' + origin + '\\ntransport local"\\n\' "$PUB" "$SUB" | sudo tee /etc/mercure/mercure.env >/dev/null\nsudo chmod 600 /etc/mercure/mercure.env')
+				+ guideStep('InboxPushGuideStepService', '# /etc/systemd/system/mercure.service\n[Unit]\nDescription=Mercure hub\nAfter=network-online.target\n\n[Service]\nUser=mercure\nEnvironmentFile=/etc/mercure/mercure.env\nEnvironment=XDG_DATA_HOME=/var/lib/mercure XDG_CONFIG_HOME=/var/lib/mercure\nExecStart=/usr/local/bin/mercure run --config /etc/mercure/Caddyfile\nRestart=on-failure\nNoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=/var/lib/mercure\n\n[Install]\nWantedBy=multi-user.target')
+				+ guideStep('InboxPushGuideStepEnable', 'sudo systemctl daemon-reload\nsudo systemctl enable --now mercure\nsudo cat /etc/mercure/mercure.env   # the keys, for this page')
+				+ '</ol>')
+			+ guidePart('InboxPushGuideNginx', false, I.html`<p>${t('InboxPushGuideNginxText')}</p>`
+				+ guideCode('server {\n    listen 443 ssl;\n    http2 on;\n    server_name push.example.com;\n    ssl_certificate     /etc/letsencrypt/live/push.example.com/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/push.example.com/privkey.pem;\n\n    location /.well-known/mercure {\n        proxy_pass http://127.0.0.1:3001;\n        proxy_http_version 1.1;\n        proxy_set_header Connection "";\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Proto https;\n        proxy_buffering off;      # a stream stays open\n        proxy_cache off;\n        proxy_read_timeout 24h;\n    }\n}'))
+			+ I.html`<h3 class="ibx-guide__then">${t('InboxMeiliGuideThen')}</h3><p>${t('InboxPushGuideThenText', origin)}</p>`);
 	}
 
 	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------

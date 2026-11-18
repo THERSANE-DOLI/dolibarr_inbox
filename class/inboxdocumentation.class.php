@@ -51,6 +51,7 @@ class InboxDocumentation
 				'install' => array('icon' => 'fa-download', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/install.md')),
 				'application' => array('icon' => 'fa-inbox', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/application.md')),
 				'reactivity' => array('icon' => 'fa-bolt', 'version' => '1.122.0', 'files' => array('en_US' => 'admin/reactivity.md')),
+				'push' => array('icon' => 'fa-broadcast-tower', 'version' => '1.124.0', 'files' => array('en_US' => 'admin/push.md')),
 			)),
 			'InboxDocGroupWork' => array('icon' => 'fa-pen', 'pages' => array(
 				'writing_editor' => array('icon' => 'fa-edit', 'version' => '1.94.0', 'files' => array('en_US' => 'admin/writing-editor.md')),
@@ -73,6 +74,7 @@ class InboxDocumentation
 				'dev_new_customer' => array('icon' => 'fa-user-plus', 'version' => '1.79.0', 'files' => array('en_US' => 'dev/new-customer.md')),
 				'dev_consumers' => array('icon' => 'fa-plug', 'version' => '1.112.0', 'files' => array('en_US' => 'dev/consumers.md')),
 				'dev_combo' => array('icon' => 'fa-list', 'version' => '1.80.0', 'files' => array('en_US' => 'dev/combo.md')),
+				'dev_push' => array('icon' => 'fa-broadcast-tower', 'version' => '1.124.0', 'files' => array('en_US' => 'dev/push.md')),
 				'dev_mail_data' => array('icon' => 'fa-broom', 'version' => '1.104.0', 'files' => array('en_US' => 'dev/mail-data.md')),
 				'dev_development' => array('icon' => 'fa-tools', 'version' => '', 'files' => array('en_US' => 'dev/development.md')),
 			)),

@@ -54,7 +54,6 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/inbox.lib.php';
 require_once '../class/inbox.class.php';
-require_once '../class/inboxevent.class.php';
 
 /**
  * @var Conf $conf
@@ -86,43 +85,6 @@ $testMessageId = dol_trunc(trim(GETPOST('test_message_id', 'none')), 255, 'right
 /*
  * Actions
  */
-
-// Quicker refresh of the lists (1.121.0): a setting of the server (its load), for the administrators of Dolibarr
-if (!class_exists('FormSetup')) {
-	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
-}
-$reactSetup = new FormSetup($db);
-$reactSetup->formHiddenInputs['action'] = 'update_reactivity';
-$item = $reactSetup->newItem('INBOX_REACTIVITY')->setAsSelect(array(
-	'standard' => $langs->trans('InboxReactivityStandard'),
-	'fast' => $langs->trans('InboxReactivityFast'),
-));
-$item->nameText = $langs->trans('InboxReactivityMode');
-$item->helpText = $langs->trans('InboxReactivityModeHelp');
-$item->defaultFieldValue = 'standard';
-$item->fieldValue = getDolGlobalString('INBOX_REACTIVITY') === 'fast' ? 'fast' : 'standard';
-$item = $reactSetup->newItem('INBOX_REACTIVITY_INTERVAL')->setAsNumber(3, 60, 1);
-$item->nameText = $langs->trans('InboxReactivityInterval');
-$item->helpText = $langs->trans('InboxReactivityIntervalHelp');
-$item->defaultFieldValue = '5';
-$rhythm = InboxEvent::rhythm();
-$item->fieldValue = (string) $rhythm['interval'];
-$item = $reactSetup->newItem('INBOX_REACTIVITY_IDLE')->setAsNumber(3, 300, 1);
-$item->nameText = $langs->trans('InboxReactivityIdle');
-$item->helpText = $langs->trans('InboxReactivityIdleHelp');
-$item->defaultFieldValue = '60';
-$item->fieldValue = (string) $rhythm['idle'];
-if ($action == 'update_reactivity' && $_SERVER['REQUEST_METHOD'] == 'POST') {
-	// Global (entity 0): the load is the one of the server, whatever the entity; idle never quicker than active
-	$mode = GETPOST('INBOX_REACTIVITY', 'aZ09') === 'fast' ? 'fast' : 'standard';
-	$rhythm = InboxEvent::rhythm(GETPOSTINT('INBOX_REACTIVITY_INTERVAL'), GETPOSTINT('INBOX_REACTIVITY_IDLE'));
-	dolibarr_set_const($db, 'INBOX_REACTIVITY', $mode, 'chaine', 0, '', 0);
-	dolibarr_set_const($db, 'INBOX_REACTIVITY_INTERVAL', (string) $rhythm['interval'], 'chaine', 0, '', 0);
-	dolibarr_set_const($db, 'INBOX_REACTIVITY_IDLE', (string) $rhythm['idle'], 'chaine', 0, '', 0);
-	setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
-	header('Location: '.$_SERVER['PHP_SELF'].'#reactivity');
-	exit;
-}
 
 if ($action == 'confirm_clearcache' && GETPOST('confirm', 'alpha') == 'yes') {
 	$removed = $inbox->clearCache();
@@ -158,7 +120,7 @@ if ($action == 'testfile' && $_SERVER['REQUEST_METHOD'] == 'POST') {
  */
 
 $title = "InboxSetup";
-llxHeader('', $langs->trans($title), '', '', 0, 0, array('/inbox/js/inbox-setup-reactivity.js'), '', '', 'mod-inbox page-admin');
+llxHeader('', $langs->trans($title), '', '', 0, 0, '', '', '', 'mod-inbox page-admin');
 
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"')
 	.'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
@@ -233,52 +195,6 @@ foreach (array_unique(array_merge(array_keys($consumerDecl), array_keys($consume
 print '<span id="consumers"></span>';
 print $formSetup->generateOutput();
 print '<span class="opacitymedium">'.$langs->trans('InboxConsumersSetupWhere').'</span><br><br>';
-
-// Quicker refresh of the lists (1.121.0): the setting, then the load it may bring on the server
-print '<span id="reactivity"></span>';
-print load_fiche_titre($langs->trans('InboxReactivitySetupTitle'), '', '');
-print '<span class="opacitymedium">'.$langs->trans('InboxReactivitySetupHelp').'</span><br><br>';
-if ($action == 'edit_reactivity') {
-	print $reactSetup->generateOutput(true);
-} else {
-	print $reactSetup->generateOutput();
-	print '<div class="tabsAction"><a class="butAction" href="'.$_SERVER['PHP_SELF'].'?action=edit_reactivity&token='.newToken().'#reactivity">'.$langs->trans('Modify').'</a></div>';
-}
-// Users who may call: those who reach a mailbox (owner, access of their own or of a group) and logged in lately
-$p = $db->prefix();
-$since = $db->idate(dol_now() - 7 * 86400);
-$reach = "SELECT fk_user_owner AS u FROM ".$p."inbox_account WHERE status = 1 AND fk_user_owner > 0 AND entity = ".((int) $conf->entity)
-	." UNION SELECT aa.fk_user FROM ".$p."inbox_account_access as aa INNER JOIN ".$p."inbox_account as a ON a.rowid = aa.fk_account WHERE a.status = 1 AND aa.fk_user > 0 AND a.entity = ".((int) $conf->entity)
-	." UNION SELECT ug.fk_user FROM ".$p."usergroup_user as ug INNER JOIN ".$p."inbox_account_access as aa ON aa.fk_usergroup = ug.fk_usergroup INNER JOIN ".$p."inbox_account as a ON a.rowid = aa.fk_account WHERE a.status = 1 AND a.entity = ".((int) $conf->entity);
-$row = $db->getRow("SELECT COUNT(DISTINCT u.rowid) AS n FROM ".$p."user as u INNER JOIN (".$reach.") as r ON r.u = u.rowid WHERE u.statut = 1 AND u.datelastlogin >= '".$since."'");
-$activeUsers = is_object($row) ? (int) $row->n : 0;
-// Load if they were all active, all idle, or in standard mode; js/inbox-setup-reactivity.js computes it again while
-// the intervals are typed (same figures, from the data-* attributes)
-$lightMs = 2;
-$fullMs = 20;
-$decimal = function ($v, $digits) use ($langs) {
-	if ($v > 0 && $v < pow(10, -$digits)) {
-		return '&lt; '.str_replace('.', $langs->transnoentitiesnoconv('SeparatorDecimal'), (string) pow(10, -$digits));
-	}
-	return str_replace('.', $langs->transnoentitiesnoconv('SeparatorDecimal'), number_format($v, $digits, '.', ''));
-};
-$loadRows = array(
-	'active' => array('InboxReactivityAllActive', $activeUsers / $rhythm['interval'], $activeUsers / 60),
-	'idle' => array('InboxReactivityAllIdle', $activeUsers / $rhythm['idle'], $activeUsers / 300),
-	'standard' => array('InboxReactivityStandardRef', 0, $activeUsers / 20),
-);
-print '<div class="opacitymedium">'.$langs->trans('InboxReactivityLoadUsers', $activeUsers).'</div>';
-print '<div class="div-table-responsive-no-min">';
-print '<table class="noborder centpercent" id="inbox-reactivity-load" data-users="'.$activeUsers.'" data-light-ms="'.$lightMs.'" data-full-ms="'.$fullMs.'">';
-print '<tr class="liste_titre"><th></th><th class="right">'.$langs->trans('InboxReactivityLightCalls').'</th><th class="right">'.$langs->trans('InboxReactivityFullCalls').'</th><th class="right">'.$langs->trans('InboxReactivityCpu').'</th></tr>';
-foreach ($loadRows as $k => $r) {
-	print '<tr class="oddeven" data-case="'.$k.'"><td>'.$langs->trans($r[0]).'</td>';
-	print '<td class="right" data-light>'.($k === 'standard' ? '0' : $decimal($r[1], 1)).'</td>';
-	print '<td class="right" data-full>'.$decimal($r[2], 1).'</td>';
-	print '<td class="right" data-cpu>'.$decimal(($r[1] * $lightMs + $r[2] * $fullMs) / 1000, 2).'</td></tr>';
-}
-print '</table></div>';
-print '<div class="opacitymedium">'.$langs->trans('InboxReactivityLoadNote').'</div><br>';
 
 // Cache: what it holds, emptied on demand
 if ($action == 'clearcache') {

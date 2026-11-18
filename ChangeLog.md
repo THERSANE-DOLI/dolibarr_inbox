@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: instant refresh of the lists through a push service installed beside Dolibarr (Mercure first) :   1.124.0
+  - Settings > Server of the application: refresh of the lists (moved from the setup of the module) with the load
+    of the settings under them, push service with its keys kept encrypted, button Test, installation guide.
+  - numbers only, each user receives his own mailboxes (signed token); without answer, the fast refresh goes on.
+  - examples to install Mercure with Docker or systemd in dev/mercure, other drivers through a hook.
+
 - NEW: fast refresh of the lists, the changes made by the other users show within a few seconds :   1.122.0
   - setting « Refresh of the lists » in the setup of the module: standard (20 s) or fast, an interval while the user
     is active and one after 2 minutes without activity, with the load they bring computed as they are typed.
