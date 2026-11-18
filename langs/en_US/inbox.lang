@@ -2392,6 +2392,10 @@ InboxDays = days
 InboxErrorServerValue = Value not valid
 InboxSetupServerMoved = These settings are now in the inbox application, Settings > Server:
 InboxUpdated = Inbox was updated (version %s): reload the page to use it.
+InboxEntityChanged = The entity changed in Dolibarr
+InboxEntityChangedTo = Dolibarr is now on the entity « %s », chosen in another tab. The mailboxes shown here are the ones of the previous entity: reload Inbox to see the ones of this entity.
+InboxEntityChangedText = Dolibarr is now on another entity, chosen in another tab. The mailboxes shown here are the ones of the previous entity: reload Inbox to see the ones of this entity.
+InboxEntityChangedBack = To go back to the mailboxes of the previous entity, choose it again in Dolibarr, then reload.
 InboxReload = Reload
 InboxLater = Later
 

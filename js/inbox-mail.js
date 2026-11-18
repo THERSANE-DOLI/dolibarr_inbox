@@ -1709,7 +1709,7 @@
 		e.folder.new = 0;
 		const body = { action: 'set', token: I.ctx('INBOX_TOKEN', ''), id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) };
 		if (keepalive) {
-			fetch(I.ctx('INBOX_AJAX_URL', '') + 'userparam.php', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+			fetch(I.ctx('INBOX_AJAX_URL', '') + 'userparam.php', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: Object.assign(I.headers(), { 'Content-Type': 'application/json' }), body: JSON.stringify(body) }).catch(() => {});
 		} else {
 			post('userparam', 'set', { id: e.account.id, param: 'seen_marks', value: JSON.stringify(marks) }).catch(() => {});
 		}
@@ -10084,7 +10084,7 @@
 		const body = $('.ibx-window__body', w.dlg);
 		if (w.source) {
 			try {
-				const res = await fetch(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=source', { credentials: 'same-origin' });
+				const res = await fetch(I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + '&part=source', { credentials: 'same-origin', headers: I.headers() });
 				if (!res.ok) {
 					throw new Error(res.statusText);
 				}

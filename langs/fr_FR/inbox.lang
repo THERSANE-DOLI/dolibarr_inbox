@@ -2392,6 +2392,10 @@ InboxDays = jours
 InboxErrorServerValue = Valeur non valide
 InboxSetupServerMoved = Ces réglages sont maintenant dans l'application inbox, Réglages > Serveur :
 InboxUpdated = Inbox a été mis à jour (version %s) : rechargez la page pour en profiter.
+InboxEntityChanged = L'entité a changé dans Dolibarr
+InboxEntityChangedTo = Dolibarr est maintenant sur l'entité « %s », choisie dans un autre onglet. Les boîtes affichées ici sont celles de l'entité précédente : rechargez Inbox pour voir celles de cette entité.
+InboxEntityChangedText = Dolibarr est maintenant sur une autre entité, choisie dans un autre onglet. Les boîtes affichées ici sont celles de l'entité précédente : rechargez Inbox pour voir celles de cette entité.
+InboxEntityChangedBack = Pour revenir aux boîtes de l'entité précédente, choisissez-la à nouveau dans Dolibarr, puis rechargez.
 InboxReload = Recharger
 InboxLater = Plus tard
 

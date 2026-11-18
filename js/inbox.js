@@ -140,6 +140,15 @@
 		}
 	})();
 	let reconnecting = null;
+	/**
+	 * Entity of Dolibarr this page was loaded in (multicompany), sent with every call (header X-Inbox-Entity). The
+	 * entity is the one of the session: changed in another tab of Dolibarr, the server answers 409 entity_changed and
+	 * the page asks to be loaded again (entityChanged), nothing is read nor written meanwhile.
+	 */
+	const entity = String(ctx('INBOX_ENTITY', ''));
+	let entityLost = false;
+	/** Headers of every call of inbox */
+	const headers = () => ({ 'Accept': 'application/json', 'X-Inbox-Origin': origin, 'X-Inbox-Entity': entity });
 
 	/**
 	 * Call an endpoint of inbox
@@ -150,11 +159,15 @@
 	 * @returns {Promise<object>} Answer; rejects with an Error having .status, .fields
 	 */
 	async function api(endpoint, action, data, opts) {
+		if (entityLost) {
+			// The page waits to be loaded again: no call, no error shown
+			return new Promise(() => {});
+		}
 		const method = (opts && opts.method) || (data && data.__post ? 'POST' : 'GET');
 		const payload = Object.assign({}, data || {});
 		delete payload.__post;
 		let url = ctx('INBOX_AJAX_URL', '') + endpoint + '.php';
-		const init = { method, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Inbox-Origin': origin } };
+		const init = { method, credentials: 'same-origin', headers: headers() };
 		if (method === 'GET') {
 			const qs = new URLSearchParams(Object.assign({ action }, payload));
 			url += '?' + qs.toString();
@@ -177,6 +190,9 @@
 		} catch (e) {
 			json = null;
 		}
+		if (resp.status === 409 && json && json.error === 'entity_changed') {
+			return entityChanged(json);
+		}
 		if (resp.status === 401 || (resp.status === 403 && json && json.error === 'bad_token')) {
 			// Session expired (or token renewed by a reconnection elsewhere): reconnect, then the same call again
 			await reconnect(resp.status === 401);
@@ -195,6 +211,31 @@
 	}
 	function post(endpoint, action, data) {
 		return api(endpoint, action, Object.assign({ __post: 1 }, data || {}));
+	}
+
+	/**
+	 * The entity of the session changed (another tab of Dolibarr): the mailboxes shown are no longer the ones of the
+	 * session. Every call stops (the pending ones never end, nothing is shown twice), the quick refresh stops, a dialog
+	 * that cannot be closed offers to load inbox again in the new entity.
+	 * @param {object} json {entity, label}
+	 * @returns {Promise<never>}
+	 */
+	function entityChanged(json) {
+		if (!entityLost) {
+			entityLost = true;
+			Dolibarr.executeHook('inbox:entity:changed', { entity: json.entity || 0 });
+			const name = String(json.label || '');
+			dialog({
+				title: t('InboxEntityChanged'),
+				body: html`<p>${name ? t('InboxEntityChangedTo', name) : t('InboxEntityChangedText')}</p><p>${t('InboxEntityChangedBack')}</p>`,
+				actions: [{ label: t('InboxReload'), primary: true, run: () => {
+					window.location.reload();
+					return false;
+				} }],
+				noCancel: true,
+			});
+		}
+		return new Promise(() => {});
 	}
 
 	/**
@@ -264,6 +305,9 @@
 	 * @returns {Promise<object>}
 	 */
 	async function upload(endpoint, action, fields, file) {
+		if (entityLost) {
+			return new Promise(() => {});
+		}
 		const form = new FormData();
 		form.append('action', action);
 		form.append('token', token);
@@ -271,7 +315,7 @@
 		form.append('file', file, file.name);
 		let resp;
 		try {
-			resp = await fetch(ctx('INBOX_AJAX_URL', '') + endpoint + '.php', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Inbox-Origin': origin }, body: form });
+			resp = await fetch(ctx('INBOX_AJAX_URL', '') + endpoint + '.php', { method: 'POST', credentials: 'same-origin', headers: headers(), body: form });
 		} catch (e) {
 			const err = new Error(t('InboxErrorOffline'));
 			err.status = 0;
@@ -283,6 +327,9 @@
 			json = await resp.json();
 		} catch (e) {
 			json = null;
+		}
+		if (resp.status === 409 && json && json.error === 'entity_changed') {
+			return entityChanged(json);
 		}
 		if (resp.status === 401 || (resp.status === 403 && json && json.error === 'bad_token')) {
 			await reconnect(resp.status === 401);
@@ -449,7 +496,24 @@
 			+ '</div>';
 		document.body.appendChild(dlg);
 		mount(dlg);
-		dlg.addEventListener('close', () => dlg.remove());
+		// A dialog that must be answered: Escape refused. Chrome still closes a modal opened without a click of the user
+		// (close request without user activation, the cancel event cannot stop it): shown again at once. Only
+		// dlg.close() (an action, or the code that opened it) really closes it
+		let closing = !o.noCancel;
+		if (o.noCancel) {
+			const nativeClose = dlg.close.bind(dlg);
+			dlg.close = value => {
+				closing = true;
+				nativeClose(value);
+			};
+		}
+		dlg.addEventListener('close', () => {
+			if (!closing && dlg.isConnected) {
+				dlg.showModal();
+				return;
+			}
+			dlg.remove();
+		});
 		dlg.addEventListener('cancel', e => {
 			if (o.noCancel) {
 				e.preventDefault();
@@ -527,7 +591,8 @@
 	 * Dolibarr: the browser shares them by origin, and two Dolibarr on the same domain (prod and test, several
 	 * entities on one host) would otherwise elect one leader for both and mix their messages
 	 */
-	const scope = name => name + ':' + ctx('INBOX_URL', location.pathname);
+	// Per entity too: the tabs of two entities never share their channel, their leader nor what they keep
+	const scope = name => name + ':' + ctx('INBOX_URL', location.pathname) + ':' + ctx('INBOX_ENTITY', '');
 	const channel = (() => {
 		const listeners = [];
 		let bc = null;
@@ -753,6 +818,8 @@
 		origin,
 		/** Current CSRF token (renewed by a reconnection): for a sendBeacon, that cannot go through post() */
 		token: () => token,
+		/** Headers of a call of inbox made without api() (X-Inbox-Origin, X-Inbox-Entity) */
+		headers,
 		$, $$,
 	};
 	Dolibarr.defineTool('inbox', inbox);

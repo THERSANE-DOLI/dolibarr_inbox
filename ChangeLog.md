@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: entity of Dolibarr changed in another tab while Inbox is open :   1.126.2
+  - Inbox notices it at once, reads and writes nothing more and asks to be reloaded in the new entity.
+  - the tabs of two entities no longer share their coordination; a dialog that must be answered stays open.
+
 - FIX: security of the quick refresh, push service, DMARC and pictures :   1.126.1
   - light call checked again at each call (user, mailboxes), token of 5 minutes, bounded read of the journal;
     https address for the browsers of the push service, keys asked again when its address changes.

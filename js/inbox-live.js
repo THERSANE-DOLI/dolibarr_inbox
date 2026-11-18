@@ -44,6 +44,8 @@
 		token: '', expires: 0, url: '', interval: 5, idle: 60, last: 0, timer: 0, busy: false, failures: 0, asleep: false, on: false, mine: Date.now(),
 		// Push: settings given with the token, connection, connected, events already applied (by id)
 		push: null, pushKey: '', conn: null, pushOn: false, seen: new Set(),
+		// Stopped for good: the entity of the session changed
+		stopped: false,
 	};
 
 	/** Adapters of the push drivers register here (js/push/*.js) */
@@ -119,7 +121,7 @@
 		openPush();
 	}
 	function openPush() {
-		if (L.conn || !L.push || !I.isLeader() || L.asleep) {
+		if (L.conn || !L.push || !I.isLeader() || L.asleep || L.stopped) {
 			return;
 		}
 		const adapter = adapters[L.push.driver];
@@ -180,6 +182,9 @@
 
 	function schedule(ms) {
 		clearTimeout(L.timer);
+		if (L.stopped) {
+			return;
+		}
 		L.timer = setTimeout(tick, ms);
 	}
 	async function tick() {
@@ -285,7 +290,19 @@
 		}
 	});
 	// This tab became the leader (the previous one was closed): it takes the calls over, from the cursor it had
-	Dolibarr.on('inbox:app:leader', () => schedule(500));
+	Dolibarr.on('inbox:app:leader', () => {
+		if (!L.stopped) {
+			schedule(500);
+		}
+	});
+	// The entity of the session changed (another tab of Dolibarr): the token is the one of the entity of this page,
+	// nothing more is asked until it is loaded again
+	Dolibarr.on('inbox:entity:changed', () => {
+		L.stopped = true;
+		clearTimeout(L.timer);
+		closePush();
+		setOn(false);
+	});
 	['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, wake, { passive: true, capture: true }));
 	document.addEventListener('visibilitychange', () => {
 		if (!document.hidden) {

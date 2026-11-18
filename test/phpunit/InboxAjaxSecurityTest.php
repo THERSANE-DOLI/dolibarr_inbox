@@ -64,9 +64,10 @@ class InboxAjaxSecurityTest extends InboxTestCase
 	 * @param array|null  $json   JSON body (POST), null for GET
 	 * @param bool        $session Use the session cookies
 	 * @param string      $method Method forced
+	 * @param string[]    $headers Headers added
 	 * @return array{code:int,body:string,json:mixed}
 	 */
-	protected function call($path, $json = null, $session = true, $method = '')
+	protected function call($path, $json = null, $session = true, $method = '', $headers = array())
 	{
 		$ch = curl_init($this->base.$path);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -76,12 +77,15 @@ class InboxAjaxSecurityTest extends InboxTestCase
 			curl_setopt($ch, CURLOPT_COOKIEJAR, $this->cookies);
 		}
 		if ($json !== null) {
+			$headers[] = 'Content-Type: application/json';
 			curl_setopt($ch, CURLOPT_POST, true);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
 			curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($json));
 		}
 		if ($method !== '') {
 			curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+		}
+		if ($headers) {
+			curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		}
 		$body = (string) curl_exec($ch);
 		$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -130,6 +134,32 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(0, (int) $this->db->getRow("SELECT COUNT(*) AS n FROM ".$this->db->prefix()."inbox_account WHERE email = 'x@inbox-test.invalid'")->n);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/account.php?action=get&id=99999999')['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/identity.php?action=list&id=99999999')['code']);
+	}
+
+	/**
+	 * A page loaded in another entity (the entity of the session changed in another tab): nothing read nor written,
+	 * 409 entity_changed; a call without the header (a link, another page) is not concerned
+	 *
+	 * @return void
+	 */
+	public function testEntityOfThePage()
+	{
+		global $conf;
+
+		$token = $this->login();
+		$here = 'X-Inbox-Entity: '.((int) $conf->entity);
+		$other = 'X-Inbox-Entity: '.((int) $conf->entity + 1000);
+		$this->assertSame(200, $this->call('/custom/inbox/ajax/account.php?action=list', null, true, '', array($here))['code']);
+		$this->assertSame(200, $this->call('/custom/inbox/ajax/account.php?action=list')['code'], 'no header: not checked');
+		$read = $this->call('/custom/inbox/ajax/account.php?action=list', null, true, '', array($other));
+		$this->assertSame(409, $read['code']);
+		$this->assertSame('entity_changed', $read['json']['error']);
+		$this->assertSame((int) $conf->entity, $read['json']['entity']);
+		$this->assertArrayNotHasKey('accounts', $read['json'], 'nothing read');
+		$write = $this->call('/custom/inbox/ajax/account.php', array('action' => 'save', 'token' => $token, 'email' => 'entity@inbox-test.invalid'), true, '', array($other));
+		$this->assertSame(409, $write['code']);
+		$this->assertSame(0, (int) $this->db->getRow("SELECT COUNT(*) AS n FROM ".$this->db->prefix()."inbox_account WHERE email = 'entity@inbox-test.invalid'")->n, 'nothing written');
+		$this->assertSame(200, $this->call('/custom/inbox/ajax/account.php?action=list', null, true, '', array('X-Inbox-Entity: x'))['code'], 'not a number: ignored');
 	}
 
 	/**
