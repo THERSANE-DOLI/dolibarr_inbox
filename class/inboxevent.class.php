@@ -38,7 +38,7 @@
 class InboxEvent
 {
 	/** Types of events */
-	const TYPES = array('assign', 'tag', 'flag', 'seen', 'move', 'delete', 'folder', 'access');
+	const TYPES = array('assign', 'tag', 'flag', 'seen', 'move', 'delete', 'folder', 'access', 'notif');
 
 	/** Mails named in one event at most; beyond, ids is empty: the folder is read again */
 	const MAX_IDS = 40;

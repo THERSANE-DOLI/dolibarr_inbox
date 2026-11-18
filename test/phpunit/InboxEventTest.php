@@ -24,6 +24,7 @@
 require_once __DIR__.'/InboxTestCase.php';
 require_once __DIR__.'/../../class/inboxevent.class.php';
 require_once __DIR__.'/../../class/inboxassign.class.php';
+require_once __DIR__.'/../../class/inboxnotification.class.php';
 
 /**
  * Journal of the changes for the quicker refresh of the lists
@@ -321,5 +322,43 @@ class InboxEventTest extends InboxTestCase
 		$r = InboxEvent::since($this->db, 1, 0, array($devis->id), $first);
 		$this->assertTrue($r['reset'] || $this->db->getRow("SELECT MIN(rowid) AS m FROM ".$p."inbox_event")->m <= $first + 1);
 		$this->assertSame($last, $r['last']);
+	}
+
+	/**
+	 * The bell (1.125.0): a notification made, merged or removed rings its user at once, him only, numbers only
+	 *
+	 * @return void
+	 */
+	public function testNotificationRingsItsUserOnly()
+	{
+		global $conf;
+
+		$alice = $this->user('alice');
+		$bob = $this->user('bob');
+		$notify = new InboxNotification($this->db);
+		$start = $this->cursor();
+		$this->assertGreaterThan(0, $notify->add($alice->id, 'assign', array('mailref' => 777001, 'actor' => $bob->id, 'payload' => array('subject' => 'Secret subject'))));
+		$ra = InboxEvent::since($this->db, $conf->entity, $alice->id, array(), $start);
+		$this->assertSame(array('notif'), array_column($ra['events'], 'type'));
+		$this->assertTrue($ra['events'][0]['mine']);
+		$this->assertStringNotContainsString('Secret', json_encode($ra['events']), 'the bell reads the notification itself');
+		$this->assertSame(array(), InboxEvent::since($this->db, $conf->entity, $bob->id, array(), $start)['events'], 'never the bell of another');
+
+		// Merged with the same one a moment later, then removed: rings again each time
+		$cur = $this->cursor();
+		$notify->add($alice->id, 'assign', array('mailref' => 777001, 'actor' => $bob->id));
+		$notify->cancel($alice->id, 'assign', 777001, $bob->id);
+		$this->assertSame(array('notif', 'notif'), array_column(InboxEvent::since($this->db, $conf->entity, $alice->id, array(), $cur)['events'], 'type'));
+		// Nothing removed: no ring
+		$cur = $this->cursor();
+		$notify->cancel($alice->id, 'assign', 777001, $bob->id);
+		$this->assertSame(array(), InboxEvent::since($this->db, $conf->entity, $alice->id, array(), $cur)['events']);
+
+		// Standard mode: nothing written
+		$conf->global->INBOX_REACTIVITY = '';
+		$cur = $this->cursor();
+		$notify->add($alice->id, 'assign', array('mailref' => 777002, 'actor' => $bob->id));
+		$this->assertSame($cur, $this->cursor());
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_notification WHERE fk_mailref IN (777001, 777002)");
 	}
 }

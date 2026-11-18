@@ -35,6 +35,13 @@ The setting is the same for every entity: it is about the load of the server.
 - An access given or removed, a mailbox disabled or given to another owner: the users concerned get a new token at
   once. A change of the members of a group of Dolibarr counts at the next token, within 15 minutes.
 
+## The bell
+
+With the fast or instant refresh, a notification made or removed for a user (an assignment by another user, a
+mailbox in error...) rings his bell at once, in any space of Inbox (Mail, Agenda, Settings), and the notification of
+the browser goes at the same time. In standard mode the bell keeps its rhythm: with the list in the Mail space,
+every 60 seconds elsewhere.
+
 ## Load on the server
 
 Under the intervals, « Load of the server with these settings » gives, for the users reaching a mailbox who logged

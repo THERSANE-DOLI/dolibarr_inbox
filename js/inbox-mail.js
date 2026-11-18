@@ -11351,7 +11351,11 @@
 		if (!S.el) {
 			return;
 		}
-		const events = (p && p.events) || [];
+		// The bell has its own count (js/inbox-notify.js): nothing to read again in the list for it
+		const events = ((p && p.events) || []).filter(e => e.type !== 'notif');
+		if (!(p && p.reset) && !events.length) {
+			return;
+		}
 		// Mailboxes given or taken, a whole folder to read again: the tree too
 		if ((p && p.reset) || events.some(e => e.type === 'access')) {
 			refreshTree();

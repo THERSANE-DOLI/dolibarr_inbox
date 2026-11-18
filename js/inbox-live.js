@@ -257,7 +257,8 @@
 	function apply(msg) {
 		// Every tab keeps the cursor: the one that becomes the leader goes on from there
 		L.last = Math.max(L.last, parseInt(msg.last, 10) || 0);
-		const events = (msg.events || []).filter(e => !e.origin || e.origin !== I.origin);
+		// The bell of this user is told even when this tab caused it (another space, another tab may show it)
+		const events = (msg.events || []).filter(e => e.type === 'notif' || !e.origin || e.origin !== I.origin);
 		if ((msg.events || []).some(e => e.type === 'access') && I.isLeader()) {
 			L.token = '';
 			schedule(0);

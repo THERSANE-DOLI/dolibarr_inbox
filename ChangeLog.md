@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the bell follows at once the notifications made or removed for the user, in any space of Inbox :   1.125.0
+  - with the fast or instant refresh: an assignment by another user rings the bell within seconds, even in Agenda.
+  - the notification of the browser goes at the same time; nothing changes in standard mode.
+
 - NEW: instant refresh of the lists through a push service installed beside Dolibarr (Mercure first) :   1.124.0
   - Settings > Server of the application: refresh of the lists (moved from the setup of the module) with the load
     of the settings under them, push service with its keys kept encrypted, button Test, installation guide.
