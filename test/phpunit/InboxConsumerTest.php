@@ -170,6 +170,39 @@ class InboxConsumerTest extends InboxTestCase
 	}
 
 	/**
+	 * A module allowed on a personal mailbox by someone else than its owner: the owner is told (bell), as for an access
+	 * given to oneself; not when he sets his own mailbox, not when nothing more is given
+	 *
+	 * @return void
+	 */
+	public function testOwnerToldWhenAModuleGetsMore()
+	{
+		$owner = $this->user('consowner');
+		$box = $this->box(true, array('type' => InboxAccount::TYPE_PERSONAL, 'fk_user_owner' => (int) $owner->id));
+		$p = $this->db->prefix();
+		$told = function () use ($owner, $p) {
+			return (int) $this->db->getRow("SELECT COUNT(*) AS n FROM ".$p."inbox_notification WHERE fk_user = ".((int) $owner->id)." AND type = 'consumer_grant'")->n;
+		};
+		$c = new InboxConsumer($this->db);
+		$this->assertTrue($c->save($this->admin, $box, 'zztickets', array('events' => array('mail.received'), 'actions' => array('link'))));
+		$this->assertSame(1, $told(), 'allowed by an administrator: the owner is told');
+		$row = $this->db->getRow("SELECT payload, url, fk_user_actor FROM ".$p."inbox_notification WHERE fk_user = ".((int) $owner->id)." AND type = 'consumer_grant'");
+		$this->assertSame((int) $this->admin->id, (int) $row->fk_user_actor);
+		$this->assertStringContainsString('/consumers', (string) $row->url);
+		$this->assertSame('ZzTickets', json_decode((string) $row->payload, true)['detail']);
+
+		$this->db->query("DELETE FROM ".$p."inbox_notification WHERE fk_user = ".((int) $owner->id));
+		$this->assertTrue($c->save($this->admin, $box, 'zztickets', array('events' => array('mail.received'), 'actions' => array())));
+		$this->assertSame(0, $told(), 'less given: nothing to tell');
+		$this->assertTrue($c->save($this->admin, $box, 'zztickets', array('events' => array('mail.received'), 'actions' => array('read'))));
+		$this->assertSame(1, $told(), 'reading given: told');
+
+		$this->db->query("DELETE FROM ".$p."inbox_notification WHERE fk_user = ".((int) $owner->id));
+		$this->assertTrue($c->save($owner, $box, 'zztickets', array('events' => array('mail.received'), 'actions' => array('read', 'move'))));
+		$this->assertSame(0, $told(), 'the owner sets his own mailbox: not told');
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testFoldersOfTheMailboxOnly()

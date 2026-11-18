@@ -335,8 +335,49 @@ class InboxConsumer
 			(new InboxAccountLog($this->db))->add((int) $account->id, $user, $before === null ? self::LOG_GRANT : self::LOG_CHANGE,
 				$was === null ? null : $was + array('code' => $code, 'label' => $d['label']), $after + array('code' => $code, 'label' => $d['label']));
 		}
+		// More given to the module (new event or action): told as an access given (audit INBX-099)
+		$added = $before === null ? array_merge($events, $actions)
+			: array_merge(array_diff($events, (array) $before['events']), array_diff($actions, (array) $before['actions']));
+		if ($added) {
+			$this->tellOwner($user, $account, (string) $d['label']);
+		}
 
 		return true;
+	}
+
+	/**
+	 * A module allowed on a personal mailbox by someone else than its owner (an administrator of the mailboxes, a
+	 * manager): its owner and the administrators of Dolibarr are told, as for an access given to oneself. The owner
+	 * who sets his own mailbox is not told.
+	 *
+	 * @param User         $user    Who saved
+	 * @param InboxAccount $account Mailbox
+	 * @param string       $label   Name of the module
+	 * @return int                  People told
+	 */
+	protected function tellOwner(User $user, InboxAccount $account, $label)
+	{
+		global $conf;
+
+		if ($account->type !== InboxAccount::TYPE_PERSONAL || (int) $account->fk_user_owner <= 0 || (int) $account->fk_user_owner === (int) $user->id) {
+			return 0;
+		}
+		require_once __DIR__.'/inboxnotification.class.php';
+		$notify = new InboxNotification($this->db);
+		$told = array((int) $account->fk_user_owner);
+		$admins = $this->db->getRows("SELECT rowid FROM ".$this->db->prefix()."user WHERE admin = 1 AND statut = 1 AND entity IN (0, ".((int) $conf->entity).") LIMIT 50");
+		foreach (is_array($admins) ? $admins : array() as $a) {
+			$told[] = (int) $a->rowid;
+		}
+		$n = 0;
+		foreach (array_unique($told) as $uid) {
+			if ($uid !== (int) $user->id && $notify->add($uid, 'consumer_grant', array('account' => (int) $account->id, 'actor' => (int) $user->id,
+				'url' => '#/settings/accounts/'.((int) $account->id).'/consumers', 'payload' => array('subject' => (string) ($account->label ?: $account->email), 'detail' => $label))) > 0) {
+				$n++;
+			}
+		}
+
+		return $n;
 	}
 
 	/**

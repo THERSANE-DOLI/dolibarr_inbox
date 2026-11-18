@@ -306,6 +306,9 @@
 		if (n.type === 'access_self') {
 			return t('InboxNotifAccessSelf', who);
 		}
+		if (n.type === 'consumer_grant') {
+			return t('InboxNotifConsumerGrant', who, n.detail || '');
+		}
 		if (n.type === 'rule_redirect') {
 			return t('InboxNotifRuleRedirect', who);
 		}

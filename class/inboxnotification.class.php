@@ -36,7 +36,7 @@ class InboxNotification
 	const MERGE_DELAY = 60;
 
 	/** Types of inbox, listed in Settings > Notifications; the types of other modules follow the defaults */
-	const TYPES = array('assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self');
+	const TYPES = array('assign', 'send_failed', 'bounce', 'box_error', 'rule_redirect', 'access_self', 'consumer_grant');
 
 	/** A notification still unread after this time (s) goes in the summary by mail */
 	const MAIL_AFTER = 900;
@@ -195,7 +195,10 @@ class InboxNotification
 				// Neither its text nor its detail (the recipients of a mail not delivered, audit INBX-045)
 				$payload['subject'] = '';
 				$payload['text'] = '';
-				$payload['detail'] = '';
+				// The name of a module allowed is no data of the mailbox: kept (the administrators are told it)
+				if ((string) $r->type !== 'consumer_grant') {
+					$payload['detail'] = '';
+				}
 			}
 			$actor = trim($r->firstname.' '.$r->lastname);
 			$items[] = array(
@@ -609,6 +612,9 @@ class InboxNotification
 		}
 		if ($n['type'] === 'access_self') {
 			return $langs->transnoentities('InboxNotifAccessSelf', $n['actor'] ? $n['actor']['name'] : '');
+		}
+		if ($n['type'] === 'consumer_grant') {
+			return $langs->transnoentities('InboxNotifConsumerGrant', $n['actor'] ? $n['actor']['name'] : '', (string) ($n['detail'] ?? ''));
 		}
 		if ($n['type'] === 'rule_redirect') {
 			return $langs->transnoentities('InboxNotifRuleRedirect', $n['actor'] ? $n['actor']['name'] : '');

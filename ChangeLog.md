@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: owner of a personal mailbox told when a module is allowed on it by someone else :   1.126.6
+  - bell (and the chosen channels) for the owner and the administrators of Dolibarr, as for an access given to oneself.
+
 - FIX: people search of the accesses shows the address when it is what matched :   1.126.5
   - a search by address answers with the address, never on something hidden.
 
