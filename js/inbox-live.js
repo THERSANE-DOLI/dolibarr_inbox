@@ -262,8 +262,11 @@
 	function apply(msg) {
 		// Every tab keeps the cursor: the one that becomes the leader goes on from there
 		L.last = Math.max(L.last, parseInt(msg.last, 10) || 0);
-		// The bell of this user is told even when this tab caused it (another space, another tab may show it)
-		const events = (msg.events || []).filter(e => e.type === 'notif' || !e.origin || e.origin !== I.origin);
+		// The bell of this user is told even when this tab caused it (another space, another tab may show it). A change
+		// is left out only when this tab made it: its number and this user as author (a colleague who would send the
+		// number of this tab never hides his changes from it)
+		const me = +I.ctx('INBOX_USER_ID', 0);
+		const events = (msg.events || []).filter(e => e.type === 'notif' || !e.origin || e.origin !== I.origin || +e.author !== me);
 		if ((msg.events || []).some(e => e.type === 'access') && I.isLeader()) {
 			L.token = '';
 			schedule(0);

@@ -308,7 +308,12 @@ class InboxEvent
 			$out['reset'] = true;
 		} else {
 			foreach ($rows as $r) {
-				$out['events'][] = self::format($r);
+				$e = self::format($r);
+				// The number of a tab is given to its own user only: nobody learns the tabs of the others
+				if ($e['author'] !== (int) $userId) {
+					$e['origin'] = '';
+				}
+				$out['events'][] = $e;
 			}
 		}
 

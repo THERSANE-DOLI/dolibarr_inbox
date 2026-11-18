@@ -184,6 +184,28 @@ class InboxDmarcTest extends InboxTestCase
 	}
 
 	/**
+	 * The check of the DNS: domains of the reports analyzed only (signed per user and day), worst case counted first
+	 *
+	 * @return void
+	 */
+	public function testDnsOfTheReportsOnly()
+	{
+		$sig = InboxDmarc::domainSignature(7, 'example.com');
+		$this->assertTrue(InboxDmarc::domainSigned(7, 'example.com', $sig));
+		$this->assertTrue(InboxDmarc::domainSigned(7, 'EXAMPLE.com', $sig), 'case of the domain');
+		$this->assertFalse(InboxDmarc::domainSigned(8, 'example.com', $sig), 'another user');
+		$this->assertFalse(InboxDmarc::domainSigned(7, 'example.org', $sig), 'another domain');
+		$this->assertFalse(InboxDmarc::domainSigned(7, 'example.com', ''), 'typed without signature');
+		$yesterday = InboxDmarc::domainSignature(7, 'example.com', (int) floor(time() / 86400) - 1);
+		$this->assertTrue(InboxDmarc::domainSigned(7, 'example.com', $yesterday), 'yesterday still');
+		$old = InboxDmarc::domainSignature(7, 'example.com', (int) floor(time() / 86400) - 2);
+		$this->assertFalse(InboxDmarc::domainSigned(7, 'example.com', $old));
+		$this->assertSame(18, InboxDmarc::dnsCost(10), 'DMARC and its organisation, 5 destinations, SPF, 10 selectors');
+		$this->assertSame(18, InboxDmarc::dnsCost(50));
+		$this->assertSame(8, InboxDmarc::dnsCost(0));
+	}
+
+	/**
 	 * Names asked for public addresses only, an IPv4 written as IPv6 judged as itself (audit INBX-096)
 	 *
 	 * @return void

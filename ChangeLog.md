@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: DNS check of the DMARC reports and number of the tabs of the quick refresh :   1.127.1
+  - DNS check for the domains of a report analyzed only, destinations of the domain of the internet only, limit kept.
+  - the number of a tab is given back to its own user only, and a change is left out only when he made it.
+
 - NEW: marker {ctx} for the pages of modules opened from a mail: a token of one use instead of its values :   1.127.0
   - the page reads the mail in PHP (InboxMailContext::take), rights checked again; nothing of the mail in its address.
   - the markers {subject}, {messageid} and {emails} after the « # » are removed; hidden constant

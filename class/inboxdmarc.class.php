@@ -943,7 +943,13 @@ class InboxDmarc
 					$checks[] = array('ok', 'dmarc_rua_ok', array($email));
 					continue;
 				}
-				// RFC 7489 §7.1: an external destination publishes <domain>._report._dmarc.<destination>
+				// RFC 7489 §7.1: an external destination publishes <domain>._report._dmarc.<destination>. The
+				// destination comes from the live DNS of the domain: a domain of the internet only (never a name of
+				// an internal zone asked by the server)
+				if (self::publicDomainOrEmpty($dest) === '') {
+					$checks[] = array('warn', 'dmarc_rua_unknown', array($email));
+					continue;
+				}
 				$authName = $policyDomain.'._report._dmarc.'.$dest;
 				$auth = self::txt($authName);
 				if ($auth === null) {
@@ -1156,10 +1162,11 @@ class InboxDmarc
 		$file = $dir.'/dmarc-dns-'.((int) $userId).'.json';
 		$hour = (int) floor(time() / 3600);
 		$fh = @fopen($file, 'c+');
+		// The counter cannot be opened: refused (never queries without a limit)
 		if ($fh === false) {
-			return true;
+			return false;
 		}
-		$ok = true;
+		$ok = false;
 		if (flock($fh, LOCK_EX)) {
 			$data = json_decode((string) stream_get_contents($fh), true);
 			$used = is_array($data) && (int) ($data['hour'] ?? 0) === $hour ? (int) ($data['used'] ?? 0) : 0;
@@ -1174,6 +1181,55 @@ class InboxDmarc
 		fclose($fh);
 
 		return $ok;
+	}
+
+	/**
+	 * Queries of one check at most: DMARC of the domain and of its organisation, 5 external destinations, SPF, one per
+	 * selector (the budget is taken for the worst case, before the queries)
+	 *
+	 * @param int $selectors Selectors kept (10 at most)
+	 * @return int
+	 */
+	public static function dnsCost($selectors)
+	{
+		return 2 + 5 + 1 + min(10, max(0, (int) $selectors));
+	}
+
+	/**
+	 * Signature of a domain of a report analyzed for a user: the check of the DNS accepts the domains of the reports
+	 * he opened only (never a domain typed), today or yesterday
+	 *
+	 * @param int    $userId User
+	 * @param string $domain Domain
+	 * @param int    $day    Day (tests), 0 = today
+	 * @return string
+	 */
+	public static function domainSignature($userId, $domain, $day = 0)
+	{
+		global $conf;
+
+		$day = $day ?: (int) floor(time() / 86400);
+		$key = (string) (!empty($conf->file->instance_unique_id) ? $conf->file->instance_unique_id : DOL_DOCUMENT_ROOT);
+
+		return substr(hash_hmac('sha256', 'inbox-dmarc-dns|'.((int) $conf->entity).'|'.((int) $userId).'|'.strtolower((string) $domain).'|'.$day, $key), 0, 32);
+	}
+
+	/**
+	 * @param int    $userId    User
+	 * @param string $domain    Domain
+	 * @param string $signature Signature given with the report
+	 * @return bool
+	 */
+	public static function domainSigned($userId, $domain, $signature)
+	{
+		$today = (int) floor(time() / 86400);
+		foreach (array($today, $today - 1) as $day) {
+			if (hash_equals(self::domainSignature($userId, $domain, $day), (string) $signature)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// ---------- Values ----------

@@ -245,6 +245,31 @@ class InboxEventTest extends InboxTestCase
 	}
 
 	/**
+	 * The number of a tab (X-Inbox-Origin) is given back to its own user only: a colleague never learns it
+	 *
+	 * @return void
+	 */
+	public function testOriginToItsAuthorOnly()
+	{
+		$alice = $this->user('alice');
+		$bob = $this->user('bob');
+		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$events = new InboxEvent($this->db);
+		$start = $this->cursor();
+		$_SERVER['HTTP_X_INBOX_ORIGIN'] = 'tabofalice123';
+		try {
+			$events->emit($devis->id, 'flag', array(1), 1, $alice);
+		} finally {
+			unset($_SERVER['HTTP_X_INBOX_ORIGIN']);
+		}
+		$mine = InboxEvent::since($this->db, 1, $alice->id, array($devis->id), $start)['events'];
+		$theirs = InboxEvent::since($this->db, 1, $bob->id, array($devis->id), $start)['events'];
+		$this->assertSame('tabofalice123', $mine[0]['origin'], 'her own tab leaves it out');
+		$this->assertSame('', $theirs[0]['origin'], 'never told to a colleague');
+		$this->assertSame((int) $alice->id, $theirs[0]['author']);
+	}
+
+	/**
 	 * One call goes through MAX_SCAN events at most, whatever the cursor: below, everything is read again (reset)
 	 *
 	 * @return void

@@ -90,7 +90,7 @@
 	}
 
 	function render(box, r) {
-		const state = { tab: 'sources', failuresOnly: false, query: '', names: {}, dns: null };
+		const state = { tab: 'sources', failuresOnly: false, query: '', names: {}, dns: null, sign: r.dns_sign || {} };
 		const domain = (r.reports[0] && r.reports[0].policy.domain) || '';
 		const selectors = [...new Set(r.rows.flatMap(row => row.dkim.filter(k => k.selector && k.domain && aligned(k.domain, row.header_from || domain)).map(k => k.selector)))];
 		box.innerHTML = alertsHtml(r) + headHtml(r) + kpisHtml(r.totals)
@@ -308,7 +308,8 @@
 		state.dns = 'loading';
 		paint();
 		try {
-			state.dns = await api('dmarc', 'dns', { domain, selectors: selectors.join(',') });
+			// The signature of the domain, given with the report: the server checks the domains of the reports only
+			state.dns = await api('dmarc', 'dns', { domain, selectors: selectors.join(','), sign: (state.sign || {})[domain] || '' });
 		} catch (err) {
 			state.dns = null;
 			toast(err.message, { error: true });
