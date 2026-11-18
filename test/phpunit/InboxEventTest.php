@@ -212,6 +212,57 @@ class InboxEventTest extends InboxTestCase
 	}
 
 	/**
+	 * Checked again at each light call: an access removed, a user disabled, a module disabled apply at once
+	 *
+	 * @return void
+	 */
+	public function testTokenCheckedAgainAtEachCall()
+	{
+		$alice = $this->user('alice');
+		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$compta = $this->box(true, array('email' => 'compta@inbox-test.invalid', 'status' => InboxAccount::STATUS_ACTIVE));
+		$acc = new InboxAccess($this->db);
+		$acc->grant($this->admin, $devis->id, $alice->id, 0, 'read');
+		$acc->grant($this->admin, $compta->id, $alice->id, 0, 'read');
+		InboxAccess::clearCache();
+		$t = (new InboxEvent($this->db))->token($alice, InboxEvent::key('test-instance'));
+		$both = array((int) $devis->id, (int) $compta->id);
+		sort($both);
+		$this->assertSame($both, $t['accounts']);
+		$this->assertSame($both, InboxEvent::stillReached($this->db, 1, $alice->id, $t['accounts']));
+		$this->assertSame(array(), (array) InboxEvent::stillReached($this->db, 2, $alice->id, $t['accounts']), 'another entity: nothing (or no module there)');
+		$this->assertSame(array((int) $devis->id), InboxEvent::stillReached($this->db, 1, $alice->id, array($devis->id)), 'never more than the token');
+
+		$acc->revoke($this->admin, $compta->id, $alice->id, 0);
+		$this->assertSame(array((int) $devis->id), InboxEvent::stillReached($this->db, 1, $alice->id, $t['accounts']), 'access removed: at once');
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET protected = 1 WHERE rowid = ".((int) $devis->id));
+		$this->assertSame(array(), InboxEvent::stillReached($this->db, 1, $alice->id, $t['accounts']), 'protected since');
+
+		$this->db->query("UPDATE ".$this->db->prefix()."user SET statut = 0 WHERE rowid = ".((int) $alice->id));
+		$this->assertNull(InboxEvent::stillReached($this->db, 1, $alice->id, $t['accounts']), 'user disabled');
+		$this->assertNull(InboxEvent::stillReached($this->db, 1, 999999999, array()), 'user gone');
+		$this->assertLessThanOrEqual(300, InboxEvent::TOKEN_LIFE);
+	}
+
+	/**
+	 * One call goes through MAX_SCAN events at most, whatever the cursor: below, everything is read again (reset)
+	 *
+	 * @return void
+	 */
+	public function testReadIsBounded()
+	{
+		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$events = new InboxEvent($this->db);
+		$id = $events->emit($devis->id, 'folder', array(), 1);
+		$this->assertContains($id, array_column(InboxEvent::since($this->db, 1, 0, array($devis->id), 0)['events'], 'id'), 'cursor 0: from the first event of the journal');
+		$r = InboxEvent::since($this->db, 1, 0, array($devis->id), $id - InboxEvent::MAX_SCAN - 1);
+		$this->assertTrue($r['reset'], 'too far behind (or events forgotten): read again');
+		$this->assertSame(array(), $r['events']);
+		$this->assertSame($id, $r['last']);
+		$this->assertSame(array(), InboxEvent::since($this->db, 1, 0, array($devis->id), $id + 1000)['events'], 'a cursor ahead: nothing');
+	}
+
+	/**
 	 * Numbers only: never a subject, a text, an address or a name in the journal nor in what is read
 	 *
 	 * @return void

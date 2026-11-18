@@ -148,20 +148,39 @@ class InboxPush
 	}
 
 	/**
-	 * An address of the settings of a driver: http(s), a host, no user, password, query nor fragment in it
+	 * An address of the settings of a driver: http(s), a host, no user, password, query nor fragment in it. An address
+	 * given to the browsers (with a token) is https, except on the computer itself (development)
 	 *
-	 * @param string $url Address
-	 * @return string     '' if refused
+	 * @param string $url    Address
+	 * @param bool   $public Given to the browsers
+	 * @return string        '' if refused
 	 */
-	public static function cleanUrl($url)
+	public static function cleanUrl($url, $public = false)
 	{
 		$url = trim((string) $url);
 		$p = parse_url($url);
 		if ($url === '' || !is_array($p) || empty($p['host']) || !in_array(strtolower($p['scheme'] ?? ''), array('http', 'https'), true) || isset($p['user']) || isset($p['pass']) || isset($p['query']) || isset($p['fragment'])) {
 			return '';
 		}
+		if ($public && strtolower($p['scheme']) !== 'https' && !self::isLoopback($p['host'])) {
+			return '';
+		}
 
 		return $url;
+	}
+
+	/**
+	 * @param string $host Host of an address
+	 * @return bool        The computer itself (localhost, 127.0.0.0/8, ::1)
+	 */
+	public static function isLoopback($host)
+	{
+		$host = strtolower(trim((string) $host, '[]'));
+		if ($host === 'localhost' || substr($host, -10) === '.localhost' || $host === '::1') {
+			return true;
+		}
+
+		return (bool) preg_match('/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host);
 	}
 
 	/**

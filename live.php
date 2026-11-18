@@ -26,7 +26,8 @@
  * of life) with the key of the instance, and reads the events of these mailboxes only. Numbers only come back.
  *
  * GET since=<last event seen>, header X-Inbox-Live: <token> (never in the address: it would be in the logs).
- * 200 {last, events, reset, renew} | 204 nothing new | 401 token refused.
+ * 200 {last, events, reset, renew} | 204 nothing new | 401 token refused (or user, module, mailboxes no longer
+ * valid) | 429 too many calls (APCu only).
  */
 
 // filefunc.inc.php: conf.php, the database settings and the common functions, nothing else
@@ -86,6 +87,16 @@ if ($token === null) {
 	inboxLiveReply(401, array('error' => 'token'));
 }
 
+// Calls of one user limited when the server has APCu (shared memory, no file, no database): a script calling in a
+// loop gets 429 and the browser waits longer (it calls every 3 s at the quickest, from one tab per browser)
+if (function_exists('apcu_enabled') && apcu_enabled()) {
+	$rateKey = 'inbox-live-'.hash('sha256', $key.'|'.$token['e'].'|'.$token['u']).'-'.intdiv($now, 10);
+	apcu_add($rateKey, 0, 20);
+	if ((int) apcu_inc($rateKey) > InboxEvent::MAX_CALLS_10S) {
+		inboxLiveReply(429, array('error' => 'rate'));
+	}
+}
+
 // The database handler of Dolibarr, without the constants nor the modules (the driver reads the charset in $conf)
 $conf = new Conf();
 $conf->db->type = $dolibarr_main_db_type;
@@ -97,11 +108,18 @@ if (empty($db->connected)) {
 	inboxLiveReply(503, array('error' => 'database'));
 }
 
+// The token is checked again at each call, lightly: a user disabled, a module disabled, an access removed apply at
+// once, without waiting for the end of the token
+$accounts = InboxEvent::stillReached($db, $token['e'], $token['u'], $token['a']);
+if ($accounts === null) {
+	$db->close();
+	inboxLiveReply(401, array('error' => 'token'));
+}
 $since = isset($_GET['since']) ? max(0, (int) $_GET['since']) : 0;
-$out = InboxEvent::since($db, $token['e'], $token['u'], $token['a'], $since);
+$out = InboxEvent::since($db, $token['e'], $token['u'], $accounts, $since);
 $db->close();
-// Less than 3 minutes left: the tab asks a new token (ajax/event.php, which checks the rights again)
-$out['renew'] = $token['x'] - $now < 180;
+// Little time left, or mailboxes lost: the tab asks a new token (ajax/event.php, which checks the rights again)
+$out['renew'] = $token['x'] - $now < InboxEvent::RENEW_BEFORE || count($accounts) !== count($token['a']);
 if (!$out['events'] && !$out['reset'] && !$out['renew'] && $out['last'] === $since) {
 	inboxLiveReply(204);
 }

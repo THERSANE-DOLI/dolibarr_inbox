@@ -25,15 +25,17 @@ The setting is the same for every entity: it is about the load of the server.
 - Each change writes a line in a journal of the changes, kept 24 hours. The line holds **numbers only**: the kind of
   change, the mailbox, the folder, the emails, the user who did it. Never a subject, a text, an address or a name.
 - In each browser, one tab only (the others ask it) calls `inbox/live.php` every few seconds. This light call does
-  not start Dolibarr: it checks a token signed by the server, valid 15 minutes, that lists the mailboxes the user can
-  read, and gives back the lines of these mailboxes only.
+  not start Dolibarr: it checks a token signed by the server, valid 5 minutes, that lists the mailboxes the user can
+  read, checks again at each call that the user is active and still reaches these mailboxes, and gives back the
+  lines of these mailboxes only. One call goes through a bounded part of the journal (beyond it, the lists are read
+  again); with APCu on the server, the calls of one user are also limited (20 in 10 seconds).
 - When something changed in a mailbox the user reads, the list reads it again through its usual calls, which check
   the rights. The 20 second refresh goes on as a safety net, every 60 seconds (every 5 minutes after 2 minutes
   without activity).
 - After 2 minutes without activity in Inbox the browser asks at the idle interval; after 30 minutes it stops, until
   the next click or key.
 - An access given or removed, a mailbox disabled or given to another owner: the users concerned get a new token at
-  once. A change of the members of a group of Dolibarr counts at the next token, within 15 minutes.
+  once. A change of the members of a group of Dolibarr, a user disabled: at the next light call.
 
 ## The bell
 

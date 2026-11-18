@@ -71,7 +71,7 @@ Dolibarr.tools.inbox.push.register('mypush', {
 });
 ```
 
-A new token (every 15 minutes, or when the mailboxes of the user change) closes the connection and calls `connect()`
+A new token (every few minutes, or when the mailboxes of the user change) closes the connection and calls `connect()`
 again with the new `config`.
 
 ## Tests

@@ -46,8 +46,17 @@ class InboxEvent
 	/** Events given back by one call at most; beyond, the browser reads everything again (reset) */
 	const MAX_READ = 200;
 
-	/** Life of a token in seconds; the browser asks a new one before the end */
-	const TOKEN_LIFE = 900;
+	/** Life of a token in seconds; the browser asks a new one before the end (the rights are checked again then) */
+	const TOKEN_LIFE = 300;
+
+	/** Seconds left under which live.php asks the browser for a new token */
+	const RENEW_BEFORE = 120;
+
+	/** Calls of live.php of one user in 10 seconds at most (all his browsers), when the server has APCu */
+	const MAX_CALLS_10S = 20;
+
+	/** Events of the journal one call may go through at most; beyond, the browser reads everything again (reset) */
+	const MAX_SCAN = 5000;
 
 	/** Hours an event is kept */
 	const KEEP_HOURS = 24;
@@ -273,11 +282,27 @@ class InboxEvent
 		$accounts = array_values(array_filter(array_map('intval', $accounts), function ($a) {
 			return $a > 0;
 		}));
-		$where = "(fk_user_target = ".((int) $userId).($accounts ? " OR fk_account IN (".implode(',', $accounts).")" : '').")";
 		$out = array('last' => $since, 'events' => array(), 'reset' => false);
-		// The rows after the cursor only (primary key): the cost does not grow with the size of the journal
+		$bounds = $db->getRow("SELECT MIN(rowid) AS lo, MAX(rowid) AS hi FROM ".$p."inbox_event");
+		$min = is_object($bounds) ? (int) $bounds->lo : 0;
+		$max = is_object($bounds) ? (int) $bounds->hi : 0;
+		if (!$max) {
+			return $out;
+		}
+		// The cursor goes to the last event of the journal (those of the other mailboxes too): never read again
+		$out['last'] = max($since, $max);
+		if ($since === 0) {
+			// The journal was empty at the start: nothing can be missing, it is read from its first event
+			$since = $min - 1;
+		} elseif ($since < $min - 1 || $max - $since > self::MAX_SCAN) {
+			// Events forgotten after the cursor (purged), or too many to go through: the browser reads everything
+			// again. Each call goes through MAX_SCAN events at most, whatever the cursor sent
+			$out['reset'] = true;
+			return $out;
+		}
+		$where = "(fk_user_target = ".((int) $userId).($accounts ? " OR fk_account IN (".implode(',', $accounts).")" : '').")";
 		$rows = $db->getRows("SELECT rowid, fk_account, fk_user_target, type, fk_folder, ids, fk_user_author, origin FROM ".$p."inbox_event"
-			." WHERE rowid > ".$since." AND entity = ".((int) $entity)." AND ".$where." ORDER BY rowid LIMIT ".(self::MAX_READ + 1));
+			." WHERE rowid > ".$since." AND rowid <= ".$max." AND entity = ".((int) $entity)." AND ".$where." ORDER BY rowid LIMIT ".(self::MAX_READ + 1));
 		$rows = is_array($rows) ? $rows : array();
 		if (count($rows) > self::MAX_READ) {
 			$out['reset'] = true;
@@ -286,20 +311,49 @@ class InboxEvent
 				$out['events'][] = self::format($r);
 			}
 		}
-		// The cursor goes to the last event of the journal (those of the other mailboxes too): never read again
-		$row = $db->getRow("SELECT MAX(rowid) AS m FROM ".$p."inbox_event");
-		$out['last'] = max($since, is_object($row) ? (int) $row->m : 0);
-		// Events forgotten after the cursor (purged): the browser reads everything again
-		if (!$out['reset']) {
-			$min = $db->getRow("SELECT MIN(rowid) AS m FROM ".$p."inbox_event");
-			// (cursor 0: the journal was empty at the start, nothing can be missing)
-			if ($since > 0 && is_object($min) && (int) $min->m > $since + 1 && $out['last'] > $since) {
-				$out['reset'] = true;
-				$out['events'] = array();
-			}
-		}
 
 		return $out;
+	}
+
+	/**
+	 * Light check of a token at each call (live.php): the user still active, still a user of the company, the module
+	 * still enabled, and of the mailboxes of the token only those he still reaches (the levels of InboxAccess, less
+	 * detailed: any level reads). Never adds a mailbox: a new access comes with a new token.
+	 *
+	 * @param DoliDB $db       Database handler
+	 * @param int    $entity   Entity
+	 * @param int    $userId   User
+	 * @param int[]  $accounts Mailboxes of the token
+	 * @return int[]|null      Mailboxes still reached, null: the token is no longer valid
+	 */
+	public static function stillReached($db, $entity, $userId, array $accounts)
+	{
+		$p = $db->prefix();
+		$entity = (int) $entity;
+		$userId = (int) $userId;
+		$u = $db->getRow("SELECT u.statut, u.fk_soc, (SELECT COUNT(*) FROM ".$p."const as c WHERE c.name = 'MAIN_MODULE_INBOX' AND c.entity IN (0, ".$entity.") AND c.value <> '0' AND c.value <> '') AS module"
+			." FROM ".$p."user as u WHERE u.rowid = ".$userId);
+		if (!is_object($u) || (int) $u->statut !== 1 || (int) $u->fk_soc > 0 || (int) $u->module < 1) {
+			return null;
+		}
+		$accounts = array_values(array_filter(array_map('intval', $accounts), function ($a) {
+			return $a > 0;
+		}));
+		if (!$accounts) {
+			return array();
+		}
+		$rows = $db->getRows("SELECT a.rowid FROM ".$p."inbox_account as a WHERE a.rowid IN (".implode(',', $accounts).") AND a.entity = ".$entity." AND a.status = 1 AND a.protected = 0"
+			." AND ((a.type = 'personal' AND a.fk_user_owner = ".$userId.")"
+			." OR EXISTS (SELECT 1 FROM ".$p."inbox_account_access as aa WHERE aa.fk_account = a.rowid AND aa.level <> ''"
+			." AND (aa.fk_user = ".$userId." OR (aa.fk_usergroup > 0 AND aa.fk_usergroup IN (SELECT ug.fk_usergroup FROM ".$p."usergroup_user as ug WHERE ug.fk_user = ".$userId." AND ug.entity IN (0, ".$entity."))))))"
+			." LIMIT 10000");
+		$still = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$still[] = (int) $r->rowid;
+		}
+		sort($still);
+
+		return $still;
 	}
 
 	/**

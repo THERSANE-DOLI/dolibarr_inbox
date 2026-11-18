@@ -47,7 +47,10 @@ class InboxDmarc
 	const MAX_ZIP_ENTRIES = 20;
 
 	/** Records read (the totals beyond it are not counted: the analysis says it is partial) */
-	const MAX_RECORDS = 100000;
+	const MAX_RECORDS = 20000;
+
+	/** Memory the records of one analysis may take at most (less when PHP has less left), then partial */
+	const MAX_MEMORY = 67108864;
 
 	/** Rows sent to the dialog (the totals count all the records read) */
 	const MAX_ROWS = 2000;
@@ -390,7 +393,8 @@ class InboxDmarc
 					} elseif ($name === 'policy_published') {
 						$out['policy'] = self::policyOf($node);
 					} else {
-						if ($limit <= 0) {
+						// Records count, and so does the memory: a report of repeated records stays partial, never fatal
+						if ($limit <= 0 || ($limit % 500 === 0 && memory_get_usage() > self::memoryCeiling())) {
 							$out['cut'] = true;
 							break;
 						}
@@ -420,6 +424,53 @@ class InboxDmarc
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Memory used beyond which no more record is read: the one in use at the first call plus MAX_MEMORY, at most
+	 * half of what memory_limit leaves (the rest of the analysis and the answer need some)
+	 *
+	 * @return int Bytes
+	 */
+	public static function memoryCeiling()
+	{
+		static $ceiling = 0;
+		if (!$ceiling) {
+			$used = memory_get_usage();
+			$room = self::MAX_MEMORY;
+			$limit = self::bytes((string) ini_get('memory_limit'));
+			if ($limit > 0) {
+				$room = min($room, max(0, (int) (($limit - $used) / 2)));
+			}
+			$ceiling = $used + $room;
+		}
+
+		return $ceiling;
+	}
+
+	/**
+	 * @param string $value Value of php.ini (« 128M », « -1 »)
+	 * @return int          Bytes, 0 = no limit
+	 */
+	public static function bytes($value)
+	{
+		$value = trim($value);
+		if ($value === '' || (int) $value <= 0) {
+			return 0;
+		}
+		$n = (int) $value;
+		switch (strtolower(substr($value, -1))) {
+			case 'g':
+				$n *= 1024;
+				// no break
+			case 'm':
+				$n *= 1024;
+				// no break
+			case 'k':
+				$n *= 1024;
+		}
+
+		return $n;
 	}
 
 	/**

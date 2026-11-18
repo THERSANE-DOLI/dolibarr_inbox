@@ -130,6 +130,20 @@ class InboxReactivityTest extends InboxTestCase
 		$this->assertSame('https://push.inbox-test.invalid/.well-known/mercure', $this->stored('INBOX_PUSH_MERCURE_HUB_URL')['value']);
 		$this->assertSame('https://erp.inbox-test.invalid', $this->stored('INBOX_PUSH_MERCURE_ISSUER')['value'], 'nothing saved before the check');
 		$this->assertFalse($r->savePush('nope', $values), 'unknown driver');
+
+		// The address of the browsers in http: refused
+		$this->assertFalse($r->savePush('mercure', array('hub_url' => 'http://push.inbox-test.invalid/.well-known/mercure') + $values));
+		$this->assertStringContainsString('https', $r->error);
+
+		// Another address with the keys left empty: the saved keys are not sent to it, they are asked again
+		$moved = array('hub_url' => 'https://other.inbox-test.invalid/.well-known/mercure', 'publisher_key' => '', 'subscriber_key' => '') + $values;
+		$this->assertFalse($r->savePush('mercure', $moved));
+		$this->assertNotSame('', $r->error);
+		$this->assertSame('https://push.inbox-test.invalid/.well-known/mercure', $this->stored('INBOX_PUSH_MERCURE_HUB_URL')['value'], 'nothing saved');
+		$this->assertFalse($r->savePush('mercure', array('subscriber_key' => 'new-subscriber-key-new-subscriber-key') + $moved), 'one key typed, the other one still asked');
+		$this->assertTrue($r->savePush('mercure', array('publisher_key' => 'new-publisher-key-new-publisher-key-12', 'subscriber_key' => 'new-subscriber-key-new-subscriber-key') + $moved));
+		// Same address again, keys left empty: kept
+		$this->assertTrue($r->savePush('mercure', array('publisher_key' => '', 'subscriber_key' => '') + $moved));
 	}
 
 	/**

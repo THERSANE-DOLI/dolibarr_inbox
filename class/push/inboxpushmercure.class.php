@@ -86,7 +86,7 @@ class InboxPushMercure implements InboxPushDriverInterface
 	public function fields()
 	{
 		return array(
-			'hub_url' => array('type' => 'url', 'label' => 'InboxPushMercureHubUrl', 'help' => 'InboxPushMercureHubUrlHelp', 'required' => true),
+			'hub_url' => array('type' => 'url', 'label' => 'InboxPushMercureHubUrl', 'help' => 'InboxPushMercureHubUrlHelp', 'required' => true, 'public' => true),
 			'publish_url' => array('type' => 'url', 'label' => 'InboxPushMercurePublishUrl', 'help' => 'InboxPushMercurePublishUrlHelp'),
 			'issuer' => array('type' => 'string', 'label' => 'InboxPushMercureIssuer', 'help' => 'InboxPushMercureIssuerHelp', 'required' => true),
 			'publisher_key' => array('type' => 'secret', 'label' => 'InboxPushMercurePublisherKey', 'help' => 'InboxPushMercurePublisherKeyHelp', 'required' => true),
@@ -101,7 +101,7 @@ class InboxPushMercure implements InboxPushDriverInterface
 	 */
 	public function configure(array $values, $namespace)
 	{
-		$this->hubUrl = InboxPush::cleanUrl(isset($values['hub_url']) ? $values['hub_url'] : '');
+		$this->hubUrl = InboxPush::cleanUrl(isset($values['hub_url']) ? $values['hub_url'] : '', true);
 		$this->publishUrl = InboxPush::cleanUrl(isset($values['publish_url']) ? $values['publish_url'] : '');
 		$this->issuer = trim(isset($values['issuer']) ? (string) $values['issuer'] : '');
 		$this->publisherKey = isset($values['publisher_key']) ? (string) $values['publisher_key'] : '';
@@ -268,7 +268,8 @@ class InboxPushMercure implements InboxPushDriverInterface
 		return array(
 			// The query asks for the topics of this instance; the token narrows to his own (the narrower applies)
 			'url' => $this->hubUrl.(strpos($this->hubUrl, '?') === false ? '?' : '&').'match_urlpattern='.rawurlencode($this->topicBase().'*'),
-			'token' => $this->token($this->subscriberKey, 'subscribe', $list, (int) $expires, 'user:'.((int) $userId)),
+			// Audience: the address the browsers use only (the inner address of the server is not theirs to know)
+			'token' => $this->token($this->subscriberKey, 'subscribe', $list, (int) $expires, 'user:'.((int) $userId), array($this->hubUrl)),
 			'expires' => (int) $expires,
 		);
 	}
@@ -384,19 +385,20 @@ class InboxPushMercure implements InboxPushDriverInterface
 	}
 
 	/**
-	 * Access token of Mercure 1 (RFC 9068, HS256): iss, aud (both addresses of the hub), exp, one grant
+	 * Access token of Mercure 1 (RFC 9068, HS256): iss, aud (both addresses of the hub by default), exp, one grant
 	 *
 	 * @param string                          $key     Key
 	 * @param string                          $action  publish or subscribe
 	 * @param array<int,array<string,string>> $topics  Topic selectors {match, match_type?}
 	 * @param int                             $expires End of validity
 	 * @param string                          $sub     Subject (numbers only)
+	 * @param string[]                        $aud     Audience, empty = both addresses of the hub
 	 * @return string
 	 */
-	public function token($key, $action, array $topics, $expires, $sub)
+	public function token($key, $action, array $topics, $expires, $sub, array $aud = array())
 	{
 		$now = dol_now();
-		$aud = array_values(array_unique(array_filter(array($this->hubUrl, $this->publishUrl))));
+		$aud = array_values(array_unique(array_filter($aud ?: array($this->hubUrl, $this->publishUrl))));
 		$h = self::b64(json_encode(array('alg' => 'HS256', 'typ' => 'at+jwt')));
 		$p = self::b64(json_encode(array(
 			'iss' => $this->issuer,

@@ -255,8 +255,8 @@ class InboxReader
 		$bounce = new InboxBounce($this->db);
 		$readable = array_keys((new InboxAccess($this->db))->getLevels($user));
 		$passed = self::authPass($auth, (string) $this->row->from_email);
-		// « Always show » applies to a proven sender, or to a mail of the mailbox itself in its sent or drafts folder:
-		// written there by the mailbox, with no receiving server to prove it, nobody else can forge it
+		// « Always show » applies to a proven sender, or to a mail sent by Inbox from this mailbox (no receiving
+		// server to prove it, the journal of the mails sent does)
 		$alwaysOk = $passed || $this->isOwnMail();
 		$allowImages = $remote && $alwaysOk && $this->imagesAllowed($user, (string) $this->row->from_email);
 		// Recognized domains (1.59.0): the sender (authenticated only) and the links, lookalikes of the list
@@ -555,24 +555,32 @@ class InboxReader
 	}
 
 	/**
-	 * Mail written by the mailbox: in its sent or drafts folder, from the mailbox or one of its identities
+	 * Mail sent by Inbox from this mailbox: in its sent folder, from the mailbox or one of its identities, and its
+	 * Message-ID in the journal of the mails sent by the mailbox. Anything else that lands there (copied by another
+	 * program, a rule, a move) proves nothing, nor does a draft
 	 *
 	 * @return bool
 	 */
 	public function isOwnMail()
 	{
-		if (!in_array((string) ($this->row->folder_role ?? ''), array('sent', 'drafts'), true)) {
+		if ((string) ($this->row->folder_role ?? '') !== 'sent') {
 			return false;
 		}
 		$from = strtolower(trim((string) $this->row->from_email));
-		if ($from === '') {
+		$messageId = trim((string) $this->row->message_id, " <>");
+		if ($from === '' || $messageId === '') {
 			return false;
 		}
-		if ($from === strtolower(trim((string) $this->account->email))) {
-			return true;
+		$p = $this->db->prefix();
+		if ($from !== strtolower(trim((string) $this->account->email))) {
+			$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_identity WHERE fk_account = ".((int) $this->account->id)
+				." AND LOWER(email) = '".$this->db->escape($from)."'");
+			if (!is_object($row)) {
+				return false;
+			}
 		}
-		$row = $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_identity WHERE fk_account = ".((int) $this->account->id)
-			." AND LOWER(email) = '".$this->db->escape($from)."' LIMIT 1");
+		$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_action_log WHERE fk_account = ".((int) $this->account->id)
+			." AND action = 'send' AND message_id IN ('".$this->db->escape($messageId)."', '".$this->db->escape('<'.$messageId.'>')."')");
 
 		return is_object($row);
 	}

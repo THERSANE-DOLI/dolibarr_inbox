@@ -201,15 +201,34 @@ class InboxReactivity
 			return false;
 		}
 		// Every address checked before anything is saved: a refused one changes nothing
+		$saved = InboxPush::values($driver);
+		$moved = false;
 		foreach ($driver->fields() as $key => $f) {
 			$v = trim((string) ($values[$key] ?? ''));
 			if ($f['type'] === 'url' && $v !== '' && InboxPush::cleanUrl($v) === '') {
 				$this->error = $langs->transnoentities('InboxPushBadUrl', $langs->transnoentities($f['label']));
 				return false;
 			}
+			// Given to the browsers with their token: https (http on the computer itself only)
+			if ($f['type'] === 'url' && $v !== '' && !empty($f['public']) && InboxPush::cleanUrl($v, true) === '') {
+				$this->error = $langs->transnoentities('InboxPushNeedsHttps', $langs->transnoentities($f['label']));
+				return false;
+			}
+			if ($f['type'] === 'url' && $v !== trim((string) $saved[$key])) {
+				$moved = true;
+			}
 			if ($f['type'] !== 'secret' && dol_strlen($v) > 255) {
 				$this->error = $langs->transnoentities('InboxPushTooLong', $langs->transnoentities($f['label']));
 				return false;
+			}
+		}
+		// Another service: the saved keys are not sent to it (tokens signed with them would be), they are typed again
+		if ($moved) {
+			foreach ($driver->fields() as $key => $f) {
+				if ($f['type'] === 'secret' && $saved[$key] !== '' && trim((string) ($values[$key] ?? '')) === '') {
+					$this->error = $langs->transnoentities('InboxPushKeysAgain', $langs->transnoentities($f['label']));
+					return false;
+				}
 			}
 		}
 		dolibarr_set_const($this->db, 'INBOX_PUSH_DRIVER', $driver->code(), 'chaine', 0, '', 0);

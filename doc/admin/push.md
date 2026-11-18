@@ -12,9 +12,12 @@ Without a push service, or when it does not answer, the lists follow at the rhyt
 - **Numbers only**: the kind of change, the mailbox, the folder, the emails, the user who did it. Never a subject, a
   text, an address, a name of mailbox or of folder. A copy of the service, or its logs, tell nothing of the emails.
 - **Each user receives his own mailboxes only**: Dolibarr gives each browser a token signed with the key of the
-  subscribers, valid 15 minutes, that lists the mailboxes the user can read (and himself). The hub refuses to give
-  him any other change. A right removed: his token is renewed at once, without the mailbox.
-- The keys stay on the server: the browser only gets its own token, in a header (never in an address).
+  subscribers, valid 5 minutes, that lists the mailboxes the user can read (and himself). The hub refuses to give
+  him any other change, and closes his connection when the token ends. A right removed: his token is renewed at once,
+  without the mailbox.
+- The keys stay on the server: the browser only gets its own token, in a header (never in an address). The address
+  of the browsers is https (http only for a hub on the computer itself); the token names it alone, never the
+  address of the server.
 - Every change stays written in the journal of inbox first: the service only delivers it sooner, a browser that
   missed something catches up by the light call.
 
@@ -67,6 +70,7 @@ Content-Security-Policy (Setup > Security), add the address of the hub to its `c
 ## Set inbox
 
 1. Inbox > Settings > Server, section « Push service »: the two addresses, the trusted issuer, the two keys; Save.
+   An address changed later asks for the keys again: the saved ones are never used towards another service.
    The link « Installation guide of Mercure » gives the commands with the address of this Dolibarr already in them.
 2. **Test**: inbox subscribes to a topic of test, publishes on it and waits for it. The message says what failed
    (address, key of the subscribers, key of the publishers), or the time it took.

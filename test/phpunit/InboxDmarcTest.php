@@ -164,6 +164,26 @@ class InboxDmarcTest extends InboxTestCase
 	}
 
 	/**
+	 * Records bounded by number and by memory: a report of repeated records is partial, never a fatal error
+	 *
+	 * @return void
+	 */
+	public function testMemoryBounded()
+	{
+		$this->assertSame(0, InboxDmarc::bytes('-1'));
+		$this->assertSame(134217728, InboxDmarc::bytes('128M'));
+		$this->assertSame(1073741824, InboxDmarc::bytes('1G'));
+		$this->assertSame(65536, InboxDmarc::bytes('64k'));
+		$this->assertGreaterThan(0, InboxDmarc::memoryCeiling(), 'a ceiling, fixed at the first record read');
+		$this->assertLessThanOrEqual(20000, InboxDmarc::MAX_RECORDS);
+		$limit = 3;
+		$rec = '<record><row><source_ip>192.0.2.1</source_ip><count>1</count></row><identifiers><header_from>a.example</header_from></identifiers></record>';
+		$r = InboxDmarc::parse('<?xml version="1.0"?><feedback>'.str_repeat($rec, 5).'</feedback>', $limit);
+		$this->assertCount(3, $r['records']);
+		$this->assertTrue($r['cut'], 'partial, said so');
+	}
+
+	/**
 	 * Names asked for public addresses only, an IPv4 written as IPv6 judged as itself (audit INBX-096)
 	 *
 	 * @return void

@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: security of the quick refresh, push service, DMARC and pictures :   1.126.1
+  - light call checked again at each call (user, mailboxes), token of 5 minutes, bounded read of the journal;
+    https address for the browsers of the push service, keys asked again when its address changes.
+  - pictures always shown without a proven sender: only for a mail sent by Inbox; DMARC analysis bounded in memory.
+
 - FIX: security, from the audit of 1.125.0 :   1.126.0
   - refresh and push service of the whole instance set by its administrator only (not the one of an entity);
     progress of an agenda event changed by its owner or author only, as in Dolibarr.

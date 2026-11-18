@@ -320,7 +320,7 @@ class InboxPushTest extends InboxTestCase
 		$this->assertSame('at+jwt', $h['typ']);
 		$this->assertSame('HS256', $h['alg']);
 		$this->assertSame('https://erp.inbox-test.invalid', $p['iss']);
-		$this->assertSame(array('https://push.inbox-test.invalid/.well-known/mercure', 'http://127.0.0.1:3001/.well-known/mercure'), $p['aud']);
+		$this->assertSame('https://push.inbox-test.invalid/.well-known/mercure', $p['aud'], 'the address of the browsers only, never the inner one');
 		$this->assertSame($exp, $p['exp']);
 		$this->assertCount(1, $p['authorization_details']);
 		$g = $p['authorization_details'][0];
@@ -378,6 +378,16 @@ class InboxPushTest extends InboxTestCase
 		$this->assertSame('', InboxPush::cleanUrl('https://user:pass@push.example.com/'));
 		$this->assertSame('', InboxPush::cleanUrl('https://push.example.com/?authorization=x'));
 		$this->assertSame('https://push.example.com/.well-known/mercure', InboxPush::cleanUrl(' https://push.example.com/.well-known/mercure '));
+		// Given to the browsers with their token: https, http only on the computer itself
+		$this->assertSame('', InboxPush::cleanUrl('http://push.example.com/.well-known/mercure', true));
+		$this->assertSame('', InboxPush::cleanUrl('http://10.0.0.5:3001/.well-known/mercure', true));
+		$this->assertSame('http://push.example.com/x', InboxPush::cleanUrl('http://push.example.com/x'), 'the address of the server may be http');
+		foreach (array('http://localhost:3001/m', 'http://127.0.0.1:3001/m', 'http://[::1]:3001/m', 'http://hub.localhost/m', 'https://push.example.com/m') as $ok) {
+			$this->assertSame($ok, InboxPush::cleanUrl($ok, true), $ok);
+		}
+		$http = new InboxPushMercure();
+		$http->configure(array('hub_url' => 'http://push.example.com/.well-known/mercure', 'issuer' => 'x', 'publisher_key' => 'a', 'subscriber_key' => 'b'), 'ns');
+		$this->assertFalse($http->isConfigured(), 'an http address for the browsers is never used');
 		$m = new InboxPushMercure();
 		$m->configure(array('hub_url' => 'https://push.example.com/.well-known/mercure', 'issuer' => 'x', 'publisher_key' => 'a'), 'ns');
 		$this->assertFalse($m->isConfigured(), 'a key missing');

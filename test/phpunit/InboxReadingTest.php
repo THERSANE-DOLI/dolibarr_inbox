@@ -22,6 +22,8 @@
  */
 
 require_once __DIR__.'/InboxTestCase.php';
+require_once __DIR__.'/../../class/inboxactionlog.class.php';
+require_once __DIR__.'/../../class/inboxreader.class.php';
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxreader.class.php');
@@ -207,6 +209,35 @@ class InboxReadingTest extends InboxTestCase
 		$this->assertSame(0, $engine->search(array((int) $a->id + 100000), 0, array(), '', 50)['total'], 'another mailbox: nothing');
 		$this->assertSame(0, $engine->search(array(), 0, array(), '', 50)['total'], 'no mailbox: nothing');
 		$this->assertSame(0, $engine->search(array((int) $a->id), 0, array(), 'not-a-cursor', 50)['total'], 'a broken cursor is ignored, never an error');
+	}
+
+	/**
+	 * Remote pictures always shown without a proof of the sender: only for a mail sent by Inbox from the mailbox
+	 * (sent folder, its address, its Message-ID in the journal of the mails sent), never a draft nor a copy
+	 *
+	 * @return void
+	 */
+	public function testOwnMailIsAMailSentByInbox()
+	{
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$reader = new InboxReader($this->db);
+		$reader->account = $box;
+		$mid = 'own-'.bin2hex(random_bytes(6)).'@inbox-test.invalid';
+		$reader->row = (object) array('folder_role' => 'sent', 'from_email' => strtoupper($box->email), 'message_id' => $mid);
+		$this->assertFalse($reader->isOwnMail(), 'copied there by another program: not proven');
+		InboxActionLog::add($this->db, $this->admin, (int) $box->id, 'send', array((object) array('message_id' => $mid, 'subject' => 'x')));
+		$this->assertTrue($reader->isOwnMail(), 'sent by Inbox');
+		$reader->row->message_id = '<'.$mid.'>';
+		$this->assertTrue($reader->isOwnMail(), 'with the angle brackets');
+		$reader->row->folder_role = 'drafts';
+		$this->assertFalse($reader->isOwnMail(), 'never a draft');
+		$reader->row->folder_role = 'sent';
+		$reader->row->from_email = 'boss@inbox-test.invalid';
+		$this->assertFalse($reader->isOwnMail(), 'another sender');
+		$other = $this->box(true, array('email' => 'other@inbox-test.invalid', 'status' => InboxAccount::STATUS_ACTIVE));
+		$reader->account = $other;
+		$reader->row->from_email = $other->email;
+		$this->assertFalse($reader->isOwnMail(), 'sent by another mailbox');
 	}
 
 	/**
