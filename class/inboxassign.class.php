@@ -197,6 +197,19 @@ class InboxAssign
 			$this->db->query("UPDATE ".$p."inbox_mail SET tms = CURRENT_TIMESTAMP WHERE rowid IN (".implode(',', array_map(function ($r) {
 				return (int) $r->rowid;
 			}, $list)).")");
+			// Journal of the changes (1.121.0): at once in the lists of the others, per mailbox and folder
+			require_once __DIR__.'/inboxevent.class.php';
+			if (InboxEvent::enabled()) {
+				$byFolder = array();
+				foreach ($list as $r) {
+					$byFolder[(int) $r->fk_account.':'.(int) $r->fk_folder][] = (int) $r->rowid;
+				}
+				$events = new InboxEvent($this->db);
+				foreach ($byFolder as $key => $ids) {
+					list($acc, $fold) = array_map('intval', explode(':', $key));
+					$events->emit($acc, 'assign', $ids, $fold, $user);
+				}
+			}
 			$out['count'] += count($list);
 			$first = $list[0];
 			foreach ($added as $uid) {

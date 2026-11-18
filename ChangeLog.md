@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: journal of the changes, so that the lists open by the other users can follow at once :   1.121.0
+  - assignments, tags, flags, moves and new mails written by numbers only, never a subject, a text or an address.
+  - light call live.php: a signed token, each user reads only the mailboxes he can read, Dolibarr not started.
+  - written only when the quicker refresh is turned on (setting INBOX_REACTIVITY, its page comes next).
+
 - FIX: the box about bank details took the reading pane, the mail was left a few lines to read :   1.120.3
   - « Collapse » leaves only its title line, remembered per mail; it folds itself once the check is written.
   - red box: only the title in red, the advice in the text colour to be readable.

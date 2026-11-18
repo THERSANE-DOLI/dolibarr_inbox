@@ -305,7 +305,8 @@ class InboxSync
 			if ($res['reset']) {
 				$mails->clearFolder($folderId);
 			}
-			$this->stats['new'] += $mails->addMany((int) $account->id, $folderId, $res['new']);
+			$added = $mails->addMany((int) $account->id, $folderId, $res['new']);
+			$this->stats['new'] += $added;
 			// New mails of the inbox (never the first indexing of the older ones): checked against the blocked senders
 			if ((string) $f->role === 'inbox' && !$backfill && $mails->lastNewIds) {
 				$this->blockedNew = array_merge($this->blockedNew, array_map('intval', $mails->lastNewIds));
@@ -326,7 +327,8 @@ class InboxSync
 				$readNow = $marks->applyIgnored($connector, (int) $account->id, (string) $f->path, $mails->lastNewIds);
 			}
 			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
-			$this->stats['changed'] += $mails->updateFlags($folderId, $res['changed']);
+			$flagged = $mails->updateFlags($folderId, $res['changed']);
+			$this->stats['changed'] += $flagged;
 			// Junk: a known sender, authenticated, is probably legitimate (lot W5 1.15.0; headers of these mails only);
 			// setting of Settings > Anti-spam (1.85.0)
 			if ((string) $f->role === 'junk' && getDolGlobalInt('INBOX_JUNK_LEGIT_CHECK', 1)) {
@@ -334,8 +336,14 @@ class InboxSync
 				$known = new InboxKnownSenders($this->db);
 				$known->checkJunk($connector, $folderId, (string) $f->path, $deadline);
 			}
-			$this->stats['deleted'] += $mails->removeMany($folderId, $res['deleted']);
+			$removed = $mails->removeMany($folderId, $res['deleted']);
+			$this->stats['deleted'] += $removed;
 			$this->stats['folders']++;
+			// Journal of the changes (1.121.0): one event per folder and pass that found something, never one per mail
+			if ($added || $flagged || $removed || $res['reset']) {
+				require_once __DIR__.'/inboxevent.class.php';
+				(new InboxEvent($this->db))->emit((int) $account->id, 'folder', array(), $folderId);
+			}
 			$after = $mails->folderStats($folderId);
 			$cursor = json_decode((string) $res['cursor'], true);
 			$complete = is_array($cursor) && !empty($cursor['done']) || ($maxMails > 0 && $after['count'] >= $maxMails);

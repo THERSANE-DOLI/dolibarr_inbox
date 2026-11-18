@@ -522,6 +522,9 @@ class Inbox
 		// Notifications of the bell (INBOX_NOTIFICATION_DAYS)
 		require_once __DIR__.'/inboxnotification.class.php';
 		InboxNotification::purge($this->db);
+		// Journal of the changes for the quicker refresh (1.121.0): 24 h
+		require_once __DIR__.'/inboxevent.class.php';
+		(new InboxEvent($this->db))->purge();
 		// Mails gone from the server for long (1.114.0): their references forgotten with their links and notes
 		require_once __DIR__.'/inboxmailref.class.php';
 		$forgotten = (new InboxMailRef($this->db))->shed();

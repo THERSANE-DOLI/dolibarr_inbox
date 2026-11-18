@@ -451,6 +451,16 @@ class InboxAccount extends CommonObject
 		$result = $this->updateCommon($user, $notrigger);
 		if ($result > 0 && is_object($old)) {
 			$this->logChanges($old, $user);
+			// Journal of the changes (1.121.0): enabled, disabled, protected or given to another owner, the tokens of
+			// its users and of the owners are asked again at once
+			if ((int) $old->status !== (int) $this->status || (int) $old->fk_user_owner !== (int) $this->fk_user_owner || (int) $old->protected !== (int) $this->protected) {
+				require_once __DIR__.'/inboxevent.class.php';
+				if (InboxEvent::enabled()) {
+					$events = new InboxEvent($this->db);
+					$events->emit((int) $this->id, 'access', array(), 0, $user);
+					$events->emitUsers(array((int) $old->fk_user_owner, (int) $this->fk_user_owner), 'access', $user);
+				}
+			}
 		}
 
 		return $result;

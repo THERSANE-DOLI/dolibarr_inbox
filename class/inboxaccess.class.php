@@ -385,8 +385,26 @@ class InboxAccess
 			$log->add($accountId, $author, InboxAccountLog::ACTION_ACCESS_ADD, null, $target + array('level' => $level));
 		}
 		self::clearCache();
+		$this->emitAccess($author, $fkUser, $fkGroup);
 
 		return 1;
+	}
+
+	/**
+	 * Journal of the changes (1.121.0): the users concerned ask a new token at once (their mailboxes changed)
+	 *
+	 * @param User $author  User doing it
+	 * @param int  $fkUser  User, or 0
+	 * @param int  $fkGroup Group, or 0
+	 * @return void
+	 */
+	protected function emitAccess($author, $fkUser, $fkGroup)
+	{
+		require_once __DIR__.'/inboxevent.class.php';
+		if (InboxEvent::enabled()) {
+			$events = new InboxEvent($this->db);
+			$events->emitUsers($events->usersOfTarget((int) $fkUser, (int) $fkGroup), 'access', $author instanceof User ? $author : null);
+		}
 	}
 
 	/**
@@ -413,6 +431,7 @@ class InboxAccess
 		$log = new InboxAccountLog($this->db);
 		$log->add($accountId, $author, InboxAccountLog::ACTION_ACCESS_REMOVE, array('fk_user' => (int) $fkUser, 'fk_usergroup' => (int) $fkGroup, 'level' => (string) $current->level), null);
 		self::clearCache();
+		$this->emitAccess($author, (int) $fkUser, (int) $fkGroup);
 		// Protected mailbox (1.89.0): the encrypted copies of who lost the access go with it
 		require_once __DIR__.'/inboxprotect.class.php';
 		(new InboxProtect($this->db))->pruneBlobs((int) $accountId);

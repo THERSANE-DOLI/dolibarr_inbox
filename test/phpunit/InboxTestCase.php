@@ -133,6 +133,10 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_message WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_readlog WHERE mailbox LIKE '%@inbox-test.invalid'");
 		$db->query("DELETE FROM ".$p."inbox_tag WHERE fk_account = 0 AND keyword LIKE 'zz_test%'");
+		// Journal of the changes (1.121.0): the events of the test mailboxes, those for the test users
+		if ($db->DDLDescTable($p.'inbox_event')) {
+			$db->query("DELETE FROM ".$p."inbox_event WHERE (fk_account > 0 AND fk_account NOT IN (SELECT rowid FROM ".$p."inbox_account)) OR fk_user_target IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
+		}
 		// Recognized domains (1.59.0) of the tests
 		$db->query("DELETE FROM ".$p."inbox_trusted_domain WHERE label LIKE 'ZzTrusted%'");
 		// Blocked senders (1.85.0) of the tests
