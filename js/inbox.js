@@ -128,6 +128,17 @@
 
 	// ---------- Ajax ----------
 	let token = ctx('INBOX_TOKEN', '');
+	/**
+	 * Number of this tab (1.121.0), sent with every call (header X-Inbox-Origin) and written with the changes it makes:
+	 * the quicker refresh does not apply again in this tab what it has just shown
+	 */
+	const origin = (() => {
+		try {
+			return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+		} catch (e) {
+			return Math.random().toString(36).slice(2, 18);
+		}
+	})();
 	let reconnecting = null;
 
 	/**
@@ -143,7 +154,7 @@
 		const payload = Object.assign({}, data || {});
 		delete payload.__post;
 		let url = ctx('INBOX_AJAX_URL', '') + endpoint + '.php';
-		const init = { method, credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
+		const init = { method, credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Inbox-Origin': origin } };
 		if (method === 'GET') {
 			const qs = new URLSearchParams(Object.assign({ action }, payload));
 			url += '?' + qs.toString();
@@ -260,7 +271,7 @@
 		form.append('file', file, file.name);
 		let resp;
 		try {
-			resp = await fetch(ctx('INBOX_AJAX_URL', '') + endpoint + '.php', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json' }, body: form });
+			resp = await fetch(ctx('INBOX_AJAX_URL', '') + endpoint + '.php', { method: 'POST', credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Inbox-Origin': origin }, body: form });
 		} catch (e) {
 			const err = new Error(t('InboxErrorOffline'));
 			err.status = 0;
@@ -738,6 +749,8 @@
 		go: hash => router.go(hash),
 		route: () => router.parse(),
 		isLeader: () => isLeader,
+		/** Number of this tab (X-Inbox-Origin) */
+		origin,
 		/** Current CSRF token (renewed by a reconnection): for a sendBeacon, that cannot go through post() */
 		token: () => token,
 		$, $$,

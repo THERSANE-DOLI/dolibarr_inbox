@@ -3727,3 +3727,25 @@ InboxDocDesc_dev_combo = Durchsuchbare Listen ohne Abhängigkeit (Dolibarr.tools
 InboxDocDesc_dev_mail_data = Die Bereinigung jedes Werts einer Mail, bevor er angezeigt oder geschrieben wird
 InboxDocDesc_dev_development = Icons, Test-Mailserver, Tests, Katalog, mitzuführende Kopien von Dolibarr
 InboxDocMissing = Diese Seite fehlt im Modul.
+
+# Refresh of the lists (1.121.0)
+InboxReactivitySetupTitle = Aktualisierung der Listen
+InboxReactivitySetupHelp = Wie schnell die Änderungen der anderen Benutzer (Zuweisung, Tags, Markierungen, Verschiebungen, neue E-Mails) in den Listen erscheinen. Eine Einstellung des Servers: sie gilt für alle Mandanten.
+InboxReactivityMode = Aktualisierung
+InboxReactivityModeHelp = Standard: die Listen fragen den Server alle 20 Sekunden. Schnell: ein Tab pro Browser fragt alle paar Sekunden über einen leichten Aufruf, der Dolibarr nicht startet, und die Listen folgen innerhalb dieser Sekunden. Von den E-Mails wird dafür nichts geschrieben (kein Betreff, kein Text, keine Adresse), nur Nummern.
+InboxReactivityStandard = Standard (alle 20 Sekunden)
+InboxReactivityFast = Schnell (alle paar Sekunden)
+InboxReactivityInterval = Intervall, Benutzer aktiv (Sekunden)
+InboxReactivityIntervalHelp = Zwischen 3 und 60 Sekunden.
+InboxReactivityIdle = Intervall nach 2 Minuten ohne Aktivität (Sekunden)
+InboxReactivityIdleHelp = Vom aktiven Intervall bis 300 Sekunden: der Benutzer ist wahrscheinlich nicht mehr am Bildschirm. Die vollständige Aktualisierung, die als Rückfall bleibt, wird ebenfalls langsamer, von jeder Minute auf alle 5 Minuten. Nach 30 Minuten ohne Aktivität hören die Aufrufe bis zur nächsten Aktivität auf.
+InboxReactivityLoadUsers = Geschätzte Last: %s Benutzer mit Zugang zu einem Postfach haben sich in den letzten 7 Tagen angemeldet, gezählt als wären alle gleichzeitig angemeldet.
+InboxReactivityLightCalls = Leichte Aufrufe pro Sekunde
+InboxReactivityFullCalls = Vollständige Aufrufe pro Sekunde
+InboxReactivityCpu = Prozessor (Kerne)
+InboxReactivityAllActive = Schnell, alle aktiv
+InboxReactivityAllIdle = Schnell, alle seit 2 Minuten ohne Aktivität
+InboxReactivityStandardRef = Standard (zum Vergleich)
+InboxReactivityLoadNote = Gemessen auf einem Entwicklungsrechner: etwa 2 ms pro leichtem Aufruf, etwa 20 ms pro vollständigem Aufruf (mehr bei vielen Postfächern und Ordnern). Im schnellen Modus ist die vollständige Aktualisierung als Rückfall mitgezählt.
+InboxDocTitle_reactivity = Aktualisierung der Listen
+InboxDocDesc_reactivity = Schnelle Aktualisierung der Änderungen der anderen Benutzer und die zusätzliche Last

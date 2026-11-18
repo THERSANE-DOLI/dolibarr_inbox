@@ -75,6 +75,23 @@ class InboxEvent
 	}
 
 	/**
+	 * Rhythm of the quick refresh, in seconds: while the user is active (3 to 60), after 2 minutes without activity
+	 * (from the active one to 300, never quicker than the active one)
+	 *
+	 * @param int|null $interval Active interval to check (null: the setting)
+	 * @param int|null $idle     Idle interval to check (null: the setting)
+	 * @return array{interval:int,idle:int}
+	 */
+	public static function rhythm($interval = null, $idle = null)
+	{
+		$interval = $interval === null ? getDolGlobalInt('INBOX_REACTIVITY_INTERVAL', 5) : (int) $interval;
+		$interval = min(60, max(3, $interval ?: 5));
+		$idle = $idle === null ? getDolGlobalInt('INBOX_REACTIVITY_IDLE', 60) : (int) $idle;
+		$idle = min(300, max($interval, $idle ?: 60));
+		return array('interval' => $interval, 'idle' => $idle);
+	}
+
+	/**
 	 * Write an event of a mailbox (read by all the users who can read it)
 	 *
 	 * @param int        $accountId Mailbox
@@ -196,6 +213,19 @@ class InboxEvent
 	}
 
 	/**
+	 * Cursor at the start: the last event of the journal, 0 when it is empty
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int
+	 */
+	public static function cursor($db)
+	{
+		$row = $db->getRow("SELECT MAX(rowid) AS m FROM ".$db->prefix()."inbox_event");
+
+		return is_object($row) ? (int) $row->m : 0;
+	}
+
+	/**
 	 * Events after a cursor for a user: his mailboxes and his own events. Used by live.php without Dolibarr started:
 	 * the database handler and the numbers only.
 	 *
@@ -203,7 +233,7 @@ class InboxEvent
 	 * @param int    $entity   Entity
 	 * @param int    $userId   User
 	 * @param int[]  $accounts Mailboxes he can read (from his token)
-	 * @param int    $since    Last event seen (0: only the cursor is given back)
+	 * @param int    $since    Last event seen (cursor() at the start; 0 when the journal was empty)
 	 * @return array{last:int,events:array<int,array<string,mixed>>,reset:bool}
 	 */
 	public static function since($db, $entity, $userId, array $accounts, $since)
@@ -215,11 +245,6 @@ class InboxEvent
 		}));
 		$where = "(fk_user_target = ".((int) $userId).($accounts ? " OR fk_account IN (".implode(',', $accounts).")" : '').")";
 		$out = array('last' => $since, 'events' => array(), 'reset' => false);
-		if ($since === 0) {
-			$row = $db->getRow("SELECT MAX(rowid) AS m FROM ".$p."inbox_event");
-			$out['last'] = is_object($row) ? (int) $row->m : 0;
-			return $out;
-		}
 		// The rows after the cursor only (primary key): the cost does not grow with the size of the journal
 		$rows = $db->getRows("SELECT rowid, fk_account, fk_user_target, type, fk_folder, ids, fk_user_author, origin FROM ".$p."inbox_event"
 			." WHERE rowid > ".$since." AND entity = ".((int) $entity)." AND ".$where." ORDER BY rowid LIMIT ".(self::MAX_READ + 1));
@@ -246,7 +271,8 @@ class InboxEvent
 		// Events forgotten after the cursor (purged): the browser reads everything again
 		if (!$out['reset']) {
 			$min = $db->getRow("SELECT MIN(rowid) AS m FROM ".$p."inbox_event");
-			if (is_object($min) && (int) $min->m > $since + 1 && $out['last'] > $since) {
+			// (cursor 0: the journal was empty at the start, nothing can be missing)
+			if ($since > 0 && is_object($min) && (int) $min->m > $since + 1 && $out['last'] > $since) {
 				$out['reset'] = true;
 				$out['events'] = array();
 			}

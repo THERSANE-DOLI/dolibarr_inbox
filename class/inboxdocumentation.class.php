@@ -50,6 +50,7 @@ class InboxDocumentation
 			'InboxDocGroupStart' => array('icon' => 'fa-rocket', 'pages' => array(
 				'install' => array('icon' => 'fa-download', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/install.md')),
 				'application' => array('icon' => 'fa-inbox', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/application.md')),
+				'reactivity' => array('icon' => 'fa-bolt', 'version' => '1.122.0', 'files' => array('en_US' => 'admin/reactivity.md')),
 			)),
 			'InboxDocGroupWork' => array('icon' => 'fa-pen', 'pages' => array(
 				'writing_editor' => array('icon' => 'fa-edit', 'version' => '1.94.0', 'files' => array('en_US' => 'admin/writing-editor.md')),

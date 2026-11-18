@@ -115,6 +115,20 @@ class InboxEventTest extends InboxTestCase
 	}
 
 	/**
+	 * Rhythm: active 3 to 60 s, idle from the active one to 300 s, never quicker than the active one
+	 *
+	 * @return void
+	 */
+	public function testRhythmBounds()
+	{
+		$this->assertSame(array('interval' => 5, 'idle' => 60), InboxEvent::rhythm(0, 0), 'defaults');
+		$this->assertSame(array('interval' => 3, 'idle' => 3), InboxEvent::rhythm(1, 1), 'minimum');
+		$this->assertSame(array('interval' => 60, 'idle' => 300), InboxEvent::rhythm(90, 900), 'maximum');
+		$this->assertSame(array('interval' => 40, 'idle' => 40), InboxEvent::rhythm(40, 20), 'idle follows the active one');
+		$this->assertSame(array('interval' => 5, 'idle' => 120), InboxEvent::rhythm(5, 120));
+	}
+
+	/**
 	 * Each user reads only the mailboxes he can read, and his own events: the filter is on the server
 	 *
 	 * @return void
@@ -286,8 +300,10 @@ class InboxEventTest extends InboxTestCase
 		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
 		$events = new InboxEvent($this->db);
 		$first = $events->emit($devis->id, 'folder', array(), 1);
-		$this->assertSame($first, InboxEvent::since($this->db, 1, 0, array($devis->id), 0)['last'], 'at the start: the cursor only');
-		$this->assertSame(array(), InboxEvent::since($this->db, 1, 0, array($devis->id), 0)['events']);
+		$this->assertSame($first, InboxEvent::cursor($this->db), 'at the start: the last event');
+		$this->assertSame(array(), InboxEvent::since($this->db, 1, 0, array($devis->id), $first)['events'], 'nothing after it');
+		// Journal empty at the start (cursor 0): the first event is read, never skipped
+		$this->assertContains($first, array_column(InboxEvent::since($this->db, 1, 0, array($devis->id), $first - 1)['events'], 'id'));
 
 		for ($i = 0; $i <= InboxEvent::MAX_READ; $i++) {
 			$events->emit($devis->id, 'folder', array(), 1);

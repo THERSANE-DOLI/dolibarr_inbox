@@ -3727,3 +3727,25 @@ InboxDocDesc_dev_combo = Listes avec recherche sans dépendance (Dolibarr.tools.
 InboxDocDesc_dev_mail_data = Le nettoyage de chaque valeur d'un mail avant de l'afficher ou de l'écrire
 InboxDocDesc_dev_development = Icônes, serveur mail de test, tests, catalogue, copies de Dolibarr à suivre
 InboxDocMissing = Cette page manque dans le module.
+
+# Refresh of the lists (1.121.0)
+InboxReactivitySetupTitle = Rafraîchissement des listes
+InboxReactivitySetupHelp = Délai avant que les changements faits par les autres utilisateurs (affectation, tags, drapeaux, déplacements, nouveaux mails) apparaissent dans les listes. Réglage du serveur : il vaut pour toutes les entités.
+InboxReactivityMode = Rafraîchissement
+InboxReactivityModeHelp = Standard : les listes interrogent le serveur toutes les 20 secondes. Rapide : un onglet par navigateur interroge toutes les quelques secondes par un appel léger qui ne démarre pas Dolibarr, et les listes suivent en quelques secondes. Rien des mails n'est écrit pour cela (ni objet, ni texte, ni adresse), seulement des numéros.
+InboxReactivityStandard = Standard (toutes les 20 secondes)
+InboxReactivityFast = Rapide (toutes les quelques secondes)
+InboxReactivityInterval = Intervalle, utilisateur actif (secondes)
+InboxReactivityIntervalHelp = Entre 3 et 60 secondes.
+InboxReactivityIdle = Intervalle après 2 minutes sans activité (secondes)
+InboxReactivityIdleHelp = De l'intervalle actif jusqu'à 300 secondes : l'utilisateur n'est sans doute plus devant l'écran. Le rafraîchissement complet gardé en secours ralentit aussi, de chaque minute à toutes les 5 minutes. Après 30 minutes sans activité, les appels s'arrêtent jusqu'à la prochaine activité.
+InboxReactivityLoadUsers = Charge estimée : %s utilisateurs ayant accès à une boîte se sont connectés ces 7 derniers jours, comptés comme s'ils étaient tous connectés en même temps.
+InboxReactivityLightCalls = Appels légers par seconde
+InboxReactivityFullCalls = Appels complets par seconde
+InboxReactivityCpu = Processeur (cœurs)
+InboxReactivityAllActive = Rapide, tous actifs
+InboxReactivityAllIdle = Rapide, tous sans activité depuis 2 minutes
+InboxReactivityStandardRef = Standard (pour comparer)
+InboxReactivityLoadNote = Mesuré sur un ordinateur de développement : environ 2 ms par appel léger, environ 20 ms par appel complet (plus avec beaucoup de boîtes et de dossiers). En mode rapide, le rafraîchissement complet gardé en secours est compté.
+InboxDocTitle_reactivity = Rafraîchissement des listes
+InboxDocDesc_reactivity = Rafraîchissement rapide des changements faits par les autres utilisateurs, et la charge qu'il ajoute

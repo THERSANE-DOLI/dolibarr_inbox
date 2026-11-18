@@ -11332,6 +11332,37 @@
 	});
 	['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(ev => document.addEventListener(ev, activity, { passive: true, capture: true }));
 
+	/**
+	 * Quicker refresh of the lists (1.121.0, js/inbox-live.js): while it runs, the regular refresh is only a safety net
+	 * (60 s, 5 min after 2 minutes without activity); the changes of the others come as events, and the usual call of state is asked at once (gathered: at
+	 * most one per second), so what is shown is always read through the calls that check the rights
+	 */
+	const live = { on: false, timer: 0, at: 0 };
+	function pollDelay() {
+		if (!live.on) {
+			return 20000;
+		}
+		return Date.now() - lastSeen() > 2 * 60 * 1000 ? 300000 : 60000;
+	}
+	Dolibarr.on('inbox:live:state', p => {
+		live.on = !!(p && p.on);
+	});
+	Dolibarr.on('inbox:live:events', p => {
+		if (!S.el) {
+			return;
+		}
+		const events = (p && p.events) || [];
+		// Mailboxes given or taken, a whole folder to read again: the tree too
+		if ((p && p.reset) || events.some(e => e.type === 'access')) {
+			refreshTree();
+		}
+		clearTimeout(live.timer);
+		live.timer = setTimeout(() => {
+			live.at = Date.now();
+			poll();
+		}, Math.max(150, 1000 - (Date.now() - live.at)));
+	});
+
 	async function poll() {
 		clearTimeout(S.pollTimer);
 		if (pauseIfIdle()) {
@@ -11339,7 +11370,7 @@
 			return;
 		}
 		if (document.hidden || !S.el || S.el.closest('[hidden]')) {
-			S.pollTimer = setTimeout(poll, 20000);
+			S.pollTimer = setTimeout(poll, pollDelay());
 			return;
 		}
 		try {
@@ -11390,7 +11421,7 @@
 		} catch (err) {
 			// Network lost: next try
 		}
-		S.pollTimer = setTimeout(poll, 20000);
+		S.pollTimer = setTimeout(poll, pollDelay());
 	}
 
 	/** « Marie reads this mail » in the head of the mail open (shared mailboxes) */
@@ -12270,7 +12301,7 @@
 					poll();
 				}
 			});
-			S.pollTimer = setTimeout(poll, 20000);
+			S.pollTimer = setTimeout(poll, pollDelay());
 			if (I.isLeader()) {
 				pumpSoon(1500);
 			}

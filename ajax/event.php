@@ -42,14 +42,15 @@ switch ($action) {
 		if ($t === null) {
 			inboxAjaxError('no_instance_id', 500);
 		}
-		$since = InboxEvent::since($db, (int) $conf->entity, (int) $user->id, $t['accounts'], 0);
+		$rhythm = InboxEvent::rhythm();
 		inboxAjaxReply(array(
 			'mode' => getDolGlobalString('INBOX_REACTIVITY'),
 			'token' => $t['token'],
 			'expires' => $t['expires'],
-			'interval' => max(3, getDolGlobalInt('INBOX_REACTIVITY_INTERVAL', 5)),
+			'interval' => $rhythm['interval'],
+			'idle' => $rhythm['idle'],
 			'url' => dol_buildpath('/inbox/live.php', 1),
-			'last' => $since['last'],
+			'last' => InboxEvent::cursor($db),
 		));
 		// no break
 	default:

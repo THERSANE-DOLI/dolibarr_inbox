@@ -3727,3 +3727,25 @@ InboxDocDesc_dev_combo = Elenchi con ricerca senza dipendenze (Dolibarr.tools.co
 InboxDocDesc_dev_mail_data = La pulizia di ogni valore di una mail prima di mostrarlo o scriverlo
 InboxDocDesc_dev_development = Icone, server mail di test, test, catalogo, copie di Dolibarr da allineare
 InboxDocMissing = Questa pagina manca nel modulo.
+
+# Refresh of the lists (1.121.0)
+InboxReactivitySetupTitle = Aggiornamento degli elenchi
+InboxReactivitySetupHelp = Quanto presto le modifiche fatte dagli altri utenti (assegnazione, tag, contrassegni, spostamenti, nuove email) compaiono negli elenchi. Un'impostazione del server: vale per tutte le entità.
+InboxReactivityMode = Aggiornamento
+InboxReactivityModeHelp = Standard: gli elenchi interrogano il server ogni 20 secondi. Rapido: una scheda per browser interroga ogni pochi secondi tramite una chiamata leggera che non avvia Dolibarr, e gli elenchi seguono entro questi pochi secondi. Nulla delle email viene scritto per questo (né oggetto, né testo, né indirizzo), solo numeri.
+InboxReactivityStandard = Standard (ogni 20 secondi)
+InboxReactivityFast = Rapido (ogni pochi secondi)
+InboxReactivityInterval = Intervallo, utente attivo (secondi)
+InboxReactivityIntervalHelp = Tra 3 e 60 secondi.
+InboxReactivityIdle = Intervallo dopo 2 minuti senza attività (secondi)
+InboxReactivityIdleHelp = Dall'intervallo attivo fino a 300 secondi: l'utente probabilmente non è più davanti allo schermo. Anche l'aggiornamento completo tenuto di riserva rallenta, da ogni minuto a ogni 5 minuti. Dopo 30 minuti senza attività le chiamate si fermano fino alla prossima attività.
+InboxReactivityLoadUsers = Carico stimato: %s utenti con accesso a una casella si sono collegati negli ultimi 7 giorni, contati come se fossero tutti collegati nello stesso momento.
+InboxReactivityLightCalls = Chiamate leggere al secondo
+InboxReactivityFullCalls = Chiamate complete al secondo
+InboxReactivityCpu = Processore (core)
+InboxReactivityAllActive = Rapido, tutti attivi
+InboxReactivityAllIdle = Rapido, tutti senza attività da 2 minuti
+InboxReactivityStandardRef = Standard (per confronto)
+InboxReactivityLoadNote = Misurato su un computer di sviluppo: circa 2 ms per chiamata leggera, circa 20 ms per chiamata completa (di più con molte caselle e cartelle). In modalità rapida è contato l'aggiornamento completo tenuto di riserva.
+InboxDocTitle_reactivity = Aggiornamento degli elenchi
+InboxDocDesc_reactivity = Aggiornamento rapido delle modifiche fatte dagli altri utenti, e il carico che aggiunge

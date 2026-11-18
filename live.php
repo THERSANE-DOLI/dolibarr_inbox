@@ -102,7 +102,7 @@ $out = InboxEvent::since($db, $token['e'], $token['u'], $token['a'], $since);
 $db->close();
 // Less than 3 minutes left: the tab asks a new token (ajax/event.php, which checks the rights again)
 $out['renew'] = $token['x'] - $now < 180;
-if ($since > 0 && !$out['events'] && !$out['reset'] && !$out['renew'] && $out['last'] === $since) {
+if (!$out['events'] && !$out['reset'] && !$out['renew'] && $out['last'] === $since) {
 	inboxLiveReply(204);
 }
 inboxLiveReply(200, $out);

@@ -3727,3 +3727,25 @@ InboxDocDesc_dev_combo = Searchable lists without dependency (Dolibarr.tools.com
 InboxDocDesc_dev_mail_data = The cleaning of every value of a mail before it is shown or written
 InboxDocDesc_dev_development = Icons, test mail server, tests, catalogue, copies of Dolibarr to keep in step
 InboxDocMissing = This page is missing from the module.
+
+# Refresh of the lists (1.121.0)
+InboxReactivitySetupTitle = Refresh of the lists
+InboxReactivitySetupHelp = How soon the changes made by the other users (assignment, tags, flags, moves, new emails) show in the lists. A setting of the server: it applies to every entity.
+InboxReactivityMode = Refresh
+InboxReactivityModeHelp = Standard: the lists ask the server every 20 seconds. Fast: one tab per browser asks every few seconds through a light call that does not start Dolibarr, and the lists follow within these few seconds. Nothing of the emails is written for it (no subject, text or address), numbers only.
+InboxReactivityStandard = Standard (every 20 seconds)
+InboxReactivityFast = Fast (every few seconds)
+InboxReactivityInterval = Interval while the user is active (seconds)
+InboxReactivityIntervalHelp = Between 3 and 60 seconds.
+InboxReactivityIdle = Interval after 2 minutes without activity (seconds)
+InboxReactivityIdleHelp = From the active interval up to 300 seconds: the user is probably away from the screen. The full refresh kept as a safety net also slows down, from every minute to every 5 minutes. After 30 minutes without activity the calls stop until the next activity.
+InboxReactivityLoadUsers = Estimated load: %s users reaching a mailbox logged in during the last 7 days, counted as if they were all connected at once.
+InboxReactivityLightCalls = Light calls per second
+InboxReactivityFullCalls = Full calls per second
+InboxReactivityCpu = Processor (cores)
+InboxReactivityAllActive = Fast, all active
+InboxReactivityAllIdle = Fast, all without activity for 2 minutes
+InboxReactivityStandardRef = Standard (for comparison)
+InboxReactivityLoadNote = Measured on a development computer: about 2 ms per light call, about 20 ms per full call (more with many mailboxes and folders). In fast mode the full refresh kept as a safety net is counted.
+InboxDocTitle_reactivity = Refresh of the lists
+InboxDocDesc_reactivity = Fast refresh of the changes made by the other users, and the load it brings

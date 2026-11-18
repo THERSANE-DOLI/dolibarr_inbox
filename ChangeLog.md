@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: fast refresh of the lists, the changes made by the other users show within a few seconds :   1.122.0
+  - setting « Refresh of the lists » in the setup of the module: standard (20 s) or fast, an interval while the user
+    is active and one after 2 minutes without activity, with the load they bring computed as they are typed.
+  - one tab per browser asks, stopped after 30 minutes without activity.
+
 - NEW: journal of the changes, so that the lists open by the other users can follow at once :   1.121.0
   - assignments, tags, flags, moves and new mails written by numbers only, never a subject, a text or an address.
   - light call live.php: a signed token, each user reads only the mailboxes he can read, Dolibarr not started.

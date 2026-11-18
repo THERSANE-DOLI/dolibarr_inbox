@@ -197,6 +197,8 @@ function inboxAppContextVars(User $user)
 		'INBOX_TOKEN' => currentToken(),
 		// The JS context only takes strings, numbers and booleans: flat keys, JSON text for the settings
 		'INBOX_USER_ID' => (int) $user->id,
+		// Quicker refresh of the lists (1.121.0): '' standard, 'fast'
+		'INBOX_REACTIVITY' => getDolGlobalString('INBOX_REACTIVITY'),
 		// Associated data of the encrypted copies of the protected mailboxes (1.89.0): entity | mailbox | user | device
 		'INBOX_ENTITY' => (int) $conf->entity,
 		'INBOX_USER_NAME' => $user->getFullName($GLOBALS['langs']),

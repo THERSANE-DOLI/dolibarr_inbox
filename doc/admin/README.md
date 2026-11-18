@@ -2,6 +2,7 @@
 
 - [Installation](install.md): zip or git, which branch for which instance, requirements
 - [Inbox application](application.md): the application, the cache of the mails read
+- [Refresh of the lists](reactivity.md): standard or fast refresh of the changes made by the other users, load on the server
 - [Writing editor](writing-editor.md): Inbox editor or CKEditor, small screens, signature
 - [Mail templates](mail-templates.md): complete mail or piece of text, default templates on four levels
 - [Agenda panel](agenda-panel.md)
