@@ -1845,7 +1845,7 @@
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r, S.tagsDots) + '</td>' },
 		assign: { label: 'InboxAssigned', icon: 'user-circle', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees, '', 2) + '</td>' },
-		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(r.soc.name) : '') + '</td>' },
+		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(socName(r.soc)) : '') + '</td>' },
 		size: { label: 'InboxSize', sort: 'size', width: '4.5rem', cell: r => '<td class="ibx-mailrow__date">' + esc(size(r.size)) + '</td>' },
 		box: { label: 'InboxMailboxFolder', width: '12rem', cell: r => '<td class="ibx-muted">' + boxHtml(r) + '</td>' },
 		date: { label: 'InboxDate', sort: 'date', width: '5.75rem', cell: r => '<td class="ibx-mailrow__date" title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</td>' },
@@ -2233,7 +2233,7 @@
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
 						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
 					// The people assigned last: pushed to the right (margin-left: auto), they never move the rest
-					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis">' + ic('company') + ' ' + esc(r.soc.name) + '</span>' : '')
+					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis"' + (r.soc.hidden ? ' title="' + th('InboxSocHiddenHelp') + '"' : '') + '>' + ic('company') + ' ' + esc(socName(r.soc)) + '</span>' : '')
 					+ (S.scope === 'all' || S.scope === 'view' ? ' ' + boxHtml(r) : '')
 					+ assigneesHtml(r.assignees, 'ibx-mailcard__assign')
 					+ '</span>'
@@ -6763,7 +6763,8 @@
 			// The thirdparty and the contact as cards (1.67.0): reach them, situation by the usage of the mailbox
 			const sender = [];
 			if (d.sender.soc) {
-				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0))
+				// A thirdparty he may not read: what to do, rather than creating it again (never who could give it)
+				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0) + '<span class="ibx-muted ibx-soccard__by">' + th('InboxSocHiddenHelp') + '</span>')
 					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
 			}
 			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
@@ -7289,11 +7290,20 @@
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],
 		});
-		dlg.addEventListener('click', e => {
+		dlg.addEventListener('click', async e => {
 			const b = e.target.closest('.ibx-js-createtype');
-			if (b) {
-				createPiece(box, b.dataset.type, $('.ibx-js-createattach', dlg).checked, dlg);
+			if (!b) {
+				return;
 			}
+			const attach = $('.ibx-js-createattach', dlg).checked;
+			// A thirdparty already known for this sender (readable or not): asked before a second one is made
+			if (b.dataset.type === 'societe' && d.sender && d.sender.soc) {
+				const ok = await I.confirmDialog({ title: t('InboxCreateSocExistsTitle'), text: t(d.sender.soc.readable ? 'InboxCreateSocExists' : 'InboxCreateSocExistsHidden'), confirm: t('InboxCreateSocAnyway') });
+				if (!ok) {
+					return;
+				}
+			}
+			createPiece(box, b.dataset.type, attach, dlg);
 		});
 	}
 	/** The page of creation of a type, in a new tab; the piece saved there is linked to the mail */
@@ -9511,6 +9521,16 @@
 				}
 			});
 		});
+	}
+
+	/**
+	 * Name of the thirdparty of a line: a thirdparty the user may not read says only that it exists (ask an access
+	 * rather than create it again)
+	 * @param {object} soc {id, name, hidden}
+	 * @returns {string}
+	 */
+	function socName(soc) {
+		return soc.hidden ? t('InboxSocHidden') : String(soc.name || '');
 	}
 
 	function hostOf(url) {

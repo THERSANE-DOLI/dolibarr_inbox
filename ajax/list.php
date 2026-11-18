@@ -32,6 +32,49 @@ $action = (string) inboxAjaxParam('action', 'aZ09');
 // The calls that write (presence, synchronisation, results of a search in the text) need POST and the token (audit INBX-017)
 inboxAjaxStart(in_array($action, array('state', 'pump', 'refresh', 'content'), true));
 $access = new InboxAccess($db);
+
+/**
+ * Lines of a list: the thirdparty of a line kept only when the user may read it (right of the thirdparties, and the
+ * restriction « his own customers » of Dolibarr); else only that one exists (hidden, no number, no name)
+ *
+ * @param array<int,array<string,mixed>> $rows Lines
+ * @return array<int,array<string,mixed>>
+ */
+function inboxListReadableSocs(array $rows)
+{
+	global $db, $user;
+
+	$ids = array();
+	foreach ($rows as $r) {
+		if (!empty($r['soc']['id'])) {
+			$ids[(int) $r['soc']['id']] = true;
+		}
+	}
+	if (!$ids) {
+		return $rows;
+	}
+	$allowed = array();
+	if (isModEnabled('societe') && $user->hasRight('societe', 'lire')) {
+		if ($user->hasRight('societe', 'client', 'voir')) {
+			$allowed = $ids;
+		} else {
+			$own = $db->getRows("SELECT fk_soc FROM ".$db->prefix()."societe_commerciaux WHERE fk_user = ".((int) $user->id)." AND fk_soc IN (".implode(',', array_keys($ids)).") LIMIT 10000");
+			foreach (is_array($own) ? $own : array() as $o) {
+				$allowed[(int) $o->fk_soc] = true;
+			}
+		}
+	}
+	foreach ($rows as $k => $r) {
+		if (!empty($r['soc']['id']) && !isset($allowed[(int) $r['soc']['id']])) {
+			// The line says a thirdparty exists (never which one): the user asks for an access instead of creating it
+			// again
+			$rows[$k]['soc'] = array('id' => 0, 'name' => '', 'hidden' => true);
+		}
+	}
+
+	return $rows;
+}
+
 /**
  * Live page of a protected mailbox (1.89.0): same answer as a page of the index, nothing of the index around it
  *
@@ -363,6 +406,10 @@ switch ($action) {
 		$limit = (int) (inboxAjaxParam('limit', 'int') ?: 200);
 		$page = $threads ? $engine->searchThreads($accounts, $folderId, $query, $cursor, $limit) : $engine->search($accounts, $folderId, $query, $cursor, $limit);
 		$page['threads'] = $threads;
+		// The thirdparty of each line as Dolibarr shows it: with the right to read the thirdparties, his own customers
+		// only for a sales representative restricted to them; else « Thirdparty not accessible » (neither its name nor
+		// its number)
+		$page['rows'] = inboxListReadableSocs($page['rows']);
 		// People assigned to each line, and their names
 		dol_include_once('/inbox/class/inboxassign.class.php');
 		$assign = new InboxAssign($db);

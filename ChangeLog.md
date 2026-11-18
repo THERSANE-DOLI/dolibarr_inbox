@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: thirdparty of the list lines, new customer and pieces created from a mail checked as in Dolibarr :   1.128.2
+  - thirdparty of a line with the right to read it, else « Thirdparty not accessible » and how to get an access.
+  - a thirdparty created from a mail whose sender is already one is asked first; new customer: lists offered only.
+  - a piece created elsewhere no longer uses the intent of a mail: token of the page of creation.
+
 - FIX: protected mailboxes locked at the logout, address typed again checked by the server for « content » :   1.128.1
   - the logout of Dolibarr locks the mailboxes unlocked and removes their cookie.
   - change to the level « content »: the address of the mailbox is checked on the server, as to protect or reset.

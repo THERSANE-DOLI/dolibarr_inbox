@@ -1463,19 +1463,24 @@ class InboxLead
 				$this->db->rollback();
 				return $this->fail('soc', $s->error);
 			}
-			// Sales representatives chosen in the panel (nobody by default)
+			// Sales representatives chosen in the panel (nobody by default): those the form offers only (active internal
+			// users of the entity), as the card of Dolibarr
+			$offered = array_column($this->users(), 'id');
 			foreach (array_unique(array_filter(array_map('intval', (array) ($opts['commercial'] ?? array())))) as $uid) {
-				if (is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."user WHERE rowid = ".$uid." AND statut = 1"))) {
+				if (in_array($uid, $offered, true)) {
 					$s->add_commercial($user, $uid);
 				}
 			}
-			$cats = array_filter(array_map('intval', (array) ($opts['categories'] ?? array())));
-			if ($cats && $s->client && $user->hasRight('categorie', 'creer')) {
-				$s->setCategories($cats, 'customer');
-			}
-			$sup = array_filter(array_map('intval', (array) ($opts['categories_supplier'] ?? array())));
-			if ($sup && $s->fournisseur && $user->hasRight('categorie', 'creer')) {
-				$s->setCategories($sup, 'supplier');
+			// Categories of the lists offered only: this entity, the right type (customer, supplier)
+			if (isModEnabled('category') && $user->hasRight('categorie', 'creer')) {
+				$cats = array_values(array_intersect(array_map('intval', (array) ($opts['categories'] ?? array())), array_column($this->categories(2), 'id')));
+				if ($cats && $s->client) {
+					$s->setCategories($cats, 'customer');
+				}
+				$sup = array_values(array_intersect(array_map('intval', (array) ($opts['categories_supplier'] ?? array())), array_column($this->categories(1), 'id')));
+				if ($sup && $s->fournisseur) {
+					$s->setCategories($sup, 'supplier');
+				}
 			}
 		}
 		$contactId = 0;

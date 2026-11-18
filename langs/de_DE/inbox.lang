@@ -1109,6 +1109,12 @@ InboxJournal_export = Exportiert
 # Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
 InboxDolibarr = Dolibarr
 InboxPieceNotReadable = nicht zugänglich
+InboxSocHidden = Geschäftspartner nicht zugänglich
+InboxSocHiddenHelp = Dieser Korrespondent ist bereits ein Geschäftspartner in Dolibarr, aber Sie haben keinen Zugriff darauf. Bitten Sie einen Verantwortlichen, Sie als Vertreter dieses Geschäftspartners hinzuzufügen oder Ihnen das Recht zu geben, alle Geschäftspartner zu sehen.
+InboxCreateSocExistsTitle = Ein Geschäftspartner existiert bereits
+InboxCreateSocExists = Für diesen Absender existiert bereits ein Geschäftspartner. Trotzdem einen neuen Geschäftspartner anlegen?
+InboxCreateSocExistsHidden = Für diesen Absender existiert bereits ein Geschäftspartner, den Sie nicht sehen können. Bitten Sie besser einen Verantwortlichen um Zugriff. Trotzdem einen neuen Geschäftspartner anlegen?
+InboxCreateSocAnyway = Trotzdem anlegen
 InboxUnlink = Verknüpfung lösen
 InboxUnlinkPiece = Verknüpfung mit %s lösen
 InboxPiecesCount = %s Beleg(e)

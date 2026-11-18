@@ -1109,6 +1109,12 @@ InboxJournal_export = Exported
 # Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
 InboxDolibarr = Dolibarr
 InboxPieceNotReadable = not accessible
+InboxSocHidden = Thirdparty not accessible
+InboxSocHiddenHelp = This correspondent is already a thirdparty of Dolibarr, but you have no access to it. Ask a manager to add you as sales representative of this thirdparty, or to give you the right to see all the thirdparties.
+InboxCreateSocExistsTitle = A thirdparty already exists
+InboxCreateSocExists = A thirdparty already exists for this sender. Create a new thirdparty anyway?
+InboxCreateSocExistsHidden = A thirdparty you cannot see already exists for this sender. Rather ask a manager for an access to it. Create a new thirdparty anyway?
+InboxCreateSocAnyway = Create anyway
 InboxUnlink = Unlink
 InboxUnlinkPiece = Unlink %s
 InboxPiecesCount = %s piece(s)

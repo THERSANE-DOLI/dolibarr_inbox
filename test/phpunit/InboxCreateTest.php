@@ -45,6 +45,33 @@ class InboxCreateTest extends InboxTestCase
 	}
 
 	/**
+	 * A creation uses the intent of the page of creation opened from the mail only (its token in the Referer), never
+	 * the creation of a thirdparty made elsewhere meanwhile
+	 *
+	 * @return void
+	 */
+	public function testIntentOfItsPageOnly()
+	{
+		$base = 'https://erp.inbox-test.invalid/societe/card.php';
+		$intents = array(
+			array('type' => 'societe', 'token' => 'aaaa1111aaaa1111', 'path' => '/societe/card.php', 'at' => dol_now() - 60),
+			array('type' => 'propal', 'token' => 'bbbb2222bbbb2222', 'path' => '/comm/propal/card.php', 'at' => dol_now() - 30),
+			array('type' => 'societe', 'token' => 'cccc3333cccc3333', 'path' => '/societe/card.php', 'at' => dol_now() - 10),
+		);
+		$this->assertSame(0, InboxCreate::intentOf($intents, 'societe', $base.'?action=create&inboxintent=aaaa1111aaaa1111'), 'its token, even an older intent');
+		$this->assertSame(2, InboxCreate::intentOf($intents, 'societe', $base.'?action=create&name=x&inboxintent=cccc3333cccc3333'));
+		$this->assertNull(InboxCreate::intentOf($intents, 'societe', $base.'?action=create&inboxintent=bbbb2222bbbb2222'), 'the token of another type');
+		$this->assertNull(InboxCreate::intentOf($intents, 'societe', $base.'?action=create'), 'a thirdparty created from the menu of Dolibarr');
+		$this->assertNull(InboxCreate::intentOf($intents, 'societe', 'https://erp.inbox-test.invalid/custom/inbox/index.php?mainmenu=home'), 'created by the panel or a module');
+		$this->assertSame(2, InboxCreate::intentOf($intents, 'societe', $base), 'the page shown again after an error: the last one');
+		$this->assertSame(2, InboxCreate::intentOf($intents, 'societe', ''), 'no Referer: the last one');
+		$intents[2]['at'] = dol_now() - InboxCreate::INTENT_UNTOKEN_TTL - 1;
+		$this->assertNull(InboxCreate::intentOf($intents, 'societe', $base), 'without token: the last minutes only');
+		$this->assertNull(InboxCreate::intentOf($intents, 'societe', ''), 'never an older one instead');
+		$this->assertSame(2, InboxCreate::intentOf($intents, 'societe', $base.'?inboxintent=cccc3333cccc3333'), 'its token: the whole life of the intent');
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testCreateLinkAttach()

@@ -1109,6 +1109,12 @@ InboxJournal_export = Esportato
 # Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
 InboxDolibarr = Dolibarr
 InboxPieceNotReadable = non accessibile
+InboxSocHidden = Soggetto terzo non accessibile
+InboxSocHiddenHelp = Questo corrispondente è già un soggetto terzo di Dolibarr, ma non avete accesso. Chiedete a un responsabile di aggiungervi come commerciale di questo soggetto terzo, o di darvi il diritto di vedere tutti i soggetti terzi.
+InboxCreateSocExistsTitle = Esiste già un soggetto terzo
+InboxCreateSocExists = Esiste già un soggetto terzo per questo mittente. Creare comunque un nuovo soggetto terzo?
+InboxCreateSocExistsHidden = Esiste già, per questo mittente, un soggetto terzo che non potete vedere. Chiedete piuttosto a un responsabile di darvi accesso. Creare comunque un nuovo soggetto terzo?
+InboxCreateSocAnyway = Crea comunque
 InboxUnlink = Scollega
 InboxUnlinkPiece = Scollega %s
 InboxPiecesCount = %s documento/i

@@ -1109,6 +1109,12 @@ InboxJournal_export = Exporté
 # Bandeau Dolibarr: sender, pieces linked, notes (1.13.0)
 InboxDolibarr = Dolibarr
 InboxPieceNotReadable = non accessible
+InboxSocHidden = Tiers non accessible
+InboxSocHiddenHelp = Ce correspondant est déjà un tiers de Dolibarr, mais vous n'y avez pas accès. Demandez à un responsable de vous ajouter comme commercial de ce tiers, ou de vous donner le droit de voir tous les tiers.
+InboxCreateSocExistsTitle = Un tiers existe déjà
+InboxCreateSocExists = Un tiers existe déjà pour cet expéditeur. Créer quand même un nouveau tiers ?
+InboxCreateSocExistsHidden = Un tiers que vous ne pouvez pas voir existe déjà pour cet expéditeur. Demandez plutôt à un responsable de vous y donner accès. Créer quand même un nouveau tiers ?
+InboxCreateSocAnyway = Créer quand même
 InboxUnlink = Délier
 InboxUnlinkPiece = Délier %s
 InboxPiecesCount = %s pièce(s)
