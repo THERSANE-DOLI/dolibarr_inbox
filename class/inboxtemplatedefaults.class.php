@@ -129,13 +129,19 @@ class InboxTemplateDefaults
 	 */
 	public function canSet(User $user, $level, $accountId)
 	{
+		global $conf;
+
 		$admin = $user->hasRight('inbox', 'account', 'admin');
 		$access = new InboxAccess($this->db);
 		switch ($level) {
 			case 'user_box':
 				return $access->check($user, (int) $accountId, InboxAccess::LEVEL_SEND);
 			case 'box':
-				return $admin || $access->check($user, (int) $accountId, InboxAccess::LEVEL_MANAGE);
+				if ($admin) {
+					// The administrator of the mailboxes: a mailbox of this entity only (never a number made up)
+					return is_object($this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_account WHERE rowid = ".((int) $accountId)." AND entity = ".((int) $conf->entity)));
+				}
+				return $access->check($user, (int) $accountId, InboxAccess::LEVEL_MANAGE);
 			case 'user':
 				return true;
 			case 'all':
@@ -328,6 +334,9 @@ class InboxTemplateDefaults
 		}
 		if (!$this->canSet($user, $level, $accountId)) {
 			return $this->fail('no_right');
+		}
+		if ($template !== null && (int) $template < 0) {
+			return $this->fail('bad_value');
 		}
 		if ($template !== null && (int) $template > 0 && !in_array((int) $template, array_column($this->choices($user, $level, $accountId), 'id'), true)) {
 			return $this->fail('bad_template');

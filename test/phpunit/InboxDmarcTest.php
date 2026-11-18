@@ -214,6 +214,10 @@ class InboxDmarcTest extends InboxTestCase
 		$this->assertSame('InboxDmarcNotReport', InboxDmarc::analyze('r.xml', '<html><body>x</body></html>')['error']);
 		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.xml', '<feedback><record>')['error']);
 		$this->assertSame('InboxDmarcUnknownFormat', InboxDmarc::analyze('r.pdf', '%PDF-1.4')['error']);
+		// A zip that does not open: refused as unreadable (never a fatal error), its temporary file gone
+		$before = glob(sys_get_temp_dir().'/ibxdm*') ?: array();
+		$this->assertSame('InboxDmarcUnreadable', InboxDmarc::analyze('r.zip', "PK\x03\x04".str_repeat('x', 200))['error']);
+		$this->assertSame($before, glob(sys_get_temp_dir().'/ibxdm*') ?: array(), 'no temporary file left');
 		$this->assertSame('InboxDmarcNested', InboxDmarc::analyze('r.zip', self::zip(array('inner.zip' => self::zip(array('r.xml' => $xml)))))['error']);
 		$many = array();
 		for ($i = 0; $i <= InboxDmarc::MAX_ZIP_ENTRIES; $i++) {

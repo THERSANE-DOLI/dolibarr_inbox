@@ -251,6 +251,64 @@ class InboxInviteTest extends InboxImapTestCase
 	}
 
 	/**
+	 * The event named by the module of the agenda (hook inboxInviteEvent): one of the agendas of this entity only
+	 *
+	 * @return void
+	 */
+	public function testKnownEventOfThisEntityOnly()
+	{
+		global $hookmanager;
+
+		$p = $this->db->prefix();
+		$ids = array();
+		foreach (array(1, 2) as $entity) {
+			$this->db->query("INSERT INTO ".$p."actioncomm (entity, ref, datep, datec, label, fk_user_action, fk_user_author, code, fk_action, percent)"
+				." VALUES (".$entity.", 'ZZINV".$entity."', '".$this->db->idate(dol_now())."', '".$this->db->idate(dol_now())."', 'ZzInvite entity ".$entity."', ".((int) $this->admin->id).", ".((int) $this->admin->id).", 'AC_OTH', 50, -1)");
+			$ids[$entity] = (int) $this->db->last_insert_id($p.'actioncomm');
+			$this->assertGreaterThan(0, $ids[$entity], $this->db->lasterror());
+		}
+		$saved = $hookmanager;
+		$hookmanager = new class {
+			/** @var array<string,mixed> */
+			public $resArray = array();
+			/** @var int */
+			public $answer = 0;
+			/**
+			 * @param string[] $contexts Contexts
+			 * @return void
+			 */
+			public function initHooks($contexts)
+			{
+			}
+			/**
+			 * @param string $name       Hook
+			 * @param array  $parameters Parameters
+			 * @param mixed  $object     Object
+			 * @param string $action     Action
+			 * @return int
+			 */
+			public function executeHooks($name, $parameters, &$object, &$action)
+			{
+				$this->resArray = array('event' => array('id' => $this->answer, 'attendee' => 0));
+				return 0;
+			}
+		};
+		try {
+			$invite = new InboxInvite($this->db);
+			$known = new ReflectionMethod($invite, 'known');
+			$known->setAccessible(true);
+			$e = array('uid' => 'zz-known@inbox-test.invalid', 'sequence' => 0, 'organizer' => null);
+			$hookmanager->answer = $ids[1];
+			$this->assertSame($ids[1], $known->invoke($invite, $this->admin, $e, 'REQUEST')['id'], 'an event of this entity');
+			$hookmanager->answer = $ids[2];
+			$this->assertNull($known->invoke($invite, $this->admin, $e, 'REQUEST'), 'an event of another entity is not known here');
+		} finally {
+			$hookmanager = $saved;
+			$this->db->query("DELETE FROM ".$p."actioncomm WHERE rowid IN (".implode(',', $ids).")");
+		}
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testAnswerAgendaUpdateCancel()

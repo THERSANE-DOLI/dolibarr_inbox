@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: invitations, DMARC archives and default templates :   1.126.3
+  - an invitation is recognized in the agendas of this entity only; answering it needs the right on own events.
+  - an unreadable DMARC zip is refused cleanly (was a server error), its temporary file always removed.
+  - default templates: a negative number refused, a mailbox of another entity refused for the administrator.
+
 - FIX: entity of Dolibarr changed in another tab while Inbox is open :   1.126.2
   - Inbox notices it at once, reads and writes nothing more and asks to be reloaded in the new entity.
   - the tabs of two entities no longer share their coordination; a dialog that must be answered stays open.

@@ -475,7 +475,9 @@ class InboxInvite
 		$x = $hookmanager->resArray['event'];
 		$id = (int) ($x['id'] ?? 0);
 		$p = $this->db->prefix();
+		// An event of the agendas of this entity (shared ones included, as in Dolibarr), whatever the module answered
 		$row = $id > 0 ? $this->db->getRow("SELECT a.id, a.label, a.fk_user_action FROM ".$p."actioncomm as a WHERE a.id = ".$id
+			." AND a.entity IN (".getEntity('agenda').")"
 			." AND (a.fk_user_action = ".((int) $user->id)." OR EXISTS (SELECT 1 FROM ".$p."actioncomm_resources as r WHERE r.fk_actioncomm = a.id AND r.element_type = 'user' AND r.fk_element = ".((int) $user->id)."))") : null;
 		if (!is_object($row)) {
 			return null;
@@ -512,6 +514,10 @@ class InboxInvite
 		$l = $this->load($user, $mailId);
 		if ($l === null) {
 			return null;
+		}
+		// An answer changes the agenda: the right of Dolibarr on its own events, as on the card of the event
+		if (!self::canAgenda($user)) {
+			return $this->fail('no_agenda');
 		}
 		// The event asked again on the server: never an id from the browser
 		$known = $this->known($user, $l['event'], $l['method']);

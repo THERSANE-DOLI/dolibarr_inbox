@@ -239,17 +239,24 @@ class InboxDmarc
 			return array();
 		}
 		$tmp = tempnam(sys_get_temp_dir(), 'ibxdm');
-		if ($tmp === false || file_put_contents($tmp, $data) === false) {
+		if ($tmp === false) {
 			$error = 'InboxDmarcUnreadable';
 			return array();
 		}
 		$out = array();
 		$zip = new ZipArchive();
+		$opened = false;
+		// Written inside the try: a failed write (disk full) never leaves the file behind
 		try {
+			if (file_put_contents($tmp, $data) === false) {
+				$error = 'InboxDmarcUnreadable';
+				return array();
+			}
 			if ($zip->open($tmp, defined('ZipArchive::RDONLY') ? ZipArchive::RDONLY : 0) !== true) {
 				$error = 'InboxDmarcUnreadable';
 				return array();
 			}
+			$opened = true;
 			if ($zip->numFiles > self::MAX_ZIP_ENTRIES) {
 				$error = 'InboxDmarcTooManyFiles';
 				return array();
@@ -302,7 +309,10 @@ class InboxDmarc
 				}
 			}
 		} finally {
-			@$zip->close();
+			// close() of an archive not opened throws (PHP 8), the @ does not stop it
+			if ($opened) {
+				$zip->close();
+			}
 			@unlink($tmp);
 		}
 		if (!$out && $error === '') {

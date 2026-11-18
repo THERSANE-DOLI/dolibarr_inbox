@@ -114,6 +114,14 @@ class InboxTemplateDefaultsTest extends InboxTestCase
 		$this->assertSame('bad_template', $d->errorCode);
 		$this->assertFalse($d->set($writer, (int) $a->id, 'user_box', 'new', $inB), 'not offered in A');
 		$this->assertSame('bad_template', $d->errorCode);
+		// A negative number is never saved; the administrator sets only the mailboxes of this entity
+		$this->assertFalse($d->set($writer, (int) $a->id, 'user_box', 'new', -5));
+		$this->assertSame('bad_value', $d->errorCode);
+		$this->assertFalse($d->set($this->admin, 999999999, 'box', 'new', $everywhere), 'a mailbox made up');
+		$this->assertSame('no_right', $d->errorCode);
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET entity = 2 WHERE rowid = ".((int) $b->id));
+		$this->assertFalse($d->set($this->admin, (int) $b->id, 'box', 'new', $everywhere), 'a mailbox of another entity');
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET entity = 1 WHERE rowid = ".((int) $b->id));
 		$this->assertFalse($d->set($writer, (int) $a->id, 'user_box', 'later', $everywhere));
 		$this->assertSame('bad_value', $d->errorCode);
 		$private = $tpl->save($writer, array('label' => 'ZzTpl private', 'html' => '<p>e</p>', 'private' => 1));
