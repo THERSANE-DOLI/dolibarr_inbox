@@ -12,7 +12,9 @@ if [ "$1" = "stop" ]; then
 	docker compose down
 	exit 0
 fi
-RSPAMD_IMAGE=rspamd/rspamd:4.2.3
+# The image of docker-compose.yml (kept up to date by Dependabot), to hash the password with the same version
+RSPAMD_IMAGE=$(sed -n 's#^ *image: *\(rspamd/rspamd:[^ ]*\).*#\1#p' docker-compose.yml)
+[ -n "$RSPAMD_IMAGE" ] || { echo "No image rspamd/rspamd in docker-compose.yml" >&2; exit 1; }
 PASSWORD=$RSPAMD_PASSWORD
 if [ -z "$PASSWORD" ]; then
 	PASSWORD=$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | cut -c1-24)

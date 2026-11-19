@@ -30,7 +30,7 @@ the controller (port 11334, its password in Settings > Anti-spam > Settings) for
   in Settings > Anti-spam. `dev/rspamd/run.sh stop` stops both. Rspamd still asks the DNS for the SPF, DKIM and
   DMARC records of the senders of the mails it judges (the hour of arrival and the resolver of the server show).
 - Without Docker: the Debian package of rspamd with redis-server, and the same `local.d/` and `override.d/` files.
-  Publish the ports on 127.0.0.1 only. These files (checked on Rspamd 4.2.3, 2026-11-16; 3.11.1 accepts them too):
+  Publish the ports on 127.0.0.1 only. These files (checked on Rspamd 4.3.0, 2026-11-19; 3.11.1 accepts them too):
   - turn off what asks outside: public fuzzy storage of rspamd.com, update of the rules from updates.rspamd.com,
     lists downloaded from maps.rspamd.com (multimap, whitelist; mid, mime_types and the equivalent domains of
     forged_recipients read the copies of the image), phishing lists, ASN zone, following of short links,
