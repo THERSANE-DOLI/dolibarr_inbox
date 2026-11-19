@@ -135,6 +135,18 @@ switch ($action) {
 				$aways[(int) $r->rowid] = array('from' => substr((string) $r->away_from, 0, 10), 'to' => substr((string) $r->away_to, 0, 10));
 			}
 		}
+		// Mails followed of each mailbox (out of the trash and the junk, as the view « Followed »): the entry « Followed »
+		// of the mailbox in the tree, shown only when there is one
+		$flagged = array();
+		if ($accounts) {
+			$rows = $db->getRows("SELECT m.fk_account, COUNT(m.rowid) AS n FROM ".$db->prefix()."inbox_mail as m"
+				." INNER JOIN ".$db->prefix()."inbox_folder as f ON f.rowid = m.fk_folder AND f.status = 1"
+				." WHERE m.fk_account IN (".implode(',', array_map('intval', array_keys($accounts))).") AND m.flagged = 1"
+				." AND COALESCE(f.role, '') NOT IN ('trash', 'junk') GROUP BY m.fk_account LIMIT 1000");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$flagged[(int) $r->fk_account] = (int) $r->n;
+			}
+		}
 		$live = new InboxLive($db);
 		foreach ($accounts as $account) {
 			$account->loadSyncState();
@@ -198,6 +210,7 @@ switch ($action) {
 				'fulltext' => isset($ftStates[(int) $account->id]) ? (string) $ftStates[(int) $account->id]->state : '',
 				'away' => $aways[(int) $account->id] ?? null,
 				'marks' => (object) $marks,
+				'flagged' => $flagged[(int) $account->id] ?? 0,
 				// Tags of the mailbox (its own list or the global one): keyword => label, color, border and colour of the rows
 				'tags' => array_values(array_map(function ($t) {
 					return array('keyword' => $t['keyword'], 'label' => $t['label'], 'color' => $t['color'], 'border' => $t['border'], 'tint' => (int) $t['tint']);

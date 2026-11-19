@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.128.7';
+		$this->version = '1.128.11';
 		// Last version published (Setup > Modules > Check the last version): the site of inbox answers the version
 		// of the latest GitHub release as plain text, kept 10 minutes; no download counted, nothing stored
 		$this->url_last_version = 'https://inbox.techsane.fr/api/download.php?version';
