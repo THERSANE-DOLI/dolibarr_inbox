@@ -99,8 +99,12 @@
 		// default: closed
 	}
 	/** A row of the tree open: a folder when the user opened it, a mailbox or the views unless he closed them */
+	/** Keys closed by default (folders, other folders of a mailbox): their opening is kept, not their closing */
+	function keptOpened(key) {
+		return key.charAt(0) === 'f' || key.indexOf('sys') === 0;
+	}
 	function isOpen(key) {
-		return key.charAt(0) === 'f' ? S.opened.has(key) : !S.collapsed.has(key);
+		return keptOpened(key) ? S.opened.has(key) : !S.collapsed.has(key);
 	}
 	/**
 	 * A row of the tree opened or closed, kept in the settings of the user unless asked otherwise
@@ -113,7 +117,7 @@
 		if (isOpen(key) === open) {
 			return false;
 		}
-		if (key.charAt(0) === 'f') {
+		if (keptOpened(key)) {
 			S.opened[open ? 'add' : 'delete'](key);
 			if (keep) {
 				saveParam('tree_open', JSON.stringify(Array.from(S.opened)));
@@ -363,7 +367,7 @@
 		S.accounts.forEach(a => a.folders.forEach(f => S.folders.set(f.id, { folder: f, account: a })));
 		S.icons = res.icons || [];
 		// Folded state of the folders and mailboxes that are gone: forgotten (the setting does not grow)
-		const known = new Set(S.accounts.map(a => 'a' + a.id).concat(Array.from(S.folders.keys(), id => 'f' + id), ['views']));
+		const known = new Set(S.accounts.map(a => 'a' + a.id).concat(S.accounts.map(a => 'sys' + a.id), Array.from(S.folders.keys(), id => 'f' + id), ['views']));
 		const stale = Array.from(S.collapsed).filter(k => !known.has(k));
 		if (stale.length && S.accounts.length) {
 			stale.forEach(k => S.collapsed.delete(k));
@@ -1152,13 +1156,14 @@
 			const open = sub && (isOpen(key) || needle !== '');
 			html += folderRow(a, f, depth, sub, open, subHtml);
 			if (parent === 0 && f.role === 'inbox' && f.primary !== false && !after) {
-				after = boxFlaggedRow(a, depth, needle) + systemStripHtml(a, strip, depth);
+				// With the line of icons, « Followed » goes into it; without (setting, filter), its own row
+				after = strip.length ? systemStripHtml(a, strip, depth) : boxFlaggedRow(a, depth, needle);
 				html += after;
 			}
 		});
 		if (parent === 0 && !after) {
 			// No Inbox (not synced yet): the line of icons first
-			html = boxFlaggedRow(a, depth, needle) + systemStripHtml(a, strip, depth) + html;
+			html = (strip.length ? systemStripHtml(a, strip, depth) : boxFlaggedRow(a, depth, needle)) + html;
 		}
 		return html;
 	}
@@ -1171,7 +1176,16 @@
 		if (!folders.length) {
 			return '';
 		}
+		// Chevron as on a folder: folded, one line of icons; unfolded, the full rows (same display in every density)
+		const key = 'sys' + a.id;
+		if (isOpen(key)) {
+			// Unfolded: the rows of before at the same level, the chevron on the first one (« Followed » when it shows)
+			const flagged = boxFlaggedRow(a, depth, '', key);
+			return flagged + folders.map((f, i) => folderRow(a, f, depth, false, false, '', !flagged && i === 0 ? key : '')).join('');
+		}
 		return '<li role="none" class="ibx-tree__stripli"><div class="ibx-tree__strip" role="group" aria-label="' + th('InboxSystemFoldersGroup') + '" style="--ibx-depth:' + depth + '">'
+			+ '<button type="button" class="ibx-tree__twisty" data-toggle="' + key + '" aria-label="' + th('InboxExpand') + ' : ' + th('InboxSystemFoldersGroup') + '" title="' + th('InboxSystemFoldersGroup') + '" tabindex="-1">' + ic('chevron-right') + '</button>'
+			+ boxFlaggedChip(a, depth)
 			+ folders.map(f => {
 				const selected = f.id === S.folderId && S.scope === 'folder';
 				const unread = f.unread && f.role !== 'sent' && f.role !== 'drafts' ? f.unread : 0;
@@ -1187,19 +1201,40 @@
 					+ '</div>';
 			}).join('') + '</div></li>';
 	}
+	/** « Followed » of a mailbox in the line of icons: same rule as its row (followed mails, or shown now) */
+	function boxFlaggedChip(a, depth) {
+		const key = 'flagged-' + a.id;
+		const sel = S.scope === 'view' && viewKey() === key;
+		const n = +(a.flagged || 0);
+		if (!n && !sel) {
+			return '';
+		}
+		const label = t('InboxView_flagged') + (n ? ', ' + t('InboxFlaggedCount', n) : '');
+		return '<div class="ibx-tree__chip" role="treeitem" aria-level="' + (depth + 1) + '" data-view="' + key + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '"'
+			+ ' title="' + th('InboxView_flagged') + '" aria-label="' + esc(label) + '">' + ic('star', 'ibx-tree__icon ibx-tree__icon--view')
+			+ (n ? '<span class="ibx-count ibx-count--muted" aria-hidden="true">' + n + '</span>' : '') + '</div>';
+	}
 	/**
 	 * « Followed » of a mailbox, under its Inbox: only when it has mails followed (or while it is shown), the view
 	 * « Followed » limited to this mailbox
 	 */
-	function boxFlaggedRow(a, depth, needle) {
+	/**
+	 * @param {object} a Mailbox
+	 * @param {number} depth Indent
+	 * @param {string} needle Filter of the folders
+	 * @param {string} foldKey Other folders unfolded: the row carries their chevron (folds them back into icons)
+	 * @returns {string}
+	 */
+	function boxFlaggedRow(a, depth, needle, foldKey = '') {
 		const key = 'flagged-' + a.id;
 		const sel = S.scope === 'view' && viewKey() === key;
 		const n = +(a.flagged || 0);
 		if ((!n && !sel) || (needle && !t('InboxView_flagged').toLowerCase().includes(needle))) {
 			return '';
 		}
-		return '<li role="treeitem" aria-level="' + (depth + 1) + '"><div class="ibx-tree__row" style="--ibx-depth:' + depth + '" data-view="' + key + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
-			+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic('star', 'ibx-tree__icon ibx-tree__icon--view')
+		return '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (foldKey ? ' aria-expanded="true"' : '') + '><div class="ibx-tree__row" style="--ibx-depth:' + depth + '" data-view="' + key + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
+			+ (foldKey ? '<button type="button" class="ibx-tree__twisty" data-toggle="' + foldKey + '" aria-label="' + th('InboxCollapse') + ' : ' + th('InboxSystemFoldersGroup') + '" title="' + th('InboxSystemFoldersGroup') + '" tabindex="-1">' + ic('chevron-down') + '</button>'
+				: '<span class="ibx-tree__twisty" aria-hidden="true"></span>') + ic('star', 'ibx-tree__icon ibx-tree__icon--view')
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_flagged') + '</span>'
 			+ (n ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxFlaggedCount', n) + '">' + n + '</span>' : '') + '</div></li>';
 	}
@@ -1216,15 +1251,17 @@
 	 * @param {boolean} open Unfolded on them
 	 * @param {string} subHtml Its subfolders
 	 */
-	function folderRow(a, f, depth, sub, open, subHtml) {
+	function folderRow(a, f, depth, sub, open, subHtml, foldKey = '') {
 		const key = 'f' + f.id;
 		// Closed: the unread of its subfolders told on it, apart from its own (nothing hidden)
 		const below = sub && !open ? unreadBelow(a, f.id) : 0;
 		const selected = f.id === S.folderId && S.scope === 'folder';
-		return '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : '') + '>'
+		// First of the other folders unfolded (no « Followed »): their chevron, in its empty column
+		const fold = foldKey && !sub ? '<button type="button" class="ibx-tree__twisty" data-toggle="' + foldKey + '" aria-label="' + th('InboxCollapse') + ' : ' + th('InboxSystemFoldersGroup') + '" title="' + th('InboxSystemFoldersGroup') + '" tabindex="-1">' + ic('chevron-down') + '</button>' : '';
+		return '<li role="treeitem" aria-level="' + (depth + 1) + '"' + (sub ? ' aria-expanded="' + open + '"' : (fold ? ' aria-expanded="true"' : '')) + '>'
 			+ '<div class="ibx-tree__row' + (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" style="--ibx-depth:' + depth + '"'
 			+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '"' + (movableFolder(f) && !isPhone() ? ' draggable="true"' : '') + '>'
-			+ '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>'
+			+ (fold || '<button type="button" class="ibx-tree__twisty"' + (sub ? ' data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '"' : ' aria-hidden="true"') + ' tabindex="-1">' + (sub ? ic(open ? 'chevron-down' : 'chevron-right') : '') + '</button>')
 			// An ordinary folder unfolded on its subfolders is drawn open
 			+ folderIcon(f, open, 'ibx-tree__icon')
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'

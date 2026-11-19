@@ -6042,7 +6042,10 @@
 				+ '<table class="ibx-table"><thead><tr><th scope="col">' + th('InboxMailbox') + '</th><th scope="col">' + th('InboxCountBox') + '</th><th scope="col">' + th('InboxNewMailNotify') + '</th></tr></thead><tbody>'
 				+ data.mailboxes.map(m => '<tr><td><b>' + esc(m.label || m.email) + '</b><div class="ibx-muted">' + esc(m.email) + '</div></td>'
 					+ '<td>' + sw('data-param="count_box" data-account="' + m.id + '"', m.params.count_box === '1', t('InboxCountBox') + ' : ' + (m.label || m.email)) + '</td>'
-					+ '<td>' + sw('data-param="new_mail_notify" data-account="' + m.id + '"', newMail(m), t('InboxNewMailNotify') + ' : ' + (m.label || m.email)) + '</td></tr>').join('')
+					+ '<td>' + sw('data-param="new_mail_notify" data-account="' + m.id + '"', newMail(m), t('InboxNewMailNotify') + ' : ' + (m.label || m.email))
+					// Not chosen yet: why it is on or off
+					+ (m.params.new_mail_notify === 'auto' ? '<div class="ibx-formrow__help ibx-js-autohint">' + th(m.personal ? 'InboxNewMailNotifyAutoPersonal' : 'InboxNewMailNotifyAutoShared') + '</div>' : '')
+					+ '</td></tr>').join('')
 				+ '</tbody></table></section>';
 		}
 		html += '</div>';
@@ -6072,16 +6075,63 @@
 				state = '<span class="ibx-status ibx-status--warning">' + th('InboxBrowserNotifDenied') + '</span><div class="ibx-formrow__help">' + th('InboxBrowserNotifDeniedHelp') + '</div>';
 			} else if (on) {
 				state = '<span class="ibx-status ibx-status--ok">' + th('InboxBrowserNotifOn') + '</span>';
-				button = '<button type="button" class="ibx-btn ibx-js-browseroff">' + th('InboxBrowserNotifDisable') + '</button>';
+				// The test is the action of this state; turning off stays at hand but lighter
+				button = '<button type="button" class="ibx-btn ibx-js-browsertest">' + ic('bell') + ' ' + th('InboxBrowserNotifTest') + '</button>'
+					+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-js-browseroff">' + th('InboxBrowserNotifDisable') + '</button>';
 			} else {
 				state = '<span class="ibx-status">' + th('InboxBrowserNotifOff') + '</span>';
 				button = '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-browseron">' + ic('bell') + ' ' + th('InboxBrowserNotifEnable') + '</button>';
 			}
+			// State, then its actions and the result of the test, then the help
 			browser.innerHTML = '<div class="ibx-form"><div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxStatus') + '</span><div>' + state
-				+ '<div class="ibx-formrow__help">' + th('InboxBrowserNotifHelp') + '</div>' + (button ? '<div class="ibx-formrow__actions">' + button + '</div>' : '') + '</div></div></div>';
+				+ (button ? '<div class="ibx-formrow__actions">' + button + '</div>' : '')
+				+ (on ? '<div class="ibx-notiftest ibx-js-browsertestresult" role="status"></div>' : '')
+				+ '<div class="ibx-formrow__help">' + th('InboxBrowserNotifHelp') + '</div>'
+				+ '<div class="ibx-formrow__help">' + th('InboxBrowserNotifFront') + '</div></div></div></div>';
+		};
+		/**
+		 * Test notification: what the browser says of it (shown, refused, or no answer) tells where it is blocked.
+		 * Shown but not seen = the system hid it (do not disturb, browser not allowed): the two checks are listed.
+		 */
+		let testRun = 0;
+		const testBrowser = () => {
+			const zone = $('.ibx-js-browsertestresult', browser);
+			if (!zone) {
+				return;
+			}
+			const run = ++testRun;
+			const checks = () => I.html`<p class="ibx-notiftest__lead">${t('InboxBrowserNotifTestNotSeen')}</p>`
+				+ I.html`<ul class="ibx-notiftest__checks"><li>${t('InboxBrowserNotifTestCheckDnd')}</li><li>${t('InboxBrowserNotifTestCheckSystem')}</li></ul>`;
+			const result = (level, text, withChecks) => {
+				if (run !== testRun) {
+					return;
+				}
+				clearTimeout(timer);
+				zone.innerHTML = I.html`<span class="ibx-status ibx-status--${level}">${text}</span>` + (withChecks ? checks() : '');
+			};
+			// Emptied first: a second test shows as a new answer
+			zone.innerHTML = I.html`<span class="ibx-status">${t('InboxBrowserNotifTestPending')}</span>`;
+			const timer = setTimeout(() => result('warning', t('InboxBrowserNotifTestNoAnswer'), true), 4000);
+			try {
+				const icon = document.querySelector('link[rel="icon"]');
+				const n = new Notification(t('InboxBrowserNotifTestTitle'), { body: t('InboxBrowserNotifTestBody'), tag: 'inbox-test', icon: icon ? icon.href : undefined });
+				n.onshow = () => result('ok', t('InboxBrowserNotifTestShown'), true);
+				n.onerror = () => result('error', t('InboxBrowserNotifTestFailed'), false);
+				n.onclick = () => {
+					window.focus();
+					n.close();
+				};
+			} catch (err) {
+				// Some phones show the notifications only through a service worker
+				result('error', t('InboxBrowserNotifTestFailed'), false);
+			}
 		};
 		paintBrowser();
 		browser.addEventListener('click', async e => {
+			if (e.target.closest('.ibx-js-browsertest')) {
+				testBrowser();
+				return;
+			}
 			const enable = e.target.closest('.ibx-js-browseron');
 			const disable = e.target.closest('.ibx-js-browseroff');
 			if (!enable && !disable) {
@@ -6123,6 +6173,12 @@
 					await save(+b.dataset.account || 0, b.dataset.param, on ? '1' : '0');
 					if (b.dataset.param !== 'new_mail_notify') {
 						recount();
+					} else {
+						// Chosen now: the default no longer applies
+						const hint = b.parentNode.querySelector('.ibx-js-autohint');
+						if (hint) {
+							hint.remove();
+						}
 					}
 				}
 			} catch (err) {

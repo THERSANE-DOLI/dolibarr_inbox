@@ -206,6 +206,69 @@
 	Dolibarr.on('inbox:params:changed', setBrowser);
 	Dolibarr.on('inbox:app:leader', () => setBrowser({ browser_notify: B.on ? '1' : '0' }));
 
+	/**
+	 * Offer at the foot of the bell panel: the notifications of the browser, never asked unprompted. Shown only when they
+	 * can work and are not on in this browser yet; « No more » is kept by this browser (the permission is per browser).
+	 */
+	const OFFER_KEY = 'inbox-browsernotif-offer';
+	function offerWanted() {
+		if (!('Notification' in window) || !window.isSecureContext || Notification.permission === 'denied' || (B.on && Notification.permission === 'granted')) {
+			return false;
+		}
+		try {
+			return localStorage.getItem(I.scope(OFFER_KEY)) !== 'no';
+		} catch (e) {
+			return true;
+		}
+	}
+	function offerHtml() {
+		const no = t('InboxBrowserNotifOfferDismiss');
+		return I.html`<div class="ibx-notifpanel__offer ibx-js-notifoffer">${I.raw(ic('bell', 'ibx-notifpanel__offericon'))}`
+			+ I.html`<p class="ibx-notifpanel__offertext">${t('InboxBrowserNotifOffer')}</p>`
+			+ I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-notifofferon">${t('InboxBrowserNotifOfferEnable')}</button>`
+			+ I.html`<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-notifofferno" title="${no}" aria-label="${no}">${I.raw(ic('close'))}</button></div>`;
+	}
+	function hideOffer(forGood) {
+		if (forGood) {
+			try {
+				localStorage.setItem(I.scope(OFFER_KEY), 'no');
+			} catch (e) {
+				// Storage refused: offered again next time
+			}
+		}
+		const offer = N.panel && $('.ibx-js-notifoffer', N.panel);
+		if (offer) {
+			offer.remove();
+			$('.ibx-js-notifclose', N.panel).focus();
+		}
+	}
+	async function enableFromOffer() {
+		let perm;
+		try {
+			perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+		} catch (e) {
+			perm = 'default';
+		}
+		if (perm !== 'granted') {
+			// Closed without a choice: the offer stays; refused: it goes, the browser keeps the refusal
+			if (perm === 'denied') {
+				hideOffer(false);
+				toast(t('InboxBrowserNotifDeniedHelp'), { error: true });
+			}
+			return;
+		}
+		try {
+			if (!B.on) {
+				const r = await post('userparam', 'set', { id: 0, param: 'browser_notify', value: '1' });
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+			}
+			hideOffer(false);
+			toast(t('InboxBrowserNotifEnabled'));
+		} catch (err) {
+			toast(err.message, { error: true });
+		}
+	}
+
 	function bell() {
 		return $('.ibx-rail .ibx-js-bell');
 	}
@@ -406,7 +469,8 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-notifarchiveall" title="' + th('InboxNotifArchiveAll') + '" aria-label="' + th('InboxNotifArchiveAll') + '">' + ic('archive') + '</button>'
 			+ '<a class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifsettings" href="#/settings/notifications" aria-label="' + th('InboxNotifSettings') + '" title="' + th('InboxNotifSettings') + '">' + ic('settings') + '</a>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-notifclose" aria-label="' + th('InboxCloseWindow') + '">' + ic('close') + '</button></div>'
-			+ '<div class="ibx-notifpanel__body ibx-js-notiflist" aria-live="polite"></div>';
+			+ '<div class="ibx-notifpanel__body ibx-js-notiflist" aria-live="polite"></div>'
+			+ (offerWanted() ? offerHtml() : '');
 		document.body.appendChild(p);
 		N.panel = p;
 		N.items = [];
@@ -502,6 +566,14 @@
 		}
 		if (e.target.closest('.ibx-js-notifclose')) {
 			close(true);
+			return;
+		}
+		if (e.target.closest('.ibx-js-notifofferon')) {
+			enableFromOffer();
+			return;
+		}
+		if (e.target.closest('.ibx-js-notifofferno')) {
+			hideOffer(true);
 			return;
 		}
 		if (e.target.closest('.ibx-js-notifmore')) {
