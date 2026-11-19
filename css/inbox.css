@@ -1112,7 +1112,11 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-convo__body .ibx-readhead__top[role="button"] { cursor: pointer; }
 .ibx-convo__body { border-top: 0; }
 .ibx-menu .ibx-menu__hint { padding: var(--ibx-s1) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); }
-.ibx-readhead__name.ibx-addr { cursor: default; }
+/* Care under « Write to » (blocked sender, spam, lookalike): right under the item, never a footer */
+.ibx-menu .ibx-menu__hint--warn { display: flex; align-items: flex-start; gap: var(--ibx-s1); max-width: 20rem; margin: 0; padding: 0 var(--ibx-s3) var(--ibx-s1) 2.25rem; border-top: 0; color: var(--ibx-text-muted); }
+.ibx-menu__hint--warn .ibx-icon { flex: none; width: 0.875rem; height: 0.875rem; margin-top: 0.0625rem; color: var(--ibx-warning); }
+/* The sender opens the menu of his address (« Write to » first): only the text is clickable, not the empty line */
+.ibx-readhead__name.ibx-addr { width: fit-content; max-width: 100%; }
 /* A user of Dolibarr as sender (UX fix series): a block as any sender, not the inline-flex of the small chips of names
    (the name wrapped on two lines beside its address on a phone) */
 .ibx-readhead__name.ibx-addr--user { display: block; }

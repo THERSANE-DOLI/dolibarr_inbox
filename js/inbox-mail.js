@@ -4054,6 +4054,7 @@
 			+ (p.phone ? line('contact-card', '<a href="tel:' + esc(p.phone.replace(/[^\d+]/g, '')) + '">' + esc(p.phone) + '</a>') : '')
 			+ (p.mobile ? line('contact-card', '<a href="tel:' + esc(p.mobile.replace(/[^\d+]/g, '')) + '">' + esc(p.mobile) + '</a>') : '')
 			+ '<div class="ibx-usercard__acts">'
+			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-ucwrite">' + ic('compose') + ' ' + th('InboxWrite') + '</button>' : '')
 			+ (p.url ? '<a class="ibx-btn ibx-btn--sm" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxUserCard') + '</a>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-ucsearch">' + ic('search') + ' ' + th('InboxMailsOf', p.name) + '</button></div></div>';
 	}
@@ -4094,6 +4095,15 @@
 			userCardHide();
 			searchFrom(p.email);
 		});
+		const write = $('.ibx-js-ucwrite', el);
+		if (write) {
+			const email = anchor.dataset.email || p.email;
+			const m = mailOfAddress(anchor);
+			write.addEventListener('click', () => {
+				userCardHide();
+				writeTo(email, p.name, m);
+			});
+		}
 		el.addEventListener('keydown', e => {
 			if (e.key === 'Escape') {
 				const back = UC.for;
@@ -8483,7 +8493,7 @@
 		box.setAttribute('role', 'menu');
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
 			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
-			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
+			: it.note ? '<div class="ibx-menu__hint' + (it.warn ? ' ibx-menu__hint--warn' : '') + '" role="note">' + (it.warn ? ic('warning') : '') + esc(it.note) + '</div>'
 			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="' + (it.checked !== undefined ? 'menuitemcheckbox" aria-checked="' + !!it.checked : 'menuitem') + '" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.swatch ? it.swatch : it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		// From a modal dialog (« Extend to » of « Link »): inside it, else the menu is under it and inert
@@ -9114,7 +9124,13 @@
 				$('.ibx-js-imagesbar', pane).remove();
 			});
 		}
-		$$('.ibx-addr', pane).forEach(el => el.setAttribute('tabindex', '0'));
+		$$('.ibx-addr', pane).forEach(el => {
+			el.setAttribute('tabindex', '0');
+			if (!el.classList.contains('ibx-addr--user')) {
+				el.setAttribute('role', 'button');
+				el.setAttribute('aria-haspopup', 'menu');
+			}
+		});
 		const allow = $('.ibx-js-allowimages', pane);
 		if (allow) {
 			const domain = '@' + (m.from.email.split('@')[1] || '');
@@ -11023,15 +11039,64 @@
 			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }], annotate) : [], [HINT()]), at || rectPoint(el));
 	}
 
-	function addressMenu(email, name, el, at) {
+	/** Mail an address of the reading belongs to (a mail of a conversation, or the mail read), null elsewhere */
+	function mailOfAddress(el) {
+		if (!el || !el.closest('.ibx-pane--read')) {
+			return null;
+		}
+		const block = el.closest('[data-mailblock]');
+		return block && S.blocks ? S.blocks[+block.dataset.mailblock] || null : S.mail;
+	}
+	/**
+	 * Why writing to the sender of a mail asks for care: blocked, judged spam, domain imitating another one. Only for
+	 * the sender himself (a recipient of the same mail is not concerned); empty when nothing is wrong.
+	 */
+	function writeWarnings(m, email) {
+		if (!m || !m.from || String(m.from.email || '').toLowerCase() !== String(email || '').toLowerCase()) {
+			return [];
+		}
+		const out = [];
+		if (m.blocked) {
+			out.push(t(m.blocked.type === 'domain' ? 'InboxWriteWarnBlockedDomain' : 'InboxWriteWarnBlockedSender'));
+		}
+		if (m.spam && (m.spam.spam || m.folder_role === 'junk')) {
+			out.push(t('InboxWriteWarnSpam'));
+		}
+		if (m.trusted && m.trusted.state === 'lookalike') {
+			out.push(t('InboxWriteWarnLookalike'));
+		}
+		return out;
+	}
+	/** New writing to an address, from the mailbox that got the mail when there is one */
+	function writeTo(email, name, m) {
+		if (!I.compose) {
+			return;
+		}
+		const clean = String(name || '').replace(/["<>]/g, '').trim();
+		I.compose({ mode: 'new', to: clean && clean.toLowerCase() !== email.toLowerCase() ? '"' + clean + '" <' + email + '>' : email, account: m ? m.account : 0 });
+	}
+	/**
+	 * Menu of an address (sender, recipients): opened by a click as by a right click. « Write to » first, with a
+	 * warning under it when the sender is doubtful; the hint of the menu of the browser only for a right click.
+	 */
+	function addressMenu(email, name, el, at, byClick) {
 		if (!email) {
 			return;
 		}
-		menu(el, [
+		const m = mailOfAddress(el);
+		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
+		const warn = writeWarnings(m, email);
+		const items = [{ icon: 'compose', label: t('InboxWriteTo', name || email), disabled: !!noSend, reason: noSend, run: () => writeTo(email, name, m) }];
+		if (warn.length && !noSend) {
+			items.push({ note: t('InboxWriteWarn', warn.join(', ')), warn: true });
+		}
+		items.push({ sep: true },
 			{ icon: 'copy', label: t('InboxCopyAddress', email), run: () => copyText(email) },
-			{ icon: 'search', label: t('InboxMailsOf', name || email), run: () => searchFrom(email) },
-			HINT(),
-		], at || rectPoint(el));
+			{ icon: 'search', label: t('InboxMailsOf', name || email), run: () => searchFrom(email) });
+		if (!byClick) {
+			items.push(HINT());
+		}
+		menu(el, items, at || rectPoint(el));
 	}
 
 	function rectPoint(el) {
@@ -11110,6 +11175,34 @@
 	}
 
 	function bindContextMenus() {
+		// An address of the reading (sender, recipients): a click opens its menu, « Write to » first. A user of
+		// Dolibarr keeps his card (it has « Write » too); a text being selected is left alone.
+		const addrOf = e => {
+			const a = e.target.closest && e.target.closest('.ibx-addr[data-email]');
+			return a && S.el.contains(a) && !a.classList.contains('ibx-addr--user') ? a : null;
+		};
+		S.el.addEventListener('click', e => {
+			const a = addrOf(e);
+			// A button inside the address (recognized domain badge) keeps its own action
+			if (!a || e.button !== 0 || e.target.closest('button, a') !== null && a.contains(e.target.closest('button, a'))) {
+				return;
+			}
+			const sel = window.getSelection ? window.getSelection() : null;
+			if (sel && String(sel) && a.contains(sel.anchorNode)) {
+				return;
+			}
+			e.preventDefault();
+			// Under the pointer: the address can be a whole line (sender), a menu at its right end would be far away
+			addressMenu(a.dataset.email, a.dataset.name, a, { x: e.clientX, y: a.getBoundingClientRect().bottom }, true);
+		});
+		S.el.addEventListener('keydown', e => {
+			const a = (e.key === 'Enter' || e.key === ' ') && addrOf(e);
+			if (a && e.target === a) {
+				e.preventDefault();
+				const r = a.getBoundingClientRect();
+				addressMenu(a.dataset.email, a.dataset.name, a, { x: r.left, y: r.bottom }, true);
+			}
+		});
 		// Recognized domain of the sender (1.59.0): its details
 		S.el.addEventListener('click', e => {
 			const b = e.target.closest('.ibx-js-trustinfo');

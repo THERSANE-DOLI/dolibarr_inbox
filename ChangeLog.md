@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: reading, a click on an address opens its menu with « Write to » first :   1.128.7
+  - sender and recipients: write, copy the address, mails of the person; a warning when the sender is doubtful.
+  - the card of a Dolibarr user gets a « Write » button.
+
 - FIX: writing, a file dropped on the signature or the quote is attached :   1.128.6
   - the drop zone no longer disappears over the signature or the quote; it also hides when the drag is cancelled.
 
