@@ -381,8 +381,9 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	padding-left: calc(var(--ibx-depth, 0) * 1rem + 0.25rem);
 	border-radius: var(--ibx-radius); cursor: pointer; user-select: none;
 }
-.ibx-tree__row:hover { background: var(--ibx-bg-hover); }
-.ibx-tree__row[aria-selected="true"] { background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 40%, transparent); }
+.ibx-tree__row { --ibx-row-bg: var(--ibx-bg-pane); }
+.ibx-tree__row:hover { --ibx-row-bg: var(--ibx-bg-hover); background: var(--ibx-bg-hover); }
+.ibx-tree__row[aria-selected="true"] { --ibx-row-bg: var(--ibx-accent-soft); background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 40%, transparent); }
 .ibx-tree__row.is-droptarget { background: var(--ibx-accent); color: var(--ibx-on-accent); }
 /* Drafts, Sent, Junk, Trash of a mailbox on one line of icons under its Inbox (setting system_folders) */
 .ibx-tree__stripli { list-style: none; }
@@ -2516,6 +2517,13 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 
 /* A closed folder: the unread of its subfolders, apart from its own (outline only) */
 .ibx-count--below { color: var(--ibx-accent); background: transparent; box-shadow: inset 0 0 0 1px var(--ibx-accent); }
+/* New mails behind a counter (folded mailbox, closed folder): the dot over its top right corner, ringed with the row */
+.ibx-count.has-new { position: relative; }
+.ibx-count.has-new::after {
+	content: ""; position: absolute; top: -0.1875rem; right: -0.1875rem; width: 0.4375rem; height: 0.4375rem; border-radius: 50%;
+	background: var(--ibx-accent); box-shadow: 0 0 0 2px var(--ibx-row-bg, var(--ibx-bg-pane));
+}
+.ibx-tree__row.is-droptarget .ibx-count.has-new::after { background: var(--ibx-on-accent); box-shadow: 0 0 0 2px var(--ibx-accent); }
 
 /* Option of the panel: size of the folders and of the mailbox, after the counters (not on a phone) */
 .ibx-tree__size { flex: none; margin-left: var(--ibx-s1); font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -156,6 +156,31 @@
 		const inbox = boxInbox(a);
 		return a.folders.reduce((n, f) => n + (f !== inbox && !['sent', 'drafts', 'junk', 'trash'].includes(f.role) ? f.unread || 0 : 0), 0);
 	}
+	/** New mails of a mailbox out of its Inbox (same folders as unreadElsewhere), a dot on its « +N » when it is folded */
+	function newElsewhere(a) {
+		const inbox = boxInbox(a);
+		return a.folders.reduce((n, f) => n + (f !== inbox && !['sent', 'drafts', 'junk', 'trash'].includes(f.role) ? f.new || 0 : 0), 0);
+	}
+	/** New mails of the subfolders of a folder (same folders as unreadBelow), a dot on its « +N » when it is closed */
+	function newBelow(a, id) {
+		return a.folders.filter(f => f.parent === id).reduce((n, f) => n + (f.role !== 'sent' && f.role !== 'drafts' ? f.new || 0 : 0) + newBelow(a, f.id), 0);
+	}
+	/**
+	 * A counter of the tree, with the dot of the new mails over its corner when some are behind it (folded mailbox or
+	 * closed folder): the dot says where they are without taking room on the row
+	 * @param {string} cls Classes of the counter
+	 * @param {string} text Shown
+	 * @param {string} label Title and label of the counter
+	 * @param {number} fresh New mails behind it
+	 */
+	function treeCount(cls, text, label, fresh) {
+		const full = fresh ? label + ' · ' + th('InboxNewCount', fresh) : label;
+		return '<span class="' + cls + (fresh ? ' has-new' : '') + '" title="' + full + '" aria-label="' + full + '">' + text + '</span>';
+	}
+	/** The dot of the new mails alone on a row (no counter to carry it) */
+	function newDot(fresh) {
+		return '<span class="ibx-newdot" title="' + th('InboxNewCount', fresh) + '"><span class="ibx-sr-only">' + th('InboxNewCount', fresh) + '</span></span>';
+	}
 	/** Unread of the subfolders of a folder (Sent and Drafts left out), told on it when it is closed */
 	function unreadBelow(a, id) {
 		return a.folders.filter(f => f.parent === id).reduce((n, f) => n + (f.role !== 'sent' && f.role !== 'drafts' ? f.unread || 0 : 0) + unreadBelow(a, f.id), 0);
@@ -435,6 +460,10 @@
 			const here = !open && cur && cur.account.id === a.id ? cur.folder : null;
 			const inboxOn = !!here && here === boxInbox(a);
 			const elsewhere = open ? 0 : unreadElsewhere(a);
+			// Folded: the new mails told by a dot over the counter of where they are (Inbox or other folders)
+			const inboxNew = open ? 0 : ((boxInbox(a) || {}).new || 0);
+			const elsewhereNew = open ? 0 : newElsewhere(a);
+			const lonelyNew = (unread ? 0 : inboxNew) + (elsewhere ? 0 : elsewhereNew);
 			S.peek = S.peek || !!here;
 			const quotaPct = a.quota && a.quota.limit ? Math.round(100 * a.quota.used / a.quota.limit) : 0;
 			const inError = !!a.error;
@@ -444,8 +473,10 @@
 				+ '<button type="button" class="ibx-tree__twisty" data-toggle="' + key + '" aria-label="' + th(open ? 'InboxCollapse' : 'InboxExpand') + '" tabindex="-1">' + ic(open ? 'chevron-down' : 'chevron-right') + '</button>'
 				+ (inError ? ic('warning', 'ibx-tree__icon') : lookIcon(a.icon || 'account', a.color, 'ibx-tree__icon'))
 				+ '<span class="ibx-tree__label ibx-ellipsis" title="' + esc(a.email) + '">' + esc(accountName(a)) + '</span>'
-				+ (!open && unread ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', unread) + '">' + unread + '</span>' : '')
-				+ (elsewhere ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadElsewhere', elsewhere) + '" aria-label="' + th('InboxUnreadElsewhere', elsewhere) + '">+' + elsewhere + '</span>' : '')
+				// New mails already read (no counter to carry the dot): the dot alone, as on a folder
+				+ (lonelyNew ? newDot(lonelyNew) : '')
+				+ (!open && unread ? treeCount('ibx-count', unread, th('InboxSyncUnread', unread), inboxNew) : '')
+				+ (elsewhere ? treeCount('ibx-count ibx-count--below', '+' + elsewhere, th('InboxUnreadElsewhere', elsewhere), elsewhereNew) : '')
 				// Option of the panel: the space used on the server (quota, in KB)
 				+ (params.folder_sizes === '1' && a.quota ? '<span class="ibx-tree__size" title="' + th('InboxQuotaUsed', size(a.quota.used * 1024), size(a.quota.limit * 1024)) + '">' + esc(size(a.quota.used * 1024)) + '</span>' : '')
 				+ (inError ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-accounterror" data-account="' + a.id + '" title="' + th('InboxSyncState_' + a.state) + '" aria-label="' + th('InboxSyncState_' + a.state) + '">' + ic('info') + '</button>' : '')
@@ -1255,6 +1286,9 @@
 		const key = 'f' + f.id;
 		// Closed: the unread of its subfolders told on it, apart from its own (nothing hidden)
 		const below = sub && !open ? unreadBelow(a, f.id) : 0;
+		// New mails of its subfolders: a dot over the « +N », or beside it when they are all read
+		const belowNew = sub && !open ? newBelow(a, f.id) : 0;
+		const fresh = (f.new || 0) + (below ? 0 : belowNew);
 		const selected = f.id === S.folderId && S.scope === 'folder';
 		// First of the other folders unfolded (no « Followed »): their chevron, in its empty column
 		const fold = foldKey && !sub ? '<button type="button" class="ibx-tree__twisty" data-toggle="' + foldKey + '" aria-label="' + th('InboxCollapse') + ' : ' + th('InboxSystemFoldersGroup') + '" title="' + th('InboxSystemFoldersGroup') + '" tabindex="-1">' + ic('chevron-down') + '</button>' : '';
@@ -1267,14 +1301,14 @@
 			+ '<span class="ibx-tree__label ibx-ellipsis">' + esc(folderName(f)) + '</span>'
 			// Mails on their way into it (1.90.1): the work goes on on the server
 			+ (pendingTargets().has(f.id) ? '<span class="ibx-spinner ibx-tree__busy" role="img" title="' + th('InboxProgressMove', folderName(f)) + '" aria-label="' + th('InboxProgressMove', folderName(f)) + '"></span>' : '')
-			+ (f.new ? '<span class="ibx-newdot" title="' + th('InboxNewCount', f.new) + '"><span class="ibx-sr-only">' + th('InboxNewCount', f.new) + '</span></span>' : '')
+			+ (fresh ? newDot(fresh) : '')
 			// Junk: mails probably legitimate (known sender, authenticated), seen without opening the folder
 			+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + f.legit + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', f.legit) + '</span></span>' : '')
 			+ (f.unread && f.role !== 'sent' && f.role !== 'drafts' ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', f.unread) + '">' + f.unread + '</span>' : '')
 			// Drafts: how many wait, in grey (they are not unread); the count of the server, the mails sending
 			// later (queue of inbox) left out (1.25.1)
 			+ (f.role === 'drafts' && f.total > 0 ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxDraftsCount', f.total) + '">' + f.total + '</span>' : '')
-			+ (below ? '<span class="ibx-count ibx-count--below" title="' + th('InboxUnreadBelow', below) + '" aria-label="' + th('InboxUnreadBelow', below) + '">+' + below + '</span>' : '')
+			+ (below ? treeCount('ibx-count ibx-count--below', '+' + below, th('InboxUnreadBelow', below), belowNew) : '')
 			+ folderSize(f)
 			+ '</div>'
 			+ (open ? '<ul role="group">' + subHtml + '</ul>' : '')
