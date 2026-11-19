@@ -1,5 +1,31 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: card of a Dolibarr user opened on a click only, closed by a click elsewhere, actions on its whole width :   1.128.11
+  - no more card on the hover (the click that followed closed it); a click in the mail closes it too.
+  - « Write », « Dolibarr card » and « Emails » on one line under the picture.
+
+- FIX: Drafts, Sent, Junk and Trash of a mailbox on one line of icons under its Inbox :   1.128.10
+  - one click each, counts kept, mails dropped on them; full rows again with the filter of the folders.
+  - setting in My account > Display to keep one row each.
+
+- FIX: « Followed » in each mailbox, under its Inbox :   1.128.9
+  - shown only when the mailbox has followed mails, with their number; the unified view stays for all of them.
+
+- FIX: list, the star of a mail follows it or stops following it in one click :   1.128.8
+  - the mail is not opened, « Undo » in the toast; an empty star on the hover to follow a mail.
+
+- FIX: reading, a click on an address opens its menu with « Write to » first :   1.128.7
+  - sender and recipients: write, copy the address, mails of the person; a warning when the sender is doubtful.
+  - the card of a Dolibarr user gets a « Write » button.
+
+- FIX: writing, a file dropped on the signature or the quote is attached :   1.128.6
+  - the drop zone no longer disappears over the signature or the quote; it also hides when the drag is cancelled.
+
+- FIX: writing, count and weight of the attachments, full name of a file in a bubble :   1.128.5
+  - from two files, « 3 attachments · 506 KB »; near the limit « 15.4 MB of 20 MB », and a warning over 25 MB sent.
+  - number of attachments on the paperclip and on the minimized writing.
+  - names cut in the middle (the end and the extension stay), the full name in a bubble on hover or focus.
+
 - FIX: texts of the module (version, history, notes, lists) never served by the web server :   1.128.4
   - a .htaccess at the root of the module refuses md, txt, json, sh, yml, lock; the rule for nginx in the install doc.
 

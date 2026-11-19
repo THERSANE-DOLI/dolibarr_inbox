@@ -357,6 +357,11 @@ switch ($action) {
 			$params = new InboxUserParam($db);
 			$out = json_decode((string) $params->get($user, 'unified_exclude'), true);
 			$accounts = array_values(array_diff($readable, array_map('intval', is_array($out) ? $out : array())));
+			if (is_array(inboxAjaxParam('accounts', 'none'))) {
+				// The view in one mailbox (entry « Followed » of a mailbox in the tree): that one if the user reads it,
+				// even left out of the unified views
+				$accounts = array_values(array_intersect($readable, array_map('intval', inboxAjaxParam('accounts', 'none'))));
+			}
 			if (!$accounts) {
 				// Every mailbox left out of the views: nothing to list
 				inboxAjaxReply(array('rows' => array(), 'next' => '', 'total' => 0, 'threads' => false, 'people' => (object) array(), 'stamp' => '',

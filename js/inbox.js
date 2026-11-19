@@ -964,7 +964,8 @@
 	 *   comes at once, the icon alone does not say enough;
 	 * - everywhere else (folders, rows of the list, rail) the native title stays: it comes with a delay and does not
 	 *   hide what the pointer crosses;
-	 * - a button that opens a menu: no bubble while its menu is open (aria-expanded), and none at all on the « ⋯ »
+	 * - names of the attachments of a writing: the chip cuts the name, the bubble gives it whole;
+ * - a button that opens a menu: no bubble while its menu is open (aria-expanded), and none at all on the « ⋯ »
 	 *   buttons (no title: their dots say it).
 	 * The title moves to data-title at the first hover or focus, with the side that keeps the bubble inside the
 	 * window. An element drawing its own ::before or ::after keeps the native title.
@@ -1010,11 +1011,20 @@
 			}
 			el.classList.remove(...SIDES);
 			el.classList.toggle('ibx-tooltip--end', below && r.right > window.innerWidth - 110);
+			// Name of an attachment of a writing (full name, the chip cuts it): above, on the side of the chip
+			// that leaves room inside the window of the writing, which scrolls and would cut a centered bubble
+			const att = el.closest('.ibx-compose__atts');
+			if (att) {
+				const box = att.getBoundingClientRect();
+				side = 'ibx-tooltip--top';
+				el.classList.add('ibx-tooltip--att');
+				el.classList.toggle('ibx-tooltip--end', r.left + r.width / 2 > box.left + box.width / 2);
+			}
 			el.classList.add('ibx-tooltip', side);
 		};
 		const target = e => {
-			const el = e.target && e.target.closest ? e.target.closest('button[title], a[title], [role="button"][title], button[data-title], a[data-title]') : null;
-			return el && el.closest('.ibx-bulkbar, .ibx-readhead__actions, .ibx-pane__head, .ibx-menu') ? el : null;
+			const el = e.target && e.target.closest ? e.target.closest('button[title], a[title], [role="button"][title], button[data-title], a[data-title], .ibx-compose__attname[title], .ibx-compose__attname[data-title]') : null;
+			return el && el.closest('.ibx-bulkbar, .ibx-readhead__actions, .ibx-pane__head, .ibx-menu, .ibx-compose__atts') ? el : null;
 		};
 		['pointerover', 'focusin'].forEach(ev => document.addEventListener(ev, e => {
 			if (e.pointerType === 'touch') {

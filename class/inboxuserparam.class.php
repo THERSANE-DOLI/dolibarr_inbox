@@ -98,6 +98,8 @@ class InboxUserParam
 			'tag_colors_adapt' => array('1', 'int:0:1'),
 			// Folders (1.8.0): icons of the folders and mailboxes in their colour, or all grey (plain)
 			'folder_icons' => array('color', array('color', 'plain')),
+			// Drafts, Sent, Junk and Trash of each mailbox: one line of icons under the Inbox, or one row each
+			'system_folders' => array('strip', array('strip', 'list')),
 			// Bandeau Dolibarr of the reading folded (1.13.0)
 			'dolibar_folded' => array('0', 'int:0:1'),
 			// Column beside a mail open, chosen in the strip on the right (1.109.0): the Dolibarr part, the agenda panel or none

@@ -590,7 +590,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-viewsmenu" title="' + th('InboxViewsChoose') + '" aria-label="' + th('InboxViewsChoose') + '" aria-haspopup="menu">' + ic('more') + '</button></div>'
 			+ (open ? '<ul role="group">' + list.map(([k, icon]) => {
 				const n = ['inbox', 'unread'].includes(k) ? viewCount(k) : 0;
-				const sel = S.scope === 'view' && S.view === k;
+				const sel = S.scope === 'view' && viewKey() === k;
 				return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-view="' + k + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
 					+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic(icon, 'ibx-tree__icon ibx-tree__icon--view')
 					+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_' + k) + '</span>'
@@ -688,6 +688,7 @@
 		S.tag = s.tag || '';
 		S.period = s.period || '';
 		S.view = '';
+		S.viewBox = 0;
 		S.scope = 'all';
 		S.vview = id;
 		if (S.peek) {
@@ -939,7 +940,7 @@
 		const shown = viewsShown();
 		const next = on ? VIEWS.map(([x]) => x).filter(x => x === k || shown.includes(x)) : shown.filter(x => x !== k);
 		saveParam('views_shown', JSON.stringify(next));
-		if (S.scope === 'view' && !next.includes(S.view)) {
+		if (S.scope === 'view' && !S.viewBox && !next.includes(S.view)) {
 			const e = currentFolder();
 			if (e) {
 				openFolder(e.folder.id);
@@ -969,14 +970,22 @@
 	}
 	/** A unified view: every mailbox read (not left out), the folders of its role; each mail in its own mailbox */
 	async function openView(key, keepRoute) {
-		if (!VIEWS.some(([k]) => k === key)) {
+		// « Followed » of one mailbox (« flagged-12 »): the view limited to it
+		const m = /^flagged-(\d+)$/.exec(String(key));
+		const box = m && S.accounts.some(a => a.id === +m[1]) ? +m[1] : 0;
+		if (m && !box) {
+			return;
+		}
+		const base = box ? 'flagged' : key;
+		if (!VIEWS.some(([k]) => k === base)) {
 			return;
 		}
 		if (S.folderId) {
 			leaveFolder(false);
 		}
 		leaveVview();
-		S.view = key;
+		S.view = base;
+		S.viewBox = box;
 		S.scope = 'view';
 		if (S.peek) {
 			renderTree();
@@ -997,7 +1006,7 @@
 			r.setAttribute('tabindex', on ? '0' : '-1');
 		});
 		if (!keepRoute) {
-			history.replaceState(null, '', '#/mail/view/' + key);
+			history.replaceState(null, '', '#/mail/view/' + viewKey());
 		}
 		S.mobile('list');
 		showNothing();
@@ -1123,8 +1132,16 @@
 	/** Folders under a parent (0 = first level), depth for the indent */
 	function branch(a, parent, depth, needle) {
 		const kids = sortKids(a, a.folders.filter(f => f.parent === parent));
+		// First level of a mailbox: Drafts, Sent, Junk and Trash on one line of icons under the Inbox (setting of My
+		// account); the filter of the folders gives them their full rows back (found by their name)
+		const strip = parent === 0 && !needle && params.system_folders !== 'list'
+			? STRIP_ROLES.map(role => kids.find(f => f.role === role && f.primary !== false && !a.folders.some(x => x.parent === f.id))).filter(Boolean) : [];
 		let html = '';
+		let after = '';
 		kids.forEach(f => {
+			if (strip.includes(f)) {
+				return;
+			}
 			const sub = a.folders.some(x => x.parent === f.id);
 			const key = 'f' + f.id;
 			const matches = !needle || folderName(f).toLowerCase().includes(needle) || f.label.toLowerCase().includes(needle);
@@ -1134,8 +1151,61 @@
 			}
 			const open = sub && (isOpen(key) || needle !== '');
 			html += folderRow(a, f, depth, sub, open, subHtml);
+			if (parent === 0 && f.role === 'inbox' && f.primary !== false && !after) {
+				after = boxFlaggedRow(a, depth, needle) + systemStripHtml(a, strip, depth);
+				html += after;
+			}
 		});
+		if (parent === 0 && !after) {
+			// No Inbox (not synced yet): the line of icons first
+			html = boxFlaggedRow(a, depth, needle) + systemStripHtml(a, strip, depth) + html;
+		}
 		return html;
+	}
+	const STRIP_ROLES = ['drafts', 'sent', 'junk', 'trash'];
+	/**
+	 * Drafts, Sent, Junk and Trash of a mailbox as one line of icons: one click each, their counts kept, a mail dropped
+	 * on one as on a folder (data-folder), their name in the bubble and said to screen readers
+	 */
+	function systemStripHtml(a, folders, depth) {
+		if (!folders.length) {
+			return '';
+		}
+		return '<li role="none" class="ibx-tree__stripli"><div class="ibx-tree__strip" role="group" aria-label="' + th('InboxSystemFoldersGroup') + '" style="--ibx-depth:' + depth + '">'
+			+ folders.map(f => {
+				const selected = f.id === S.folderId && S.scope === 'folder';
+				const unread = f.unread && f.role !== 'sent' && f.role !== 'drafts' ? f.unread : 0;
+				const drafts = f.role === 'drafts' && f.total > 0 ? f.total : 0;
+				const label = folderName(f) + (unread ? ', ' + t('InboxSyncUnread', unread) : '') + (drafts ? ', ' + t('InboxDraftsCount', drafts) : '');
+				return '<div class="ibx-tree__chip' + (unread ? ' has-unread' : '') + (f.error ? ' has-error' : '') + (f.selectable ? '' : ' is-disabled') + '" role="treeitem" aria-level="' + (depth + 1) + '"'
+					+ ' data-folder="' + f.id + '" aria-selected="' + selected + '" tabindex="' + (selected ? 0 : -1) + '" title="' + esc(folderName(f)) + '" aria-label="' + esc(label) + '">'
+					+ folderIcon(f, false, 'ibx-tree__icon')
+					+ (pendingTargets().has(f.id) ? '<span class="ibx-spinner ibx-tree__busy" aria-hidden="true"></span>' : '')
+					+ (f.role === 'junk' && f.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', f.legit) + '">' + ic('warning') + '</span>' : '')
+					+ (unread ? '<span class="ibx-count" aria-hidden="true">' + unread + '</span>' : '')
+					+ (drafts ? '<span class="ibx-count ibx-count--muted" aria-hidden="true">' + drafts + '</span>' : '')
+					+ '</div>';
+			}).join('') + '</div></li>';
+	}
+	/**
+	 * « Followed » of a mailbox, under its Inbox: only when it has mails followed (or while it is shown), the view
+	 * « Followed » limited to this mailbox
+	 */
+	function boxFlaggedRow(a, depth, needle) {
+		const key = 'flagged-' + a.id;
+		const sel = S.scope === 'view' && viewKey() === key;
+		const n = +(a.flagged || 0);
+		if ((!n && !sel) || (needle && !t('InboxView_flagged').toLowerCase().includes(needle))) {
+			return '';
+		}
+		return '<li role="treeitem" aria-level="' + (depth + 1) + '"><div class="ibx-tree__row" style="--ibx-depth:' + depth + '" data-view="' + key + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
+			+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic('star', 'ibx-tree__icon ibx-tree__icon--view')
+			+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_flagged') + '</span>'
+			+ (n ? '<span class="ibx-count ibx-count--muted" aria-label="' + th('InboxFlaggedCount', n) + '">' + n + '</span>' : '') + '</div></li>';
+	}
+	/** Key of the view shown, with its mailbox when it is limited to one (« flagged-12 ») */
+	function viewKey() {
+		return S.view + (S.viewBox ? '-' + S.viewBox : '');
 	}
 	/**
 	 * One folder of the tree (its subfolders already drawn)
@@ -1293,6 +1363,14 @@
 				openFolder(+row.dataset.folder);
 				e.preventDefault();
 				return;
+			} else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && row.classList.contains('ibx-tree__chip')) {
+				// Line of icons (Drafts, Sent, Junk, Trash): left / right go from one to the next
+				const next = rows[i + (e.key === 'ArrowRight' ? 1 : -1)];
+				target = next && next.parentElement === row.parentElement ? next : null;
+				if (!target) {
+					e.preventDefault();
+					return;
+				}
 			} else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
 				const tw = $('[data-toggle]', row);
 				if (tw && (row.parentElement.getAttribute('aria-expanded') === 'true') === (e.key === 'ArrowLeft')) {
@@ -1355,6 +1433,9 @@
 		const q = { folder: S.folderId, scope: S.scope, q: S.q, sort: params.list_sort || 'date:desc', cursor: cursor || '', limit: 200, threads: params.conversation === '0' ? 0 : 1 };
 		if (S.scope === 'view') {
 			q.view = S.view;
+			if (S.viewBox) {
+				q.accounts = [S.viewBox];
+			}
 		}
 		if (S.vview && S.vAccounts.length) {
 			q.accounts = S.vAccounts;
@@ -1839,7 +1920,7 @@
 	 */
 	const COLUMNS = {
 		marks: { label: 'InboxIndicators', icon: 'circles', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__marks">' + marksHtml(r) + '</td>' },
-		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</td>' },
+		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + starBtn(r) + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '14rem', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
 		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
@@ -1853,13 +1934,34 @@
 	const DEFAULT_COLUMNS = ['marks', 'from', 'subject', 'tags', 'date'];
 
 	/**
+	 * Star of a line: a button, a click follows the mail or stops following it without opening it (undo in the toast).
+	 * Off, it shows only on the hover or the focus of the line (css), the key S and the menus doing the same.
+	 */
+	function starBtn(r) {
+		const label = (r.flagged ? t('InboxUnflag') : t('InboxFlag')) + ' (S)';
+		return '<button type="button" class="ibx-star ibx-js-star' + (r.flagged ? ' is-on' : '') + '" tabindex="-1" aria-pressed="' + (r.flagged ? 'true' : 'false') + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">'
+			+ ic(r.flagged ? 'star-on' : 'star') + '</button>';
+	}
+	/** Click on the star of a line: at once on the screen, the toast offers to undo */
+	async function starClick(id) {
+		const r = rowOf(id);
+		if (!r) {
+			return;
+		}
+		const on = !r.flagged;
+		const res = await runAction('flag', [id], { on: on ? 1 : 0 }, { quiet: true });
+		if (res) {
+			toast(t(on ? 'InboxActFlaggedOne' : 'InboxActUnflaggedOne'), { action: t('InboxUndo'), onAction: () => runAction('flag', [id], { on: on ? 0 : 1 }, { quiet: true }) });
+		}
+	}
+	/**
 	 * Indicators of a line in fixed slots (star, attachment, assigned people): an empty slot stays empty so that
 	 * each indicator keeps its place from one line to the next
 	 */
 	function marksHtml(r) {
 		const used = S.marksSlots || {};
 		return '<span class="ibx-marks">'
-			+ (used.flag || r.flagged ? '<span class="ibx-marks__slot">' + (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '') + '</span>' : '')
+			+ (used.flag || r.flagged ? '<span class="ibx-marks__slot">' + starBtn(r) + '</span>' : '')
 			+ (used.att || r.attachments ? '<span class="ibx-marks__slot">' + (r.attachments ? '<span title="' + th('InboxAttachments') + '">' + ic('attachment', 'ibx-faint') + '<span class="ibx-sr-only">' + th('InboxAttachments') + '</span></span>' : '') + '</span>' : '')
 			+ (used.assign || (r.assignees && r.assignees.length) ? '<span class="ibx-marks__slot ibx-marks__slot--assign">' + assigneesHtml(r.assignees) + '</span>' : '')
 			+ '</span>';
@@ -2227,7 +2329,7 @@
 					+ '<span class="ibx-ellipsis">' + (isNew(r) ? '<span class="ibx-sr-only">' + th('InboxNew') + ' </span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + '</span>' + viaHtml(r) + '</span>'
 					// Short marks beside the date (answered, attachment, starred): the bottom line is only for what needs width
 					+ '<span class="ibx-mailcard__meta">' + threadMarks(r) + (r.answered ? answeredMark() : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward') + '</span>' : '') + (r.attachments ? ic('attachment', 'ibx-faint') : '')
-					+ (r.flagged ? '<span class="ibx-star" aria-pressed="true" title="' + th('InboxFlagged') + '">' + ic('star-on') + '</span>' : '')
+					+ starBtn(r)
 					+ '<span class="ibx-mailcard__dot" aria-hidden="true"></span><span title="' + esc(longDate(r.date)) + '">' + esc(shortDate(r.date)) + '</span></span>'
 					+ '<span class="ibx-mailcard__subject ibx-ellipsis">' + esc(r.subject || t('InboxNoSubject')) + '</span>'
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
@@ -2398,6 +2500,10 @@
 			name = t('InboxAllBoxes');
 		} else if (S.scope === 'view') {
 			name = t('InboxView_' + S.view);
+			const box = S.viewBox ? S.accounts.find(a => a.id === S.viewBox) : null;
+			if (box) {
+				name += ' · ' + accountName(box);
+			}
 		}
 		const vv = S.vview ? S.vviews.find(x => x.id === S.vview) : null;
 		if (vv) {
@@ -3668,7 +3774,7 @@
 			return '#/mail/vview/' + S.vview;
 		}
 		if (S.scope === 'view' && S.view) {
-			return '#/mail/view/' + S.view;
+			return '#/mail/view/' + viewKey();
 		}
 		return '#/mail/' + (S.folderId || '');
 	}
@@ -4053,9 +4159,12 @@
 			+ line('mail', esc(p.email))
 			+ (p.phone ? line('contact-card', '<a href="tel:' + esc(p.phone.replace(/[^\d+]/g, '')) + '">' + esc(p.phone) + '</a>') : '')
 			+ (p.mobile ? line('contact-card', '<a href="tel:' + esc(p.mobile.replace(/[^\d+]/g, '')) + '">' + esc(p.mobile) + '</a>') : '')
+			+ '</div>'
+			// Actions on the whole width, under the picture and the text (no empty space under the picture)
 			+ '<div class="ibx-usercard__acts">'
+			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-ucwrite">' + ic('compose') + ' ' + th('InboxWrite') + '</button>' : '')
 			+ (p.url ? '<a class="ibx-btn ibx-btn--sm" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + ic('external') + ' ' + th('InboxUserCard') + '</a>' : '')
-			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-ucsearch">' + ic('search') + ' ' + th('InboxMailsOf', p.name) + '</button></div></div>';
+			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-ucsearch" title="' + th('InboxMailsOf', p.name) + '" aria-label="' + th('InboxMailsOf', p.name) + '">' + ic('search') + ' ' + th('InboxUserCardMails') + '</button></div>';
 	}
 	function userCardHide() {
 		clearTimeout(UC.timer);
@@ -4086,14 +4195,19 @@
 		const w = el.offsetWidth;
 		el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
 		el.style.top = (r.bottom + el.offsetHeight + 12 > window.innerHeight ? Math.max(8, r.top - el.offsetHeight - 6) : r.bottom + 6) + 'px';
-		el.addEventListener('mouseenter', () => clearTimeout(UC.timer));
-		el.addEventListener('mouseleave', () => {
-			UC.timer = setTimeout(userCardHide, 200);
-		});
 		$('.ibx-js-ucsearch', el).addEventListener('click', () => {
 			userCardHide();
 			searchFrom(p.email);
 		});
+		const write = $('.ibx-js-ucwrite', el);
+		if (write) {
+			const email = anchor.dataset.email || p.email;
+			const m = mailOfAddress(anchor);
+			write.addEventListener('click', () => {
+				userCardHide();
+				writeTo(email, p.name, m);
+			});
+		}
 		el.addEventListener('keydown', e => {
 			if (e.key === 'Escape') {
 				const back = UC.for;
@@ -4108,35 +4222,31 @@
 		anchor.setAttribute('aria-expanded', 'true');
 	}
 	function bindUserCards(root) {
-		root.addEventListener('mouseover', e => {
-			const a = e.target.closest('.ibx-addr--user');
-			if (a && root.contains(a)) {
-				clearTimeout(UC.timer);
-				UC.timer = setTimeout(() => userCardShow(a), 350);
+		// The card of a user of Dolibarr opens on a click only (UX fix series): opened on the hover, the click that
+		// followed closed it. A second click closes it, as a click elsewhere or Escape; leaving it with the pointer
+		// keeps it open (its buttons are reached without hurry).
+		const toggle = (a, keyboard) => {
+			if (UC.for === a) {
+				userCardHide();
+				return;
 			}
-		});
-		root.addEventListener('mouseout', e => {
-			const a = e.target.closest('.ibx-addr--user');
-			if (a && !(e.relatedTarget && a.contains(e.relatedTarget))) {
-				clearTimeout(UC.timer);
-				UC.timer = setTimeout(userCardHide, 200);
+			userCardShow(a);
+			const first = keyboard && UC.el ? $('button, a', UC.el) : null;
+			if (first) {
+				first.focus();
 			}
-		});
-		root.addEventListener('focusin', e => {
-			const a = e.target.closest('.ibx-addr--user');
-			if (a) {
-				userCardShow(a);
-			}
-		});
+		};
 		root.addEventListener('click', e => {
 			const a = e.target.closest('.ibx-addr--user');
-			if (a) {
-				// A tap on a phone (no hover): the card, a second tap closes it
-				if (UC.for === a) {
-					userCardHide();
-				} else {
-					userCardShow(a);
-				}
+			if (a && root.contains(a)) {
+				toggle(a, false);
+			}
+		});
+		root.addEventListener('keydown', e => {
+			const a = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.ibx-addr--user');
+			if (a && e.target === a) {
+				e.preventDefault();
+				toggle(a, true);
 			}
 		});
 		document.addEventListener('keydown', e => {
@@ -4146,6 +4256,18 @@
 		});
 		document.addEventListener('pointerdown', e => {
 			if (UC.el && !UC.el.contains(e.target) && !(UC.for && UC.for.contains(e.target))) {
+				userCardHide();
+			}
+		}, true);
+		// A click in the body of the mail (iframe: its events never reach the page) takes the focus out of the page:
+		// the card closes as for a click elsewhere; a scroll would leave it away from the name
+		window.addEventListener('blur', () => {
+			if (UC.el) {
+				userCardHide();
+			}
+		});
+		document.addEventListener('scroll', e => {
+			if (UC.el && !UC.el.contains(e.target)) {
 				userCardHide();
 			}
 		}, true);
@@ -4749,6 +4871,12 @@
 				}
 				r.seen = p.on ? 1 : 0;
 			} else if (what === 'flag') {
+				if (!!r.flagged !== !!p.on) {
+					const a = accountOfRow(r);
+					if (a && a.flagged !== undefined) {
+						a.flagged = Math.max(0, (a.flagged || 0) + (p.on ? 1 : -1));
+					}
+				}
 				r.flagged = p.on ? 1 : 0;
 			} else if (what === 'tag') {
 				const rm = (p.remove || []).map(lower);
@@ -4766,6 +4894,9 @@
 				renderTree();
 			} else {
 				renderList();
+				if (what === 'flag') {
+					renderTree();
+				}
 			}
 			if (S.mail && rows.some(r => r.id === S.mail.id || r === S.mail)) {
 				const r = rows.find(x => x.id === S.mail.id) || S.mail;
@@ -8483,7 +8614,7 @@
 		box.setAttribute('role', 'menu');
 		box.innerHTML = items.map((it, i) => it.sep ? '<div class="ibx-menu__sep" role="separator"></div>'
 			: it.header ? '<div class="ibx-menu__header" role="presentation">' + esc(it.header) + '</div>'
-			: it.note ? '<div class="ibx-menu__hint" role="note">' + esc(it.note) + '</div>'
+			: it.note ? '<div class="ibx-menu__hint' + (it.warn ? ' ibx-menu__hint--warn' : '') + '" role="note">' + (it.warn ? ic('warning') : '') + esc(it.note) + '</div>'
 			: '<button type="button" class="ibx-menu__item' + (it.danger ? ' ibx-menu__item--danger' : '') + '" role="' + (it.checked !== undefined ? 'menuitemcheckbox" aria-checked="' + !!it.checked : 'menuitem') + '" data-i="' + i + '"' + (it.disabled ? ' aria-disabled="true"' + (it.reason ? ' title="' + esc(it.reason) + '"' : '') : '') + '>' + (it.swatch ? it.swatch : it.icon ? ic(it.icon, 'ibx-menu__icon') : '<span class="ibx-menu__icon"></span>')
 				+ '<span class="ibx-menu__label">' + esc(it.label) + '</span>' + (it.checked !== undefined ? (it.checked ? ic('check') : '') : '') + (it.key ? '<span class="ibx-menu__key">' + esc(it.key) + '</span>' : '') + '</button>').join('');
 		// From a modal dialog (« Extend to » of « Link »): inside it, else the menu is under it and inert
@@ -9114,7 +9245,12 @@
 				$('.ibx-js-imagesbar', pane).remove();
 			});
 		}
-		$$('.ibx-addr', pane).forEach(el => el.setAttribute('tabindex', '0'));
+		$$('.ibx-addr', pane).forEach(el => {
+			el.setAttribute('tabindex', '0');
+			el.setAttribute('role', 'button');
+			// A user of Dolibarr opens his card (dialog), any other address its menu
+			el.setAttribute('aria-haspopup', el.classList.contains('ibx-addr--user') ? 'dialog' : 'menu');
+		});
 		const allow = $('.ibx-js-allowimages', pane);
 		if (allow) {
 			const domain = '@' + (m.from.email.split('@')[1] || '');
@@ -11023,15 +11159,64 @@
 			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }], annotate) : [], [HINT()]), at || rectPoint(el));
 	}
 
-	function addressMenu(email, name, el, at) {
+	/** Mail an address of the reading belongs to (a mail of a conversation, or the mail read), null elsewhere */
+	function mailOfAddress(el) {
+		if (!el || !el.closest('.ibx-pane--read')) {
+			return null;
+		}
+		const block = el.closest('[data-mailblock]');
+		return block && S.blocks ? S.blocks[+block.dataset.mailblock] || null : S.mail;
+	}
+	/**
+	 * Why writing to the sender of a mail asks for care: blocked, judged spam, domain imitating another one. Only for
+	 * the sender himself (a recipient of the same mail is not concerned); empty when nothing is wrong.
+	 */
+	function writeWarnings(m, email) {
+		if (!m || !m.from || String(m.from.email || '').toLowerCase() !== String(email || '').toLowerCase()) {
+			return [];
+		}
+		const out = [];
+		if (m.blocked) {
+			out.push(t(m.blocked.type === 'domain' ? 'InboxWriteWarnBlockedDomain' : 'InboxWriteWarnBlockedSender'));
+		}
+		if (m.spam && (m.spam.spam || m.folder_role === 'junk')) {
+			out.push(t('InboxWriteWarnSpam'));
+		}
+		if (m.trusted && m.trusted.state === 'lookalike') {
+			out.push(t('InboxWriteWarnLookalike'));
+		}
+		return out;
+	}
+	/** New writing to an address, from the mailbox that got the mail when there is one */
+	function writeTo(email, name, m) {
+		if (!I.compose) {
+			return;
+		}
+		const clean = String(name || '').replace(/["<>]/g, '').trim();
+		I.compose({ mode: 'new', to: clean && clean.toLowerCase() !== email.toLowerCase() ? '"' + clean + '" <' + email + '>' : email, account: m ? m.account : 0 });
+	}
+	/**
+	 * Menu of an address (sender, recipients): opened by a click as by a right click. « Write to » first, with a
+	 * warning under it when the sender is doubtful; the hint of the menu of the browser only for a right click.
+	 */
+	function addressMenu(email, name, el, at, byClick) {
 		if (!email) {
 			return;
 		}
-		menu(el, [
+		const m = mailOfAddress(el);
+		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
+		const warn = writeWarnings(m, email);
+		const items = [{ icon: 'compose', label: t('InboxWriteTo', name || email), disabled: !!noSend, reason: noSend, run: () => writeTo(email, name, m) }];
+		if (warn.length && !noSend) {
+			items.push({ note: t('InboxWriteWarn', warn.join(', ')), warn: true });
+		}
+		items.push({ sep: true },
 			{ icon: 'copy', label: t('InboxCopyAddress', email), run: () => copyText(email) },
-			{ icon: 'search', label: t('InboxMailsOf', name || email), run: () => searchFrom(email) },
-			HINT(),
-		], at || rectPoint(el));
+			{ icon: 'search', label: t('InboxMailsOf', name || email), run: () => searchFrom(email) });
+		if (!byClick) {
+			items.push(HINT());
+		}
+		menu(el, items, at || rectPoint(el));
 	}
 
 	function rectPoint(el) {
@@ -11080,6 +11265,10 @@
 		}
 		// The unified views (1.29.0): the same menu as « ⋯ », with the view right clicked first
 		const view = target.closest('[data-view]');
+		if (view && S.el.contains(view) && view.dataset.view.indexOf('flagged-') === 0) {
+			// « Followed » of a mailbox: no setting of the unified views on it
+			return at => menu(view, [{ icon: 'mail-opened', label: t('InboxOpen'), run: () => openView(view.dataset.view) }, HINT()], at);
+		}
 		if (view && S.el.contains(view)) {
 			return at => viewsMenu(view, at, view.dataset.view);
 		}
@@ -11110,6 +11299,34 @@
 	}
 
 	function bindContextMenus() {
+		// An address of the reading (sender, recipients): a click opens its menu, « Write to » first. A user of
+		// Dolibarr keeps his card (it has « Write » too); a text being selected is left alone.
+		const addrOf = e => {
+			const a = e.target.closest && e.target.closest('.ibx-addr[data-email]');
+			return a && S.el.contains(a) && !a.classList.contains('ibx-addr--user') ? a : null;
+		};
+		S.el.addEventListener('click', e => {
+			const a = addrOf(e);
+			// A button inside the address (recognized domain badge) keeps its own action
+			if (!a || e.button !== 0 || e.target.closest('button, a') !== null && a.contains(e.target.closest('button, a'))) {
+				return;
+			}
+			const sel = window.getSelection ? window.getSelection() : null;
+			if (sel && String(sel) && a.contains(sel.anchorNode)) {
+				return;
+			}
+			e.preventDefault();
+			// Under the pointer: the address can be a whole line (sender), a menu at its right end would be far away
+			addressMenu(a.dataset.email, a.dataset.name, a, { x: e.clientX, y: a.getBoundingClientRect().bottom }, true);
+		});
+		S.el.addEventListener('keydown', e => {
+			const a = (e.key === 'Enter' || e.key === ' ') && addrOf(e);
+			if (a && e.target === a) {
+				e.preventDefault();
+				const r = a.getBoundingClientRect();
+				addressMenu(a.dataset.email, a.dataset.name, a, { x: r.left, y: r.bottom }, true);
+			}
+		});
 		// Recognized domain of the sender (1.59.0): its details
 		S.el.addEventListener('click', e => {
 			const b = e.target.closest('.ibx-js-trustinfo');
@@ -11213,6 +11430,7 @@
 		leaveVview();
 		S.scope = 'folder';
 		S.view = '';
+		S.viewBox = 0;
 		if (reveal || S.peek || S.collapsed.has('a' + entry.account.id)) {
 			renderTree();
 		}
@@ -12150,6 +12368,13 @@
 				toggleThread(+tg.dataset.row);
 				return;
 			}
+			// The star of a line: follow / stop following, the mail is not opened
+			const star = e.target.closest('.ibx-js-star');
+			if (star && star.closest('[data-mail]')) {
+				e.stopPropagation();
+				starClick(+star.closest('[data-mail]').dataset.mail);
+				return;
+			}
 			const item = e.target.closest('[data-mail]');
 			if (!item || Date.now() - (S.swipedAt || 0) < 400) {
 				return;
@@ -12329,7 +12554,7 @@
 					showNothing();
 					S.mobile('list');
 				}
-				if (wantedView && (S.scope !== 'view' || S.view !== wantedView)) {
+				if (wantedView && (S.scope !== 'view' || viewKey() !== wantedView)) {
 					await openView(wantedView, true);
 				} else if (wantedVview && S.vview !== wantedVview) {
 					await openVview(wantedVview, true);

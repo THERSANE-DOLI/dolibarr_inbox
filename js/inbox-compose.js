@@ -380,15 +380,52 @@
 			}
 		});
 	}
+	/** Name of a file cut in its middle: the end (dates of screenshots, extension) stays readable */
+	function attName(name) {
+		if (name.length <= 18) {
+			return '<span class="ibx-ellipsis">' + esc(name) + '</span>';
+		}
+		return '<span class="ibx-ellipsis">' + esc(name.slice(0, -10)) + '</span><span class="ibx-compose__atttail">' + esc(name.slice(-10)) + '</span>';
+	}
+	/** Count and weight of the attachments: the limit shows only near it, and the encoded weight refused by some servers */
+	function attSummary(w) {
+		const done = w.attachments.filter(a => !a.pending);
+		const pending = w.attachments.length - done.length;
+		const used = done.reduce((n, a) => n + (a.size || 0), 0);
+		const max = w.data.max_size || 0;
+		// The sent mail is in base64: about 4/3 of the files, and many servers refuse a mail over 25 MB
+		const heavy = used * 4 / 3 > 25 * 1048576;
+		const near = max && used >= max * 0.75;
+		const count = w.attachments.length;
+		// One file already shows its weight: the total only from two, or when the weight matters
+		if (count < 2 && !near && !heavy) {
+			return '';
+		}
+		const parts = [count === 1 ? t('InboxComposeAttCountOne') : t('InboxComposeAttCount', count), near ? t('InboxComposeAttOfMax', size(used), size(max)) : size(used)];
+		if (pending) {
+			parts.push(t('InboxComposeAttPending', pending));
+		}
+		const level = max && used >= max ? ' is-full' : (near || heavy ? ' is-near' : '');
+		return '<li class="ibx-compose__atttotal' + level + '">' + esc(parts.join(' · '))
+			+ (heavy ? '<span class="ibx-compose__attheavy">' + ic('warning') + esc(t('InboxComposeAttHeavy')) + '</span>' : '') + '</li>';
+	}
 	function paintAttachments(w) {
 		const box = $('.ibx-js-atts', w.dlg);
 		box.hidden = !w.attachments.length;
+		// Counter on the paperclip: the attachments are there even when the list is out of sight
+		const badge = $('.ibx-js-attcount', w.dlg);
+		if (badge) {
+			badge.hidden = !w.attachments.length;
+			badge.textContent = w.attachments.length;
+			$('.ibx-js-attachbtn', w.dlg).title = w.attachments.length ? t('InboxComposeAttachHave', w.attachments.length) : t('InboxComposeAttach');
+		}
 		box.innerHTML = w.attachments.map(a => '<li class="ibx-compose__att' + (a.scan === 'infected' ? ' is-bad' : '') + (a.pending ? ' is-pending' : '') + '">' + ic(a.pending ? 'send-later' : 'attachment')
 			// The name opens the file in the viewer (lot A5, 1.82.0): the very file that leaves with the mail, checked
-			+ (a.pending || a.scan === 'infected' || !I.viewComposeFiles ? '<span class="ibx-ellipsis" title="' + esc(a.name) + '">' + esc(a.name) + '</span>'
-				: '<button type="button" class="ibx-compose__attname ibx-ellipsis ibx-js-attview" data-id="' + esc(a.id) + '" title="' + esc(t('InboxComposeViewFile', a.name)) + '">' + esc(a.name) + '</button>')
-			+ '<span class="ibx-muted">' + esc(a.pending ? t('InboxComposeUploading') : size(a.size)) + '</span>'
-			+ (a.pending ? '' : '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-unattach" data-id="' + esc(a.id) + '" aria-label="' + esc(t('InboxComposeRemoveFile', a.name)) + '">' + ic('close') + '</button>') + '</li>').join('');
+			+ (a.pending || a.scan === 'infected' || !I.viewComposeFiles ? '<span class="ibx-compose__attname is-static" title="' + esc(a.name) + '">' + attName(a.name) + '</span>'
+				: '<button type="button" class="ibx-compose__attname ibx-js-attview" data-id="' + esc(a.id) + '" title="' + esc(t('InboxComposeViewFile', a.name)) + '">' + attName(a.name) + '</button>')
+			+ '<span class="ibx-muted ibx-compose__attsize">' + esc(a.pending ? t('InboxComposeUploading') : size(a.size)) + '</span>'
+			+ (a.pending ? '' : '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-unattach" data-id="' + esc(a.id) + '" aria-label="' + esc(t('InboxComposeRemoveFile', a.name)) + '">' + ic('close') + '</button>') + '</li>').join('')
+			+ attSummary(w);
 	}
 	function status(w, text, error) {
 		const s = $('.ibx-js-status', w.dlg);
@@ -412,7 +449,8 @@
 		w.dock = document.createElement('button');
 		w.dock.type = 'button';
 		w.dock.className = 'ibx-dock__item ibx-dock__item--compose';
-		w.dock.innerHTML = ic('compose') + '<span class="ibx-dock__label ibx-ellipsis">' + esc(titleOf(w)) + '</span>';
+		w.dock.innerHTML = ic('compose') + '<span class="ibx-dock__label ibx-ellipsis">' + esc(titleOf(w)) + '</span>'
+			+ (w.attachments.length ? '<span class="ibx-dock__atts" title="' + esc(t('InboxComposeAttachHave', w.attachments.length)) + '">' + ic('attachment') + w.attachments.length + '</span>' : '');
 		w.dock.addEventListener('click', () => restore(w));
 		dockBox().appendChild(w.dock);
 		save(w);
@@ -2866,7 +2904,7 @@
 			+ '<div class="ibx-window__foot ibx-compose__foot">'
 			+ '<span class="ibx-sendsplit"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-sendsplit__arrow ibx-js-sendlater" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSendLater') + '" aria-label="' + th('InboxSendLater') + '">' + ic('chevron-down') + '</button></span>'
-			+ '<label class="ibx-btn ibx-btn--icon" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
+			+ '<label class="ibx-btn ibx-btn--icon ibx-compose__attachbtn ibx-js-attachbtn" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><span class="ibx-compose__attcount ibx-js-attcount" aria-hidden="true" hidden></span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
 			// Insert a piece of Dolibarr (lot A5, 1.83.0): recall, lines, PDF, online links
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-insertpiece" aria-haspopup="dialog" title="' + th('InboxPieceInsert') + '" aria-label="' + th('InboxPieceInsert') + '">' + ic('piece') + '</button>'
 			+ ((d.linked || []).length ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-docs" title="' + th('InboxComposeAttachDocs') + '" aria-label="' + th('InboxComposeAttachDocs') + '">' + ic('document') + '</button>' : '')
@@ -3046,12 +3084,27 @@
 			if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
 				depth++;
 				drop.hidden = false;
+				// The signature and the quote are frames: entering one would leave the window for the browser
+				// (the drop zone gone, the file lost in the frame). No pointer on them while a file is carried.
+				dlg.classList.add('is-dragging');
 			}
 		});
+		const dragEnd = () => {
+			depth = 0;
+			drop.hidden = true;
+			dlg.classList.remove('is-dragging');
+		};
 		dlg.addEventListener('dragleave', () => {
 			depth = Math.max(0, depth - 1);
 			if (!depth) {
-				drop.hidden = true;
+				dragEnd();
+			}
+		});
+		// Drag cancelled (Esc) or dropped elsewhere: the zone never stays shown
+		document.addEventListener('dragend', dragEnd);
+		window.addEventListener('blur', () => {
+			if (depth) {
+				dragEnd();
 			}
 		});
 		dlg.addEventListener('dragover', e => {
@@ -3062,8 +3115,7 @@
 		dlg.addEventListener('drop', e => {
 			if (e.dataTransfer && e.dataTransfer.files.length) {
 				e.preventDefault();
-				depth = 0;
-				drop.hidden = true;
+				dragEnd();
 				addFiles(w, e.dataTransfer.files);
 			}
 		});

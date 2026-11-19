@@ -384,6 +384,18 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-tree__row:hover { background: var(--ibx-bg-hover); }
 .ibx-tree__row[aria-selected="true"] { background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 40%, transparent); }
 .ibx-tree__row.is-droptarget { background: var(--ibx-accent); color: var(--ibx-on-accent); }
+/* Drafts, Sent, Junk, Trash of a mailbox on one line of icons under its Inbox (setting system_folders) */
+.ibx-tree__stripli { list-style: none; }
+.ibx-tree__strip { display: flex; flex-wrap: wrap; gap: 0.125rem; padding: 0.0625rem var(--ibx-s2) 0.125rem calc(var(--ibx-depth, 0) * 1rem + 1.625rem); }
+.ibx-tree__chip { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 2rem; height: 1.75rem; padding: 0 0.375rem; border-radius: var(--ibx-radius); cursor: pointer; user-select: none; }
+.ibx-tree__chip:hover { background: var(--ibx-bg-hover); }
+.ibx-tree__chip:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-tree__chip[aria-selected="true"] { background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 40%, transparent); }
+.ibx-tree__chip.is-droptarget { background: var(--ibx-accent); color: var(--ibx-on-accent); }
+.ibx-tree__chip.is-droptarget .ibx-tree__icon { color: inherit; }
+.ibx-tree__chip.is-disabled { opacity: 0.5; cursor: default; }
+.ibx-tree__chip .ibx-count { margin-left: 0; }
+.ibx-tree__chip .ibx-tree__legit { display: inline-flex; color: var(--ibx-warning); }
 /* A view dragged among the views: the line where it goes (1.34.0) */
 .ibx-tree__row.is-dropbefore { box-shadow: inset 0 2px 0 var(--ibx-accent); }
 .ibx-tree__row.is-dropafter { box-shadow: inset 0 -2px 0 var(--ibx-accent); }
@@ -476,6 +488,18 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-answered > .ibx-icon { width: 1.125em; height: 1.125em; stroke-width: 2.25; }
 .ibx-star { border: 0; background: none; cursor: pointer; color: var(--ibx-text-faint); padding: 0.125rem; font-size: 0.8125rem; }
 .ibx-star[aria-pressed="true"] { color: var(--ibx-tag-2); }
+/* Star of a line (button): a click follows / stops following without opening the mail. Off, it keeps its place but
+   shows only on the hover, the focus or the selection of the line; never on a touch screen (key S, swipe, menu) */
+.ibx-js-star { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; margin: -0.25rem -0.125rem; padding: 0; border-radius: var(--ibx-radius-sm); line-height: 1; transition: transform 120ms ease, background-color 120ms ease, color 120ms ease; }
+.ibx-js-star > .ibx-icon { width: 1rem; height: 1rem; }
+.ibx-js-star:not(.is-on) { visibility: hidden; }
+[data-mail]:hover .ibx-js-star, [data-mail]:focus-within .ibx-js-star, [data-mail][aria-selected="true"] .ibx-js-star { visibility: visible; }
+.ibx-js-star:hover { color: var(--ibx-tag-2); background: var(--ibx-bg-hover); transform: scale(1.15); }
+.ibx-js-star.is-on:hover > .ibx-icon { opacity: 0.55; }
+.ibx-js-star:focus-visible { visibility: visible; outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+@media (hover: none) {
+	.ibx-js-star:not(.is-on), [data-mail]:hover .ibx-js-star:not(.is-on), [data-mail][aria-selected="true"] .ibx-js-star:not(.is-on) { visibility: hidden; }
+}
 .ibx-thread { margin: 0 0 var(--ibx-s2) 1.25rem; padding-left: var(--ibx-s3); border-left: 2px dotted var(--ibx-border-strong); }
 .ibx-thread > .ibx-mailcard { padding-top: 0.375rem; padding-bottom: 0.375rem; }
 .ibx-threadtoggle {
@@ -695,7 +719,7 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 		border-radius: 50%; background: var(--ibx-danger, #c0392b); box-shadow: 0 0 0 2px var(--ibx-bg); }
 	.ibx-window { inset: 0 !important; width: auto !important; height: auto !important; border-radius: 0; resize: none; }
 	.ibx-wgrip { display: none; }
-	.ibx-btn, .ibx-tree__row { min-height: 2.75rem; }
+	.ibx-btn, .ibx-tree__row, .ibx-tree__chip { min-height: 2.75rem; }
 }
 
 a.ibx-btn, a.ibx-btn:hover { text-decoration: none; }
@@ -1074,7 +1098,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 }
 @media (pointer: coarse) {
 	.ibx-mailcard { min-height: 2.75rem; }
-	.ibx-attachment__open, .ibx-tree__row { min-height: 2.75rem; }
+	.ibx-attachment__open, .ibx-tree__row, .ibx-tree__chip { min-height: 2.75rem; min-width: 2.75rem; }
 }
 
 /* Columns of the table: width by the edge of a header, order by drag and drop */
@@ -1112,7 +1136,11 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-convo__body .ibx-readhead__top[role="button"] { cursor: pointer; }
 .ibx-convo__body { border-top: 0; }
 .ibx-menu .ibx-menu__hint { padding: var(--ibx-s1) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); }
-.ibx-readhead__name.ibx-addr { cursor: default; }
+/* Care under « Write to » (blocked sender, spam, lookalike): right under the item, never a footer */
+.ibx-menu .ibx-menu__hint--warn { display: flex; align-items: flex-start; gap: var(--ibx-s1); max-width: 20rem; margin: 0; padding: 0 var(--ibx-s3) var(--ibx-s1) 2.25rem; border-top: 0; color: var(--ibx-text-muted); }
+.ibx-menu__hint--warn .ibx-icon { flex: none; width: 0.875rem; height: 0.875rem; margin-top: 0.0625rem; color: var(--ibx-warning); }
+/* The sender opens the menu of his address (« Write to » first): only the text is clickable, not the empty line */
+.ibx-readhead__name.ibx-addr { width: fit-content; max-width: 100%; }
 /* A user of Dolibarr as sender (UX fix series): a block as any sender, not the inline-flex of the small chips of names
    (the name wrapped on two lines beside its address on a phone) */
 .ibx-readhead__name.ibx-addr--user { display: block; }
@@ -1849,6 +1877,16 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__att { display: inline-flex; align-items: center; gap: var(--ibx-s2); max-width: 16rem; height: 2rem; padding: 0 0.125rem 0 var(--ibx-s2); background: var(--ibx-bg-sunken); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); font-size: var(--ibx-fs-sm); }
 .ibx-compose__att.is-pending { opacity: 0.7; }
 .ibx-compose__att.is-bad { color: var(--ibx-danger); border-color: var(--ibx-danger); }
+.ibx-compose__attsize { flex-shrink: 0; white-space: nowrap; }
+.ibx-compose__atttail { flex-shrink: 0; white-space: pre; }
+.ibx-compose__atttotal { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 var(--ibx-s2); min-height: 2rem; margin-left: auto; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }
+.ibx-compose__atttotal.is-near { color: var(--ibx-warning); font-weight: 600; }
+.ibx-compose__atttotal.is-full { color: var(--ibx-danger); font-weight: 600; }
+.ibx-compose__attheavy { display: inline-flex; align-items: center; gap: var(--ibx-s1); font-weight: 400; }
+.ibx-compose__attachbtn { position: relative; }
+.ibx-compose__attcount { position: absolute; top: -0.4rem; right: -0.4rem; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; font-size: var(--ibx-fs-xs); font-weight: 700; line-height: 1rem; text-align: center; color: var(--ibx-on-accent); background: var(--ibx-accent); box-shadow: 0 0 0 2px var(--ibx-bg); pointer-events: none; }
+.ibx-compose__attcount[hidden] { display: none; }
+.ibx-dock__atts { display: inline-flex; align-items: center; gap: 0.125rem; flex-shrink: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }
 .ibx-compose__drop { position: absolute; inset: 2.75rem 0 0; z-index: 4; display: flex; align-items: center; justify-content: center; gap: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); background: color-mix(in srgb, var(--ibx-bg) 85%, transparent); border: 2px dashed var(--ibx-accent); border-radius: var(--ibx-radius-lg); pointer-events: none; }
 .ibx-compose__foot { gap: var(--ibx-s1); }
 /* Discard set apart from « More » (1.101.1): a destructive action never next to a common one */
@@ -2153,7 +2191,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 /* User of Dolibarr named in the head of a mail (1.22.0): photo and name, card on hover */
 .ibx-addr--user { display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; }
 .ibx-addr--user .ibx-avatar--xs { border: 0; }
-.ibx-usercard { position: fixed; z-index: 70; display: flex; gap: var(--ibx-s3); width: 20rem; max-width: calc(100vw - 1rem); padding: var(--ibx-s3);
+.ibx-usercard { position: fixed; z-index: 70; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--ibx-s2) var(--ibx-s3); width: 20rem; max-width: calc(100vw - 1rem); padding: var(--ibx-s3);
 	font-family: var(--ibx-font); font-size: var(--ibx-fs-md); color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border);
 	border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); }
 .ibx-usercard *, .ibx-usercard { box-sizing: border-box; }
@@ -2167,7 +2205,9 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-usercard__name { font-weight: 600; font-size: var(--ibx-fs-lg); }
 .ibx-usercard__line { display: flex; align-items: center; gap: var(--ibx-s1); color: var(--ibx-text-muted); overflow-wrap: anywhere; }
 .ibx-usercard__line a { color: var(--ibx-accent); }
-.ibx-usercard__acts { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); margin-top: var(--ibx-s2); }
+/* Actions under the picture and the text, on the whole width of the card */
+.ibx-usercard__acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--ibx-s1); padding-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
+.ibx-usercard__acts > .ibx-btn { flex: 1 1 auto; justify-content: center; }
 
 /* ===== Rules and out of office of a mailbox (lot W8 1.23.0, maquette regles.html) ===== */
 .ibx-linkbtn { padding: 0; font: inherit; color: var(--ibx-accent); background: none; border: 0; cursor: pointer; text-decoration: underline; }
@@ -2765,7 +2805,19 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
 .ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }
 /* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
-.ibx-compose__attname { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname { display: inline-flex; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ibx-compose__attname > span { text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname.is-static { cursor: default; }
+/* Full name of an attachment: wraps, on the side of the chip that has room (js/inbox.js, tooltips) */
+.ibx-tooltip--att::after { width: max-content; max-width: min(24rem, 80vw); white-space: normal; overflow-wrap: anywhere; font-size: var(--ibx-fs-sm); }
+.ibx-tooltip--att.ibx-tooltip--top::after { left: 0; transform: translateY(4px); }
+.ibx-tooltip--att.ibx-tooltip--top.ibx-tooltip--end::after { left: auto; right: 0; }
+.ibx-tooltip--att.ibx-tooltip--top:hover::after, .ibx-tooltip--att.ibx-tooltip--top:focus-visible::after { transform: none; }
+.ibx-tooltip--att::before { left: 1rem; }
+.ibx-tooltip--att.ibx-tooltip--end::before { left: auto; right: 1rem; }
+/* A file carried over the window: the frames (signature, quote) let it through to the drop zone */
+.ibx-compose.is-dragging iframe { pointer-events: none; }
+.ibx-compose__attname.is-static > span { text-decoration: none; }
 .ibx-compose__attname:hover { color: var(--ibx-accent); }
 /* Insert a piece of Dolibarr (lot A5, 1.83.0) */
 .ibx-pieceins { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: min(40rem, 80vw); }
