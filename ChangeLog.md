@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: dot of the new mails on a folded mailbox and on a closed folder, over the counter of where they are :   1.129.2
+  - folded mailbox: the dot on the count of the Inbox or on « +N » of the other folders.
+  - closed folder: the dot on « +N » when its subfolders have new mails; alone beside them when all are read.
+
 - FIX: chevron on the line of icons of Drafts, Sent, Junk and Trash, unfolded into their rows of before :   1.129.1
   - « Followed » joins the line of icons; unfolded, the chevron is on its row (or on Drafts), kept per mailbox.
   - same display in every density; the setting in My account still keeps one row each.
