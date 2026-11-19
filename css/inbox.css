@@ -386,7 +386,9 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-tree__row.is-droptarget { background: var(--ibx-accent); color: var(--ibx-on-accent); }
 /* Drafts, Sent, Junk, Trash of a mailbox on one line of icons under its Inbox (setting system_folders) */
 .ibx-tree__stripli { list-style: none; }
-.ibx-tree__strip { display: flex; flex-wrap: wrap; gap: 0.125rem; padding: 0.0625rem var(--ibx-s2) 0.125rem calc(var(--ibx-depth, 0) * 1rem + 1.625rem); }
+.ibx-tree__strip { display: flex; flex-wrap: wrap; align-items: center; gap: 0.125rem; padding: 0.0625rem var(--ibx-s2) 0.125rem calc(var(--ibx-depth, 0) * 1rem + 0.25rem); }
+/* Chevron of the line of icons in the column of the chevrons of the folders; the icons start under their icons */
+.ibx-tree__strip > .ibx-tree__twisty { align-self: stretch; margin-right: 0.125rem; }
 .ibx-tree__chip { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 2rem; height: 1.75rem; padding: 0 0.375rem; border-radius: var(--ibx-radius); cursor: pointer; user-select: none; }
 .ibx-tree__chip:hover { background: var(--ibx-bg-hover); }
 .ibx-tree__chip:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
@@ -2134,7 +2136,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-apreview__mail { padding: 0.3rem 0.5rem; border: 1px solid var(--ibx-border); border-left: 3px solid var(--ibx-accent); border-radius: var(--ibx-radius-sm); }
 .ibx-apreview__mail span { display: block; color: var(--ibx-text-muted); }
 .ibx-apreview__btn { align-self: flex-start; padding: 0.15rem 0.6rem; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent); color: var(--ibx-on-accent); font-weight: 600; }
-.ibx-formrow__actions { margin-top: .5rem; }
+.ibx-formrow__actions { margin-top: .5rem; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
 
 /* Invitation of the mail read (lot W8 1.22.0) */
 /* DMARC aggregate reports (1.111.0, js/inbox-dmarc.js) */
@@ -3151,3 +3153,15 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-load__label { font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
 .ibx-load__value { margin: var(--ibx-s1) 0 0; font-size: var(--ibx-fs-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ibx-load__cpu { margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }
+
+/* Bell panel: offer of the notifications of the browser, at its foot */
+.ibx-notifpanel__offer { flex: none; display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); background: var(--ibx-bg-sunken); }
+.ibx-notifpanel__offericon { flex: none; color: var(--ibx-text-muted); }
+.ibx-notifpanel__offertext { flex: 1; min-width: 0; margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+.ibx-notifpanel__offer > .ibx-btn { flex: none; }
+
+/* Result of the test notification (Settings > Notifications) */
+.ibx-notiftest:empty { display: none; }
+.ibx-notiftest { margin-top: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg-sunken); }
+.ibx-notiftest__lead { margin: var(--ibx-s2) 0 var(--ibx-s1); font-size: var(--ibx-fs-sm); }
+.ibx-notiftest__checks { margin: 0; padding-inline-start: 1.25rem; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }

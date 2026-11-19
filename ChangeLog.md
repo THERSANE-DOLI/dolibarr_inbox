@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: chevron on the line of icons of Drafts, Sent, Junk and Trash, unfolded into their rows of before :   1.129.1
+  - « Followed » joins the line of icons; unfolded, the chevron is on its row (or on Drafts), kept per mailbox.
+  - same display in every density; the setting in My account still keeps one row each.
+
+- NEW: browser notifications offered from the bell, test notification that tells where they are blocked :   1.129.0
+  - at the foot of the bell panel, « Turn on » or « Do not offer again », only when they can work here.
+  - Settings > Notifications: the test says shown, refused or no answer, with the checks of the system.
+  - per mailbox, why new mails are told or not by default (personal on, shared off).
+
 - FIX: card of a Dolibarr user opened on a click only, closed by a click elsewhere, actions on its whole width :   1.128.11
   - no more card on the hover (the click that followed closed it); a click in the mail closes it too.
   - « Write », « Dolibarr card » and « Emails » on one line under the picture.
