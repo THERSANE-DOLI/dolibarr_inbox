@@ -1,5 +1,13 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: writing, a file dropped on the signature or the quote is attached :   1.128.6
+  - the drop zone no longer disappears over the signature or the quote; it also hides when the drag is cancelled.
+
+- FIX: writing, count and weight of the attachments, full name of a file in a bubble :   1.128.5
+  - from two files, « 3 attachments · 506 KB »; near the limit « 15.4 MB of 20 MB », and a warning over 25 MB sent.
+  - number of attachments on the paperclip and on the minimized writing.
+  - names cut in the middle (the end and the extension stay), the full name in a bubble on hover or focus.
+
 - FIX: texts of the module (version, history, notes, lists) never served by the web server :   1.128.4
   - a .htaccess at the root of the module refuses md, txt, json, sh, yml, lock; the rule for nginx in the install doc.
 

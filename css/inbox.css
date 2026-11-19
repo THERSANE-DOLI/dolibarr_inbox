@@ -1849,6 +1849,16 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__att { display: inline-flex; align-items: center; gap: var(--ibx-s2); max-width: 16rem; height: 2rem; padding: 0 0.125rem 0 var(--ibx-s2); background: var(--ibx-bg-sunken); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); font-size: var(--ibx-fs-sm); }
 .ibx-compose__att.is-pending { opacity: 0.7; }
 .ibx-compose__att.is-bad { color: var(--ibx-danger); border-color: var(--ibx-danger); }
+.ibx-compose__attsize { flex-shrink: 0; white-space: nowrap; }
+.ibx-compose__atttail { flex-shrink: 0; white-space: pre; }
+.ibx-compose__atttotal { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 var(--ibx-s2); min-height: 2rem; margin-left: auto; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }
+.ibx-compose__atttotal.is-near { color: var(--ibx-warning); font-weight: 600; }
+.ibx-compose__atttotal.is-full { color: var(--ibx-danger); font-weight: 600; }
+.ibx-compose__attheavy { display: inline-flex; align-items: center; gap: var(--ibx-s1); font-weight: 400; }
+.ibx-compose__attachbtn { position: relative; }
+.ibx-compose__attcount { position: absolute; top: -0.4rem; right: -0.4rem; min-width: 1rem; height: 1rem; padding: 0 0.25rem; border-radius: 0.5rem; font-size: var(--ibx-fs-xs); font-weight: 700; line-height: 1rem; text-align: center; color: var(--ibx-on-accent); background: var(--ibx-accent); box-shadow: 0 0 0 2px var(--ibx-bg); pointer-events: none; }
+.ibx-compose__attcount[hidden] { display: none; }
+.ibx-dock__atts { display: inline-flex; align-items: center; gap: 0.125rem; flex-shrink: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); font-variant-numeric: tabular-nums; }
 .ibx-compose__drop { position: absolute; inset: 2.75rem 0 0; z-index: 4; display: flex; align-items: center; justify-content: center; gap: var(--ibx-s2); font-weight: 600; color: var(--ibx-accent); background: color-mix(in srgb, var(--ibx-bg) 85%, transparent); border: 2px dashed var(--ibx-accent); border-radius: var(--ibx-radius-lg); pointer-events: none; }
 .ibx-compose__foot { gap: var(--ibx-s1); }
 /* Discard set apart from « More » (1.101.1): a destructive action never next to a common one */
@@ -2765,7 +2775,19 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
 .ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }
 /* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
-.ibx-compose__attname { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname { display: inline-flex; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ibx-compose__attname > span { text-decoration: underline dotted; text-underline-offset: 2px; }
+.ibx-compose__attname.is-static { cursor: default; }
+/* Full name of an attachment: wraps, on the side of the chip that has room (js/inbox.js, tooltips) */
+.ibx-tooltip--att::after { width: max-content; max-width: min(24rem, 80vw); white-space: normal; overflow-wrap: anywhere; font-size: var(--ibx-fs-sm); }
+.ibx-tooltip--att.ibx-tooltip--top::after { left: 0; transform: translateY(4px); }
+.ibx-tooltip--att.ibx-tooltip--top.ibx-tooltip--end::after { left: auto; right: 0; }
+.ibx-tooltip--att.ibx-tooltip--top:hover::after, .ibx-tooltip--att.ibx-tooltip--top:focus-visible::after { transform: none; }
+.ibx-tooltip--att::before { left: 1rem; }
+.ibx-tooltip--att.ibx-tooltip--end::before { left: auto; right: 1rem; }
+/* A file carried over the window: the frames (signature, quote) let it through to the drop zone */
+.ibx-compose.is-dragging iframe { pointer-events: none; }
+.ibx-compose__attname.is-static > span { text-decoration: none; }
 .ibx-compose__attname:hover { color: var(--ibx-accent); }
 /* Insert a piece of Dolibarr (lot A5, 1.83.0) */
 .ibx-pieceins { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: min(40rem, 80vw); }
