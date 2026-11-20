@@ -1,6 +1,6 @@
 # Inbox for developers
 
-Mail foundation used by other modules (first one: quoteassist, customer price request prefill).
+Mail foundation for other modules: they plug into Inbox through the hooks below.
 
 - `Inbox::getMessage($mailbox, $messageId, $user, $origin)`: one mail read in a mailbox of inbox (or given by another
   module through the hook `inboxResolveAccount`), from its complete Message-ID, read only, cached, journaled.
