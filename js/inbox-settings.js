@@ -1607,6 +1607,8 @@
 					kind = 'warning';
 				} else if (n === 'oauth_offered') {
 					lines.push(th('InboxAutoconfigOAuthOffered', label));
+				} else if (n === 'ovh_offer') {
+					lines.push(th('InboxAutoconfigOvhOffer'));
 				}
 			});
 			if (touched) {

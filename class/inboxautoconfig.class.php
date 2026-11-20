@@ -50,6 +50,9 @@ class InboxAutoconfig
 	 * Known providers: domains of the addresses, suffixes of their MX, servers, login, OAuth.
 	 * oauth: provider whose services of the OAuth module of the core may be used (prefix of their key);
 	 * oauth_only: the password is refused by the provider for IMAP (Microsoft 365).
+	 * offers: offers of the provider received by the same MX but read on their own numbered server, found by the SRV
+	 * record the provider asks for its offers (target matched by « host », its first group = key of « labels »);
+	 * without it, the servers of the provider are given with the note « note ».
 	 *
 	 * @var array<string,array<string,mixed>>
 	 */
@@ -60,8 +63,12 @@ class InboxAutoconfig
 			'imap' => array('outlook.office365.com', 993, 'ssl'), 'smtp' => array('smtp.office365.com', 587, 'tls'), 'login' => 'email', 'oauth' => 'MICROSOFT', 'oauth_only' => true),
 		'outlook' => array('label' => 'Outlook.com', 'domains' => array('outlook.com', 'outlook.fr', 'hotmail.com', 'hotmail.fr', 'live.com', 'live.fr', 'msn.com'), 'mx' => array('.olc.protection.outlook.com'),
 			'imap' => array('outlook.office365.com', 993, 'ssl'), 'smtp' => array('smtp-mail.outlook.com', 587, 'tls'), 'login' => 'email', 'oauth' => 'MICROSOFT', 'oauth_only' => true),
+		// MX Plan, Email Pro and Exchange share the MX: Email Pro (proN) and Exchange (exN) by the SRV autodiscover record
+		// that OVHcloud asks for these offers (diagnostic of the domain in its control panel)
 		'ovh' => array('label' => 'OVHcloud', 'domains' => array(), 'mx' => array('.mail.ovh.net'),
-			'imap' => array('ssl0.ovh.net', 993, 'ssl'), 'smtp' => array('ssl0.ovh.net', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false),
+			'imap' => array('ssl0.ovh.net', 993, 'ssl'), 'smtp' => array('ssl0.ovh.net', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false,
+			'offers' => array('record' => '_autodiscover._tcp', 'host' => '/^(pro|ex)[0-9]+\.mail\.ovh\.net$/', 'imap' => array(993, 'ssl'), 'smtp' => array(587, 'tls'),
+				'labels' => array('pro' => 'OVHcloud Email Pro', 'ex' => 'OVHcloud Exchange'), 'note' => 'ovh_offer')),
 		'infomaniak' => array('label' => 'Infomaniak', 'domains' => array('ik.me', 'etik.com'), 'mx' => array('.infomaniak.ch'),
 			'imap' => array('mail.infomaniak.com', 993, 'ssl'), 'smtp' => array('mail.infomaniak.com', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false),
 		'orange' => array('label' => 'Orange', 'domains' => array('orange.fr', 'wanadoo.fr'), 'mx' => array(),
@@ -473,13 +480,40 @@ class InboxAutoconfig
 			}
 			if ($hit !== '') {
 				$this->tried('provider', $hit, 'found');
-				return array('source' => 'provider', 'detail' => $hit, 'provider' => $key, 'provider_label' => $p['label'],
+				$out = array('source' => 'provider', 'detail' => $hit, 'provider' => $key, 'provider_label' => $p['label'],
 					'imap' => self::server($p['imap'][0], $p['imap'][1], $p['imap'][2]), 'smtp' => self::server($p['smtp'][0], $p['smtp'][1], $p['smtp'][2]), 'login' => $p['login']);
+
+				return empty($p['offers']) ? $out : $this->withOffer($domain, $p['offers'], $out);
 			}
 		}
 		$this->tried('provider', $mx ? implode(', ', array_slice($mx, 0, 2)) : $domain, 'none');
 
 		return null;
+	}
+
+	/**
+	 * Own server of an offer of the provider, by its SRV record; else the servers of the provider with a note
+	 *
+	 * @param string              $domain Domain
+	 * @param array<string,mixed> $offers Offers of the provider (PROVIDERS)
+	 * @param array<string,mixed> $out    Servers of the provider
+	 * @return array<string,mixed>
+	 */
+	protected function withOffer($domain, array $offers, array $out)
+	{
+		$name = $offers['record'].'.'.$domain;
+		$record = $this->srv($name, 'ssl');
+		$reg = array();
+		if (!$record || !preg_match($offers['host'], $record['host'], $reg)) {
+			$this->tried('srv', $name, 'none');
+			$out['notes'] = array($offers['note']);
+			return $out;
+		}
+		$this->tried('srv', $name, 'found');
+		$host = $record['host'];
+
+		return array_merge($out, array('detail' => $host, 'provider_label' => $offers['labels'][$reg[1]] ?? $out['provider_label'],
+			'imap' => self::server($host, $offers['imap'][0], $offers['imap'][1]), 'smtp' => self::server($host, $offers['smtp'][0], $offers['smtp'][1])));
 	}
 
 	// ----- 6. SRV -----

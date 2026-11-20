@@ -38,6 +38,9 @@ class InboxAutoconfigOffline extends InboxAutoconfig
 	/** @var string[] MX of the domain */
 	public $mx = array();
 
+	/** @var array<string,string> SRV record => target */
+	public $srvTargets = array();
+
 	/**
 	 * @param string      $url  Address
 	 * @param string|null $post Body
@@ -70,11 +73,11 @@ class InboxAutoconfigOffline extends InboxAutoconfig
 	/**
 	 * @param string $name Record
 	 * @param string $enc  Encryption
-	 * @return null
+	 * @return array{host:string,port:int,encryption:string}|null
 	 */
 	protected function srv($name, $enc)
 	{
-		return null;
+		return isset($this->srvTargets[$name]) ? self::server($this->srvTargets[$name], 443, $enc) : null;
 	}
 }
 
@@ -199,6 +202,46 @@ class InboxAutoconfigTest extends InboxTestCase
 		$r = $f->discover('anne@nowhere.example');
 		$this->assertSame('ispdb', $r['source']);
 		$this->assertContains('https://autoconfig.thunderbird.net/v1.1/nowhere.example', $f->asked);
+	}
+
+	/**
+	 * OVHcloud: MX Plan, Email Pro and Exchange share the MX; the offers with their own server by their SRV record
+	 *
+	 * @return void
+	 */
+	public function testOvhOffers()
+	{
+		$f = new InboxAutoconfigOffline($this->db);
+		$f->guess = false;
+		$f->ispdb = false;
+		$f->mx = array('mx1.mail.ovh.net', 'mx2.mail.ovh.net');
+		// MX Plan: no record, servers of MX Plan and the note for the other offers
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('provider', $r['source']);
+		$this->assertSame('ovh', $r['provider']);
+		$this->assertSame(array('host' => 'ssl0.ovh.net', 'port' => 993, 'encryption' => 'ssl'), $r['imap']);
+		$this->assertSame(465, $r['smtp']['port']);
+		$this->assertSame(array('ovh_offer'), $r['notes']);
+
+		// Email Pro: its own server, IMAP 993 SSL, SMTP 587 STARTTLS, no note
+		$f->srvTargets['_autodiscover._tcp.example.org'] = 'pro2.mail.ovh.net.';
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('OVHcloud Email Pro', $r['provider_label']);
+		$this->assertSame(array('host' => 'pro2.mail.ovh.net', 'port' => 993, 'encryption' => 'ssl'), $r['imap']);
+		$this->assertSame(array('host' => 'pro2.mail.ovh.net', 'port' => 587, 'encryption' => 'tls'), $r['smtp']);
+		$this->assertSame(array(), $r['notes']);
+
+		// Exchange
+		$f->srvTargets['_autodiscover._tcp.example.org'] = 'ex4.mail.ovh.net';
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('OVHcloud Exchange', $r['provider_label']);
+		$this->assertSame('ex4.mail.ovh.net', $r['imap']['host']);
+
+		// A record to another host is not trusted: servers of MX Plan and the note
+		$f->srvTargets['_autodiscover._tcp.example.org'] = 'pro2.mail.ovh.net.attacker.example';
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('ssl0.ovh.net', $r['imap']['host']);
+		$this->assertSame(array('ovh_offer'), $r['notes']);
 	}
 
 	/**
