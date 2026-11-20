@@ -10374,7 +10374,10 @@
 				await doArchive(ids, { quiet: true });
 			}
 		} finally {
-			closeWindow(w);
+			// keepOpen: the page goes on (next step in the same window), only the panel of the mail is refreshed
+			if (d.keepOpen !== true) {
+				closeWindow(w);
+			}
 			if (w.box && w.box.isConnected && +w.box.dataset.mail === w.mailId) {
 				loadDolibar(w.box);
 			}
