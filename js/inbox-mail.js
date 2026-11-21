@@ -502,8 +502,32 @@
 		if (!a.locked) {
 			return '';
 		}
-		return '<div class="ibx-tree__note ibx-tree__note--locked">' + ic('lock') + ' ' + th('InboxProtectLockedShort')
-			+ ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-unlockbox" data-account="' + a.id + '">' + th('InboxProtectUnlock') + '</button></div>';
+		// Being unlocked in silence (copy of this browser): no button, it would ask the password for nothing
+		if (I.protect && I.protect.isUnlocking(a.id)) {
+			return I.html`<div class="ibx-tree__note ibx-tree__note--unlocking" role="status"><span class="ibx-spinner" aria-hidden="true"></span>${t('InboxProtectUnlocking')}</div>`;
+		}
+		const why = I.protect ? I.protect.failure(a.id) : '';
+		return I.html`<div class="ibx-tree__note ibx-tree__note--locked">${I.raw(ic('lock'))} ${t('InboxProtectLockedShort')}${why ? I.html`<span class="ibx-tree__note__why">${why}</span>` : ''} <button type="button" class="ibx-btn ibx-btn--sm ibx-js-unlockbox" data-account="${a.id}">${t('InboxProtectUnlock')}</button></div>`;
+	}
+
+	/**
+	 * List of a protected mailbox locked in this session: being unlocked in silence (spinner), else the reason of
+	 * the failure and the button to unlock it
+	 * @param {HTMLElement} body Body of the list pane
+	 * @param {string} message Answer of the server (« Protected mailbox, locked. »)
+	 */
+	function renderListLocked(body, message) {
+		if (I.protect && I.protect.isUnlocking(S.listLocked)) {
+			body.innerHTML = I.html`<div class="ibx-empty ibx-empty--unlocking" role="status"><span class="ibx-spinner" aria-hidden="true"></span><div>${t('InboxProtectUnlocking')}</div></div>`;
+			return;
+		}
+		const why = I.protect ? I.protect.failure(S.listLocked) : '';
+		body.innerHTML = I.html`<div class="ibx-empty">${I.raw(ic('lock', 'ibx-empty__icon'))}<div>${message}</div>${why ? I.html`<div>${why}</div>` : ''}<button type="button" class="ibx-btn ibx-js-unlocklist">${t('InboxProtectUnlock')}</button></div>`;
+		$('.ibx-js-unlocklist', body).addEventListener('click', () => {
+			if (I.protect) {
+				I.protect.openLock(S.listLocked).then(ok => (ok ? refreshTree().then(() => loadList()) : null));
+			}
+		});
 	}
 
 	// ---------- One mailbox at a time (1.30.0, analyse-navigation-vues.md §2) ----------
@@ -1589,13 +1613,17 @@
 			// Protected mailbox not unlocked yet in this session (first load of a new session, the silent unlock
 			// comes just after): told as locked, the list loaded again once unlocked (inbox:protect:state)
 			S.listLocked = err.code === 'locked' ? +(err.data.account || 0) : 0;
+			S.listLockedMsg = err.message;
+			// Unlocked in silence while the answer was on its way (the state came first): read again, once
+			if (S.listLocked && I.protect && !I.protect.isLocked(S.listLocked) && S.listLockedRetry !== S.listLocked) {
+				S.listLockedRetry = S.listLocked;
+				S.listLocked = 0;
+				loadList(keep);
+				return;
+			}
+			S.listLockedRetry = 0;
 			if (!keep && S.listLocked) {
-				body.innerHTML = '<div class="ibx-empty">' + ic('lock', 'ibx-empty__icon') + '<div>' + esc(err.message) + '</div><button type="button" class="ibx-btn ibx-js-unlocklist">' + th('InboxProtectUnlock') + '</button></div>';
-				$('.ibx-js-unlocklist', body).addEventListener('click', () => {
-					if (I.protect) {
-						I.protect.openLock(S.listLocked).then(ok => (ok ? refreshTree().then(() => loadList()) : null));
-					}
-				});
+				renderListLocked(body, err.message);
 			} else if (!keep) {
 				body.innerHTML = '<div class="ibx-empty">' + ic('warning', 'ibx-empty__icon') + '<div>' + esc(err.message) + '</div><button type="button" class="ibx-btn ibx-js-retry">' + th('InboxRetry') + '</button></div>';
 				$('.ibx-js-retry', body).addEventListener('click', () => loadList());
@@ -1655,9 +1683,14 @@
 	}
 
 	function skeletonList() {
-		let h = '<div class="ibx-maillist" aria-hidden="true">';
+		let h = '<div class="ibx-maillist ibx-maillist--skeleton" aria-hidden="true">';
+		// Shaped as a card (sender and date, subject, snippet), widths varied so that it does not look like a grid
 		for (let i = 0; i < 8; i++) {
-			h += '<div class="ibx-mailcard"><span></span><span class="ibx-skeleton" style="width:' + (40 + (i * 17) % 40) + '%"></span><span></span><span class="ibx-skeleton" style="grid-column:2/4;width:' + (55 + (i * 23) % 35) + '%"></span></div>';
+			h += '<div class="ibx-mailcard ibx-mailcard--skeleton">'
+				+ '<span class="ibx-skeleton ibx-mailcard__from" style="width:' + (35 + (i * 17) % 35) + '%"></span>'
+				+ '<span class="ibx-skeleton ibx-mailcard__meta"></span>'
+				+ '<span class="ibx-skeleton ibx-mailcard__subject" style="width:' + (55 + (i * 23) % 35) + '%"></span>'
+				+ '<span class="ibx-skeleton ibx-skeleton--faint ibx-mailcard__snippet" style="width:' + (70 + (i * 13) % 25) + '%"></span></div>';
 		}
 		return h + '</div>';
 	}
@@ -12587,11 +12620,21 @@
 		if (!S.el || !(S.accounts || []).length || !I.protect) {
 			return;
 		}
-		const tree = S.accounts.some(a => a.protected && !!a.locked !== I.protect.isLocked(a.id)) ? refreshTree() : Promise.resolve();
+		const changed = S.accounts.some(a => a.protected && !!a.locked !== I.protect.isLocked(a.id));
+		const tree = changed ? refreshTree() : Promise.resolve();
+		if (!changed && S.accounts.some(a => a.locked)) {
+			// Still locked: being unlocked, or failed (its reason, the button back)
+			renderTree();
+		}
 		// The list refused as locked (first load of the session, before the silent unlock): loaded again
 		if (S.listLocked && !I.protect.isLocked(S.listLocked)) {
 			S.listLocked = 0;
 			tree.then(() => loadList(), () => loadList());
+		} else if (S.listLocked) {
+			const body = $('.ibx-pane--list .ibx-pane__body', S.el);
+			if (body && !body.getAttribute('aria-busy')) {
+				renderListLocked(body, S.listLockedMsg || t('InboxProtectLockedShort'));
+			}
 		}
 	});
 

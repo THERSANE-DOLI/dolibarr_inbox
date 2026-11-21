@@ -216,6 +216,8 @@
 	/** Protected mailboxes of the user: {id, label, email, unlocked, blob, smtp_own, failed, error} */
 	let boxes = [];
 	const listeners = new Set();
+	/** First reading of the page not done yet: a locked mailbox may be unlocked in silence in a moment */
+	let starting = true;
 	function emit() {
 		listeners.forEach(fn => {
 			try {
@@ -232,6 +234,16 @@
 	 * @returns {Promise<object[]>}
 	 */
 	async function refresh() {
+		try {
+			return await readAndUnlock();
+		} finally {
+			if (starting) {
+				starting = false;
+				emit();
+			}
+		}
+	}
+	async function readAndUnlock() {
 		let res = await api('protect', 'state', { device: me ? me.deviceId : 0 });
 		if (!res.accounts.length) {
 			boxes = [];
@@ -249,10 +261,17 @@
 			}
 		}
 		boxes = res.accounts;
-		for (const b of boxes) {
-			if (b.unlocked || !b.blob || !me || b.failed) {
-				continue;
-			}
+		// The mailboxes opened in silence are told as being unlocked, not as locked with a button (the password
+		// would be asked for nothing)
+		const silent = boxes.filter(b => !b.unlocked && b.blob && me && !b.failed);
+		silent.forEach(b => {
+			b.unlocking = true;
+		});
+		starting = false;
+		if (silent.length) {
+			emit();
+		}
+		for (const b of silent) {
 			try {
 				const s = await unwrap(b.blob, aad(b.id, ctx('INBOX_USER_ID', 0), me.deviceId));
 				await post('protect', 'unlock', { id: b.id, device: me.deviceId, imap_password: s.imap, smtp_password: s.smtp || '' });
@@ -263,6 +282,7 @@
 				b.failed = err.code === 'auth';
 				b.message = err.message;
 			}
+			b.unlocking = false;
 		}
 		emit();
 		checkApprovals();
@@ -422,7 +442,7 @@
 				title: t('InboxProtectLockedTitle', b.label),
 				body: reason + '<p>' + th('InboxProtectLockedHelp') + '</p>' + passwordFields(!!b.smtp_own, 'ibx-unlock')
 					+ '<p class="ibx-section__help">' + th('InboxProtectOrApprove') + ' <button type="button" class="ibx-btn ibx-btn--sm ibx-js-ask">' + th('InboxProtectAskApproval') + '</button></p>',
-				actions: [{ label: t('InboxProtectUnlock'), primary: true, run: async d => {
+				actions: [{ label: t('InboxProtectUnlock'), busyLabel: t('InboxProtectUnlockChecking'), primary: true, run: async d => {
 					const secrets = readPasswords(d, 'ibx-unlock');
 					if (!secrets.imap) {
 						$('#ibx-unlock-imap', d).focus();
@@ -618,6 +638,23 @@
 		isLocked: id => {
 			const b = byId(id);
 			return !!b && !b.unlocked;
+		},
+		/** @param {number} id Mailbox @returns {boolean} locked, being unlocked in silence (or not known yet) */
+		isUnlocking: id => {
+			const b = byId(id);
+			return b ? !b.unlocked && (starting || !!b.unlocking) : starting;
+		},
+		/**
+		 * Why the silent unlocking of a mailbox failed, in a few words
+		 * @param {number} id Mailbox
+		 * @returns {string} plain text, empty when it did not fail
+		 */
+		failure: id => {
+			const b = byId(id);
+			if (!b || b.unlocked || !(b.error || b.failed)) {
+				return '';
+			}
+			return t(b.error === 'auth' || b.failed ? 'InboxProtectFailAuth' : (b.error === 'copy' ? 'InboxProtectFailCopy' : 'InboxProtectFailServer'));
 		},
 		onChange: fn => listeners.add(fn),
 	};

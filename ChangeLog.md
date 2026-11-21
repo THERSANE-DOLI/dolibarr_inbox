@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: protected mailbox being unlocked in silence told as such, no longer as locked with a button :   1.130.3
+  - « Unlocking... » with a spinner in the tree and the list; a failure gives its reason under the button.
+  - dialogs: an action still running after 300 ms shows a spinner in its button (« Checking... » to unlock).
+
+- FIX: list of a protected mailbox left locked when the silent unlock ended while it was loading :   1.130.2
+  - the « locked » answer arrived after the unlock: the list is read again once.
+
+- FIX: skeleton of the list visible again, shaped as a mail card, shown after 300 ms only :   1.130.1
+  - its bars fell into the date column of the card grid and had no width.
+
 - NEW: IONOS and o2switch recognized when a mailbox is added :   1.130.0
   - IONOS: servers of the country of the contract, read from the MX (imap.ionos.fr, .de, .com...).
   - o2switch: known by its name servers, the shared server read in the certificate of mail.<domain>.
