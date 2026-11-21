@@ -1609,6 +1609,9 @@
 					lines.push(th('InboxAutoconfigOAuthOffered', label));
 				} else if (n === 'ovh_offer') {
 					lines.push(th('InboxAutoconfigOvhOffer'));
+				} else if (n === 'o2switch_server') {
+					lines.push(th('InboxAutoconfigO2switchServer'));
+					kind = 'warning';
 				}
 			});
 			if (touched) {

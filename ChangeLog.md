@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: IONOS and o2switch recognized when a mailbox is added :   1.130.0
+  - IONOS: servers of the country of the contract, read from the MX (imap.ionos.fr, .de, .com...).
+  - o2switch: known by its name servers, the shared server read in the certificate of mail.<domain>.
+
 - FIX: OAuth services named as the setup of Dolibarr shows them, « Sales (Microsoft Exchange Online [SMTP/IMAP]) » :   1.129.4
   - was the name of the callback file of the core (« Microsoft3 Sales »), which the user never sees.
 
