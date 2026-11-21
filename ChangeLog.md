@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: OVHcloud Email Pro and Exchange mailboxes get their own server, found by the SRV autodiscover record :   1.129.3
+  - the MX of MX Plan, Email Pro and Exchange are the same: ssl0.ovh.net was offered to all of them.
+  - no record: servers of MX Plan, with a note telling where to find the server of the other offers.
+
 - FIX: dot of the new mails on a folded mailbox and on a closed folder, over the counter of where they are :   1.129.2
   - folded mailbox: the dot on the count of the Inbox or on « +N » of the other folders.
   - closed folder: the dot on « +N » when its subfolders have new mails; alone beside them when all are read.

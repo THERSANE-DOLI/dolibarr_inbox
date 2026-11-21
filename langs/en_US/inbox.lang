@@ -3485,6 +3485,7 @@ InboxAutoconfigTriedSource_guess = Usual names
 InboxAutoconfigOAuth = %s: OAuth login with the service « %s » of Dolibarr.
 InboxAutoconfigOAuthNeeded = %s refuses passwords for IMAP. Set up an OAuth connection for it in Dolibarr (Setup > Modules > OAuth), then choose it here.
 InboxAutoconfigOAuthOffered = %s accepts an app password; an OAuth connection (Setup > Modules > OAuth of Dolibarr) is safer.
+InboxAutoconfigOvhOffer = OVHcloud: these are the servers of MX Plan. For an Email Pro or Exchange mailbox, type the server of your offer instead (proN.mail.ovh.net or exN.mail.ovh.net, given in the OVHcloud control panel).
 InboxAutoconfigError = The search failed: %s. Type the servers below.
 InboxAutoconfigBadEmail = Invalid address
 InboxAutoconfigSection = New mailboxes
