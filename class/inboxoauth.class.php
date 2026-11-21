@@ -28,11 +28,12 @@
 class InboxOAuth
 {
 	/**
-	 * @return array<string,string> Services set up in the core: key (ex: Google-MyCompany) => label
+	 * @return array<string,string> Services set up in the core: key (ex: GOOGLE-MyCompany) => label as the setup of
+	 *                              the core shows it, « MyCompany (Google) » (the provider alone without a label)
 	 */
 	public static function listServices()
 	{
-		global $conf;
+		global $conf, $langs;
 
 		$out = array();
 		if (!isModEnabled('oauth')) {
@@ -44,10 +45,15 @@ class InboxOAuth
 			if (!preg_match('/^OAUTH_([A-Z0-9]+)(-[^_]+)?_ID$/', (string) $key, $reg) || (string) $value === '') {
 				continue;
 			}
+			// Name of the provider as in Setup > OAuth (« Microsoft Exchange Online [SMTP/IMAP] »), never the name of its
+			// callback file (« Microsoft3 »), which the user never sees
 			$name = 'OAUTH_'.$reg[1].'_NAME';
-			$provider = isset($supported[$name]['callbackfile']) ? ucfirst(strtolower($supported[$name]['callbackfile'])) : ucfirst(strtolower($reg[1]));
+			$provider = is_object($langs) ? $langs->trans($name) : $name;
+			if ($provider === $name) {
+				$provider = isset($supported[$name]['name']) ? (string) $supported[$name]['name'] : ucfirst(strtolower($reg[1]));
+			}
 			$service = $reg[1].(isset($reg[2]) ? $reg[2] : '');
-			$out[$service] = $provider.(isset($reg[2]) ? ' '.substr($reg[2], 1) : '');
+			$out[$service] = isset($reg[2]) ? substr($reg[2], 1).' ('.$provider.')' : $provider;
 		}
 
 		return $out;
