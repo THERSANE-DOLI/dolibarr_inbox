@@ -205,6 +205,40 @@ class InboxAutoconfigTest extends InboxTestCase
 	}
 
 	/**
+	 * OAuth services of the core named as its setup shows them: label and name of the provider, never the name of the
+	 * callback file (« Microsoft3 »)
+	 *
+	 * @return void
+	 */
+	public function testOAuthServiceLabels()
+	{
+		global $conf;
+
+		$keep = array($conf->modules['oauth'] ?? null, $conf->global->{'OAUTH_MICROSOFT3-Sales_ID'} ?? null, $conf->global->OAUTH_GOOGLE_ID ?? null);
+		$conf->modules['oauth'] = 'oauth';
+		$conf->global->{'OAUTH_MICROSOFT3-Sales_ID'} = 'id-1';
+		$conf->global->OAUTH_GOOGLE_ID = 'id-2';
+		try {
+			$list = InboxOAuth::listServices();
+			$this->assertSame('Sales (Microsoft Exchange Online [SMTP/IMAP])', $list['MICROSOFT3-Sales'] ?? null);
+			$this->assertSame('Google', $list['GOOGLE'] ?? null);
+		} finally {
+			foreach (array('OAUTH_MICROSOFT3-Sales_ID' => $keep[1], 'OAUTH_GOOGLE_ID' => $keep[2]) as $k => $v) {
+				if ($v === null) {
+					unset($conf->global->$k);
+				} else {
+					$conf->global->$k = $v;
+				}
+			}
+			if ($keep[0] === null) {
+				unset($conf->modules['oauth']);
+			} else {
+				$conf->modules['oauth'] = $keep[0];
+			}
+		}
+	}
+
+	/**
 	 * OVHcloud: MX Plan, Email Pro and Exchange share the MX; the offers with their own server by their SRV record
 	 *
 	 * @return void

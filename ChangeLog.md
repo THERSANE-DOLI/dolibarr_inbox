@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: OAuth services named as the setup of Dolibarr shows them, « Sales (Microsoft Exchange Online [SMTP/IMAP]) » :   1.129.4
+  - was the name of the callback file of the core (« Microsoft3 Sales »), which the user never sees.
+
 - FIX: OVHcloud Email Pro and Exchange mailboxes get their own server, found by the SRV autodiscover record :   1.129.3
   - the MX of MX Plan, Email Pro and Exchange are the same: ssl0.ovh.net was offered to all of them.
   - no record: servers of MX Plan, with a note telling where to find the server of the other offers.
