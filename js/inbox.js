@@ -473,7 +473,8 @@
 	// ---------- Dialogs ----------
 	/**
 	 * Native <dialog>, modal: Cancel on the left, main action on the right (principle P27)
-	 * @param {object} o {title, body (HTML), actions: [{label, primary, danger, run: fn returning false to keep it open}], noCancel, wide, onOpen}
+	 * An action still running after 300 ms shows a spinner in its button, with busyLabel when given (« Checking... »)
+ * @param {object} o {title, body (HTML), actions: [{label, busyLabel, primary, danger, run: fn returning false to keep it open}], noCancel, wide, onOpen}
 	 * @returns {HTMLDialogElement}
 	 */
 	function dialog(o) {
@@ -531,12 +532,25 @@
 			}
 			const a = o.actions[+b.dataset.i];
 			b.setAttribute('aria-disabled', 'true');
+			// No flash for a quick action: the spinner only after 300 ms
+			const label = b.innerHTML;
+			const busy = setTimeout(() => {
+				b.classList.add('is-busy');
+				b.setAttribute('aria-busy', 'true');
+				b.innerHTML = '<span class="ibx-spinner" aria-hidden="true"></span>' + esc(a.busyLabel || a.label);
+			}, 300);
 			let keep = false;
 			try {
 				keep = (await a.run(dlg)) === false;
 			} catch (err) {
 				keep = true;
 				toast(err.message, { error: true });
+			}
+			clearTimeout(busy);
+			if (b.classList.contains('is-busy')) {
+				b.classList.remove('is-busy');
+				b.removeAttribute('aria-busy');
+				b.innerHTML = label;
 			}
 			b.removeAttribute('aria-disabled');
 			if (!keep) {

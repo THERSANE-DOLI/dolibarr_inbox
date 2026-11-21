@@ -203,6 +203,7 @@
 }
 .ibx-btn:hover:not(:disabled):not([aria-disabled="true"]) { color: var(--_fg-h); background: var(--_bg-h); border-color: var(--_bd-h); }
 .ibx-btn:disabled, .ibx-btn[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+.ibx-btn.is-busy { opacity: 1; cursor: progress; }
 .ibx-btn .ibx-icon { width: 1.15em; height: 1.15em; }
 .ibx-btn--primary {
 	--_fg: var(--ibx-on-accent); --_bg: var(--ibx-accent); --_bd: var(--ibx-accent);
@@ -695,6 +696,14 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-empty__title { font-size: var(--ibx-fs-lg); font-weight: 600; color: var(--ibx-text); }
 .ibx-skeleton { display: block; height: 0.75rem; margin: 0.375rem 0; border-radius: var(--ibx-radius-sm); background: linear-gradient(90deg, var(--ibx-bg-sunken), var(--ibx-bg-hover), var(--ibx-bg-sunken)); background-size: 200% 100%; animation: ibx-shimmer 1.2s linear infinite; }
 @keyframes ibx-shimmer { to { background-position: -200% 0; } }
+/* List loading: cards of bars, same grid as the real cards; not clickable. Shown after 300 ms only, as the
+   settings: a quick folder goes straight to its mails without a flash */
+.ibx-maillist--skeleton { animation: ibx-busy-in 120ms ease-out 300ms both; }
+.ibx-mailcard--skeleton, .ibx-mailcard--skeleton:hover { cursor: default; background: var(--ibx-bg); border-color: var(--ibx-border); }
+.ibx-mailcard--skeleton .ibx-skeleton { margin: 0.25rem 0; }
+.ibx-mailcard--skeleton .ibx-mailcard__meta { display: block; width: 2.5rem; }
+.ibx-skeleton--faint { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) { .ibx-skeleton { animation: none; } .ibx-maillist--skeleton { animation: none; } }
 
 /* ===== 15. Small screens ===== */
 @media (max-width: 79.9375rem) {
@@ -1112,6 +1121,12 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-menu__item[aria-disabled="true"] { color: var(--ibx-text-muted); cursor: default; }
 .ibx-tree__note--warning { color: var(--ibx-warning); font-weight: 600; }
 .ibx-tree__note--warning .ibx-icon { width: 0.875rem; height: 0.875rem; vertical-align: -2px; }
+/* Protected mailbox opened in silence: told after 300 ms only (no flash when it is quick) */
+.ibx-tree__note--unlocking { display: flex; align-items: center; gap: var(--ibx-s2); }
+.ibx-tree__note--unlocking, .ibx-empty--unlocking { animation: ibx-busy-in 120ms ease-out 300ms both; }
+.ibx-empty--unlocking .ibx-spinner { width: 1.25rem; height: 1.25rem; }
+.ibx-tree__note__why { display: block; color: var(--ibx-warning); }
+@media (prefers-reduced-motion: reduce) { .ibx-tree__note--unlocking, .ibx-empty--unlocking { animation: none; } }
 .ibx-paused { margin: 0 var(--ibx-s3) var(--ibx-s2); }
 .ibx-mailtable th.ibx-mailtable__checkall { text-align: left; cursor: default; }
 .ibx-mailrow__tags .ibx-tag + .ibx-tag { margin-left: 0.125rem; }
