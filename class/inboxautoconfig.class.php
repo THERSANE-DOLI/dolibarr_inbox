@@ -53,6 +53,12 @@ class InboxAutoconfig
 	 * offers: offers of the provider received by the same MX but read on their own numbered server, found by the SRV
 	 * record the provider asks for its offers (target matched by « host », its first group = key of « labels »);
 	 * without it, the servers of the provider are given with the note « note ».
+	 * country: providers whose servers carry the country of the contract (IONOS): suffix of the MX => country, put in
+	 * place of {cc} in the servers.
+	 * ns: suffixes of the name servers of the domain, for the providers whose MX is the domain itself (o2switch, cPanel).
+	 * cert: the real server is the name of the certificate of the mail server of the domain (the shared server answers
+	 * with its own certificate when the domain has none): « host » matches it, its first group is the server; without
+	 * it, the mail server of the domain is kept with the note « note ».
 	 *
 	 * @var array<string,array<string,mixed>>
 	 */
@@ -69,6 +75,16 @@ class InboxAutoconfig
 			'imap' => array('ssl0.ovh.net', 993, 'ssl'), 'smtp' => array('ssl0.ovh.net', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false,
 			'offers' => array('record' => '_autodiscover._tcp', 'host' => '/^(pro|ex)[0-9]+\.mail\.ovh\.net$/', 'imap' => array(993, 'ssl'), 'smtp' => array(587, 'tls'),
 				'labels' => array('pro' => 'OVHcloud Email Pro', 'ex' => 'OVHcloud Exchange'), 'note' => 'ovh_offer')),
+		// IONOS: one pair of MX per country of the contract (mx00/mx01.ionos.fr...), former names 1and1 and kundenserver
+		'ionos' => array('label' => 'IONOS', 'domains' => array(),
+			'mx' => array('.ionos.fr', '.ionos.de', '.ionos.com', '.ionos.co.uk', '.ionos.es', '.ionos.it', '.1and1.fr', '.1and1.com', '.1and1.co.uk', '.1and1.es', '.1and1.it', '.kundenserver.de'),
+			'imap' => array('imap.ionos.{cc}', 993, 'ssl'), 'smtp' => array('smtp.ionos.{cc}', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false,
+			'country' => array('.ionos.fr' => 'fr', '.ionos.de' => 'de', '.ionos.com' => 'com', '.ionos.co.uk' => 'co.uk', '.ionos.es' => 'es', '.ionos.it' => 'it',
+				'.1and1.fr' => 'fr', '.1and1.com' => 'com', '.1and1.co.uk' => 'co.uk', '.1and1.es' => 'es', '.1and1.it' => 'it', '.kundenserver.de' => 'de')),
+		// o2switch: the MX is mail.<domain> on the shared cPanel server; the server is named in its certificate
+		'o2switch' => array('label' => 'o2switch', 'domains' => array(), 'mx' => array(), 'ns' => array('.o2switch.net'),
+			'imap' => array('{server}', 993, 'ssl'), 'smtp' => array('{server}', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false,
+			'cert' => array('port' => 993, 'host' => '/^(?:mail\.)?([a-z0-9-]+\.o2switch\.net)$/', 'note' => 'o2switch_server')),
 		'infomaniak' => array('label' => 'Infomaniak', 'domains' => array('ik.me', 'etik.com'), 'mx' => array('.infomaniak.ch'),
 			'imap' => array('mail.infomaniak.com', 993, 'ssl'), 'smtp' => array('mail.infomaniak.com', 465, 'ssl'), 'login' => 'email', 'oauth' => '', 'oauth_only' => false),
 		'orange' => array('label' => 'Orange', 'domains' => array('orange.fr', 'wanadoo.fr'), 'mx' => array(),
@@ -469,19 +485,40 @@ class InboxAutoconfig
 	 */
 	protected function fromProviders($domain, array $mx)
 	{
+		$ns = null;
 		foreach (self::PROVIDERS as $key => $p) {
 			$hit = in_array($domain, $p['domains'], true) ? $domain : '';
+			$suffixHit = '';
 			foreach ($p['mx'] as $suffix) {
 				foreach ($mx as $host) {
 					if ($hit === '' && substr('.'.$host, -strlen($suffix)) === $suffix) {
 						$hit = $host;
+						$suffixHit = $suffix;
+					}
+				}
+			}
+			// Name servers, asked once and only for the providers known by them
+			if ($hit === '' && !empty($p['ns'])) {
+				$ns = $ns ?? $this->nsHosts($domain);
+				foreach ($p['ns'] as $suffix) {
+					foreach ($ns as $host) {
+						if ($hit === '' && substr('.'.$host, -strlen($suffix)) === $suffix) {
+							$hit = $host;
+						}
 					}
 				}
 			}
 			if ($hit !== '') {
 				$this->tried('provider', $hit, 'found');
+				$names = array($p['imap'][0], $p['smtp'][0]);
+				if (!empty($p['country'])) {
+					$names = str_replace('{cc}', $p['country'][$suffixHit] ?? 'com', $names);
+				}
 				$out = array('source' => 'provider', 'detail' => $hit, 'provider' => $key, 'provider_label' => $p['label'],
-					'imap' => self::server($p['imap'][0], $p['imap'][1], $p['imap'][2]), 'smtp' => self::server($p['smtp'][0], $p['smtp'][1], $p['smtp'][2]), 'login' => $p['login']);
+					'imap' => self::server($names[0], $p['imap'][1], $p['imap'][2]), 'smtp' => self::server($names[1], $p['smtp'][1], $p['smtp'][2]), 'login' => $p['login']);
+				if (!empty($p['cert'])) {
+					return $this->withCertServer($domain, $mx, $p, $out);
+				}
 
 				return empty($p['offers']) ? $out : $this->withOffer($domain, $p['offers'], $out);
 			}
@@ -514,6 +551,63 @@ class InboxAutoconfig
 
 		return array_merge($out, array('detail' => $host, 'provider_label' => $offers['labels'][$reg[1]] ?? $out['provider_label'],
 			'imap' => self::server($host, $offers['imap'][0], $offers['imap'][1]), 'smtp' => self::server($host, $offers['smtp'][0], $offers['smtp'][1])));
+	}
+
+	/**
+	 * Server of a shared host named in the certificate of the mail server of the domain (o2switch): without a certificate
+	 * of its own, the domain is answered with the one of the server. Nothing is sent, the TLS handshake only.
+	 *
+	 * @param string              $domain Domain
+	 * @param string[]            $mx     MX hosts
+	 * @param array<string,mixed> $p      Provider (PROVIDERS)
+	 * @param array<string,mixed> $out    Result so far
+	 * @return array<string,mixed>
+	 */
+	protected function withCertServer($domain, array $mx, array $p, array $out)
+	{
+		$probe = $mx ? $mx[0] : 'mail.'.$domain;
+		$name = $this->certName($probe, (int) $p['cert']['port']);
+		$reg = array();
+		if ($name !== '' && preg_match($p['cert']['host'], $name, $reg)) {
+			$server = $reg[1];
+			$this->tried('certificate', $probe, 'found');
+		} else {
+			// A certificate of the domain itself (or no answer): its mail server, to be checked by the test
+			$server = $probe;
+			$this->tried('certificate', $probe, 'none');
+			if ($name === '') {
+				$out['notes'] = array($p['cert']['note']);
+			}
+		}
+
+		return array_merge($out, array('detail' => $server,
+			'imap' => self::server($server, $p['imap'][1], $p['imap'][2]), 'smtp' => self::server($server, $p['smtp'][1], $p['smtp'][2])));
+	}
+
+	/**
+	 * Name (CN) of the certificate a mail server presents, not verified: only read to find the name of a shared server
+	 *
+	 * @param string $host Host
+	 * @param int    $port Port (SSL/TLS)
+	 * @return string '' when it does not answer or is refused (private network for a non administrator)
+	 */
+	protected function certName($host, $port)
+	{
+		if (!function_exists('openssl_x509_parse') || !$this->resolves($host) || InboxServerTester::privateRefused($host)) {
+			return '';
+		}
+		$context = stream_context_create(array('ssl' => array('capture_peer_cert' => true, 'verify_peer' => false, 'verify_peer_name' => false, 'peer_name' => $host, 'SNI_enabled' => true)));
+		$errno = 0;
+		$errstr = '';
+		$fp = @stream_socket_client('ssl://'.$host.':'.((int) $port), $errno, $errstr, 5, STREAM_CLIENT_CONNECT, $context);
+		if (!$fp) {
+			return '';
+		}
+		$params = stream_context_get_params($fp);
+		fclose($fp);
+		$cert = isset($params['options']['ssl']['peer_certificate']) ? openssl_x509_parse($params['options']['ssl']['peer_certificate']) : false;
+
+		return is_array($cert) && isset($cert['subject']['CN']) ? strtolower((string) (is_array($cert['subject']['CN']) ? reset($cert['subject']['CN']) : $cert['subject']['CN'])) : '';
 	}
 
 	// ----- 6. SRV -----
@@ -606,6 +700,21 @@ class InboxAutoconfig
 	}
 
 	// ----- Tools -----
+
+	/**
+	 * @param string $domain Domain
+	 * @return string[] Name servers of the domain
+	 */
+	protected function nsHosts($domain)
+	{
+		if (!function_exists('dns_get_record')) {
+			return array();
+		}
+
+		return array_values(array_filter(array_map(function ($r) {
+			return strtolower(rtrim((string) ($r['target'] ?? ''), '.'));
+		}, (array) @dns_get_record($domain, DNS_NS))));
+	}
 
 	/**
 	 * @param string $domain Domain

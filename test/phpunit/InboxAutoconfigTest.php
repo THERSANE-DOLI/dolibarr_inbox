@@ -41,6 +41,15 @@ class InboxAutoconfigOffline extends InboxAutoconfig
 	/** @var array<string,string> SRV record => target */
 	public $srvTargets = array();
 
+	/** @var string[] Name servers of the domain */
+	public $ns = array();
+
+	/** @var array<string,string> Host => name of its certificate */
+	public $certs = array();
+
+	/** @var string[] Hosts whose certificate was read */
+	public $certAsked = array();
+
 	/**
 	 * @param string      $url  Address
 	 * @param string|null $post Body
@@ -68,6 +77,27 @@ class InboxAutoconfigOffline extends InboxAutoconfig
 	protected function mxHosts($domain)
 	{
 		return $this->mx;
+	}
+
+	/**
+	 * @param string $name Record
+	 * @param string $enc  Encryption
+	 * @return array{host:string,port:int,encryption:string}|null
+	 */
+	protected function nsHosts($domain)
+	{
+		return $this->ns;
+	}
+
+	/**
+	 * @param string $host Host
+	 * @param int    $port Port
+	 * @return string
+	 */
+	protected function certName($host, $port)
+	{
+		$this->certAsked[] = $host.':'.$port;
+		return $this->certs[$host] ?? '';
 	}
 
 	/**
@@ -236,6 +266,67 @@ class InboxAutoconfigTest extends InboxTestCase
 				$conf->modules['oauth'] = $keep[0];
 			}
 		}
+	}
+
+	/**
+	 * IONOS: the servers of the country of the contract, read from the MX (current and former names)
+	 *
+	 * @return void
+	 */
+	public function testIonosCountry()
+	{
+		foreach (array('mx00.ionos.fr' => 'fr', 'mx01.ionos.de' => 'de', 'mx00.ionos.co.uk' => 'co.uk', 'mx00.1and1.com' => 'com', 'mx00.kundenserver.de' => 'de') as $mx => $cc) {
+			$f = new InboxAutoconfigOffline($this->db);
+			$f->guess = false;
+			$f->ispdb = false;
+			$f->mx = array($mx);
+			$r = $f->discover('anne@example.org');
+			$this->assertSame('ionos', $r['provider'], $mx);
+			$this->assertSame(array('host' => 'imap.ionos.'.$cc, 'port' => 993, 'encryption' => 'ssl'), $r['imap'], $mx);
+			$this->assertSame('smtp.ionos.'.$cc, $r['smtp']['host'], $mx);
+		}
+	}
+
+	/**
+	 * o2switch: known by its name servers, the server read in the certificate of the mail server of the domain
+	 *
+	 * @return void
+	 */
+	public function testO2switchServer()
+	{
+		$f = new InboxAutoconfigOffline($this->db);
+		$f->guess = false;
+		$f->ispdb = false;
+		$f->mx = array('mail.example.org');
+		$f->ns = array('ns1.o2switch.net', 'ns2.o2switch.net');
+		$f->certs['mail.example.org'] = 'mail.robotcop.o2switch.net';
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('o2switch', $r['provider']);
+		$this->assertSame(array('host' => 'robotcop.o2switch.net', 'port' => 993, 'encryption' => 'ssl'), $r['imap']);
+		$this->assertSame(array('host' => 'robotcop.o2switch.net', 'port' => 465, 'encryption' => 'ssl'), $r['smtp']);
+		$this->assertSame(array('mail.example.org:993'), $f->certAsked);
+		$this->assertSame(array(), $r['notes']);
+
+		// The domain has its own certificate: its mail server is kept, to be checked by the test
+		$f->certs['mail.example.org'] = 'example.org';
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('mail.example.org', $r['imap']['host']);
+		$this->assertSame(array(), $r['notes']);
+
+		// No answer: its mail server, and the note telling where to find the name of the server
+		unset($f->certs['mail.example.org']);
+		$r = $f->discover('anne@example.org');
+		$this->assertSame('mail.example.org', $r['imap']['host']);
+		$this->assertSame(array('o2switch_server'), $r['notes']);
+
+		// Another host with the same kind of MX: name servers elsewhere, not o2switch
+		$f = new InboxAutoconfigOffline($this->db);
+		$f->guess = false;
+		$f->ispdb = false;
+		$f->mx = array('mail.example.org');
+		$f->ns = array('ns1.example.net');
+		$this->assertNotSame('o2switch', $f->discover('anne@example.org')['provider']);
+		$this->assertSame(array(), $f->certAsked);
 	}
 
 	/**
