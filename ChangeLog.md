@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a view saved from a search in one mailbox keeps that mailbox, no longer every mailbox :   1.130.4
+  - search « This mailbox » or « This folder »: the new view dialog opens on « Some mailboxes », that one checked.
+
 - FIX: protected mailbox being unlocked in silence told as such, no longer as locked with a button :   1.130.3
   - « Unlocking... » with a spinner in the tree and the list; a failure gives its reason under the button.
   - dialogs: an action still running after 300 ms shows a spinner in its button (« Checking... » to unlock).

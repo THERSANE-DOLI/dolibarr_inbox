@@ -880,7 +880,9 @@
 	 */
 	function vviewDialog(v, withSearch) {
 		const own = !v || v.mine;
-		const cur = v || { label: '', icon: 'folder-heart', color: '', accounts: [], show_count: 0, shared_edit: 0, shares: [] };
+		// A new view from a search made in one mailbox (folder or whole mailbox): that mailbox chosen, not all of them
+		const here = !v && (S.scope === 'folder' || S.scope === 'account') ? currentFolder() : null;
+		const cur = v || { label: '', icon: 'folder-heart', color: '', accounts: here ? [here.account.id] : [], show_count: 0, shared_edit: 0, shares: [] };
 		let shares = (cur.shares || []).slice();
 		let icon = cur.icon || 'folder-heart';
 		let color = cur.color || '';
