@@ -113,4 +113,31 @@ class ActionsInbox
 
 		return 0;
 	}
+
+	/**
+	 * A mail sent by Dolibarr itself (CMailFile, context mail): its copy in the Sent folder of the mailbox of its
+	 * sender (1.132.0, InboxDolibarrSent). Always 0 and never an error: the mail left, sendfile() would say it failed;
+	 * a copy not filed is only written in the log of Dolibarr.
+	 *
+	 * @param array<string,mixed> $parameters  Parameters (sent: the sending worked)
+	 * @param CMailFile|null      $object      Mail sent
+	 * @param string              $action      Unused
+	 * @param HookManager         $hookmanager Hook manager
+	 * @return int 0
+	 */
+	public function sendMailAfter($parameters, &$object, &$action, $hookmanager)
+	{
+		if (empty($parameters['sent']) || !($object instanceof CMailFile) || !isModEnabled('inbox')) {
+			return 0;
+		}
+		try {
+			dol_include_once('/inbox/class/inboxdolibarrsent.class.php');
+			$copy = new InboxDolibarrSent($this->db);
+			$copy->file($object);
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__.' '.get_class($e).' '.$e->getMessage(), LOG_WARNING);
+		}
+
+		return 0;
+	}
 }

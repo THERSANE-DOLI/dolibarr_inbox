@@ -61,8 +61,9 @@ function inboxAccountFromInput(InboxAccount $account)
 	if ((int) $account->fk_user_owner <= 0) {
 		$account->fk_user_owner = null;
 	}
-	// Never the AI (1.27.0), never the voice typing (1.28.0) for this mailbox
-	foreach (array('ai_off', 'dictation_off') as $flag) {
+	// Never the AI (1.27.0), never the voice typing (1.28.0) for this mailbox; the mails sent by Dolibarr itself from
+	// its address filed in Sent (1.132.0, on when never saved)
+	foreach (array('ai_off', 'dictation_off', 'dolibarr_sent') as $flag) {
 		if (inboxAjaxHas($flag)) {
 			$config = $account->getConnectorConfig();
 			$config[$flag] = inboxAjaxParam($flag, 'int') ? 1 : 0;
