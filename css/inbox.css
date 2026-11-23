@@ -788,8 +788,11 @@ select.ibx-field, textarea.ibx-field { width: 100%; }
 textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical; font-family: inherit; }
 .ibx-radio, .ibx-check { display: inline-flex; align-items: center; gap: var(--ibx-s2); min-height: 2rem; cursor: pointer; }
 .ibx-radio input, .ibx-check input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--ibx-accent); }
-.ibx-formfoot { display: flex; align-items: center; gap: var(--ibx-s2); padding-top: var(--ibx-s3); margin-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
+/* The buttons wrap on a narrow screen instead of making the form wider than it (phone); the main action placed after
+   the spacer stays on the right when it wraps alone (no change on a line where the spacer takes the free space) */
+.ibx-formfoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); padding-top: var(--ibx-s3); margin-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
 .ibx-formfoot__spacer { flex: 1; }
+.ibx-formfoot > .ibx-formfoot__spacer ~ .ibx-btn--primary { margin-left: auto; }
 .ibx-password { display: flex; gap: var(--ibx-s2); align-items: center; }
 .ibx-color { width: 2.5rem; height: 2rem; padding: 0.125rem; border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); background: var(--ibx-bg); cursor: pointer; }
 

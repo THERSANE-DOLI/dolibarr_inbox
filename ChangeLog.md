@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: buttons at the foot of a form wrap on a phone, no longer making the form wider than the screen :   1.132.1
+  - card of a mailbox > Server: « Test the connection », « Delete the mailbox » and « Save » cut the tab at 431 px.
+  - the main action after the spacer stays on the right when it wraps alone; nothing moves on a computer.
+
 - NEW: emails sent by Dolibarr itself from the address of a mailbox filed in its Sent folder, marked read :   1.132.0
   - tickets, proposals, invoices, notifications: same Message-ID, the answer joins the conversation, the email
     answered gets « Answered »; never the mass emailing nor the new passwords. Activate the module again.
