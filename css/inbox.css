@@ -982,6 +982,11 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 }
 .ibx-sx__pill button:hover { background: color-mix(in srgb, var(--ibx-accent) 18%, transparent); }
 .ibx-sx__close { display: none; }
+/* Open panel (1.131.0): the corner of the field closes it and keeps the search, everywhere; clearing goes to the foot */
+.ibx-sx.is-open .ibx-sx__close { display: inline-flex; }
+.ibx-sx.is-open .ibx-sx__clear { display: none; }
+.ibx-sx__clearword { display: none; }
+.ibx-sx.is-open .ibx-sx__clearword:not([hidden]) { display: inline-flex; margin-right: var(--ibx-s2); }
 .ibx-sx__panel { max-height: min(34rem, calc(100dvh - 9rem)); overflow: auto; padding: var(--ibx-s2) 0; border-top: 1px solid var(--ibx-border); }
 .ibx-sx__sec { padding: var(--ibx-s1) var(--ibx-s3) var(--ibx-s2); }
 .ibx-sx__sec + .ibx-sx__sec { padding-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
@@ -1013,7 +1018,18 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-sx__deep small { grid-column: 2; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
 .ibx-sx__deep .ibx-kbd { grid-column: 3; grid-row: 1 / 3; }
 .ibx-sx__deep:hover, .ibx-sx__deep.is-active { background: var(--ibx-accent-soft); border-color: var(--ibx-accent); }
-.ibx-sx__foot { display: flex; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); padding: var(--ibx-s2) var(--ibx-s3) 0; font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); border-top: 1px solid var(--ibx-border); }
+.ibx-sx__foot {
+	position: sticky; bottom: calc(-1 * var(--ibx-s2)); z-index: 1; display: flex; flex-wrap: nowrap; align-items: center; gap: var(--ibx-s3);
+	margin-bottom: calc(-1 * var(--ibx-s2)); padding: var(--ibx-s2) var(--ibx-s3); font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint);
+	background: var(--ibx-bg); border-top: 1px solid var(--ibx-border);
+}
+.ibx-sx__keys { display: flex; gap: var(--ibx-s3); min-width: 0; white-space: nowrap; overflow: hidden; }
+.ibx-sx__opsbtn, .ibx-sx__actions { flex: none; white-space: nowrap; }
+.ibx-sx__actions { display: inline-flex; align-items: center; gap: var(--ibx-s2); margin-left: auto; font-size: var(--ibx-fs-sm); }
+/* The keys give way on a narrow panel (its width follows the list, not the screen): the arrows first, then all */
+.ibx-sx__panel { container-type: inline-size; }
+@container (max-width: 36rem) { .ibx-sx__key--choose { display: none; } }
+@container (max-width: 32rem) { .ibx-sx__keys { display: none; } }
 /* Deep search: progress, then what was searched */
 .ibx-sx-deepbar {
 	display: grid; grid-template-columns: 1fr auto; gap: var(--ibx-s1) var(--ibx-s2); align-items: center; margin: 0 var(--ibx-s3) var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3);
@@ -2205,6 +2221,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-sx__pill .ibx-sx__pilltext:hover { background: none; text-decoration: underline dotted; }
 /* Link of the foot of the search panel that unfolds the operators */
 .ibx-sx__opsbtn { margin-left: auto; display: inline-flex; align-items: center; gap: 0.125rem; padding: 0; font: inherit; color: var(--ibx-text-muted); background: none; border: 0; cursor: pointer; }
+.ibx-sx__opsbtn + .ibx-sx__actions { margin-left: 0; }
 .ibx-sx__opsbtn:hover, .ibx-sx__opsbtn[aria-expanded="true"] { color: var(--ibx-accent); }
 /* User of Dolibarr named in the head of a mail (1.22.0): photo and name, card on hover */
 .ibx-addr--user { display: inline-flex; align-items: center; gap: 0.25rem; vertical-align: middle; }

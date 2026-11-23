@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: search panel with a « Search » button, its cross closes the panel and keeps the search :   1.131.0
+  - « Search » does what Enter does; its arrow searches in the text of the mails (Ctrl+Enter).
+  - « Clear » written in the field; the foot on one line in every state, « Operators » there while typing too.
+
 - FIX: a view saved from a search in one mailbox keeps that mailbox, no longer every mailbox :   1.130.4
   - search « This mailbox » or « This folder »: the new view dialog opens on « Some mailboxes », that one checked.
 
