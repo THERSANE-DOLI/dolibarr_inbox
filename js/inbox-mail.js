@@ -880,7 +880,9 @@
 	 */
 	function vviewDialog(v, withSearch) {
 		const own = !v || v.mine;
-		const cur = v || { label: '', icon: 'folder-heart', color: '', accounts: [], show_count: 0, shared_edit: 0, shares: [] };
+		// A new view from a search made in one mailbox (folder or whole mailbox): that mailbox chosen, not all of them
+		const here = !v && (S.scope === 'folder' || S.scope === 'account') ? currentFolder() : null;
+		const cur = v || { label: '', icon: 'folder-heart', color: '', accounts: here ? [here.account.id] : [], show_count: 0, shared_edit: 0, shares: [] };
 		let shares = (cur.shares || []).slice();
 		let icon = cur.icon || 'folder-heart';
 		let color = cur.color || '';
@@ -2673,10 +2675,10 @@
 
 	/** The cross in the search field: shown as soon as something is searched, typed or kept (pills, filters...) */
 	function sxClearIn() {
-		const b = $('.ibx-js-sxclearin', S.el);
-		if (b) {
-			b.hidden = !($('.ibx-js-search', S.el).value || hasFilter());
-		}
+		const some = !!($('.ibx-js-search', S.el).value || hasFilter());
+		$$('.ibx-js-sxclearin, .ibx-js-sxclearword', S.el).forEach(b => {
+			b.hidden = !some;
+		});
 	}
 
 	function renderFilters() {
@@ -3252,7 +3254,8 @@
 
 		// The operators that work at the keyboard, unfolded by the link of the foot; a click puts one in the field
 		const showOps = sxOpsShown();
-		if (showOps && text === '') {
+		// Unfolded while typing too, except while an operator is typed (its own help is shown above)
+		if (showOps && !typed) {
 			h += '<div class="ibx-sx__sec" id="ibx-sxops"><p class="ibx-sx__label">' + th('InboxSxOps') + '</p><div class="ibx-sx__ops">'
 				+ SX_OPS.map(o => '<button type="button" class="ibx-sx__op" data-sxop="' + esc(sxOpName(o)) + ':" title="' + th('InboxSxOpDesc_' + o.op) + '"><code>' + esc(sxOpName(o)) + ':</code> '
 					+ th('InboxSxOpDesc_' + o.op) + '</button>').join('')
@@ -3261,12 +3264,19 @@
 				+ '</div></div>';
 		}
 
-		h += '<div class="ibx-sx__foot ibx-desktoponly-phone"><span><kbd class="ibx-kbd">↑</kbd> <kbd class="ibx-kbd">↓</kbd> ' + th('InboxSxKeysChoose') + '</span>'
+		// Foot: the keys (computer only), then what a click does: search (Enter) and its arrow for the text of the
+		// mails (Ctrl+Enter); clearing is in the field, the corner of the field only closes the panel (1.131.0)
+		const deepHere = words.length && canDeep();
+		// One line in every state: Ctrl+Enter is taught by the card « Text of the mails » and the menu of the arrow, the
+		// keys give way first on a narrow panel, never the actions
+		h += '<div class="ibx-sx__foot"><span class="ibx-sx__keys ibx-desktoponly-phone"><span class="ibx-sx__key--choose"><kbd class="ibx-kbd">↑</kbd> <kbd class="ibx-kbd">↓</kbd> ' + th('InboxSxKeysChoose') + '</span>'
 			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysValidate') + '</span>'
-			+ (words.length ? '<span><kbd class="ibx-kbd">Ctrl+' + th('InboxSxKeyEnter') + '</kbd> ' + th('InboxSxKeysDeep') + '</span>' : '')
-			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEscape') + '</kbd> ' + th('InboxSxKeysClose') + '</span>'
-			+ (text === '' ? '<button type="button" class="ibx-sx__opsbtn ibx-js-sxops" aria-expanded="' + showOps + '" aria-controls="ibx-sxops">' + ic(showOps ? 'chevron-down' : 'chevron-right') + ' ' + th('InboxSxOpsToggle') + '</button>' : '')
-			+ '</div>';
+			+ '<span><kbd class="ibx-kbd">' + th('InboxSxKeyEscape') + '</kbd> ' + th('InboxSxKeysClose') + '</span></span>'
+			+ '<button type="button" class="ibx-sx__opsbtn ibx-js-sxops" aria-expanded="' + showOps + '" aria-controls="ibx-sxops">' + ic(showOps ? 'chevron-down' : 'chevron-right') + ' ' + th('InboxSxOpsToggle') + '</button>'
+			+ '<span class="ibx-sx__actions">'
+			+ '<span class="ibx-btngroup"><button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-sxgo">' + ic('search') + ' ' + th('InboxSxSearch') + '</button>'
+			+ (deepHere ? '<button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-btn--icon ibx-js-sxgomore" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSxSearchMore') + '" aria-label="' + th('InboxSxSearchMore') + '">' + ic('chevron-down') + '</button>' : '')
+			+ '</span></span></div>';
 
 		panel.innerHTML = h;
 		S.sx.opts = opts;
@@ -3461,11 +3471,31 @@
 				loadList();
 			}, 300);
 		});
+		// Enter and the button « Search »: the option chosen, else an operator being typed becomes its pill (the panel
+		// stays open), else the search is run and the panel closed
+		function sxSubmit() {
+			if (S.sx.open && S.sx.active >= 0 && S.sx.opts[S.sx.active]) {
+				S.sx.opts[S.sx.active]();
+				return;
+			}
+			if (sxCommitAll()) {
+				input.focus();
+				return;
+			}
+			clearTimeout(S.sx.timer);
+			S.q = sxQuery(input.value);
+			sxClose();
+			loadList();
+		}
+		// Ctrl+Enter and the arrow of the button: the text of the mails
+		function sxDeep() {
+			S.q = sxQuery(input.value);
+			startDeep();
+		}
 		input.addEventListener('keydown', e => {
 			if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
 				e.preventDefault();
-				S.q = sxQuery(input.value);
-				startDeep();
+				sxDeep();
 				return;
 			}
 			if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && S.sx.open) {
@@ -3488,18 +3518,7 @@
 			}
 			if (e.key === 'Enter') {
 				e.preventDefault();
-				if (S.sx.open && S.sx.active >= 0 && S.sx.opts[S.sx.active]) {
-					S.sx.opts[S.sx.active]();
-					return;
-				}
-				// An operator being typed becomes its pill, the panel stays open for the rest of the search
-				if (sxCommitAll()) {
-					return;
-				}
-				clearTimeout(S.sx.timer);
-				S.q = sxQuery(input.value);
-				sxClose();
-				loadList();
+				sxSubmit();
 				return;
 			}
 			if (e.key === 'Tab' && !e.shiftKey && sxCommitAll()) {
@@ -3550,6 +3569,10 @@
 				input.focus();
 			} else if (e.target.closest('[data-sxop]')) {
 				sxInsertOp(e.target.closest('[data-sxop]').dataset.sxop);
+			} else if (e.target.closest('.ibx-js-sxgo')) {
+				sxSubmit();
+			} else if (e.target.closest('.ibx-js-sxgomore')) {
+				menu(e.target.closest('.ibx-js-sxgomore'), [{ icon: 'search', label: t('InboxSxSearchText'), key: 'Ctrl+' + t('InboxSxKeyEnter'), run: sxDeep }]);
 			} else if (e.target.closest('.ibx-js-sxrecentclear')) {
 				try {
 					localStorage.removeItem(sxRecentKey());
@@ -3573,24 +3596,30 @@
 			input.blur();
 		});
 		document.addEventListener('mousedown', e => {
-			if (S.sx.open && !sx.contains(e.target)) {
+			// The menu of the arrow of « Search » is outside the panel: a click in it keeps the panel
+			if (S.sx.open && !sx.contains(e.target) && !(S.menu && S.menu.contains(e.target))) {
 				sxClose();
 			}
 		});
 		$('.ibx-js-sxclear', el).addEventListener('click', clearFilters);
-		// The cross of the field: the same as « Clear the search » (and Escape), the cursor back in the field
-		$('.ibx-js-sxclearin', el).addEventListener('click', e => {
-			e.stopPropagation();
+		// « Clear » of the open field and the cross of the closed one: the same as « Clear the search » (and Escape), the
+		// cursor back in the field
+		function sxClearAll() {
 			if (hasFilter()) {
 				clearFilters();
 			} else {
 				input.value = '';
 				S.sx.text = '';
 				sxRenderChips();
+				sxRenderPanel();
 			}
 			sxClearIn();
 			input.focus();
-		});
+		}
+		$$('.ibx-js-sxclearin, .ibx-js-sxclearword', el).forEach(b => b.addEventListener('click', e => {
+			e.stopPropagation();
+			sxClearAll();
+		}));
 		input.addEventListener('input', sxClearIn);
 	}
 
@@ -12240,6 +12269,8 @@
 			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'
 			+ ' placeholder="' + th('InboxSearchPlaceholder') + '" aria-label="' + th('InboxSearchPlaceholder') + '" aria-describedby="ibx-scopehint"><kbd class="ibx-kbd ibx-js-sxkbd">Ctrl+Maj+K</kbd>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__clear ibx-js-sxclearin" aria-label="' + th('InboxClearSearch') + '" title="' + th('InboxClearSearch') + '" hidden>' + ic('close') + '</button>'
+			// Open panel: the clearing written in words, the cross of the corner only closes (1.131.0)
+			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-sx__clearword ibx-js-sxclearword" title="' + th('InboxClearSearch') + '" hidden>' + th('InboxSxClearAll') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--icon ibx-btn--sm ibx-sx__close ibx-js-sxclose" aria-label="' + th('InboxSxClose') + '" title="' + th('InboxSxClose') + '">' + ic('close') + '</button></div>'
 			+ '<div class="ibx-sx__panel ibx-js-sxpanel" id="ibx-sxpanel" hidden></div></div></div></div>'
 			+ '<div class="ibx-searchinfo"><span id="ibx-scopehint" class="ibx-muted ibx-js-scopehint"></span>'
