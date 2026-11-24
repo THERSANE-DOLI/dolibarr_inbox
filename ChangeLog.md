@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: setup page warns when the folders dev/ and test/ of a Git deployment can be read from the web :   1.135.0
+  - checked from the browser (web-probe.txt, without cookies), shown only when exposed, never for a zip install;
+    gives the fix: git sparse-checkout for a clone, an action after deployment for a copy, Apache / nginx.
+  - doc/admin/install.md: section on these folders.
+
 - NEW: emails sent by Dolibarr from an identity of a mailbox also filed in its Sent folder :   1.133.0
   - a sender profile of Dolibarr on an alias: the mailbox having this address as its only active identity;
     an identity of several mailboxes files nothing (log « ambiguous »), the address of a mailbox wins.

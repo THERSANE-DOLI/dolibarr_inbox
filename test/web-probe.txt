@@ -1,0 +1,3 @@
+inbox-web-probe
+If a browser can read this file, the folder test/ of the module is served by the web server.
+It is only used to develop and test Inbox (left out of the zip of the releases): see doc/admin/install.md.

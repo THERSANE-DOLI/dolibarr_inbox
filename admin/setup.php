@@ -120,7 +120,7 @@ if ($action == 'testfile' && $_SERVER['REQUEST_METHOD'] == 'POST') {
  */
 
 $title = "InboxSetup";
-llxHeader('', $langs->trans($title), '', '', 0, 0, '', '', '', 'mod-inbox page-admin');
+llxHeader('', $langs->trans($title), '', '', 0, 0, array('/inbox/js/inbox-setup.js'), '', '', 'mod-inbox page-admin');
 
 $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"')
 	.'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
@@ -140,6 +140,27 @@ if ($pending) {
 // (the most deceptive lookalikes) are neither recognized nor told
 if (!function_exists('idn_to_ascii') || !class_exists('Normalizer')) {
 	print info_admin($langs->trans('InboxIntlMissing'), 0, 0, 'warning');
+}
+// Folders dev/ and test/ of a Git deployment (1.135.0): shown only when the browser can read them (js/inbox-setup.js
+// fetches their web-probe.txt without cookies, as anybody would). Never a button that deletes them: in a Git clone
+// the next git pull would fail
+$devFolders = inboxDevFolders();
+$devProbes = array();
+foreach ($devFolders['folders'] as $folder) {
+	if (is_file(dirname(__DIR__).'/'.$folder.'/web-probe.txt')) {
+		$devProbes[$folder] = dol_buildpath('/inbox/'.$folder.'/web-probe.txt', 1);
+	}
+}
+if ($devProbes) {
+	if ($devFolders['git']) {
+		$devFix = $langs->trans('InboxDevFoldersFixGit', '<code>'.dol_escape_htmltag(dirname(__DIR__)).'</code>', '<code>git sparse-checkout set --no-cone \'/*\' \'!/dev/\' \'!/test/\'</code>', '<code>git sparse-checkout disable</code>');
+	} else {
+		$devFix = $langs->trans('InboxDevFoldersFixCopy', '<code>rm -rf dev test</code>');
+	}
+	$devDoc = '<a href="'.dol_buildpath('/inbox/admin/doc.php', 1).'?page=install">'.$langs->trans('InboxDevFoldersDoc').'</a>';
+	print '<div id="inbox-devfolders" hidden data-probe="'.dol_escape_htmltag(json_encode($devProbes)).'">';
+	print info_admin($langs->trans('InboxDevFoldersExposed', '<span data-devfolders-list></span>').'<br>'.$devFix.'<br>'.$langs->trans('InboxDevFoldersFixServer', $devDoc), 0, 0, 'warning');
+	print '</div>';
 }
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
 // The webmail settings live in the application, not here (analyse-lot-w1 §5)
