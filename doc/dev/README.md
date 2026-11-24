@@ -13,6 +13,9 @@ Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `
 `inboxInviteEvent`, `inboxConsumers` (context `inbox`), the module_parts `inboxcss` and
 `inboxjs` (see « Extend the application ») and the triggers of its objects.
 
+A mail sent with `CMailFile` from the address of a mailbox gets its copy in Sent without anything to do (hook
+`sendMailAfter` of the core, context `mail`): see [Emails sent by Dolibarr in Sent](../admin/dolibarr-sent.md).
+
 Pages:
 
 - [Principles](principles.md): the rules of every change (read this first)
