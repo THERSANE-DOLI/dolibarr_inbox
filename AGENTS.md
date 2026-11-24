@@ -65,6 +65,8 @@ Read before changing anything:
 - [ ] Coding style of Dolibarr on the PHP files changed:
       `phpcs --standard=<dolibarr>/dev/setup/codesniffer/ruleset.xml <files>`; `php -l` on each.
 - [ ] `node --check` on each JavaScript file changed.
+- [ ] A PHP file added in `dev/` or `test/` starts with the guard `if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }`
+      (these folders stay in the Git branches): `php dev/check-cli-guard.php`, also run by the CI.
 - [ ] Icons changed: `php dev/build-icons.php`.
 - [ ] Language keys added in the five files.
 - [ ] Version and ChangeLog entry as above.

@@ -21,6 +21,12 @@
  * \brief   1.75.0 (lot A6): bank details in a mail, never green; numbers to call from the cards, never from the mail
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxbankcheck.class.php');
 

@@ -23,6 +23,12 @@
 
 use PHPUnit\Framework\TestCase;
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 dol_include_once('/inbox/class/inboxaccess.class.php');
 dol_include_once('/inbox/class/inboxidentity.class.php');
 dol_include_once('/inbox/class/inboxtag.class.php');

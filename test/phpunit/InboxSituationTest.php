@@ -21,6 +21,12 @@
  * \brief   Usage of a mailbox and situation of a thirdparty (1.67.0)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxsituation.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');

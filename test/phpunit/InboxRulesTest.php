@@ -21,6 +21,12 @@
  * \brief   Rules and out of office written by ManageSieve (lot W8 1.23.0)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 dol_include_once('/inbox/class/inboxrules.class.php');
 
 /**

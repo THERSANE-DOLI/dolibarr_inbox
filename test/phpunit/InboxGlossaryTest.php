@@ -21,6 +21,12 @@
  * \brief   1.88.5: glossary of the terms explained where they are named, markers [[key:word]] of the language files
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 
 /**

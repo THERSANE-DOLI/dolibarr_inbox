@@ -21,6 +21,12 @@
  * \brief   1.54.0: Settings > Server (keeping, timeouts, master user, scheduled jobs and the hook of their card)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxserver.class.php');
 

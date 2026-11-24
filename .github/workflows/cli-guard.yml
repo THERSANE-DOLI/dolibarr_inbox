@@ -1,0 +1,29 @@
+# Every PHP file of dev/ and test/ must refuse the web before running anything (first statement
+# « if (PHP_SAPI !== 'cli') { http_response_code(404); exit; } »): these folders stay in the Git branches, so a Git
+# deployment has them in the web root, where their .htaccess is ignored by nginx. Left out of the zip only.
+# The check is dev/check-cli-guard.php, also run by hand before a pull request.
+name: cli-guard
+
+# pull_request (not pull_request_target): the code of the PR is checked out but runs with a read-only token and
+# no secret.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  cli-guard:
+    name: dev/ and test/ refuse the web
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned by commit (v7.0.1), Dependabot proposes the next ones
+      - name: Source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the guards
+        run: php dev/check-cli-guard.php

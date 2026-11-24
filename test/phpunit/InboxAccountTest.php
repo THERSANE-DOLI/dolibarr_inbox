@@ -21,6 +21,12 @@
  * \brief   Mailboxes: creation, checks, secrets never given out, deletion (CA-06, CA-18, CA-28)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests of InboxAccount
  */

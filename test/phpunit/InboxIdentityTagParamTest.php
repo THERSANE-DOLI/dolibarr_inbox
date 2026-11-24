@@ -21,6 +21,12 @@
  * \brief   Identities, tags, settings of the users (CA-14, CA-15, CA-16)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests of InboxIdentity, InboxTag, InboxUserParam
  */

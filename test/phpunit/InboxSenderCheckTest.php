@@ -21,6 +21,12 @@
  * \brief   Lot W5 1.15.0: imitation of a known sender, junk probably legitimate
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxknownsenders.class.php');
 

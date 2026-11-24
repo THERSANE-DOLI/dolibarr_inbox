@@ -21,6 +21,12 @@
  * \brief   Levels per mailbox (CA-09 to CA-11, CA-13)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests of InboxAccess
  */

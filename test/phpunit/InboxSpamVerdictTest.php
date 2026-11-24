@@ -21,6 +21,12 @@
  * \brief   1.86.1: verdict of the anti-spam filter believed only above the entry of the mail into our servers
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxreader.class.php');
 

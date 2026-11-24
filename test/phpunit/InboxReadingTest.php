@@ -21,6 +21,12 @@
  * \brief   Lot W3: lists and search on the index, reading of a mail, safety of the body, antivirus
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 require_once __DIR__.'/../../class/inboxactionlog.class.php';
 require_once __DIR__.'/../../class/inboxreader.class.php';

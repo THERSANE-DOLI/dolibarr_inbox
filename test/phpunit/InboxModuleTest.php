@@ -21,6 +21,12 @@
  * \brief   Activation of the module replay safe (CA-21), languages (CA-20)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests of the module
  */

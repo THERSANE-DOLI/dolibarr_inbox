@@ -21,6 +21,12 @@
  * \brief   Reading by Message-ID on the mailboxes of inbox, hooks for the other modules, import (CA-07, CA-08, CA-17, CA-25)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Hooks of a module plugged on inbox (as crmclientconnector will do in its repository)
  */

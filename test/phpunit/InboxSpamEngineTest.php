@@ -22,6 +22,12 @@
  *          learning queue, training)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxspamcheck.class.php');
 dol_include_once('/inbox/class/inboxactions.class.php');

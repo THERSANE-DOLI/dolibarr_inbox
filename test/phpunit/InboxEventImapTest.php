@@ -22,6 +22,12 @@
  * \brief   Journal of the changes (1.121.0): the actions on the mails and the synchronisation write it
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxactions.class.php');
 dol_include_once('/inbox/class/inboxevent.class.php');

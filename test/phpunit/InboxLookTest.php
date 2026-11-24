@@ -21,6 +21,12 @@
  * \brief   Colour and icon of the folders and mailboxes (1.8.0), rows forgotten with a user or a group deleted
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once dirname(__DIR__, 2).'/class/inboxlook.class.php';
 require_once dirname(__DIR__, 2).'/core/triggers/interface_95_modInbox_InboxTriggers.class.php';
 

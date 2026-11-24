@@ -21,6 +21,12 @@
  * \brief   1.118.0: default templates on four levels, templates that are a complete mail
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxaccount.class.php');
 dol_include_once('/inbox/class/inboxtemplates.class.php');

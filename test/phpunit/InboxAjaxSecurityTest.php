@@ -24,6 +24,12 @@
  * INBOX_TEST_PASSWORD of an admin of that test instance. Skipped without them.
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests over HTTP
  */

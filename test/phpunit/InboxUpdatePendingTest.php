@@ -21,6 +21,12 @@
  * \brief   1.86.0: an update not finished (files newer than the last activation) is detected
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 require_once dirname(__DIR__, 2).'/lib/inboxapp.lib.php';
 

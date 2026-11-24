@@ -21,6 +21,12 @@
  * \brief   Delivery reports (1.25.0): reading of the reports, families, record, bell, event on the piece, sync
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxbounce.class.php');
 dol_include_once('/inbox/class/inboxsync.class.php');

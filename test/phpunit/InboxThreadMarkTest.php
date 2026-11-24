@@ -21,6 +21,12 @@
  * \brief   Lot W4 1.11.0: threads ignored (answers arrive read) or watched; unsubscribe refused when unsafe
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxthreadmark.class.php');
 dol_include_once('/inbox/class/inboxreader.class.php');

@@ -21,6 +21,12 @@
  * \brief   Protected mailboxes (1.89.0, analyse-boites-protegees): keys, session, rights, nothing kept, no job
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 dol_include_once('/inbox/class/inboxprotect.class.php');
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/inboxlive.class.php');

@@ -21,6 +21,12 @@
  * \brief   Lot W7 1.20.0: Meilisearch (option, key limited to the prefix, one index per mailbox, indexing, search)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 dol_include_once('/inbox/class/inboxsync.class.php');

@@ -22,6 +22,12 @@
  *          thirdparties offered for a shared domain)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxdomains.class.php');
 dol_include_once('/inbox/class/inboxnotification.class.php');

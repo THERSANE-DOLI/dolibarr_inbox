@@ -21,6 +21,12 @@
  * \brief   1.46.0: pieces cited in a mail, checked against the thirdparty of the one who writes
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once dirname(__DIR__, 2).'/class/inboxcited.class.php';
 
 /**

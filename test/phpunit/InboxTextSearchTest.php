@@ -21,6 +21,12 @@
  * \brief   Lot W7 1.19.0: deep search in the text of the mails on the mail server
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/inboxsearchsql.class.php');

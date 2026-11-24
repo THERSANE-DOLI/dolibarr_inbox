@@ -21,6 +21,12 @@
  * \brief   Agenda panel (1.107.0): events of the user, filters, case « done », what a module may give
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxagendapanel.class.php');
 

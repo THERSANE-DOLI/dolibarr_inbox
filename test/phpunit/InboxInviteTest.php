@@ -21,6 +21,12 @@
  * \brief   Invitations (iCalendar, answer, agenda) and read receipts (lot W8 1.22.0)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 dol_include_once('/inbox/class/inboxinvite.class.php');
 dol_include_once('/inbox/class/inboxreceipt.class.php');
 dol_include_once('/inbox/class/inboxidentity.class.php');

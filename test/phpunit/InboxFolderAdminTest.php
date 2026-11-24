@@ -21,6 +21,12 @@
  * \brief   Lot W4 1.10.0: folders created, renamed, moved, removed, marked read, emptied, on the server then in the index
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxfolderadmin.class.php');
 

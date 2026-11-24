@@ -21,6 +21,12 @@
  * \brief   Fixes of the security audit of 2026-11-08 (1.23.1): one test per finding fixed in the classes
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 dol_include_once('/inbox/class/inboxmimeparser.class.php');
 dol_include_once('/inbox/class/inboxreader.class.php');
 dol_include_once('/inbox/class/inboxrules.class.php');

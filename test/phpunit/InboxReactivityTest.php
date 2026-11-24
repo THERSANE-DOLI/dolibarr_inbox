@@ -21,6 +21,12 @@
  * \brief   Settings > Server (1.124.0): refresh of the lists and push service, global, secrets never given back
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 require_once __DIR__.'/../../class/inboxreactivity.class.php';
 

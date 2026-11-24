@@ -21,6 +21,12 @@
  * \brief   1.85.0: blocked senders (matching, levels of a sender, rights, Sieve block, synchronisation)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxblockedsender.class.php');
 dol_include_once('/inbox/class/inboxrules.class.php');

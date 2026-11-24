@@ -21,6 +21,12 @@
  * \brief   Copy in Sent of the mails Dolibarr sends itself from the address of a mailbox (1.132.0)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/CMailFile.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';

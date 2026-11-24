@@ -22,6 +22,12 @@
  *          delivery reports, INBX-030 and INBX-031, in InboxBounceTest)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxai.class.php');
 dol_include_once('/inbox/class/inboxmailbuilder.class.php');

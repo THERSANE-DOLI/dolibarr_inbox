@@ -22,6 +22,12 @@
  *          to what is declared, folders of the mailbox only, new requests, protection with the content, journal)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxconsumer.class.php');
 dol_include_once('/inbox/class/inboxconsumerinterface.class.php');

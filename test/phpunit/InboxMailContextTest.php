@@ -21,6 +21,12 @@
  * \brief   The mail open given to a page of a module by a token of one use ({ctx})
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 require_once __DIR__.'/../../class/inboxmailcontext.class.php';
 

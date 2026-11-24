@@ -21,6 +21,12 @@
  * \brief   Lot W6 1.16.0: building of a mail, sending (local Dovecot relaying to Mailpit), Sent, drafts, rights
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxImapTestCase.php';
 dol_include_once('/inbox/class/inboxcomposer.class.php');
 dol_include_once('/inbox/class/inboxidentity.class.php');

@@ -21,6 +21,12 @@
  * \brief   IMAP connector and connection test, on the local test Dovecot (CA-02 to CA-05)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 /**
  * Tests of InboxImapConnector and InboxServerTester
  */

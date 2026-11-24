@@ -21,6 +21,12 @@
  * \brief   Lot W5 1.14.0: a piece created from a mail is linked to it (and gets the .eml), files put in a piece
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once dirname(__DIR__, 2).'/class/inboxcreate.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 

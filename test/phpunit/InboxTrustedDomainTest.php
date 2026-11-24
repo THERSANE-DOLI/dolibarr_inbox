@@ -21,6 +21,12 @@
  * \brief   1.59.0: recognized domains (normalization, refusals, matching, lookalikes, sender and links of a mail)
  */
 
+// From the command line only, never from the web: test/ stays in the Git branches
+if (PHP_SAPI !== 'cli') {
+	http_response_code(404);
+	exit;
+}
+
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxtrusteddomain.class.php');
 dol_include_once('/inbox/class/inboxknownsenders.class.php');
