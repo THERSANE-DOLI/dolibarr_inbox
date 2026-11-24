@@ -6399,6 +6399,15 @@
 		if (!box.isConnected || box.dataset.mail !== mail) {
 			return;
 		}
+		// Nothing for this mail (1.134.0): a module that can only tell after reading the mail takes its block away
+		if (data && data.hidden === true) {
+			box._data.panels = (box._data.panels || []).filter(x => x.id !== p.id);
+			const row = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"]', box);
+			if (row) {
+				row.remove();
+			}
+			return;
+		}
 		box._panels[p.id] = data && typeof data === 'object' ? data : { error: 'Error' };
 		const el = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"] .ibx-mpanel__body', box);
 		if (el) {

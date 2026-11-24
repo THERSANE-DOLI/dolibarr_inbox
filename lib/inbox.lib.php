@@ -22,6 +22,29 @@
  */
 
 /**
+ * Folders of development of the module present on the disk (1.135.0)
+ *
+ * dev/ and test/ stay in the Git branches, left out of the zip only: a Git deployment has them in the web root. Their
+ * PHP files refuse the web (dev/check-cli-guard.php), the setup page checks from the browser that the rest is not
+ * readable either.
+ *
+ * @param	string|null	$moduleDir	Directory of the module (null: this module)
+ * @return	array{folders:string[],git:bool}	Folders among dev and test present; git: the module is a Git clone
+ */
+function inboxDevFolders($moduleDir = null)
+{
+	$dir = ($moduleDir === null) ? dirname(__DIR__) : rtrim($moduleDir, '/');
+	$folders = array();
+	foreach (array('dev', 'test') as $folder) {
+		if (is_dir($dir.'/'.$folder)) {
+			$folders[] = $folder;
+		}
+	}
+	// .git is a folder in a clone, a file in a worktree or a submodule
+	return array('folders' => $folders, 'git' => file_exists($dir.'/.git'));
+}
+
+/**
  * Tabs of the setup pages
  *
  * @return array<int,array<int,string>>

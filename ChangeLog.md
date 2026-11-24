@@ -1,5 +1,19 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: setup page warns when the folders dev/ and test/ of a Git deployment can be read from the web :   1.135.0
+  - checked from the browser (web-probe.txt, without cookies), shown only when exposed, never for a zip install;
+    gives the fix: git sparse-checkout for a clone, an action after deployment for a copy, Apache / nginx.
+  - doc/admin/install.md: section on these folders.
+
+- NEW: block of a module in the panel of a mail can take itself away (answer `hidden: true`) :   1.134.0
+  - for a module that only knows after reading the mail (attachments) whether it has something to show.
+  - hook inboxMailPanels documented in doc/dev/extend-application.md.
+
+- NEW: emails sent by Dolibarr from an identity of a mailbox also filed in its Sent folder :   1.133.0
+  - a sender profile of Dolibarr on an alias: the mailbox having this address as its only active identity;
+    an identity of several mailboxes files nothing (log « ambiguous »), the address of a mailbox wins.
+  - with MAIN_MAIL_FORCE_FROM, the Reply-To kept by Dolibarr (sender chosen) is looked up before the forced From.
+
 - FIX: buttons at the foot of a form wrap on a phone, no longer making the form wider than the screen :   1.132.1
   - card of a mailbox > Server: « Test the connection », « Delete the mailbox » and « Save » cut the tab at 431 px.
   - the main action after the spacer stays on the right when it wraps alone; nothing moves on a computer.

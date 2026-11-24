@@ -56,3 +56,18 @@ public function inboxSituationIndicators($parameters, &$object, &$action, $hookm
 
 Level `alert`, `attention` or `normal` (only the first two show on the closed card, `short` is that text); the
 address stays inside Dolibarr; values of other modules are never shown for an indicator the user cannot read.
+
+## Blocks of a module in the panel of a mail
+
+Hook `inboxMailPanels`, context `inbox`: `$parameters` gives `mail` (row of the index), `account`, `message_id`,
+`from`, `subject`, `mailref`, `socid`, `contactid`. The method adds to `$this->results['panels']` an `id`, a `title`,
+an `icon` (usage name) and a `url` inside Dolibarr. The panel reads that address after it is shown and expects JSON:
+
+- `badges` (6 at most, `label` and `level`: `ok`, `warning`, `danger`, `info`, `neutral`), `lines` (4 at most),
+  one `action` (`label`, `url`, `title`, `primary`) opened in a window of inbox, `links` (3 at most);
+- `pending` with `pending_text` and `retry_ms`: read again while the module is still working;
+- `error`: shown instead of the summary;
+- `hidden: true` (1.134.0): the block goes away. For a module that can only tell after reading the mail whether it
+  has something to show; keep the answer so that the hook gives no block the next time.
+
+Every text is escaped by the panel. Check the rights in the page: the hook runs for any mail the user opens.
