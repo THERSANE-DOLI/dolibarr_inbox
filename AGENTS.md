@@ -71,5 +71,8 @@ Read before changing anything:
 - [ ] A new feature has its page in `doc/admin/` and/or `doc/dev/`, registered in `class/inboxdocumentation.class.php`
       (key, title and description in the five languages, version).
 - [ ] Checked in a browser on a computer **and** a phone width; no error in the console.
+- [ ] Visual change (`css/`, `js/`, `tpl/`, `img/`): screenshots pasted in the description of the
+      PR, **before and after** for a FIX, one at least for a NEW. Checked by the CI
+      (`.github/workflows/pr-screenshots.yml`); the label `no-screenshot` skips it when nothing visible changes.
 
 Never run tests, scripts or synchronisations against a real database or a real mailbox.

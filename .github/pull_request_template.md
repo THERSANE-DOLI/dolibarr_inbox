@@ -6,6 +6,16 @@
 
 <!-- Tests run, browser checks (computer and phone), test database used. -->
 
+## Screenshots
+
+<!-- Required when the PR changes what the user sees (css/, js/, tpl/, img/), checked by the CI.
+FIX: before and after, side by side. NEW: one screenshot at least (computer and/or phone).
+Paste the images in the table, delete this section if nothing visible changes. -->
+
+| Before | After |
+| --- | --- |
+|  |  |
+
 ## Checklist
 
 See [AGENTS.md](../AGENTS.md) and [doc/dev/principles.md](../doc/dev/principles.md).
@@ -18,3 +28,4 @@ See [AGENTS.md](../AGENTS.md) and [doc/dev/principles.md](../doc/dev/principles.
 - [ ] Version (`modInbox.class.php`) and ChangeLog entry; Y when the module must be activated again
 - [ ] New feature: its page in `doc/` registered in `InboxDocumentation`
 - [ ] Checked in a browser on a computer and a phone width
+- [ ] Visual change: screenshots in the description (FIX: before and after, NEW: one at least)

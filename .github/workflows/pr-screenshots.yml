@@ -1,0 +1,82 @@
+# A pull request that changes what the user sees must show it in its description, so the reviewer sees the
+# change without installing the branch:
+#   - FIX: two screenshots at least, before and after;
+#   - any other type (NEW, QUAL...): one screenshot at least.
+# A PR is visual when it changes css/, js/ (not js/vendor/), tpl/, img/ or a .css/.js file outside dev/.
+# Only the description counts (not the comments), editing it runs the check again. Images are counted by distinct URL: pasted images (github.com/user-attachments/assets/...) and links
+# ending in .png, .jpg, .gif or .webp. HTML comments of the template are ignored.
+# The label "no-screenshot" skips the check (only members of the repository can set it), for a visual file
+# changed without a visible effect. Drafts and Dependabot are skipped.
+name: PR screenshots
+
+# pull_request_target gives a token even for PRs from forks. Safe here: the workflow never checks out nor runs
+# code of the PR, it only reads its title, body, labels and list of files.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, ready_for_review, synchronize, labeled, unlabeled]
+
+permissions: {}
+
+concurrency:
+  group: pr-screenshots-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Screenshots of a visual change
+    if: github.event.pull_request.draft != true && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check the screenshots of the description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          if printf ',%s,' "$PR_LABELS" | grep -q ',no-screenshot,'; then
+            echo "Label no-screenshot set: check skipped."
+            exit 0
+          fi
+
+          VISUAL=0
+          FILES=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')
+          UI_FILES=$(printf '%s\n' "$FILES" \
+            | grep -E '^(css|js|tpl|img)/|\.(css|js)$' \
+            | grep -Ev '^(js/vendor|dev)/|node_modules/' || true)
+          if [ -n "$UI_FILES" ]; then
+            VISUAL=1
+            echo "Visual files changed:"
+            printf '%s\n' "$UI_FILES" | head -n 15
+          fi
+
+          if [ "$VISUAL" = "0" ]; then
+            echo "No visual change: no screenshot needed."
+            exit 0
+          fi
+
+          if printf '%s' "$PR_TITLE" | grep -Eiq '^FIX[ #:]'; then
+            NEEDED=2
+            WHAT="a FIX needs two screenshots, before and after"
+          else
+            NEEDED=1
+            WHAT="a visual change needs one screenshot at least"
+          fi
+
+          # Distinct image URLs of the description, template comments removed
+          COUNT=$(printf '%s' "$PR_BODY" \
+            | perl -0pe 's/<!--.*?-->//gs' \
+            | grep -oE 'https?://[^][:space:]()<>"'"'"']+' \
+            | grep -Ei 'github\.com/user-attachments/assets/|\.(png|jpe?g|gif|webp)([?#]|$)' \
+            | sort -u | wc -l)
+          echo "Screenshots found in the description: $COUNT (needed: $NEEDED)."
+
+          if [ "$COUNT" -ge "$NEEDED" ]; then
+            exit 0
+          fi
+
+          echo "::error::This PR changes what the user sees and $WHAT, pasted in the description (section Screenshots of the template). Found: $COUNT. If nothing visible changes, a member of the repository can set the label no-screenshot."
+          exit 1
