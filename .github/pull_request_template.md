@@ -1,3 +1,7 @@
+<!-- Title: « NEW: », « FIX: », « QUAL: », « SEC: », « DOC: » or « PERF: » then a short summary.
+Base branch: develop; a FIX may go on the branch X.Y of its series. Never stable, rc nor edge.
+See .github/CONTRIBUTING.md. -->
+
 ## What changes
 
 <!-- For the users, then for the code. Link the issue if there is one. -->

@@ -1,0 +1,56 @@
+# A pull request goes on develop, or on the branch X.Y of a series for a fix (doc/dev/development.md):
+#   - title starting with NEW, FIX, QUAL, SEC, DOC or PERF, then « : » or a space (« FIX: short summary »), the
+#     keyword deciding the version raised and the screenshots asked (pr-screenshots.yml);
+#   - develop: every keyword;
+#   - X.Y (1.135...): FIX or SEC only, a series receives fixes only;
+#   - any other branch (stable, rc, edge: moved by the CI only): refused.
+# Drafts and Dependabot are skipped. The base branch can be changed on the PR without closing it (Edit, next to the
+# title): the check runs again.
+name: PR branch
+
+# pull_request_target gives a token even for PRs from forks. Safe here: the workflow never checks out nor runs
+# code of the PR, it only reads its title and base branch.
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, ready_for_review, synchronize]
+
+permissions: {}
+
+concurrency:
+  group: pr-branch-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  branch:
+    name: Branch and title of the PR
+    if: github.event.pull_request.draft != true && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the base branch and the keyword of the title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          GUIDE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/develop/.github/CONTRIBUTING.md"
+          KEYWORD=$(printf '%s' "$PR_TITLE" | sed -nE 's/^(NEW|FIX|QUAL|SEC|DOC|PERF)([: ].*)?$/\1/ip' | tr '[:lower:]' '[:upper:]')
+          if [ -z "$KEYWORD" ]; then
+            echo "::error::The title of the PR must start with NEW, FIX, QUAL, SEC, DOC or PERF, then « : » and a short summary (example: « FIX: buttons wrap on a phone »). Title: « $PR_TITLE ». See $GUIDE"
+            exit 1
+          fi
+
+          if [ "$PR_BASE" = develop ]; then
+            echo "PR on develop, keyword $KEYWORD: accepted."
+            exit 0
+          fi
+
+          if printf '%s' "$PR_BASE" | grep -Eq '^[0-9]+\.[0-9]+$'; then
+            if [ "$KEYWORD" = FIX ] || [ "$KEYWORD" = SEC ]; then
+              echo "PR on the series $PR_BASE, keyword $KEYWORD: accepted. Once merged, the series is merged into develop (dev/merge-series.sh)."
+              exit 0
+            fi
+            echo "::error::The branch $PR_BASE is a series: it receives FIX or SEC only. A $KEYWORD goes on develop (change the base branch of the PR: Edit, next to the title). See $GUIDE"
+            exit 1
+          fi
+
+          echo "::error::No pull request on the branch $PR_BASE: stable, rc and edge are moved by the CI only. Open it on develop, or on the branch X.Y of the series for a fix (change the base branch of the PR: Edit, next to the title). See $GUIDE"
+          exit 1
