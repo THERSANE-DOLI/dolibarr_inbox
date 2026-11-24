@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: emails sent by Dolibarr itself from the address of a mailbox filed in its Sent folder, marked read :   1.132.0
+  - tickets, proposals, invoices, notifications: same Message-ID, the answer joins the conversation, the email
+    answered gets « Answered »; never the mass emailing nor the new passwords. Activate the module again.
+  - card of the mailbox > Server: « File in Sent the emails Dolibarr sends from this address », on by default.
+
 - NEW: search panel with a « Search » button, its cross closes the panel and keeps the search :   1.131.0
   - « Search » does what Enter does; its arrow searches in the text of the mails (Ctrl+Enter).
   - « Clear » written in the field; the foot on one line in every state, « Operators » there while typing too.

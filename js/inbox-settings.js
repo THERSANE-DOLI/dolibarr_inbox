@@ -1275,6 +1275,9 @@
 			+ '<div class="ibx-formrow" data-field="smtp_password"' + (a.smtp_same_credentials ? ' hidden' : '') + '><label class="ibx-formrow__label" for="f-smtp_password">' + th('InboxPassword') + '</label><div><input class="ibx-field ibx-field--medium" id="f-smtp_password" name="smtp_password" type="password" autocomplete="new-password" placeholder="' + (a.has_smtp_password ? th('InboxPasswordKept') : '') + '"></div></div>'
 			// Copy of the mails sent (1.26.0): some sending servers file it themselves
 			+ field('sent_copy', t('InboxSentCopy'), (a.connector_config && a.connector_config.sent_copy) || 'auto', { options: [['auto', t('InboxSentCopy_auto')], ['inbox', t('InboxSentCopy_inbox')], ['server', t('InboxSentCopy_server')]], help: t('InboxSentCopyHelp'), cls: 'ibx-field--medium' })
+			// The mails Dolibarr sends itself from this address filed in Sent too (1.132.0): on until turned off here
+			+ I.html`<div class="ibx-formrow" data-field="dolibarr_sent"><span class="ibx-formrow__label">${t('InboxDolibarrSent')}</span><div><label class="ibx-check"><input type="checkbox" name="dolibarr_sent"${a.connector_config && +a.connector_config.dolibarr_sent === 0 ? '' : I.raw(' checked')}> ${t('InboxDolibarrSentOn')}</label>`
+			+ I.html`<div class="ibx-formrow__help">${t('InboxDolibarrSentHelp')}</div></div></div>`
 			+ '</div></section>';
 		const moreSection = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMore') + '</h2><div class="ibx-form">'
 			+ field('sieve_port', t('InboxSievePort'), a.sieve_port, { type: 'number', min: 0, max: 65535, inputmode: 'numeric', help: t('InboxSievePortHelp'), cls: 'ibx-field--narrow' })

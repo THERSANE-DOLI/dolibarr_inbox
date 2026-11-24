@@ -915,6 +915,19 @@ class InboxAccount extends CommonObject
 	}
 
 	/**
+	 * The mails Dolibarr sends itself from the address of the mailbox are filed in its Sent folder (1.132.0, see
+	 * InboxDolibarrSent): on unless turned off in the card of the mailbox
+	 *
+	 * @return bool
+	 */
+	public function filesDolibarrSent()
+	{
+		$config = $this->getConnectorConfig();
+
+		return !isset($config['dolibarr_sent']) || !empty($config['dolibarr_sent']);
+	}
+
+	/**
 	 * @return array<string,mixed> Settings of the connector
 	 */
 	public function getConnectorConfig()

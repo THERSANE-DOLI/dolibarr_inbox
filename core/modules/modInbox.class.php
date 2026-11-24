@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.131.0';
+		$this->version = '1.132.0';
 		// Last version published (Setup > Modules > Check the last version): the site of inbox answers the version
 		// of the latest GitHub release as plain text, kept 10 minutes; no download counted, nothing stored
 		$this->url_last_version = 'https://inbox.techsane.fr/api/download.php?version';
@@ -60,8 +60,9 @@ class modInbox extends DolibarrModules
 
 		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
 		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0), the unread
-		// counter in the top bar of the other pages of Dolibarr (lot W8 1.21.0)
-		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates', 'toprightmenu'), 'entity' => '0'));
+		// counter in the top bar of the other pages of Dolibarr (lot W8 1.21.0), the copy in Sent of the mails sent by
+		// Dolibarr itself from the address of a mailbox (context mail, 1.132.0)
+		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates', 'toprightmenu', 'mail'), 'entity' => '0'));
 		// Raw mails kept for a while (never served by document.php: no read right at the root of the module)
 		$this->dirs = array('/inbox/raw');
 		$this->config_page_url = array("setup.php@inbox");

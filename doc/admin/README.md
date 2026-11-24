@@ -7,6 +7,7 @@
 - [Instant refresh (push service)](push.md): Mercure (Docker or systemd) beside Dolibarr, what it receives, its test
 - [Writing editor](writing-editor.md): Inbox editor or CKEditor, small screens, signature
 - [Mail templates](mail-templates.md): complete mail or piece of text, default templates on four levels
+- [Emails sent by Dolibarr in Sent](dolibarr-sent.md): tickets, proposals, invoices sent from a mailbox, their copy in Sent
 - [Agenda panel](agenda-panel.md)
 - [Mails sent by a site: data sources](data-sources.md)
 - [Public and shared domains](shared-domains.md)
