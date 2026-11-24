@@ -9,7 +9,7 @@ Mail foundation for other modules: they plug into Inbox through the hooks below.
 - Result: `InboxMessage` (headers, text and HTML bodies, attachments, attached mails).
 
 Other modules plug into inbox, never the reverse: hooks `inboxResolveAccount`, `inboxAccountImportSources`,
-`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators`, `inboxMailActions`, `inboxAgendaProvider`,
+`inboxConnectors`, `addInboxHtmlHeader`, `inboxSituationIndicators`, `inboxMailActions`, `inboxMailPanels`, `inboxAgendaProvider`,
 `inboxInviteEvent`, `inboxConsumers` (context `inbox`), the module_parts `inboxcss` and
 `inboxjs` (see « Extend the application ») and the triggers of its objects.
 

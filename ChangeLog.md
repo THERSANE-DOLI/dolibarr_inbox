@@ -5,6 +5,10 @@
     gives the fix: git sparse-checkout for a clone, an action after deployment for a copy, Apache / nginx.
   - doc/admin/install.md: section on these folders.
 
+- NEW: block of a module in the panel of a mail can take itself away (answer `hidden: true`) :   1.134.0
+  - for a module that only knows after reading the mail (attachments) whether it has something to show.
+  - hook inboxMailPanels documented in doc/dev/extend-application.md.
+
 - NEW: emails sent by Dolibarr from an identity of a mailbox also filed in its Sent folder :   1.133.0
   - a sender profile of Dolibarr on an alias: the mailbox having this address as its only active identity;
     an identity of several mailboxes files nothing (log « ambiguous »), the address of a mailbox wins.
