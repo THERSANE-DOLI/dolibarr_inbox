@@ -18,5 +18,26 @@
   - the card of an object calls `core/ajax/ajaxtooltip.php` with the `data-params` read in `getNomUrl()`
     (`InboxElements::describe()`): to check if the core changes this attribute or this page.
 
+## Branches and publication
+
+| Branch | Receives | Role |
+|---|---|---|
+| `develop` | everything (NEW, FIX, QUAL...) | the next versions, version raised at each NEW / FIX |
+| `X.Y` | **FIX only** | a series: created from develop at the freeze, release candidate, then published series |
+| `stable`, `rc`, `edge` | nothing (moved by the CI) | highest published version; newest `X.Y`; build of develop without `dev/` nor `test/` |
+
+1. **Freeze** (a candidate is wanted): `git push origin develop:1.135` (the version of develop at that time). `rc`
+   moves on it (`.github/workflows/rc.yml`).
+2. **Fixes of the candidate or of a published series**: on its branch `X.Y`, Z raised (1.135.1) with its ChangeLog
+   entry, then merged into develop: `dev/merge-series.sh 1.135` (solves the line of the version, develop keeps its
+   own, and the ChangeLog, both entries kept), `git push origin develop`. A fix that also concerns an older series
+   still maintained goes on the oldest one, merged into the newer ones then develop.
+3. **Publish**: `git tag v1.135.1 origin/1.135 && git push origin v1.135.1`. The tag must be the version of the
+   descriptor and be on its `X.Y`. Zip, GitHub release (Latest when it is the highest version), `stable` moved
+   (`.github/workflows/release.yml`, `.github/release.sh`).
+
+Before a freeze, every series still maintained is merged into develop: `rc` and `stable` only move forward, they
+refuse a series that does not hold the previous one (warning in the run, nothing forced).
+
 Credits: icons [Tabler Icons](https://tabler.io/icons) (MIT), [DOMPurify](https://github.com/cure53/DOMPurify)
 (Apache 2.0 or MPL 2.0), [HTML Purifier](http://htmlpurifier.org) (LGPL 2.1 or later).

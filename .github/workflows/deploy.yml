@@ -1,7 +1,8 @@
 # Branch « edge »: the module as deployed (Git deployment of Plesk), without dev/ nor test/.
 # Built at each push on develop from git archive (entries export-ignore of .gitattributes), one commit per push on top
 # of the previous build, so that a deployment by git pull always moves forward.
-# Not the published versions (tags, GitHub releases, branches stable and X.Y): see release.yml.
+# Not the published versions (tags, GitHub releases, branch stable), see release.yml; nor the release candidate
+# (branch rc on the newest X.Y), see rc.yml.
 name: deploy
 
 on:

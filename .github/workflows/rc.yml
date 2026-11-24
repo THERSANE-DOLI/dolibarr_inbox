@@ -1,0 +1,50 @@
+# Branch « rc »: pointer on the newest series X.Y (release candidate), for a Git deployment that tests the next
+# version in real use before it is published. Moved at each push on the newest X.Y, fast-forward only, so that a
+# deployment by git pull always moves forward from one freeze to the next (each X.Y starts from a develop that holds
+# the previous ones, dev/merge-series.sh). A push on an older series moves nothing. Never a branch of work.
+# Holds dev/ and test/ like the other branches (their PHP files refuse the web, the setup page warns when they can
+# be read). Published versions: release.yml.
+name: rc
+
+on:
+  push:
+    branches: ['[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rc
+  cancel-in-progress: false
+
+jobs:
+  rc:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned by commit (v7.0.1), Dependabot proposes the next ones
+      - name: Source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Move rc on the newest series
+        run: |
+          set -euo pipefail
+          series="${GITHUB_REF_NAME}"
+          newest=$(git ls-remote --heads origin | sed -n 's#.*refs/heads/\([0-9]\+\.[0-9]\+\)$#\1#p' | sort -V | tail -n1)
+          if [ "$series" != "$newest" ]; then
+            echo "Series $series is not the newest ($newest): rc not moved"
+            exit 0
+          fi
+          if ! git ls-remote --exit-code --heads origin rc >/dev/null; then
+            git push -q origin "${GITHUB_SHA}:refs/heads/rc"
+            echo "::notice::Branch rc created on $series"
+            exit 0
+          fi
+          git fetch -q origin refs/heads/rc
+          if git merge-base --is-ancestor FETCH_HEAD "${GITHUB_SHA}"; then
+            git push -q origin "${GITHUB_SHA}:refs/heads/rc"
+            echo "::notice::Branch rc moved on $series"
+          else
+            echo "::warning::Branch rc not moved: $series does not hold its last commit (the previous series was not merged into develop before the freeze). Merge it into develop and into $series."
+          fi

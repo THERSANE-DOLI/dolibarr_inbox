@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
-# Publication of a version of the module: tag vX.Y.Z, GitHub release with the zip installable from Dolibarr
-# (Setup > Modules > Deploy an external module), branch X.Y on the published commit.
+# Publication of a version of the module, run when a tag vX.Y.Z is pushed: GitHub release with the zip installable
+# from Dolibarr (Setup > Modules > Deploy an external module), branch stable moved on it when it is the highest version.
 #
-# Branches:
+# Branches (doc/dev/development.md):
 #   develop  daily work, versions raised at each FIX / NEW, nothing published
-#   stable   « I publish »: git push origin develop:stable, the release is marked Latest and the branch X.Y
-#            is created or moved forward (fast-forward only) on this commit
-#   X.Y      maintenance of a published series: a fix committed there with X.Y.Z raised gives a release
-#            not marked Latest (unless it is the highest version), then merge X.Y into develop
+#   X.Y      a series: created from develop at the freeze (git push origin develop:X.Y), release candidate then
+#            published series. FIX only, each one merged back into develop (dev/merge-series.sh)
+#   stable   pointer on the highest version published, moved here (fast-forward only), never a branch of work
+#   rc, edge pointer on the newest X.Y (.github/workflows/rc.yml), build of develop (deploy.yml)
+# Publish: git tag vX.Y.Z origin/X.Y && git push origin vX.Y.Z. The tag must be the version of the descriptor and its
+# commit must be on the branch X.Y of the series.
 #
 # Run by .github/workflows/release.yml. Needs MODULE (dir of the module in the zip), DESCRIPTOR (path of the
 # module descriptor), TITLE (name of the module in the release title) and GH_TOKEN.
-# Same file in every module of THERSANE-DOLI that publishes its releases this way.
 set -euo pipefail
 
 : "${MODULE:?}" "${DESCRIPTOR:?}" "${TITLE:?}" "${GH_TOKEN:?}"
-branch="${GITHUB_REF_NAME:?}"
+tag="${GITHUB_REF_NAME:?}"
 sha="${GITHUB_SHA:?}"
 
 fail() {
 	echo "::error::$*"
 	exit 1
 }
+
+[ "${GITHUB_REF_TYPE:-}" = tag ] || fail "A version is published by a tag vX.Y.Z, not from the branch $tag"
 
 # true when the version $1 is higher than the version $2
 vgt() {
@@ -32,42 +35,38 @@ v=$(grep -oP "\\\$this->version\s*=\s*'\K[0-9]+\.[0-9]+\.[0-9]+(?=')" "$DESCRIPT
 [ -n "$v" ] || fail "No version X.Y.Z found in $DESCRIPTOR"
 xy="${v%.*}"
 
-if [ "$branch" != stable ] && [ "$branch" != "$xy" ]; then
-	fail "Version $v cannot be published from the branch $branch (stable, or $xy for a fix of this series)"
-fi
+[ "$tag" = "v$v" ] || fail "Tag $tag but version $v in $DESCRIPTOR: the tag must be v$v (version raised and committed?)"
 
-if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
-	echo "::notice::v$v already published, nothing to do (version of the descriptor not raised?)"
+if gh release view "v$v" >/dev/null 2>&1; then
+	echo "::notice::v$v already published, nothing to do"
 	exit 0
 fi
 
-# Versions already published, lowest first
-tags=$(git tag -l 'v[0-9]*' | sed -n 's/^v\([0-9]\+\.[0-9]\+\.[0-9]\+\)$/\1/p' | sort -V)
+# The commit of the tag must be on the branch of its series (freeze first: git push origin develop:$xy)
+git ls-remote --exit-code --heads origin "$xy" >/dev/null \
+	|| fail "No branch $xy: a version is published from the branch of its series (freeze: git push origin develop:$xy)"
+git fetch -q origin "refs/heads/$xy"
+git merge-base --is-ancestor "$sha" FETCH_HEAD \
+	|| fail "The commit of $tag is not on the branch $xy: tag a commit of $xy"
+
+# Versions already published (the tags but this one), lowest first
+tags=$(git tag -l 'v[0-9]*' | sed -n 's/^v\([0-9]\+\.[0-9]\+\.[0-9]\+\)$/\1/p' | grep -vx "${v//./\\.}" | sort -V || true)
 last=$(printf '%s\n' "$tags" | tail -n1)
 lastxy=$(printf '%s\n' "$tags" | grep "^${xy//./\\.}\." | tail -n1 || true)
 
-if [ "$branch" = stable ]; then
-	if [ -n "$last" ] && ! vgt "$v" "$last"; then
-		fail "Version $v is not higher than the last one published ($last): stable only goes forward"
-	fi
-	from="$last"
-	# The branch X.Y follows stable: refused when it holds a fix that develop does not have yet
-	if git ls-remote --exit-code --heads origin "$xy" >/dev/null; then
-		git fetch -q origin "refs/heads/$xy"
-		git merge-base --is-ancestor FETCH_HEAD "$sha" \
-			|| fail "Branch $xy holds commits that stable does not have: merge $xy into develop, then push develop on stable again"
-	fi
-	git push -q origin "$sha:refs/heads/$xy"
-else
-	if [ -n "$lastxy" ] && ! vgt "$v" "$lastxy"; then
-		fail "Version $v is not higher than the last one published in $xy ($lastxy)"
-	fi
-	from="$lastxy"
+if [ -n "$lastxy" ] && ! vgt "$v" "$lastxy"; then
+	fail "Version $v is not higher than the last one published in $xy ($lastxy)"
 fi
 
 latest=false
 if [ -z "$last" ] || vgt "$v" "$last"; then
 	latest=true
+fi
+# Notes: since the previous release of the whole module when this one is the highest, else of its series
+if [ "$latest" = true ]; then
+	from="$last"
+else
+	from="$lastxy"
 fi
 
 work=$(mktemp -d)
@@ -115,7 +114,24 @@ awk -v hi="$v" -v lo="$from" -v first="$xy.0" '
 gh release create "v$v" "$zip" --title "$TITLE $v" --notes-file "$work/notes.md" --target "$sha" --latest="$latest"
 echo "::notice::Published v$v (latest: $latest)"
 
-# Optional copy on SourceForge (download stats): only the releases of stable (never the fixes of a series X.Y),
+# The branch stable follows the highest version published, fast-forward only: a Git deployment on stable always
+# moves forward with git pull. Never forced: a warning when it cannot follow
+if [ "$latest" = true ]; then
+	if ! git ls-remote --exit-code --heads origin stable >/dev/null; then
+		git push -q origin "$sha:refs/heads/stable"
+		echo "::notice::Branch stable created on v$v"
+	else
+		git fetch -q origin refs/heads/stable
+		if git merge-base --is-ancestor FETCH_HEAD "$sha"; then
+			git push -q origin "$sha:refs/heads/stable"
+			echo "::notice::Branch stable moved on v$v"
+		else
+			echo "::warning::Branch stable not moved: v$v does not hold its last commit (the series $xy does not start from a develop that holds stable). Merge the previous series into develop before the next freeze."
+		fi
+	fi
+fi
+
+# Optional copy on SourceForge (download stats): only the releases marked Latest (never the fixes of an older series),
 # and only when SF_PROJECT is set. The zip goes by rsync over SSH
 # (SF_USER + private key SF_SSH_KEY) into the folder X.Y.Z of the project files; when the release is Latest, the
 # Release API key SF_API_KEY (optional) makes it the default download of every platform.
@@ -141,7 +157,7 @@ sf_publish() {
 		rm -f "$work/sf_api"
 	fi
 }
-if [ "$branch" = stable ] && [ -n "${SF_PROJECT:-}" ]; then
+if [ "$latest" = true ] && [ -n "${SF_PROJECT:-}" ]; then
 	if sf_publish; then
 		echo "::notice::Copied on SourceForge: https://sourceforge.net/projects/$SF_PROJECT/files/$v/"
 	else

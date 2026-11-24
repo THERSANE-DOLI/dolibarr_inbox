@@ -56,6 +56,8 @@ Read before changing anything:
   - Entry: `- NEW: short summary :   X.Y.Z` (or `- FIX:`), then 1 to 3 short sub-items, wrapped at about 110
     characters, newest on top.
 - Commit messages: what changes, no internal codes of plans or audits.
+- Branches: NEW on `develop`; FIX on `develop`, or on the branch `X.Y` of the series it concerns (merged back with
+  `dev/merge-series.sh`). Publication by tag, see [doc/dev/development.md](doc/dev/development.md).
 
 ## Before you open a pull request
 

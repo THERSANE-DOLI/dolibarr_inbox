@@ -8,17 +8,20 @@
 | Branch | What it holds | Use it for |
 |---|---|---|
 | `stable` | the last published version (the one of the latest release) | **production** (recommended) |
-| `X.Y` (`1.83`...) | one published series and its fixes only | a production that must stay on a series |
+| `X.Y` (`1.135`...) | one series: its release candidate, then its published versions and their fixes | a production that must stay on a series |
+| `rc` | the newest series, release candidate before it is published, then its fixes | an instance that tests the next version in real use and reports what goes wrong |
 | `edge` | every change of `develop` as soon as it is pushed, before any release, without `dev/` nor `test/` | a test or preproduction instance that follows the work in progress |
 | `develop` | the work in progress, with the development tools and the tests | development only |
 
-`stable`, `X.Y` and `edge` only go forward, a `git pull` is always enough. As after any update of a module, disable
-and enable the module again when its version changed, so that its database updates run.
+A given version: its tag `vX.Y.Z` (`git checkout v1.135.2`), it never moves.
+
+`stable`, `X.Y`, `rc` and `edge` only go forward, a `git pull` is always enough. As after any update of a module,
+disable and enable the module again when its version changed, so that its database updates run.
 
 ## Folders dev/ and test/ of a Git deployment
 
-`stable`, `X.Y` and `develop` also hold `dev/` and `test/` (left out of the zip and of `edge`): the development tools
-and the tests, not used by the module. None of their PHP files runs from the web (each one refuses anything but the
+`stable`, `X.Y`, `rc` and `develop` also hold `dev/` and `test/` (left out of the zip and of `edge`): the development
+tools and the tests, not used by the module. None of their PHP files runs from the web (each one refuses anything but the
 command line), but their other files (configurations of the tests, trapped mails used by the tests) should not be
 readable. The setup page of the module checks it from the browser and warns only when one of them can be read.
 

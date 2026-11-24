@@ -1,15 +1,18 @@
 # GitHub release with the module zip, installable from Dolibarr (Setup > Modules > Deploy an external module).
-# Work goes on develop; a version is published by pushing it on stable (git push origin develop:stable): tag vX.Y.Z,
-# release marked Latest, branch X.Y moved on it. A fix of an older series goes on its branch X.Y (release not
-# marked Latest), then X.Y is merged into develop. Details in .github/release.sh.
-# Can be run by hand (Actions > release > Run workflow) on stable or on a branch X.Y.
+# Branches (doc/dev/development.md): work on develop; a freeze creates the branch X.Y of a series from develop
+# (git push origin develop:1.135), release candidate then published series, FIX only, merged back into develop
+# (dev/merge-series.sh). A version is published by a tag on its branch X.Y:
+#   git tag v1.135.0 origin/1.135 && git push origin v1.135.0
+# The tag must be the version of the descriptor and be on the branch X.Y of its series. Release marked Latest when it
+# is the highest version, then the branch stable is moved on it (fast-forward only). Details in .github/release.sh.
+# Can be run again by hand (Actions > release > Run workflow, on the tag).
 # Stable links: .../releases/latest (page of the last release),
 # .../releases/download/vX.Y.Z/module_inbox-X.Y.Z.zip (zip of a given version).
 name: release
 
 on:
   push:
-    branches: ['stable', '[0-9]+.[0-9]+']
+    tags: ['v[0-9]*']
   workflow_dispatch:
 
 permissions:
@@ -30,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       # The secrets are given to this step only, never to the actions before it (audit INBX-108)
-      - name: Tag, zip, release and branch X.Y
+      - name: Zip, release and branch stable
         run: bash .github/release.sh
         env:
           GH_TOKEN: ${{ github.token }}
