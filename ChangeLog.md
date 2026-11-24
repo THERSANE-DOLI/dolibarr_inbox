@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: emails sent by Dolibarr from an identity of a mailbox also filed in its Sent folder :   1.133.0
+  - a sender profile of Dolibarr on an alias: the mailbox having this address as its only active identity;
+    an identity of several mailboxes files nothing (log « ambiguous »), the address of a mailbox wins.
+  - with MAIN_MAIL_FORCE_FROM, the Reply-To kept by Dolibarr (sender chosen) is looked up before the forced From.
+
 - FIX: buttons at the foot of a form wrap on a phone, no longer making the form wider than the screen :   1.132.1
   - card of a mailbox > Server: « Test the connection », « Delete the mailbox » and « Save » cut the tab at 431 px.
   - the main action after the spacer stays on the right when it wraps alone; nothing moves on a computer.

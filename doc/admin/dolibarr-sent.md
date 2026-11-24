@@ -2,8 +2,8 @@
 
 Dolibarr sends some emails itself, through its own sending server (Setup > Emails): the answers written on the card
 of a ticket, the proposals, orders and invoices sent by email, the notifications, the emails of the scheduled jobs...
-When such an email leaves from the address of a mailbox of Inbox, Inbox files a copy of it, marked read, in the Sent
-folder of that mailbox, as if it had been written in Inbox:
+When such an email leaves from the address of a mailbox of Inbox, or from one of its identities, Inbox files a copy of
+it, marked read, in the Sent folder of that mailbox, as if it had been written in Inbox:
 
 - the conversation shows both sides: the answer of the customer joins the email it answers (same Message-ID);
 - when Dolibarr answers an email of the mailbox (In-Reply-To), that email is marked « Answered »;
@@ -20,10 +20,28 @@ On by default: a mail program keeps what it sends, and the answers of the custom
 conversation. Turn it off when the sending server of Dolibarr already files a copy in that mailbox and is not
 recognised (a copy by Inbox would be a second one), or when the mailbox must not keep the emails of Dolibarr.
 
+## Which mailbox
+
+The sender chosen in Dolibarr (the user, the company, a sender profile of Setup > Emails > Senders) gives the From of
+the email. Inbox looks for, in the active mailboxes of the current entity:
+
+1. the mailbox whose address is this From;
+2. else the mailbox that has this address as an active identity (Settings > Mailboxes > the mailbox > Identities).
+
+So a sender profile files its emails in a mailbox when its address is the address of that mailbox or one of its
+identities: add the address of the profile as an identity of the mailbox that must keep its emails. An address that
+is an identity of several mailboxes files nothing (Inbox never guesses which one): it is written in the log of
+Dolibarr (« InboxDolibarrSent ambiguous »). The address of a mailbox always wins over the identity of another one.
+
+When `MAIN_MAIL_FORCE_FROM` is set, every email leaves with this forced From, and Dolibarr keeps the sender chosen as
+Reply-To (when no other Reply-To was given). Inbox then looks for the mailbox of the Reply-To first, then for the one
+of the forced From.
+
 ## When nothing is filed
 
-The address compared is the address of the From sent (the forced one when `MAIN_MAIL_FORCE_FROM` is set), with the
-address of the active mailboxes of the current entity; the identities of a mailbox do not count. Nothing is filed:
+Nothing is filed:
+
+- when no mailbox is found as above, or several have the identity;
 
 - for the mass emailing (module Emailing): one connection per recipient;
 - for a new password, or the link to choose one (context « passwordreset » of Dolibarr): a secret has nothing to do

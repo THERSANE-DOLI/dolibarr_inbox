@@ -145,12 +145,13 @@ class InboxDolibarrSentTest extends InboxImapTestCase
 	 * @param string $from    From
 	 * @param string $context Context of CMailFile
 	 * @param string $trackid Track id
+	 * @param string $force   MAIN_MAIL_FORCE_FROM ('' none)
 	 * @return CMailFile
 	 */
-	protected function mail($mode, $id, $from = 'Service devis <devis@inbox-test.invalid>', $context = 'ticket', $trackid = 'tic42')
+	protected function mail($mode, $id, $from = 'Service devis <devis@inbox-test.invalid>', $context = 'ticket', $trackid = 'tic42', $force = '')
 	{
 		$this->set(array('MAIN_MAIL_SENDMODE' => $mode, 'MAIN_MAIL_SENDMODE_TICKET' => null, 'MAIN_MAIL_SENDMODE_EMAILING' => null, 'MAIN_MAIL_SENDMODE_PASSWORDRESET' => null,
-			'MAIN_MAIL_FORCE_SENDTO' => null, 'MAIN_MAIL_FORCE_FROM' => null, 'MAIN_MAIL_AUTOCOPY_TO' => null, 'MAIN_FIX_FOR_BUGGED_MTA' => 0));
+			'MAIN_MAIL_FORCE_SENDTO' => null, 'MAIN_MAIL_FORCE_FROM' => $force !== '' ? $force : null, 'MAIN_MAIL_AUTOCOPY_TO' => null, 'MAIN_FIX_FOR_BUGGED_MTA' => 0));
 		$more = "In-Reply-To: <m1".self::MARK.">\r\nReferences: <m1".self::MARK.">\r\n";
 		$mail = new CMailFile('ZzAct Réponse '.$id, 'Client <client@example.invalid>', $from, '<p>Merci pour votre message</p>', array(), array(), array(), '',
 			'cachee@inbox-test.invalid', 0, 1, '', '', $trackid, $more, $context);
@@ -338,6 +339,82 @@ class InboxDolibarrSentTest extends InboxImapTestCase
 		// Protected, not unlocked in this request (a scheduled job, another user): nothing tried
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_account SET protected = 1, protect_level = 'password' WHERE rowid = ".((int) $a->id));
 		$this->assertSame('protected', $copy->file($this->mail('smtps', 'nf7')));
+	}
+
+	/**
+	 * @param InboxAccount $a      Mailbox
+	 * @param string       $email  Address of the identity
+	 * @param int          $status 1 active, 0 disabled
+	 * @return InboxIdentity
+	 */
+	protected function identity(InboxAccount $a, $email, $status = 1)
+	{
+		dol_include_once('/inbox/class/inboxidentity.class.php');
+		$i = new InboxIdentity($this->db);
+		$i->fk_account = (int) $a->id;
+		$i->email = $email;
+		$i->status = $status;
+		$this->assertGreaterThan(0, $i->create($this->admin), $i->error);
+
+		return $i;
+	}
+
+	/**
+	 * The mailbox found from an identity (sender profile of Dolibarr on an alias), never guessed when several have it;
+	 * with MAIN_MAIL_FORCE_FROM, the Reply-To first. « no_folder » says a mailbox was found (it has no Sent folder).
+	 *
+	 * @return void
+	 */
+	public function testMailboxOfAnIdentityAndForcedFrom()
+	{
+		$copy = new InboxDolibarrSent($this->db);
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$b = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE, 'email' => 'autre@inbox-test.invalid'));
+		$this->identity($a, 'Offres@Inbox-Test.invalid');
+		$this->identity($a, 'pause@inbox-test.invalid', 0);
+		$this->identity($a, 'commun@inbox-test.invalid');
+		$this->identity($b, 'commun@inbox-test.invalid');
+		// The address of a mailbox wins over the identity of another one
+		$this->identity($b, 'devis@inbox-test.invalid');
+		InboxDolibarrSent::reset();
+
+		$this->assertSame('no_folder', $copy->file($this->mail('smtps', 'id1', 'Offres <offres@inbox-test.invalid>')), 'identity of one mailbox');
+		$this->assertStringContainsString('offres@inbox-test.invalid', $copy->error);
+		$this->assertSame('not_managed', $copy->file($this->mail('smtps', 'id2', 'pause@inbox-test.invalid')), 'disabled identity');
+		$this->assertSame('ambiguous', $copy->file($this->mail('smtps', 'id3', 'commun@inbox-test.invalid')), 'identity of two mailboxes');
+		$this->assertSame('no_folder', $copy->file($this->mail('smtps', 'id4')));
+		$this->assertStringContainsString('devis@inbox-test.invalid', $copy->error);
+
+		// Forced From: the From asked stays as Reply-To, looked up first, then the forced From
+		$mail = $this->mail('smtps', 'id5', 'Offres <offres@inbox-test.invalid>', 'ticket', 'tic42', 'robot@inbox-test.invalid');
+		$this->assertSame(array('offres@inbox-test.invalid', 'robot@inbox-test.invalid'), InboxDolibarrSent::candidateAddresses($mail));
+		$this->assertSame('no_folder', $copy->file($mail));
+		$mail = $this->mail('smtps', 'id6', 'Inconnu <inconnu@inbox-test.invalid>', 'ticket', 'tic42', 'Robot <autre@inbox-test.invalid>');
+		$this->assertSame('no_folder', $copy->file($mail), 'Reply-To of no mailbox: the forced From');
+		$this->assertStringContainsString('autre@inbox-test.invalid', $copy->error);
+		// Not forced: the Reply-To is never looked up
+		$mail = $this->mail('smtps', 'id7', 'inconnu@inbox-test.invalid');
+		$mail->reply_to = 'offres@inbox-test.invalid';
+		$this->assertSame(array('inconnu@inbox-test.invalid'), InboxDolibarrSent::candidateAddresses($mail));
+		$this->assertSame('not_managed', $copy->file($mail));
+	}
+
+	/**
+	 * Sent by Dolibarr from an identity of the mailbox of the tests: filed in its Sent folder
+	 *
+	 * @return void
+	 */
+	public function testIdentityFiledInSent()
+	{
+		$a = $this->readyWithSent();
+		$this->identity($a, 'offres@inbox-test.invalid');
+		InboxDolibarrSent::reset();
+		$copy = new InboxDolibarrSent($this->db);
+		$this->assertSame('filed', $copy->file($this->mail('smtps', 'idf1', 'Offres <offres@inbox-test.invalid>')), (string) $copy->error);
+		$this->assertCount(1, $this->onServer('INBOX.Sent', 'idf1'));
+		$mail = $this->mail('smtps', 'idf2', 'Offres <offres@inbox-test.invalid>', 'ticket', 'tic42', 'robot@inbox-test.invalid');
+		$this->assertSame('filed', $copy->file($mail), (string) $copy->error);
+		$this->assertCount(1, $this->onServer('INBOX.Sent', 'idf2'));
 	}
 
 	/**

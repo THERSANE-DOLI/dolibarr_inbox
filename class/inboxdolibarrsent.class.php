@@ -31,6 +31,11 @@ require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
  * mailbox of the current entity whose address is the From sent, as inbox does for its own mails: same Message-ID, so
  * the answers join the conversation. The mail answered (In-Reply-To) gets \Answered, on the server then in the index.
  *
+ * The mailbox is the one whose address is the From, else the only one that has it as an active identity (1.133.0):
+ * a sender profile of Dolibarr sending from an alias of a mailbox. An identity of several mailboxes files nothing
+ * (never a guess). When MAIN_MAIL_FORCE_FROM replaces the From, the address chosen by the user is the Reply-To that
+ * CMailFile keeps: it is looked up first, then the forced From.
+ *
  * Never for the mass emailing (one connection per recipient) nor for the new passwords (a secret in a mailbox read by
  * several people), nor when the mailbox turned it off (card of the mailbox, on by default), nor when the sending
  * server of Dolibarr files the copy itself. A protected mailbox gets it only from a session that unlocked it.
@@ -48,13 +53,13 @@ class InboxDolibarrSent
 	/** @var DoliDB */
 	protected $db;
 
-	/** @var string Result of the last call: filed, excluded, no_from, not_managed, off, protected, server_copy, no_source, no_folder, failed */
+	/** @var string Result of the last call: filed, excluded, no_from, not_managed, ambiguous, off, protected, server_copy, no_source, no_folder, failed */
 	public $result = '';
 
 	/** @var string Detail of the result (never a secret) */
 	public $error = '';
 
-	/** @var array<int,array<string,int>> Active mailboxes per entity: address => id, read once per request */
+	/** @var array<int,array{main:array<string,int>,identity:array<string,int[]>}> Active mailboxes per entity: address => id, identity address => ids, read once per request */
 	protected static $addresses = array();
 
 	/** @var array<int,InboxConnectorInterface> Connectors opened during the request, one per mailbox */
@@ -95,11 +100,22 @@ class InboxDolibarrSent
 		if ($why !== '') {
 			return $this->done('excluded', $why);
 		}
-		$from = self::fromAddress((string) $mail->addr_from);
-		if ($from === '') {
+		$candidates = self::candidateAddresses($mail);
+		if (!$candidates) {
 			return $this->done('no_from');
 		}
-		$id = $this->accountIdOf($from);
+		$id = 0;
+		$from = $candidates[0];
+		foreach ($candidates as $address) {
+			$id = $this->accountIdOf($address);
+			if ($id !== 0) {
+				$from = $address;
+				break;
+			}
+		}
+		if ($id < 0) {
+			return $this->done('ambiguous', $from);
+		}
 		$account = new InboxAccount($this->db);
 		if ($id <= 0 || $account->fetch($id) <= 0 || !$account->isActive()) {
 			return $this->done('not_managed');
@@ -198,8 +214,44 @@ class InboxDolibarrSent
 	}
 
 	/**
+	 * Addresses that may designate the mailbox of the sender, in the order they are looked up
+	 *
+	 * @param CMailFile $mail Mail
+	 * @return string[] Lower case addresses; the From alone, or the Reply-To then the From when MAIN_MAIL_FORCE_FROM
+	 *                  replaced it; empty when the From is not an address
+	 */
+	public static function candidateAddresses($mail)
+	{
+		$from = self::fromAddress((string) $mail->addr_from);
+		if ($from === '') {
+			return array();
+		}
+		$forced = self::fromAddress(getDolGlobalString('MAIN_MAIL_FORCE_FROM'));
+		if ($forced !== '' && $forced === $from) {
+			// CMailFile keeps the From asked as Reply-To when none was given: the identity chosen by the user
+			$reply = self::firstAddress((string) $mail->reply_to);
+			if ($reply !== '' && $reply !== $from) {
+				return array($reply, $from);
+			}
+		}
+
+		return array($from);
+	}
+
+	/**
+	 * @param string $list Addresses separated by commas ('Name <a@b.c>, d@e.f')
+	 * @return string First address, lower case, '' if none
+	 */
+	protected static function firstAddress($list)
+	{
+		// A name holding a comma (« Doe, John <a@b.c> ») gives no address: the From is then looked up alone
+		return self::fromAddress((string) strtok(trim((string) $list), ','));
+	}
+
+	/**
 	 * @param string $email Address, lower case
-	 * @return int Active mailbox of the current entity with this address, 0 if none
+	 * @return int Active mailbox of the current entity with this address, else the only one having it as an active
+	 *             identity; 0 if none, -1 when several mailboxes have this identity
 	 */
 	protected function accountIdOf($email)
 	{
@@ -207,14 +259,30 @@ class InboxDolibarrSent
 
 		$entity = (int) $conf->entity;
 		if (!isset(self::$addresses[$entity])) {
-			self::$addresses[$entity] = array();
-			$rows = $this->db->getRows("SELECT rowid, email FROM ".$this->db->prefix()."inbox_account WHERE entity = ".$entity." AND status = ".InboxAccount::STATUS_ACTIVE." LIMIT 5000");
+			self::$addresses[$entity] = array('main' => array(), 'identity' => array());
+			$p = $this->db->prefix();
+			$rows = $this->db->getRows("SELECT rowid, email FROM ".$p."inbox_account WHERE entity = ".$entity." AND status = ".InboxAccount::STATUS_ACTIVE." LIMIT 5000");
 			foreach (is_array($rows) ? $rows : array() as $r) {
-				self::$addresses[$entity][strtolower(trim((string) $r->email))] = (int) $r->rowid;
+				self::$addresses[$entity]['main'][strtolower(trim((string) $r->email))] = (int) $r->rowid;
+			}
+			$sql = "SELECT i.fk_account, i.email FROM ".$p."inbox_identity as i INNER JOIN ".$p."inbox_account as a ON a.rowid = i.fk_account";
+			$sql .= " WHERE a.entity = ".$entity." AND a.status = ".InboxAccount::STATUS_ACTIVE." AND i.status = 1 LIMIT 20000";
+			$rows = $this->db->getRows($sql);
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$key = strtolower(trim((string) $r->email));
+				$ids = self::$addresses[$entity]['identity'][$key] ?? array();
+				if (!in_array((int) $r->fk_account, $ids, true)) {
+					$ids[] = (int) $r->fk_account;
+				}
+				self::$addresses[$entity]['identity'][$key] = $ids;
 			}
 		}
+		if (isset(self::$addresses[$entity]['main'][$email])) {
+			return self::$addresses[$entity]['main'][$email];
+		}
+		$ids = self::$addresses[$entity]['identity'][$email] ?? array();
 
-		return self::$addresses[$entity][$email] ?? 0;
+		return count($ids) === 1 ? $ids[0] : (count($ids) > 1 ? -1 : 0);
 	}
 
 	/**
