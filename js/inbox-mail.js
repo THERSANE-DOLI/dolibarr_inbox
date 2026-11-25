@@ -6518,6 +6518,46 @@
 		return d.label || '';
 	}
 	/**
+	 * Links of the conversation that came from a mail of another subject (1.138.2): proposed, ticked, removed once
+	 * validated; undo by the toast
+	 * @param {HTMLElement} box    Panel of the mail
+	 * @param {number}      mailId Mail
+	 */
+	async function threadStrayDialog(box, mailId) {
+		let res;
+		try {
+			res = await api('dolibarr', 'thread_stray', { id: mailId });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const items = res.items || [];
+		if (!items.length) {
+			loadDolibar(box);
+			return;
+		}
+		const body = I.html`<p>${t('InboxThreadStrayText')}</p><ul class="ibx-checklist">${items.map(x => I.html`<li class="ibx-checklist__item"><input type="checkbox" id="ibx-stray-${x.link}" value="${x.link}" checked><label for="ibx-stray-${x.link}">${I.raw(ic(x.icon || 'link'))} <b>${x.readable ? (x.ref || x.kind) : x.kind}</b><br><span class="ibx-muted">${x.subject} · ${shortDate(x.date)}</span></label></li>`)}</ul>`;
+		dialog({
+			title: t('InboxThreadStrayTitle'),
+			body: String(body),
+			actions: [{ label: t('InboxThreadStrayRemove'), primary: true, run: async dd => {
+				const links = $$('.ibx-checklist input:checked', dd).map(c => +c.value);
+				if (!links.length) {
+					return true;
+				}
+				const r = await post('dolibarr', 'thread_unstray', { id: mailId, links });
+				await loadDolibar(box);
+				const removed = r.removed || [];
+				toast(t('InboxThreadStrayRemoved', removed.length), { action: t('InboxUndo'), onAction: async () => {
+					await post('dolibarr', 'thread_restray', { id: mailId, links: removed });
+					loadDolibar(box);
+				} });
+				return true;
+			} }],
+		});
+	}
+
+	/**
 	 * A piece as a pill: icon, ref (link to its card), thirdparty, status, unlink; « not accessible » without anything
 	 * else. In the column on the right a card of two lines at most: ref, status and warning on the first, the
 	 * thirdparty, « their ref » and the action on the second (no line for a lonely button)
@@ -7102,6 +7142,8 @@
 					+ ((d.create || []).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createpiece" aria-haspopup="dialog">' + ic('compose') + ' ' + th('InboxCreatePiece') + ' ' + ic('chevron-down') + '</button>' : '')
 					+ (convo.detached ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threadattach" title="' + th('InboxThreadDetachedHelp') + '">' + ic('thread') + ' ' + th('InboxThreadAttach') + '</button>'
 						: (convo.others && !+box.dataset.thread ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threaddetach" title="' + th('InboxThreadDetachHelp') + '">' + ic('unlink') + ' ' + th('InboxThreadDetach') + '</button>' : ''))
+					// Links of the conversation come from a mail of another subject (1.138.2): reviewed in a dialog
+					+ (convo.stray && d.level !== 'read' ? I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-threadstray" aria-haspopup="dialog" title="${t('InboxThreadStrayHelp')}">${I.raw(ic('warning'))} ${t('InboxThreadStray', convo.stray)}</button>` : '')
 					+ '</span>' : '') + '</span></div>'
 				+ (canWrite && suggest.length ? '<div class="ibx-dolibar__row ibx-cited"><span class="ibx-dolibar__label">' + th('InboxCitedInMail') + '</span><span class="ibx-dolibar__items">'
 					+ suggest.map(c => pieceHtml(c, 0, c.match === 'unknown' ? citedWarning(box, c) : '', socId, {
@@ -7390,6 +7432,10 @@
 				await post('dolibarr', 'attach_thread', { id: mailId, links: res.removed || [] });
 				loadDolibar(box);
 			} });
+			return;
+		}
+		if (e.target.closest('.ibx-js-threadstray')) {
+			threadStrayDialog(box, mailId);
 			return;
 		}
 		if (e.target.closest('.ibx-js-threadattach')) {

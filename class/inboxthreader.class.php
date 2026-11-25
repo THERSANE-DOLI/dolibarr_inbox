@@ -79,6 +79,66 @@ class InboxThreader
 		return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $s)), 'UTF-8');
 	}
 
+	/** Similarity of the letters for a typo fixed (same numbers), in % */
+	const SUBJECT_SIMILAR = 85;
+
+	/**
+	 * Two mails speak of the same thing (rules measured on a year of a real mailbox, 1.139.0):
+	 * - letters and digits only, the prefixes « Re: », « Fwd: »... removed: the spaces a long header gets when folded
+	 *   (« siegfri ed », « B L ») and the punctuation (« l’état » / « létat ») never separate;
+	 * - one contains the other: « URGENT - X », « [Ticket #12] X »;
+	 * - a reference in common (5 characters or more, 4 digits or more): « RQ2511-28231 » and « [AG] Offer - your
+	 *   enquiry no. RQ2511-28231 », « Annule et remplace Devis DVV2603662 »;
+	 * - the same numbers and almost the same letters: a typo fixed (« exceptionelle »).
+	 * Another number (« ROND 304L » / « ROND 316L », another order) is another subject. An empty subject never
+	 * separates.
+	 *
+	 * @param string|null $a Subject
+	 * @param string|null $b Subject
+	 * @return bool
+	 */
+	public static function sameSubject($a, $b)
+	{
+		$na = self::normalizeSubject((string) $a);
+		$nb = self::normalizeSubject((string) $b);
+		$x = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', $na);
+		$y = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', $nb);
+		if ($x === '' || $y === '' || $x === $y || mb_strpos($x, $y) !== false || mb_strpos($y, $x) !== false) {
+			return true;
+		}
+		if (array_intersect(self::subjectRefs($na), self::subjectRefs($nb))) {
+			return true;
+		}
+		preg_match_all('/\d+/', $x, $dx);
+		preg_match_all('/\d+/', $y, $dy);
+		$nx = array_unique($dx[0]);
+		$ny = array_unique($dy[0]);
+		sort($nx);
+		sort($ny);
+		if ($nx !== $ny) {
+			return false;
+		}
+		similar_text($x, $y, $percent);
+
+		return $percent >= self::SUBJECT_SIMILAR;
+	}
+
+	/**
+	 * References of a normalised subject: words of 5 characters or more with 4 digits or more (RQ2511-28231,
+	 * DEVIS2606219, HT-26/04328)
+	 *
+	 * @param string $subject Subject normalised
+	 * @return string[]
+	 */
+	protected static function subjectRefs($subject)
+	{
+		preg_match_all('/[\p{L}\p{N}][\p{L}\p{N}\-\/]{4,}/u', (string) $subject, $m);
+
+		return array_values(array_filter(array_unique($m[0]), function ($w) {
+			return preg_match_all('/\d/', $w) >= 4;
+		}));
+	}
+
 	/**
 	 * Addresses of a mailbox: its account and its identities (active or not: a mail sent stays one of the mailbox)
 	 *

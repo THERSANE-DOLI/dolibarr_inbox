@@ -24,11 +24,16 @@
 
 require_once __DIR__.'/inboxlink.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
+require_once __DIR__.'/inboxthreader.class.php';
 
 /**
  * The links made by the conversation have the origin « thread » (badge in the panel). A mail detached
  * (inbox_mailref.thread_detached, kept by Message-ID so it survives every move) loses its links of the conversation,
  * never gets new ones, and its own links never go to the others.
+ *
+ * A link follows only between mails of the same subject (1.138.2): a correspondent who sends each new request as a
+ * reply to the previous one, the subject replaced, keeps it in the same conversation; the piece of one request must not
+ * reach the others.
  */
 class InboxThreadLink
 {
@@ -53,19 +58,33 @@ class InboxThreadLink
 	}
 
 	/**
+	 * Two mails speak of the same thing: same subject once the prefixes « Re: », « Fwd: »... removed, or one subject
+	 * contains the other (« URGENT - X », « [Ticket #12] X »). An empty subject never separates.
+	 *
+	 * @param string|null $a Subject
+	 * @param string|null $b Subject
+	 * @return bool
+	 */
+	public static function sameSubject($a, $b)
+	{
+		return InboxThreader::sameSubject($a, $b);
+	}
+
+	/**
 	 * Other mails of the conversation of a mail (same mailbox, outside the trash and the junk)
 	 *
-	 * @param object $row Mail of the index (rowid, fk_account, thread_key)
-	 * @return object[]    Rows (rowid, fk_account, message_id, date_mail, from_email, subject, size)
+	 * @param object $row         Mail of the index (rowid, fk_account, thread_key, subject)
+	 * @param bool   $sameSubject Only the mails of the same subject (the ones a link follows to)
+	 * @return object[]            Rows (rowid, fk_account, message_id, date_mail, from_email, subject, size)
 	 */
-	public function others($row)
+	public function others($row, $sameSubject = false)
 	{
 		if ((string) ($row->thread_key ?? '') === '') {
 			return array();
 		}
 		$p = $this->db->prefix();
 		$rows = $this->db->getRows("SELECT m.rowid, m.fk_account, m.message_id, m.date_mail, m.from_email, m.subject, m.size FROM ".$p."inbox_mail as m"
-			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.role NOT IN ('trash', 'junk')"
+			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND COALESCE(f.role, '') NOT IN ('trash', 'junk')"
 			." WHERE m.fk_account = ".((int) $row->fk_account)." AND m.thread_key = '".$this->db->escape((string) $row->thread_key)."' AND m.rowid <> ".((int) $row->rowid)
 			." ORDER BY m.rowid LIMIT ".self::MAX_MAILS);
 		$rows = is_array($rows) ? $rows : array();
@@ -79,6 +98,9 @@ class InboxThreadLink
 				continue;
 			}
 			$seen[$k] = true;
+			if ($sameSubject && !self::sameSubject($row->subject ?? '', $r->subject)) {
+				continue;
+			}
 			$out[] = $r;
 		}
 
@@ -110,14 +132,15 @@ class InboxThreadLink
 	 * What the panel says of the conversation of a mail
 	 *
 	 * @param object $row Mail
-	 * @return array{others:int,detached:bool}
+	 * @return array{others:int,detached:bool,stray:int} others: mails a link of this one follows to; stray: links of
+	 *                                                    the conversation come from a mail of another subject
 	 */
 	public function state($row)
 	{
 		$refs = new InboxMailRef($this->db);
 		$mine = $refs->forRows(array($row));
 		$detached = isset($mine[(int) $row->rowid]) && $this->detachedOf(array($mine[(int) $row->rowid]));
-		$others = $this->others($row);
+		$others = $this->others($row, true);
 		$byRow = $refs->forRows($others);
 		$off = $this->detachedOf(array_values($byRow));
 		$n = 0;
@@ -127,7 +150,7 @@ class InboxThreadLink
 			}
 		}
 
-		return array('others' => $n, 'detached' => $detached);
+		return array('others' => $n, 'detached' => $detached, 'stray' => count($this->strayLinks($row)));
 	}
 
 	/**
@@ -149,7 +172,7 @@ class InboxThreadLink
 		}
 		$linker = new InboxLink($this->db);
 		$n = 0;
-		foreach ($this->others($row) as $r) {
+		foreach ($this->others($row, true) as $r) {
 			$ref = $refs->fetchOrCreate($r, $user);
 			if ($ref <= 0 || $this->detachedOf(array($ref))) {
 				continue;
@@ -170,8 +193,8 @@ class InboxThreadLink
 	}
 
 	/**
-	 * Synchronisation: new mails in a linked conversation get its links (origin « thread »); the links of a detached
-	 * mail are not given
+	 * Synchronisation: new mails in a linked conversation get its links (origin « thread »), each from the mails of its
+	 * subject; the links of a detached mail are not given
 	 *
 	 * @param int   $accountId Mailbox
 	 * @param int[] $mailIds   New mails of the index (their conversation assigned)
@@ -185,7 +208,7 @@ class InboxThreadLink
 		}
 		$p = $this->db->prefix();
 		$news = $this->db->getRows("SELECT m.rowid, m.fk_account, m.message_id, m.date_mail, m.from_email, m.subject, m.size, m.thread_key FROM ".$p."inbox_mail as m"
-			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND f.role NOT IN ('trash', 'junk')"
+			." INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder AND COALESCE(f.role, '') NOT IN ('trash', 'junk')"
 			." WHERE m.rowid IN (".implode(',', $mailIds).") AND m.thread_key IS NOT NULL AND m.thread_key <> '' LIMIT ".count($mailIds));
 		if (!is_array($news) || !$news) {
 			return 0;
@@ -214,11 +237,20 @@ class InboxThreadLink
 			if (empty($old[$key])) {
 				continue;
 			}
-			$oldRefs = array_values($refs->forRows($old[$key]));
-			$off = $this->detachedOf($oldRefs);
+			$refOf = $refs->forRows($old[$key]);
+			$off = $this->detachedOf(array_values($refOf));
+			// Subjects of the mails holding each link: a link follows only to a new mail of the same subject
+			$subjectsOf = array();
+			foreach ($old[$key] as $o) {
+				if (isset($refOf[(int) $o->rowid])) {
+					$subjectsOf[$refOf[(int) $o->rowid]][] = (string) $o->subject;
+				}
+			}
 			$links = array();
-			foreach ($linker->listFor(array_diff($oldRefs, array_keys($off))) as $l) {
-				$links[$l['type'].':'.$l['element']] = $l;
+			foreach ($linker->listFor(array_diff(array_values($refOf), array_keys($off))) as $l) {
+				$k = $l['type'].':'.$l['element'];
+				$links[$k] = $l;
+				$links[$k]['subjects'] = array_merge($links[$k]['subjects'] ?? array(), $subjectsOf[$l['mailref']] ?? array());
 			}
 			if (!$links) {
 				continue;
@@ -244,6 +276,16 @@ class InboxThreadLink
 					continue;
 				}
 				foreach ($links as $l) {
+					$same = false;
+					foreach ($l['subjects'] as $subject) {
+						if (self::sameSubject($subject, $r->subject)) {
+							$same = true;
+							break;
+						}
+					}
+					if (!$same) {
+						continue;
+					}
 					$exists = $this->db->getRow("SELECT rowid FROM ".$p."inbox_link WHERE fk_mailref = ".((int) $ref)." AND element_type = '".$this->db->escape($l['type'])."' AND fk_element = ".((int) $l['element']));
 					if (!is_object($exists) && $linker->link($ref, $l['type'], $l['element'], null, self::ORIGIN) > 0) {
 						$made++;
@@ -253,6 +295,124 @@ class InboxThreadLink
 		}
 
 		return $made;
+	}
+
+	/**
+	 * Links of the conversation (origin « thread ») that came from a mail of another subject: made before 1.138.2, when
+	 * a link went to every mail of the conversation. A link is stray when the mails holding the piece by themselves
+	 * (any other origin) all have another subject than its mail; without such a mail it is kept (nothing proves it).
+	 *
+	 * @param object $row Mail of the conversation (rowid, fk_account, thread_key, subject)
+	 * @return array<int,array{link:int,mailref:int,mail:int,type:string,element:int,subject:string,date:int}>
+	 */
+	public function strayLinks($row)
+	{
+		$mails = array_merge(array($row), $this->others($row));
+		if (count($mails) < 2) {
+			return array();
+		}
+		$refOf = (new InboxMailRef($this->db))->forRows($mails);
+		$byRef = array();
+		foreach ($mails as $m) {
+			if (isset($refOf[(int) $m->rowid]) && !isset($byRef[$refOf[(int) $m->rowid]])) {
+				$byRef[$refOf[(int) $m->rowid]] = $m;
+			}
+		}
+		if (!$byRef) {
+			return array();
+		}
+		$links = (new InboxLink($this->db))->listFor(array_keys($byRef));
+		// Subjects of the mails that hold each piece by themselves
+		$sources = array();
+		foreach ($links as $l) {
+			if ($l['origin'] !== self::ORIGIN && isset($byRef[$l['mailref']])) {
+				$sources[$l['type'].':'.$l['element']][] = (string) $byRef[$l['mailref']]->subject;
+			}
+		}
+		$out = array();
+		foreach ($links as $l) {
+			$k = $l['type'].':'.$l['element'];
+			if ($l['origin'] !== self::ORIGIN || empty($sources[$k]) || !isset($byRef[$l['mailref']])) {
+				continue;
+			}
+			$m = $byRef[$l['mailref']];
+			$same = false;
+			foreach ($sources[$k] as $subject) {
+				if (self::sameSubject($subject, $m->subject)) {
+					$same = true;
+					break;
+				}
+			}
+			if (!$same) {
+				$out[] = array('link' => $l['id'], 'mailref' => $l['mailref'], 'mail' => (int) $m->rowid, 'type' => $l['type'], 'element' => $l['element'],
+					'subject' => (string) $m->subject, 'date' => (int) $this->db->jdate($m->date_mail));
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Remove the stray links chosen by the user, among the ones strayLinks() finds now (never a link given by the
+	 * browser alone)
+	 *
+	 * @param object $row     Mail of the conversation
+	 * @param int[]  $linkIds Links validated
+	 * @return array<int,array{mail:int,type:string,element:int}>|null Links removed (for the undo), null KO
+	 */
+	public function removeStray($row, array $linkIds)
+	{
+		$wanted = array_flip(array_map('intval', $linkIds));
+		$linker = new InboxLink($this->db);
+		$removed = array();
+		$this->db->begin();
+		foreach ($this->strayLinks($row) as $l) {
+			if (!isset($wanted[$l['link']])) {
+				continue;
+			}
+			if ($linker->unlink($l['link']) < 0) {
+				$this->error = $linker->error;
+				$this->db->rollback();
+				return null;
+			}
+			$removed[] = array('mail' => $l['mail'], 'type' => $l['type'], 'element' => $l['element']);
+		}
+		$this->db->commit();
+
+		return $removed;
+	}
+
+	/**
+	 * Undo of removeStray(): the links given back, only on mails of this conversation and pieces the user may read
+	 *
+	 * @param User                                          $user  User
+	 * @param object                                        $row   Mail of the conversation
+	 * @param array<int,array{mail:int,type:string,element:int}> $links Links removed
+	 * @return int Links given back
+	 */
+	public function restoreStray(User $user, $row, array $links)
+	{
+		$mails = array();
+		foreach (array_merge(array($row), $this->others($row)) as $m) {
+			$mails[(int) $m->rowid] = $m;
+		}
+		$refs = new InboxMailRef($this->db);
+		$linker = new InboxLink($this->db);
+		$n = 0;
+		foreach (array_slice($links, 0, 500) as $l) {
+			$mail = $mails[(int) ($l['mail'] ?? 0)] ?? null;
+			$type = (string) ($l['type'] ?? '');
+			$id = (int) ($l['element'] ?? 0);
+			if ($mail === null || $type === '' || $id <= 0 || !InboxElements::canRead($user, $type, $id)) {
+				continue;
+			}
+			$ref = $refs->fetchOrCreate($mail, $user);
+			if ($ref > 0 && $linker->link($ref, $type, $id, null, self::ORIGIN) > 0) {
+				$n++;
+			}
+		}
+
+		return $n;
 	}
 
 	/**

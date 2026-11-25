@@ -2747,14 +2747,20 @@ InboxSourceErrorMany = Höchstens %s Quellen.
 InboxSourceExampleLabel = Angebotsanfrage (Beispiel)
 # The link follows the conversation (lot A3, 1.73.0)
 InboxLinkedByThread = über die Unterhaltung verknüpft
-InboxLinkThreadToo = Auch die %s anderen Mails der Unterhaltung verknüpfen
-InboxLinkedThreadToo = Verknüpft, zusammen mit den %s anderen Mails der Unterhaltung
+InboxLinkThreadToo = Auch die %s anderen Mails der Unterhaltung mit demselben Betreff verknüpfen
+InboxLinkedThreadToo = Verknüpft, zusammen mit den %s anderen Mails der Unterhaltung mit demselben Betreff
 InboxThreadDetach = Von der Unterhaltung lösen
 InboxThreadDetachHelp = Die Unterhaltung betrifft jetzt einen anderen Kunden: diese Mail verliert die über die Unterhaltung erstellten Verknüpfungen und erhält keine neuen mehr
 InboxThreadDetached = Mail von ihrer Unterhaltung gelöst (%s Verknüpfungen entfernt)
 InboxThreadAttach = Wieder zur Unterhaltung
 InboxThreadDetachedHelp = Diese Mail wurde von ihrer Unterhaltung gelöst: die Verknüpfungen der Unterhaltung erreichen sie nicht
 InboxThreadAttached = Mail wieder in ihrer Unterhaltung: die nächsten Verknüpfungen folgen
+InboxThreadStray = %s Verknüpfung(en) aus einem anderen Betreff
+InboxThreadStrayHelp = Verknüpfungen, die die Unterhaltung an Mails mit einem anderen Betreff weitergegeben hat (frühere Version): zu prüfen
+InboxThreadStrayTitle = Verknüpfungen aus einem anderen Betreff
+InboxThreadStrayText = Diese Mails haben ein Element erhalten, das mit einer Mail derselben Unterhaltung, aber mit einem anderen Betreff verknüpft ist. Der Absender hat wohl auf eine frühere Mail geantwortet, um eine neue Anfrage zu senden. Entfernen Sie das Häkchen bei den Verknüpfungen, die bleiben sollen.
+InboxThreadStrayRemove = Angehakte Verknüpfungen entfernen
+InboxThreadStrayRemoved = %s Verknüpfung(en) entfernt
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = E-Mail des Anfragenden
 InboxSourceFieldFills_email = E-Mail des Partners und des Kontakts; der Partner wird darüber gesucht

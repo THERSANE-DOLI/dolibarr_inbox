@@ -2747,14 +2747,20 @@ InboxSourceErrorMany = %s sources au plus.
 InboxSourceExampleLabel = Demande de devis (exemple)
 # The link follows the conversation (lot A3, 1.73.0)
 InboxLinkedByThread = lié par la conversation
-InboxLinkThreadToo = Lier aussi les %s autres mails de la conversation
-InboxLinkedThreadToo = Lié, ainsi que les %s autres mails de la conversation
+InboxLinkThreadToo = Lier aussi les %s autres mails de la conversation sur le même objet
+InboxLinkedThreadToo = Lié, ainsi que les %s autres mails de la conversation sur le même objet
 InboxThreadDetach = Détacher du fil
 InboxThreadDetachHelp = La conversation a dérivé vers un autre client : ce mail perd les liens faits par la conversation et n'en reçoit plus
 InboxThreadDetached = Mail détaché de sa conversation (%s liens retirés)
 InboxThreadAttach = Rattacher au fil
 InboxThreadDetachedHelp = Ce mail a été détaché de sa conversation : les liens de la conversation ne l'atteignent pas
 InboxThreadAttached = Mail rattaché à sa conversation : les prochains liens le suivront
+InboxThreadStray = %s lien(s) venu(s) d'un autre objet
+InboxThreadStrayHelp = Liens donnés par la conversation à des mails d'un autre objet, posés par une version précédente : à vérifier
+InboxThreadStrayTitle = Liens venus d'un autre objet
+InboxThreadStrayText = Ces mails ont reçu une pièce liée à un mail de la même conversation mais d'un autre objet. Le correspondant a sans doute répondu à un ancien mail pour envoyer une nouvelle demande. Décochez les liens à garder.
+InboxThreadStrayRemove = Retirer les liens cochés
+InboxThreadStrayRemoved = %s lien(s) retiré(s)
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email du demandeur
 InboxSourceFieldFills_email = Email du tiers et du contact ; le tiers est cherché dessus

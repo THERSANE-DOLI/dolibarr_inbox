@@ -2747,14 +2747,20 @@ InboxSourceErrorMany = Al massimo %s fonti.
 InboxSourceExampleLabel = Richiesta di preventivo (esempio)
 # The link follows the conversation (lot A3, 1.73.0)
 InboxLinkedByThread = collegato dalla conversazione
-InboxLinkThreadToo = Collega anche le altre %s mail della conversazione
-InboxLinkedThreadToo = Collegato, insieme alle altre %s mail della conversazione
+InboxLinkThreadToo = Collega anche le altre %s mail della conversazione con lo stesso oggetto
+InboxLinkedThreadToo = Collegato, insieme alle altre %s mail della conversazione con lo stesso oggetto
 InboxThreadDetach = Stacca dalla conversazione
 InboxThreadDetachHelp = La conversazione è passata a un altro cliente: questa mail perde i collegamenti fatti dalla conversazione e non ne riceve più
 InboxThreadDetached = Mail staccata dalla sua conversazione (%s collegamenti rimossi)
 InboxThreadAttach = Riaggancia alla conversazione
 InboxThreadDetachedHelp = Questa mail è stata staccata dalla sua conversazione: i collegamenti della conversazione non la raggiungono
 InboxThreadAttached = Mail riagganciata alla sua conversazione: i prossimi collegamenti la seguiranno
+InboxThreadStray = %s collegamento/i da un altro oggetto
+InboxThreadStrayHelp = Collegamenti dati dalla conversazione a mail con un altro oggetto, creati da una versione precedente: da verificare
+InboxThreadStrayTitle = Collegamenti da un altro oggetto
+InboxThreadStrayText = Queste mail hanno ricevuto un elemento collegato a una mail della stessa conversazione ma con un altro oggetto. Il corrispondente ha probabilmente risposto a una mail precedente per inviare una nuova richiesta. Togli la spunta ai collegamenti da conservare.
+InboxThreadStrayRemove = Rimuovi i collegamenti spuntati
+InboxThreadStrayRemoved = %s collegamento/i rimosso/i
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email del richiedente
 InboxSourceFieldFills_email = Email del soggetto terzo e del contatto; il soggetto terzo è cercato su di essa

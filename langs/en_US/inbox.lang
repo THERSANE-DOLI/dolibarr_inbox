@@ -2747,14 +2747,20 @@ InboxSourceErrorMany = %s sources at most.
 InboxSourceExampleLabel = Quote request (example)
 # The link follows the conversation (lot A3, 1.73.0)
 InboxLinkedByThread = linked by the conversation
-InboxLinkThreadToo = Link also the %s other emails of the conversation
-InboxLinkedThreadToo = Linked, with the %s other emails of the conversation
+InboxLinkThreadToo = Link also the %s other emails of the conversation on the same subject
+InboxLinkedThreadToo = Linked, with the %s other emails of the conversation on the same subject
 InboxThreadDetach = Detach from the conversation
 InboxThreadDetachHelp = The conversation has moved to another customer: this email loses the links made by the conversation and gets no more
 InboxThreadDetached = Email detached from its conversation (%s links removed)
 InboxThreadAttach = Back in the conversation
 InboxThreadDetachedHelp = This email was detached from its conversation: the links of the conversation do not reach it
 InboxThreadAttached = Email back in its conversation: the next links will follow
+InboxThreadStray = %s link(s) from another subject
+InboxThreadStrayHelp = Links given by the conversation to emails of another subject, made by an earlier version: to check
+InboxThreadStrayTitle = Links from another subject
+InboxThreadStrayText = These emails received a piece linked to an email of the same conversation but of another subject. The correspondent probably replied to an earlier email to send a new request. Untick the links to keep.
+InboxThreadStrayRemove = Remove the ticked links
+InboxThreadStrayRemoved = %s link(s) removed
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email of the requester
 InboxSourceFieldFills_email = Email of the thirdparty and of the contact; the thirdparty is looked for on it

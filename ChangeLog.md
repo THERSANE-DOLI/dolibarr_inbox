@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a link follows the conversation only to its emails of the same subject :   1.138.2
+  - a new request sent as a reply to the previous one, subject replaced, no longer gets the pieces of the others
+    (ticket of each request on every email); « Re: », « Fwd: » and a subject retouched (« URGENT - ») keep following.
+  - links made before: « N links from another subject » in the panel, listed ticked, removed once validated, undo.
+  - the emails filed in a folder of the user (« Clients »...) were left out of their conversation for the links.
+
 - FIX: Junk and Trash indexed in full, as the other folders: a badge on an empty list no more :   1.138.1
   - they were indexed on their last 30 days only: the older mails counted (unread badge) but never listed.
   - mailboxes already indexed take their older mails at the next synchronisation, without reading the others again.

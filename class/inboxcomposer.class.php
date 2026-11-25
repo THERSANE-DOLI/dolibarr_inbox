@@ -1165,7 +1165,7 @@ class InboxComposer
 		}
 		$p = $this->db->prefix();
 		$row = $this->db->getRow("SELECT m.rowid, m.fk_account, m.remote_id, f.path FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
-			." WHERE m.message_id = '".$this->db->escape($messageId)."' AND m.fk_account IN (".implode(',', $readable).") AND f.role <> 'drafts'"
+			." WHERE m.message_id = '".$this->db->escape($messageId)."' AND m.fk_account IN (".implode(',', $readable).") AND COALESCE(f.role, '') <> 'drafts'"
 			." ORDER BY (m.fk_account = ".((int) $accountId).") DESC, m.rowid DESC");
 		if (!is_object($row)) {
 			return null;
