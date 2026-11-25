@@ -2761,6 +2761,21 @@ InboxThreadStrayTitle = Verknüpfungen aus einem anderen Betreff
 InboxThreadStrayText = Diese Mails haben ein Element erhalten, das mit einer Mail derselben Unterhaltung, aber mit einem anderen Betreff verknüpft ist. Der Absender hat wohl auf eine frühere Mail geantwortet, um eine neue Anfrage zu senden. Entfernen Sie das Häkchen bei den Verknüpfungen, die bleiben sollen.
 InboxThreadStrayRemove = Angehakte Verknüpfungen entfernen
 InboxThreadStrayRemoved = %s Verknüpfung(en) entfernt
+InboxThreadSplitHere = Hier eine neue Unterhaltung beginnen
+InboxThreadSplitText = Diese Mail und ihre Antworten bilden eine eigene Unterhaltung. Eine Antwort auf eine ältere Mail bleibt in der aktuellen Unterhaltung: Die Trennung folgt den Antworten, nicht den Daten. Sie gilt in allen Postfächern mit dieser Mail.
+InboxThreadSplitMoving = Gehen in die neue Unterhaltung (%s)
+InboxThreadSplitStaying = Bleiben in der aktuellen Unterhaltung (%s)
+InboxThreadSplitLinks = Verknüpfungen der aktuellen Unterhaltung auf diesen Mails: die zu behaltenden anhaken
+InboxThreadSplitConfirm = Neue Unterhaltung beginnen
+InboxThreadSplitDone = Neue Unterhaltung begonnen
+InboxThreadSplitFrom = Unterhaltung getrennt von « %s » (%s)
+InboxThreadSplitAuto = Neue Unterhaltung: Diese Mail antwortet auf « %s » (%s) mit einem anderen Betreff
+InboxThreadJoin = Der vorherigen Unterhaltung zuordnen
+InboxThreadJoined = Mail wieder in der vorherigen Unterhaltung
+InboxThreadSplitSubject = Neuer Betreff = neue Unterhaltung
+InboxThreadSplitSubjectHelp = Eine Mail, die als Antwort auf eine andere, aber mit einem anderen Betreff gesendet wird (eine neue Anfrage, geschrieben als Antwort auf die vorherige), öffnet eine neue Unterhaltung. « Re: », « AW: » und ein nur ergänzter Betreff (« DRINGEND - ... ») behalten die Unterhaltung.
+InboxJournal_thread_split = Neue Unterhaltung begonnen
+InboxJournal_thread_join = Unterhaltung wieder zugeordnet
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = E-Mail des Anfragenden
 InboxSourceFieldFills_email = E-Mail des Partners und des Kontakts; der Partner wird darüber gesucht
@@ -3905,3 +3920,5 @@ InboxDocTitle_mailto_links = Mail-Links (mailto)
 InboxDocDesc_mailto_links = In Dolibarr, auf Websites oder in anderen Programmen angeklickte E-Mail-Adressen in Inbox öffnen
 InboxDocTitle_dolibarr_sent = Von Dolibarr gesendete Mails in Gesendet
 InboxDocDesc_dolibarr_sent = Die von der Adresse eines Postfachs gesendeten Tickets, Angebote und Rechnungen in seinem Ordner Gesendet, die Antworten in derselben Konversation
+InboxDocTitle_conversations = Unterhaltungen: neuer Betreff, neue Unterhaltung
+InboxDocDesc_conversations = Ein neuer Betreff als Antwort öffnet eine eigene Unterhaltung; Unterhaltungen von Hand trennen oder zusammenführen; Verknüpfungen folgen dem Betreff

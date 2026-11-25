@@ -2761,6 +2761,21 @@ InboxThreadStrayTitle = Collegamenti da un altro oggetto
 InboxThreadStrayText = Queste mail hanno ricevuto un elemento collegato a una mail della stessa conversazione ma con un altro oggetto. Il corrispondente ha probabilmente risposto a una mail precedente per inviare una nuova richiesta. Togli la spunta ai collegamenti da conservare.
 InboxThreadStrayRemove = Rimuovi i collegamenti spuntati
 InboxThreadStrayRemoved = %s collegamento/i rimosso/i
+InboxThreadSplitHere = Inizia qui una nuova conversazione
+InboxThreadSplitText = Questa mail e le sue risposte formano una conversazione a parte. Una risposta a una mail più vecchia resta nella conversazione attuale: la separazione segue le risposte, non le date. Vale in tutte le caselle che hanno questa mail.
+InboxThreadSplitMoving = Passano nella nuova conversazione (%s)
+InboxThreadSplitStaying = Restano nella conversazione attuale (%s)
+InboxThreadSplitLinks = Collegamenti posti dalla conversazione attuale su queste mail: spunta quelli da conservare
+InboxThreadSplitConfirm = Inizia la nuova conversazione
+InboxThreadSplitDone = Nuova conversazione iniziata
+InboxThreadSplitFrom = Conversazione separata da « %s » (%s)
+InboxThreadSplitAuto = Nuova conversazione: questa mail risponde a « %s » (%s) con un altro oggetto
+InboxThreadJoin = Riaggancia alla conversazione precedente
+InboxThreadJoined = Mail riagganciata alla conversazione precedente
+InboxThreadSplitSubject = Nuovo oggetto = nuova conversazione
+InboxThreadSplitSubjectHelp = Una mail inviata in risposta a un'altra ma con un altro oggetto (una nuova richiesta scritta rispondendo alla precedente) apre una nuova conversazione. « Re: », « I: » e un oggetto solo completato (« URGENTE - ... ») mantengono la conversazione.
+InboxJournal_thread_split = Nuova conversazione iniziata
+InboxJournal_thread_join = Conversazione riagganciata
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email del richiedente
 InboxSourceFieldFills_email = Email del soggetto terzo e del contatto; il soggetto terzo è cercato su di essa
@@ -3905,3 +3920,5 @@ InboxDocTitle_mailto_links = Link di mail (mailto)
 InboxDocDesc_mailto_links = Aprire in Inbox gli indirizzi email cliccati in Dolibarr, nei siti o negli altri programmi
 InboxDocTitle_dolibarr_sent = Mail inviate da Dolibarr in Inviati
 InboxDocDesc_dolibarr_sent = I ticket, preventivi e fatture inviati dall'indirizzo di una casella nella sua cartella Inviati, le risposte nella stessa conversazione
+InboxDocTitle_conversations = Conversazioni: nuovo oggetto, nuova conversazione
+InboxDocDesc_conversations = Un nuovo oggetto inviato come risposta apre una propria conversazione; separare o riagganciare conversazioni a mano; collegamenti che seguono l'oggetto

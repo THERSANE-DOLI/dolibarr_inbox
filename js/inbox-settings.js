@@ -1082,7 +1082,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join'];
 	async function tabJournal(box, account) {
 		const f = { user: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
@@ -4242,6 +4242,10 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxSendAutocopy') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_SEND_AUTOCOPY" aria-checked="' + (s.INBOX_SEND_AUTOCOPY === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxSendAutocopy') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxSendAutocopyHelp') + '</div></div></div>'
+			// A new subject sent in answer to another mail opens a new conversation (1.139.0), on by default
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxThreadSplitSubject') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_THREAD_SPLIT_SUBJECT" aria-checked="' + (s.INBOX_THREAD_SPLIT_SUBJECT === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxThreadSplitSubject') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxThreadSplitSubjectHelp') + '</div></div></div>'
 			+ '</div></section>'
 			// Editor of the writing (1.94.0): the one of inbox, or the CKEditor of Dolibarr (module FCKeditor on)
 			+ editorSection(s, editorInfo, title('editor'))

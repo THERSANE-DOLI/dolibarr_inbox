@@ -58,6 +58,8 @@ function inboxGeneralSettings()
 		// Lot W6 1.16.0: size of the attachments of a mail, copy of Dolibarr (MAIN_MAIL_AUTOCOPY_TO) added or not
 		'INBOX_SEND_MAX_MB' => array('right' => 'manager', 'default' => '20', 'check' => 'int:1:100'),
 		'INBOX_SEND_AUTOCOPY' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
+		// 1.139.0: a mail whose subject is not the one of the mail it answers opens a new conversation
+		'INBOX_THREAD_SPLIT_SUBJECT' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Pictures of the correspondents (1.5.0): sources looked for by the server
 		'INBOX_AVATAR_DOLIBARR' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Off by default (audit INBX-008): when on, the server asks the domain of the sender at the opening of a mail

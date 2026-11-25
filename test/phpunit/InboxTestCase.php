@@ -105,8 +105,9 @@ abstract class InboxTestCase extends TestCase
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}
-		// Assignments and notifications (1.9.0): test mails have a Message-ID of the test domain
-		$refs = "SELECT rowid FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%'";
+		// Assignments and notifications (1.9.0): test mails have a Message-ID of the test domain (or of a subdomain,
+		// « @act.inbox-test.invalid »: a cut point of a conversation, 1.139.0, would stay from one run to the next)
+		$refs = "SELECT rowid FROM ".$p."inbox_mailref WHERE message_id LIKE '%inbox-test.invalid%'";
 		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_notification WHERE fk_mailref IN (".$refs.") OR fk_user IN (SELECT rowid FROM ".$p."user WHERE login LIKE 'inboxtest_%')");
 		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (".$refs.")");
@@ -118,7 +119,7 @@ abstract class InboxTestCase extends TestCase
 		$db->query("DELETE FROM ".$p."inbox_link WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
 		$db->query("DELETE FROM ".$p."inbox_note WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
 		$db->query("DELETE FROM ".$p."inbox_mail_assign WHERE fk_mailref IN (SELECT rowid FROM ".$p."inbox_mailref WHERE from_email LIKE '%inbox-test.invalid')");
-		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%@inbox-test.invalid%' OR from_email LIKE '%inbox-test.invalid'");
+		$db->query("DELETE FROM ".$p."inbox_mailref WHERE message_id LIKE '%inbox-test.invalid%' OR from_email LIKE '%inbox-test.invalid'");
 		// Templates (1.18.0): named ZzTpl, contacts of the tests
 		$db->query("DELETE FROM ".$p."inbox_template_account WHERE fk_template IN (SELECT rowid FROM ".$p."c_email_templates WHERE label LIKE 'ZzTpl%')");
 		// Default templates and options (1.118.0): of the test templates, test users, test mailboxes

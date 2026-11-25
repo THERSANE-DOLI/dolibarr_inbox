@@ -2761,6 +2761,21 @@ InboxThreadStrayTitle = Links from another subject
 InboxThreadStrayText = These emails received a piece linked to an email of the same conversation but of another subject. The correspondent probably replied to an earlier email to send a new request. Untick the links to keep.
 InboxThreadStrayRemove = Remove the ticked links
 InboxThreadStrayRemoved = %s link(s) removed
+InboxThreadSplitHere = Start a new conversation here
+InboxThreadSplitText = This email and its answers become a conversation of their own. An answer to an older email stays in the current conversation: the separation follows the answers, not the dates. It holds in every mailbox that has this email.
+InboxThreadSplitMoving = Leave for the new conversation (%s)
+InboxThreadSplitStaying = Stay in the current conversation (%s)
+InboxThreadSplitLinks = Links made by the current conversation on these emails: tick the ones to keep
+InboxThreadSplitConfirm = Start the new conversation
+InboxThreadSplitDone = New conversation started
+InboxThreadSplitFrom = Conversation separated from « %s » (%s)
+InboxThreadSplitAuto = New conversation: this email answers « %s » (%s) with another subject
+InboxThreadJoin = Join the previous conversation
+InboxThreadJoined = Email back in the previous conversation
+InboxThreadSplitSubject = New subject = new conversation
+InboxThreadSplitSubjectHelp = An email sent in answer to another one but with another subject (a new request written by answering the previous one) opens a new conversation. « Re: », « Fwd: » and a subject only completed (« URGENT - ... ») keep the conversation.
+InboxJournal_thread_split = New conversation started
+InboxJournal_thread_join = Conversation joined back
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email of the requester
 InboxSourceFieldFills_email = Email of the thirdparty and of the contact; the thirdparty is looked for on it
@@ -3905,3 +3920,5 @@ InboxDocTitle_mailto_links = Email links (mailto)
 InboxDocDesc_mailto_links = Open the email addresses clicked in Dolibarr, in the sites or in the other programs in Inbox
 InboxDocTitle_dolibarr_sent = Emails sent by Dolibarr in Sent
 InboxDocDesc_dolibarr_sent = The tickets, proposals and invoices sent from the address of a mailbox in its Sent folder, the answers in the same conversation
+InboxDocTitle_conversations = Conversations: new subject, new conversation
+InboxDocDesc_conversations = A new subject sent as an answer opens a conversation of its own; separate or join conversations by hand; links that follow the subject

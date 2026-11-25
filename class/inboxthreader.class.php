@@ -34,6 +34,11 @@
  *    the requester read in its headers; without a requester known, it never joins by the subject, else every mail of
  *    the form would be one conversation.
  * When a mail links two threads, they become one (the oldest key is kept). The key is opaque.
+ *
+ * A mail can start a new conversation (cut point, 1.139.0, inbox_mailref.thread_root by Message-ID): the climb up
+ * the parents of a mail (nearest first) stops on the first cut point met, included; the cut point itself takes a key
+ * of its own. Cut by a user, or because its subject is not the one of the mail it answers (a new request sent as a
+ * reply to the previous one); a mail joined back by a user is never cut again automatically.
  */
 class InboxThreader
 {
@@ -42,6 +47,11 @@ class InboxThreader
 
 	/** Mails without key done per call of backfill() */
 	const BACKFILL = 1000;
+
+	/** Cut points (inbox_mailref.thread_root): cut by a user, cut because the subject changed, joined back */
+	const ROOT_USER = 1;
+	const ROOT_SUBJECT = 2;
+	const ROOT_JOINED = -1;
 
 	/** @var DoliDB */
 	protected $db;
@@ -137,6 +147,54 @@ class InboxThreader
 		return array_values(array_filter(array_unique($m[0]), function ($w) {
 			return preg_match_all('/\d/', $w) >= 4;
 		}));
+	}
+
+	/**
+	 * Parents of a mail, the nearest first: In-Reply-To, then References from the end
+	 *
+	 * @param object $r Row (message_id, in_reply_to, refs)
+	 * @return string[] 50 at most
+	 */
+	public static function parentsOf($r)
+	{
+		$msgid = (string) $r->message_id;
+		$refs = preg_split('/\s+/', trim((string) $r->refs)) ?: array();
+		$out = array();
+		foreach (array_merge(array((string) $r->in_reply_to), array_reverse($refs)) as $id) {
+			if ($id !== '' && $id !== $msgid && !isset($out[$id])) {
+				$out[$id] = true;
+			}
+		}
+
+		return array_slice(array_keys($out), 0, 50);
+	}
+
+	/**
+	 * Cut points among Message-IDs
+	 *
+	 * @param string[] $messageIds Message-IDs
+	 * @return array<string,int> Message-ID => thread_root (1, 2 or -1), only the ones set
+	 */
+	public function rootsOf(array $messageIds)
+	{
+		global $conf;
+
+		$messageIds = array_values(array_filter(array_map('strval', $messageIds)));
+		if (!$messageIds) {
+			return array();
+		}
+		$out = array();
+		foreach (array_chunk($messageIds, 500) as $chunk) {
+			$rows = $this->db->getRows("SELECT message_id, thread_root FROM ".$this->db->prefix()."inbox_mailref WHERE entity = ".((int) $conf->entity)." AND thread_root <> 0"
+				." AND message_id IN (".implode(',', array_map(function ($v) {
+					return "'".$this->db->escape($v)."'";
+				}, $chunk)).") LIMIT ".(count($chunk) * 4));
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$out[(string) $r->message_id] = (int) $r->thread_root;
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -238,7 +296,7 @@ class InboxThreader
 		$accountId = (int) $accountId;
 		$done = 0;
 		foreach (array_chunk(array_map('intval', $mailIds), 200) as $chunk) {
-			$rows = $this->db->getRows("SELECT rowid, message_id, in_reply_to, refs, subject, from_email, to_text, cc_text, requester_email, date_received, date_mail FROM ".$p."inbox_mail"
+			$rows = $this->db->getRows("SELECT rowid, fk_account, message_id, in_reply_to, refs, subject, from_email, to_text, cc_text, requester_email, date_received, date_mail, size FROM ".$p."inbox_mail"
 				." WHERE rowid IN (".implode(',', $chunk).") ORDER BY COALESCE(date_received, date_mail) ASC LIMIT 1000");
 			foreach (is_array($rows) ? $rows : array() as $r) {
 				$this->assignOne($accountId, $r);
@@ -262,25 +320,57 @@ class InboxThreader
 			return "'".$this->db->escape((string) $v)."'";
 		};
 		$msgid = (string) $r->message_id;
-		// 1. Parents
-		$parents = array_filter(array_unique(array_merge(preg_split('/\s+/', trim((string) $r->refs)) ?: array(), array((string) $r->in_reply_to))), function ($id) use ($msgid) {
-			return $id !== '' && $id !== $msgid;
-		});
-		$parents = array_slice(array_values($parents), -50);
+		$parents = self::parentsOf($r);
+		$roots = $this->rootsOf(array_merge($parents, array($msgid)));
+		$root = (int) ($roots[$msgid] ?? 0);
+		// A new subject in answer to a mail of another subject: a new conversation (1.139.0)
+		if ($root === 0 && $msgid !== '' && $parents && getDolGlobalInt('INBOX_THREAD_SPLIT_SUBJECT', 1)) {
+			$parent = $this->db->getRow("SELECT subject FROM ".$p."inbox_mail WHERE fk_account = ".((int) $accountId)." AND message_id = ".$esc($parents[0])." AND rowid <> ".((int) $r->rowid)." ORDER BY rowid");
+			if (is_object($parent) && !self::sameSubject($parent->subject, $r->subject) && $this->setRoot($r, self::ROOT_SUBJECT)) {
+				$root = self::ROOT_SUBJECT;
+			}
+		}
+		if ($root > 0) {
+			// Its own conversation: the same key for its copies, never the one of its old first mail
+			$key = substr(sha1($accountId.':'.$msgid.':root'), 0, 32);
+			$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = ".$esc($key)." WHERE rowid = ".((int) $r->rowid));
+
+			return $key;
+		}
+		// 1. Parents, up to the first cut point met (included)
+		foreach ($parents as $i => $id) {
+			if (($roots[$id] ?? 0) > 0) {
+				$parents = array_slice($parents, 0, $i + 1);
+				break;
+			}
+		}
 		$where = array();
 		if ($parents) {
 			$where[] = "message_id IN (".implode(',', array_map($esc, $parents)).")";
 		}
 		if ($msgid !== '') {
-			// 2. Copies in other folders, 3. answers arrived before
+			// 2. Copies in other folders
 			$where[] = "message_id = ".$esc($msgid);
-			$where[] = "in_reply_to = ".$esc($msgid);
 		}
 		if ($where) {
 			$found = $this->db->getRows("SELECT DISTINCT thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
 				." AND thread_key IS NOT NULL AND (".implode(' OR ', $where).") LIMIT 50");
 			foreach (is_array($found) ? $found : array() as $f) {
 				$keys[(string) $f->thread_key] = true;
+			}
+		}
+		if ($msgid !== '') {
+			// 3. Answers arrived before, except the ones that start a conversation of their own
+			$answers = $this->db->getRows("SELECT DISTINCT thread_key, message_id FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
+				." AND thread_key IS NOT NULL AND in_reply_to = ".$esc($msgid)." LIMIT 50");
+			$answers = is_array($answers) ? $answers : array();
+			$cut = $this->rootsOf(array_map(function ($a) {
+				return (string) $a->message_id;
+			}, $answers));
+			foreach ($answers as $a) {
+				if (($cut[(string) $a->message_id] ?? 0) <= 0) {
+					$keys[(string) $a->thread_key] = true;
+				}
 			}
 		}
 		// 4. Same subject, same correspondent, less than 30 days
@@ -292,17 +382,22 @@ class InboxThreader
 			if (mb_strlen($norm, 'UTF-8') >= 4 && $date && $mine) {
 				$ts = (int) $this->db->jdate($date);
 				$like = "%".$this->db->escapeforlike($norm)."%";
-				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, cc_text, requester_email, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
+				$cands = $this->db->getRows("SELECT rowid, subject, from_email, to_text, cc_text, requester_email, thread_key, COALESCE(date_received, date_mail) as d FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND rowid <> ".((int) $r->rowid)
 					." AND thread_key IS NOT NULL AND subject LIKE '".$this->db->escape($like)."'"
 					." AND COALESCE(date_received, date_mail) BETWEEN '".$this->db->idate($ts - self::SUBJECT_DAYS * 86400)."' AND '".$this->db->idate($ts + self::SUBJECT_DAYS * 86400)."' LIMIT 200");
+				$best = null;
 				foreach (is_array($cands) ? $cands : array() as $c) {
 					if (self::normalizeSubject($c->subject) !== $norm) {
 						continue;
 					}
 					// Same correspondent on the other side (the mailbox itself never counts, a source counts for its requester)
-					if (array_intersect($mine, $this->correspondentsOf($c, $own))) {
-						$keys[(string) $c->thread_key] = true;
+					if (array_intersect($mine, $this->correspondentsOf($c, $own)) && ($best === null || (string) $c->d > (string) $best->d)) {
+						$best = $c;
 					}
+				}
+				// Two conversations of the same subject (one cut from the other): the most recent, never both merged
+				if ($best !== null) {
+					$keys[(string) $best->thread_key] = true;
 				}
 			}
 		}
@@ -323,6 +418,80 @@ class InboxThreader
 		$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = ".$esc($key)." WHERE rowid = ".((int) $r->rowid));
 
 		return $key;
+	}
+
+	/**
+	 * Cut point of a mail (inbox_mailref.thread_root), its mailref made when it has none
+	 *
+	 * @param object $r    Row of the index (rowid, fk_account, message_id, date_mail, from_email, subject, size)
+	 * @param int    $root ROOT_USER, ROOT_SUBJECT, ROOT_JOINED or 0
+	 * @return bool
+	 */
+	public function setRoot($r, $root)
+	{
+		require_once __DIR__.'/inboxmailref.class.php';
+		$ref = (new InboxMailRef($this->db))->fetchOrCreate($r);
+		if ($ref <= 0) {
+			return false;
+		}
+
+		return (bool) $this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET thread_root = ".((int) $root)." WHERE rowid = ".((int) $ref));
+	}
+
+	/**
+	 * Keys given again to some conversations of a mailbox (a cut made or undone): their mails in the order of arrival.
+	 * The conversation holding the oldest mail of a key keeps that key, so its marks (ignored, watched) stay.
+	 *
+	 * @param int      $accountId Mailbox
+	 * @param string[] $keys      Keys of the conversations
+	 * @return int Mails done
+	 */
+	public function rethread($accountId, array $keys)
+	{
+		$p = $this->db->prefix();
+		$accountId = (int) $accountId;
+		$keys = array_values(array_unique(array_filter(array_map('strval', $keys))));
+		if (!$keys) {
+			return 0;
+		}
+		$in = implode(',', array_map(function ($k) {
+			return "'".$this->db->escape($k)."'";
+		}, $keys));
+		$rows = $this->db->getRows("SELECT rowid, thread_key FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND thread_key IN (".$in.")"
+			." ORDER BY COALESCE(date_received, date_mail) ASC, rowid ASC LIMIT 5000");
+		if (!is_array($rows) || !$rows) {
+			return 0;
+		}
+		$firstOf = array();
+		$ids = array();
+		foreach ($rows as $r) {
+			$ids[] = (int) $r->rowid;
+			if (!isset($firstOf[(string) $r->thread_key])) {
+				$firstOf[(string) $r->thread_key] = (int) $r->rowid;
+			}
+		}
+		$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = NULL WHERE rowid IN (".implode(',', $ids).")");
+		$done = 0;
+		foreach (array_chunk($ids, 200) as $chunk) {
+			$done += $this->assign($accountId, $chunk);
+		}
+		// The oldest conversation first: a conversation made of two (joined back) takes the key of the oldest one only
+		$claimed = array();
+		foreach ($firstOf as $old => $rowid) {
+			$now = $this->db->getRow("SELECT thread_key FROM ".$p."inbox_mail WHERE rowid = ".((int) $rowid));
+			$new = is_object($now) ? (string) $now->thread_key : '';
+			if ($new === '' || isset($claimed[$new])) {
+				continue;
+			}
+			$taken = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".$accountId." AND thread_key = '".$this->db->escape($old)."' LIMIT 1");
+			if ($new !== $old && !is_object($taken)) {
+				$this->db->query("UPDATE ".$p."inbox_mail SET thread_key = '".$this->db->escape($old)."' WHERE fk_account = ".$accountId." AND thread_key = '".$this->db->escape($new)."'");
+				$new = $old;
+			}
+			$claimed[$new] = true;
+		}
+
+		return $done;
 	}
 
 	/**

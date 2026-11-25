@@ -2761,6 +2761,21 @@ InboxThreadStrayTitle = Liens venus d'un autre objet
 InboxThreadStrayText = Ces mails ont reçu une pièce liée à un mail de la même conversation mais d'un autre objet. Le correspondant a sans doute répondu à un ancien mail pour envoyer une nouvelle demande. Décochez les liens à garder.
 InboxThreadStrayRemove = Retirer les liens cochés
 InboxThreadStrayRemoved = %s lien(s) retiré(s)
+InboxThreadSplitHere = Démarrer une nouvelle conversation ici
+InboxThreadSplitText = Ce mail et ses réponses forment une conversation à part. Une réponse à un mail plus ancien reste dans la conversation actuelle : la séparation suit les réponses, pas les dates. Elle vaut dans toutes les boîtes qui ont ce mail.
+InboxThreadSplitMoving = Passent dans la nouvelle conversation (%s)
+InboxThreadSplitStaying = Restent dans la conversation actuelle (%s)
+InboxThreadSplitLinks = Liens posés par la conversation actuelle sur ces mails : cochez ceux à garder
+InboxThreadSplitConfirm = Démarrer la nouvelle conversation
+InboxThreadSplitDone = Nouvelle conversation démarrée
+InboxThreadSplitFrom = Conversation séparée de « %s » (%s)
+InboxThreadSplitAuto = Nouvelle conversation : ce mail répond à « %s » (%s) avec un autre objet
+InboxThreadJoin = Rattacher à la conversation précédente
+InboxThreadJoined = Mail rattaché à la conversation précédente
+InboxThreadSplitSubject = Nouvel objet = nouvelle conversation
+InboxThreadSplitSubjectHelp = Un mail envoyé en réponse à un autre mais avec un autre objet (une nouvelle demande écrite en répondant à la précédente) ouvre une nouvelle conversation. « Re: », « TR: » et un objet seulement complété (« URGENT - ... ») gardent la conversation.
+InboxJournal_thread_split = Nouvelle conversation démarrée
+InboxJournal_thread_join = Conversation rattachée
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email du demandeur
 InboxSourceFieldFills_email = Email du tiers et du contact ; le tiers est cherché dessus
@@ -3905,3 +3920,5 @@ InboxDocTitle_mailto_links = Liens de mail (mailto)
 InboxDocDesc_mailto_links = Ouvrir dans Inbox les adresses mail cliquées dans Dolibarr, dans les sites ou dans les autres logiciels
 InboxDocTitle_dolibarr_sent = Mails envoyés par Dolibarr dans Envoyés
 InboxDocDesc_dolibarr_sent = Les tickets, propositions et factures envoyés depuis l'adresse d'une boîte dans son dossier Envoyés, les réponses dans la même conversation
+InboxDocTitle_conversations = Conversations : nouvel objet, nouvelle conversation
+InboxDocDesc_conversations = Un nouvel objet envoyé en réponse ouvre sa propre conversation ; séparer ou rattacher des conversations à la main ; liens qui suivent l'objet

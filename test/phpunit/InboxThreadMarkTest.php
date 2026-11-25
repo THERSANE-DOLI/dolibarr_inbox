@@ -43,12 +43,14 @@ class InboxThreadMarkTest extends InboxImapTestCase
 	 * @param string $folder Folder
 	 * @param string $id     Local part of its Message-ID
 	 * @param string $parent Local part of the Message-ID it answers
+	 * @param string $first  Local part of the first mail of the conversation (its subject, 1.139.0: another subject
+	 *                       starts a new conversation)
 	 * @return void
 	 */
-	protected function answer($folder, $id, $parent)
+	protected function answer($folder, $id, $parent, $first = '')
 	{
 		$raw = "Message-ID: <".$id.self::MARK.">\r\nIn-Reply-To: <".$parent.self::MARK.">\r\nReferences: <".$parent.self::MARK.">\r\nFrom: Client <client@example.invalid>\r\n"
-			."To: ".self::BOX."\r\nSubject: Re: ZzAct ".$parent."\r\nDate: ".date('r', mktime(11, 0, 0, 3, 15, 2025))."\r\n\r\nAnswer ".$id."\r\n";
+			."To: ".self::BOX."\r\nSubject: Re: ZzAct ".($first !== '' ? $first : $parent)."\r\nDate: ".date('r', mktime(11, 0, 0, 3, 15, 2025))."\r\n\r\nAnswer ".$id."\r\n";
 		$this->imap()->appendMessage($folder, $raw);
 	}
 
@@ -72,7 +74,7 @@ class InboxThreadMarkTest extends InboxImapTestCase
 		$this->assertSame(0, $marks->set($this->admin, (int) $r1->rowid, InboxThreadMark::IGNORE, true), 'same thread: nothing to do');
 
 		// A later answer arrives read, on the server and in the index; another thread stays unread
-		$this->answer('INBOX.ZzActA', 'r2', 'r1');
+		$this->answer('INBOX.ZzActA', 'r2', 'r1', 'm1');
 		$this->append('INBOX.ZzActA', 'm4');
 		$this->sync($a);
 		$this->assertSame(1, (int) $this->row($a, 'r2')->seen);

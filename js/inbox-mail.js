@@ -8676,6 +8676,60 @@
 		});
 	}
 
+	/**
+	 * « Start a new conversation here » (1.139.0): what leaves and what stays shown before, the links of the old
+	 * conversation on the mails that leave proposed unticked (they speak of the old subject); undo by the toast
+	 * @param {object} m Mail
+	 */
+	async function threadSplitDialog(m) {
+		let res;
+		try {
+			res = await post('thread', 'split_preview', { id: m.id });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const line = x => I.html`<li>${x.subject || t('InboxNoSubject')} <span class="ibx-muted">· ${x.from} · ${shortDate(x.date)}</span></li>`;
+		const links = res.links || [];
+		const body = I.html`<p>${t('InboxThreadSplitText')}</p>
+			<p><b>${t('InboxThreadSplitMoving', (res.moving || []).length)}</b></p><ul>${(res.moving || []).map(line)}</ul>
+			${(res.staying || []).length ? I.html`<p><b>${t('InboxThreadSplitStaying', res.staying.length)}</b></p><ul>${res.staying.map(line)}</ul>` : ''}
+			${links.length ? I.html`<p><b>${t('InboxThreadSplitLinks')}</b></p><ul class="ibx-checklist">${links.map(x => I.html`<li class="ibx-checklist__item"><input type="checkbox" id="ibx-split-${x.link}" value="${x.link}"><label for="ibx-split-${x.link}">${I.raw(ic(x.icon || 'link'))} <b>${x.readable ? (x.ref || x.kind) : x.kind}</b></label></li>`)}</ul>` : ''}`;
+		dialog({
+			title: t('InboxThreadSplitHere'),
+			body: String(body),
+			actions: [{ label: t('InboxThreadSplitConfirm'), primary: true, run: async dd => {
+				const keep = $$('.ibx-checklist input:checked', dd).map(c => +c.value);
+				const r = await post('thread', 'split', { id: m.id, keep });
+				const removed = r.removed || [];
+				await loadList(true);
+				openMail(m.id);
+				toast(t('InboxThreadSplitDone'), { action: t('InboxUndo'), onAction: async () => {
+					await post('thread', 'join', { id: m.id, links: removed });
+					await loadList(true);
+					openMail(m.id);
+				} });
+				return true;
+			} }],
+		});
+	}
+	/** « Join back to the previous conversation »: the cut undone; undo by the toast */
+	async function threadJoin(mailId) {
+		try {
+			await post('thread', 'join', { id: mailId, links: [] });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		await loadList(true);
+		openMail(mailId);
+		toast(t('InboxThreadJoined'), { action: t('InboxUndo'), onAction: async () => {
+			await post('thread', 'split', { id: mailId, keep: [] });
+			await loadList(true);
+			openMail(mailId);
+		} });
+	}
+
 	/** Redirect (B19): the mail goes as it is (its sender, its text, its files) to the addresses typed */
 	function redirectDialog(m) {
 		const body = '<form class="ibx-form" novalidate><p class="ibx-section__help">' + th('InboxRedirectHelp') + '</p>'
@@ -8740,6 +8794,10 @@
 			const tagAnchor = () => shown('.ibx-js-panebar .ibx-js-action[data-action="tag"]') || $('.ibx-js-action[data-action="tag"]', mailRoot(m)) || anchor();
 			list.push(Object.assign({}, a, { button: ['flag', 'tag', 'archive', 'junk', 'notjunk', 'delete'].includes(a.id), run: a.id === 'tag' ? () => tagMenu(tagAnchor(), [m.id]) : a.run }));
 		});
+		// A new subject started from an answer (1.139.0): this mail and its answers become a conversation of their own
+		if (m.split && m.split.can && m.split.root <= 0) {
+			list.push({ id: 'threadsplit', icon: 'thread', label: t('InboxThreadSplitHere'), run: () => threadSplitDialog(m) });
+		}
 		// Recognized domains (1.59.0): with the right, the domain of the authenticated sender or of the links
 		const offer = m.trust_offer;
 		if (offer && (offer.sender || (offer.links || []).length)) {
@@ -9086,6 +9144,11 @@
 		if (m.security && m.security.encrypted) {
 			banners += banner('warning', 'lock', th('InboxEncrypted'));
 		}
+		if (m.split && m.split.root > 0 && m.split.from) {
+			const f = m.split.from;
+			banners += banner('info', 'thread', String(I.html`${t(m.split.root === 2 ? 'InboxThreadSplitAuto' : 'InboxThreadSplitFrom', f.subject || t('InboxNoSubject'), shortDate(f.date))}`)
+				+ (m.split.can ? String(I.html` <button type="button" class="ibx-linkbtn ibx-js-threadjoin" data-mail="${m.id}">${t('InboxThreadJoin')}</button>`) : ''));
+		}
 		// Delivery report (1.25.0): one line per recipient in words; the sentence of the server in small; link to the
 		// mail sent. A mail sent: its failures, link to the report.
 		const bounceLine = (r, key) => '<div class="ibx-bounce__line"><b>' + th(key, r.email) + '</b> : ' + th('InboxBounce_' + r.family)
@@ -9418,6 +9481,7 @@
 		}
 		// Delivery report <-> mail sent (1.25.0)
 		$$('.ibx-js-bouncego', pane).forEach(b => b.addEventListener('click', () => Dolibarr.executeHook('inbox:mail:goto', { folder: +b.dataset.folder, mail: +b.dataset.mail })));
+		$$('.ibx-js-threadjoin', pane).forEach(b => b.addEventListener('click', () => threadJoin(+b.dataset.mail)));
 		const unsub = $('.ibx-js-unsubscribe', pane);
 		if (unsub) {
 			unsub.addEventListener('click', () => unsubscribe(m, unsub));

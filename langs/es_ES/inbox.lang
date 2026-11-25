@@ -2761,6 +2761,21 @@ InboxThreadStrayTitle = Vínculos de otro asunto
 InboxThreadStrayText = Estos correos recibieron un elemento vinculado a un correo de la misma conversación pero de otro asunto. El remitente probablemente respondió a un correo anterior para enviar una nueva solicitud. Desmarque los vínculos que desea conservar.
 InboxThreadStrayRemove = Quitar los vínculos marcados
 InboxThreadStrayRemoved = %s vínculo(s) quitado(s)
+InboxThreadSplitHere = Iniciar aquí una nueva conversación
+InboxThreadSplitText = Este correo y sus respuestas forman una conversación aparte. Una respuesta a un correo más antiguo se queda en la conversación actual: la separación sigue las respuestas, no las fechas. Vale en todos los buzones que tienen este correo.
+InboxThreadSplitMoving = Pasan a la nueva conversación (%s)
+InboxThreadSplitStaying = Se quedan en la conversación actual (%s)
+InboxThreadSplitLinks = Vínculos puestos por la conversación actual en estos correos: marque los que desea conservar
+InboxThreadSplitConfirm = Iniciar la nueva conversación
+InboxThreadSplitDone = Nueva conversación iniciada
+InboxThreadSplitFrom = Conversación separada de « %s » (%s)
+InboxThreadSplitAuto = Nueva conversación: este correo responde a « %s » (%s) con otro asunto
+InboxThreadJoin = Volver a unir a la conversación anterior
+InboxThreadJoined = Correo de nuevo en la conversación anterior
+InboxThreadSplitSubject = Nuevo asunto = nueva conversación
+InboxThreadSplitSubjectHelp = Un correo enviado en respuesta a otro pero con otro asunto (una nueva solicitud escrita respondiendo a la anterior) abre una nueva conversación. « Re: », « RV: » y un asunto solo completado (« URGENTE - ... ») mantienen la conversación.
+InboxJournal_thread_split = Nueva conversación iniciada
+InboxJournal_thread_join = Conversación vuelta a unir
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email del solicitante
 InboxSourceFieldFills_email = Email del tercero y del contacto; el tercero se busca por ella
@@ -3905,3 +3920,5 @@ InboxDocTitle_mailto_links = Enlaces de correo (mailto)
 InboxDocDesc_mailto_links = Abrir en Inbox las direcciones de correo pulsadas en Dolibarr, en los sitios o en los otros programas
 InboxDocTitle_dolibarr_sent = Correos enviados por Dolibarr en Enviados
 InboxDocDesc_dolibarr_sent = Los tickets, presupuestos y facturas enviados desde la dirección de un buzón en su carpeta Enviados, las respuestas en la misma conversación
+InboxDocTitle_conversations = Conversaciones: nuevo asunto, nueva conversación
+InboxDocDesc_conversations = Un nuevo asunto enviado como respuesta abre su propia conversación; separar o volver a unir conversaciones a mano; vínculos que siguen el asunto
