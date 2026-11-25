@@ -76,6 +76,9 @@ switch ($action) {
 		// Own key: « people » are the users of Dolibarr among the addresses of the mail (head of the reading)
 		$out['assignee_people'] = (object) $assign->cards($assignees);
 		$out['has_message_id'] = true;
+		// A new conversation started from this mail, or one it can start (1.139.0)
+		dol_include_once('/inbox/class/inboxthreadsplit.class.php');
+		$out['split'] = (new InboxThreadSplit($db))->info($reader->row, $reader->level);
 		inboxAjaxReply($out);
 		// no break
 

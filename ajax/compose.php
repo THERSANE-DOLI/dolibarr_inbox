@@ -83,6 +83,7 @@ function inboxComposeTyped()
 		'quote' => (int) inboxAjaxParam('quote', 'int'),
 		'signature' => (int) inboxAjaxParam('signature', 'int'),
 		'receipt' => (int) inboxAjaxParam('receipt', 'int'),
+		'new_thread' => (int) inboxAjaxParam('new_thread', 'int'),
 	);
 }
 

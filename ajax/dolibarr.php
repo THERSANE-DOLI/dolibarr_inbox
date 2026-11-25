@@ -38,7 +38,7 @@ dol_include_once('/inbox/class/inboxsituation.class.php');
 dol_include_once('/inbox/class/inboxlead.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-inboxAjaxStart(in_array($action, array('link', 'unlink', 'detach', 'attach_thread', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
+inboxAjaxStart(in_array($action, array('link', 'unlink', 'detach', 'attach_thread', 'thread_unstray', 'thread_restray', 'note', 'noteedit', 'notedelete', 'intent', 'attach', 'resoc', 'phone'), true));
 $langs->loadLangs(array('companies', 'propal', 'orders', 'bills', 'projects', 'ticket', 'interventions', 'sendings', 'supplier_proposal', 'suppliers'));
 $elements = new InboxElements($db);
 $refs = new InboxMailRef($db);
@@ -536,6 +536,42 @@ switch ($action) {
 			inboxDolibarrFail($threads->error);
 		}
 		inboxAjaxReply(array('done' => 1));
+		// no break
+
+	case 'thread_stray':
+		// Links of the conversation that came from a mail of another subject (1.138.2): listed, removed once validated
+		$reader = inboxDolibarrMail();
+		$items = array();
+		foreach ((new InboxThreadLink($db))->strayLinks($reader->row) as $l) {
+			$d = $elements->describe($user, $l['type'], $l['element']);
+			if ($d === null) {
+				continue;
+			}
+			$items[] = array('link' => $l['link'], 'mail' => $l['mail'], 'subject' => $l['subject'], 'date' => $l['date'],
+				'kind' => (string) ($d['kind'] ?? ''), 'ref' => (string) ($d['ref'] ?? ''), 'icon' => (string) ($d['icon'] ?? 'link'), 'readable' => !empty($d['readable']));
+		}
+		inboxAjaxReply(array('items' => $items));
+		// no break
+
+	case 'thread_unstray':
+	case 'thread_restray':
+		$reader = inboxDolibarrMail();
+		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
+		// mailbox (as the detachment), never by a reader
+		if (!InboxAccess::atLeast($reader->level, InboxAccess::LEVEL_SEND)) {
+			inboxAjaxNotFound();
+		}
+		$threads = new InboxThreadLink($db);
+		if ($action === 'thread_restray') {
+			$links = inboxAjaxParam('links', 'none');
+			inboxAjaxReply(array('restored' => $threads->restoreStray($user, $reader->row, is_array($links) ? $links : array())));
+		}
+		$ids = inboxAjaxParam('links', 'none');
+		$removed = $threads->removeStray($reader->row, is_array($ids) ? array_map('intval', $ids) : array());
+		if ($removed === null) {
+			inboxDolibarrFail($threads->error);
+		}
+		inboxAjaxReply(array('removed' => $removed));
 		// no break
 
 	case 'note':
