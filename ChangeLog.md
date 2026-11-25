@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Junk and Trash indexed in full, as the other folders: a badge on an empty list no more :   1.138.1
+  - they were indexed on their last 30 days only: the older mails counted (unread badge) but never listed.
+  - mailboxes already indexed take their older mails at the next synchronisation, without reading the others again.
+
 - FIX: mail declaring a charset unknown to PHP (« unknown-8bit »...) opens on PHP 8, no warning on PHP 7 :   1.136.1
   - PHP 8 threw a ValueError that stopped the reading of the mail (body, attachments, mail attached); PHP 7 gave a
     warning and « ? » in place of the accents, in the subject as in the text.

@@ -2185,15 +2185,33 @@ class InboxImapConnector extends InboxConnector
 			}
 			$v = $status['uidvalidity'];
 			$read = 0;
+			// Mails already in the index (remote ids), asked once per call when needed: a folder indexed again (cursor
+			// emptied, 1.138.1) never reads twice the mails it already has
+			$knownList = null;
+			$knownIds = function () use (&$knownList, $options) {
+				if ($knownList === null) {
+					$knownList = isset($options['known']) && is_callable($options['known']) ? (array) call_user_func($options['known']) : array();
+				}
+				return $knownList;
+			};
+			$notKnown = function (array $uids) use ($knownIds, $v) {
+				$known = array_flip($knownIds());
+				return $known ? array_values(array_filter($uids, function ($u) use ($known, $v) {
+					return !isset($known[$v.':'.$u]);
+				})) : $uids;
+			};
 			if (empty($c)) {
 				// First call: every UID of the folder, the most recent read first; a mail marked \Deleted by another
 				// client (removed at its next expunge, hidden by the other clients) is not indexed
 				$all = $this->searchUids($since > 0 ? array('SINCE', date('d-M-Y', $since), 'UNDELETED') : array('UNDELETED'));
 				rsort($all);
-				$take = array_slice($all, 0, $max);
+				$todo = $notKnown($all);
+				$take = array_slice($todo, 0, $max);
 				$out['new'] = $this->fetchMails($take, $v);
 				$read = count($take);
-				$c = array('v' => $v, 'next' => $status['uidnext'], 'low' => $take ? min($take) : $status['uidnext'], 'done' => count($all) <= $max, 'modseq' => $status['modseq'],
+				$done = count($todo) <= $max;
+				$low = $take ? min($take) : ($all ? min($all) : $status['uidnext']);
+				$c = array('v' => $v, 'next' => $status['uidnext'], 'low' => $done && $since <= 0 ? 1 : $low, 'done' => $done, 'all' => $since <= 0 ? 1 : 0, 'modseq' => $status['modseq'],
 					'cmp' => dol_now());
 			} else {
 				// New mails since the last call
@@ -2239,6 +2257,7 @@ class InboxImapConnector extends InboxConnector
 						$recent = $this->searchUids(array('SINCE', date('d-M-Y', $since)));
 						$older = array_values(array_intersect($older, $recent));
 					}
+					$older = $notKnown($older);
 					rsort($older);
 					$take = array_slice($older, 0, $max - $read);
 					$out['new'] = array_merge($out['new'], $this->fetchMails($take, $v));
@@ -2246,6 +2265,11 @@ class InboxImapConnector extends InboxConnector
 						$c['low'] = min($take);
 					}
 					$c['done'] = count($older) <= count($take);
+					if ($c['done'] && $since <= 0) {
+						// Every mail of the folder indexed: the comparison and the flags cover it all, the mails indexed
+						// before an indexing again included
+						$c['low'] = 1;
+					}
 				} elseif (empty($c['done']) && (int) $c['low'] <= 1) {
 					$c['done'] = true;
 				}
@@ -2260,7 +2284,11 @@ class InboxImapConnector extends InboxConnector
 					}));
 					if ($expected !== count($present) || empty($c['cmp']) || (int) $c['cmp'] < dol_now() - self::COMPARE_SECONDS) {
 						$c['cmp'] = dol_now();
-						$known = call_user_func($options['known']);
+						// Only the indexed mails within the UIDs compared (an indexing again keeps the older ones meanwhile)
+						$known = array_values(array_filter($knownIds(), function ($remoteId) use ($v, $c) {
+							$p = explode(':', (string) $remoteId);
+							return count($p) !== 2 || (int) $p[0] !== (int) $v || (int) $p[1] >= (int) $c['low'];
+						}));
 						// Nothing found while the folder says it holds mails: the answer is not believed, nothing is
 						// removed (audit INBX-095); compared again at the next pass
 						if (!$present && $known && (int) $status['total'] > 0) {

@@ -499,6 +499,53 @@ class InboxSyncTest extends InboxTestCase
 	}
 
 	/**
+	 * Junk and trash indexed in full (1.138.1): a spam received 60 days ago is listed; a cursor of before (indexed on
+	 * 30 days, no « all ») is taken again once, without reading again the mails already indexed
+	 *
+	 * @return void
+	 */
+	public function testJunkIndexedInFull()
+	{
+		$this->needDovecot();
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$p = $this->other();
+		foreach (array('old' => 60, 'new' => 1) as $k => $days) {
+			$raw = "Message-ID: <sync-junk-".$k."@inbox-test.invalid>\r\nFrom: Spam <spam@example.invalid>\r\nTo: ".self::BOX."\r\nSubject: Junk ".$k."\r\nDate: ".date('r', dol_now() - $days * 86400)."\r\n\r\nCorps\r\n";
+			$p->appendMessage('INBOX.Junk', $raw, null, date('d-M-Y H:i:s O', dol_now() - $days * 86400));
+		}
+		$this->sync($a);
+		$old = $this->row($a, 'sync-junk-old@inbox-test.invalid');
+		$recent = $this->row($a, 'sync-junk-new@inbox-test.invalid');
+		$this->assertNotNull($old, 'a spam of 60 days is indexed');
+		$this->assertNotNull($recent);
+		$folderId = (int) $old->fk_folder;
+		$f = $this->db->getRow("SELECT sync_cursor, unread FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".$folderId);
+		$c = json_decode((string) $f->sync_cursor, true);
+		$this->assertSame(1, (int) ($c['all'] ?? 0), 'cursor of a folder indexed in full');
+		$this->assertSame(1, (int) $c['low'], 'comparison over the whole folder');
+		$this->assertSame(2, (int) $f->unread, 'the badge counts what the list shows');
+
+		// Cursor of before 1.138.1: the old spam was out of the 30 days
+		unset($c['all']);
+		$c['low'] = (int) explode(':', (string) $recent->remote_id)[1];
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_mail WHERE rowid = ".((int) $old->rowid));
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_cursor = '".$this->db->escape(json_encode($c))."' WHERE rowid = ".$folderId);
+		$this->sync($a);
+		$this->assertNotNull($this->row($a, 'sync-junk-old@inbox-test.invalid'), 'old cursor: the folder indexed again in full');
+		$again = $this->row($a, 'sync-junk-new@inbox-test.invalid');
+		$this->assertNotNull($again, 'an indexed mail is not taken for removed');
+		$this->assertSame((int) $recent->rowid, (int) $again->rowid, 'an indexed mail is kept as it is');
+		$f = $this->db->getRow("SELECT sync_cursor FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".$folderId);
+		$this->assertSame(1, (int) (json_decode((string) $f->sync_cursor, true)['all'] ?? 0), 'taken again once');
+
+		$p->selectFolder('INBOX.Junk');
+		foreach ((array) $p->search(array('HEADER', 'Message-ID', '"sync-junk-"'), true) as $u) {
+			$p->requestAndResponse('UID STORE', array((string) $u, '+FLAGS.SILENT', '(\\Deleted)'));
+		}
+		$p->expunge();
+	}
+
+	/**
 	 * A linked mail removed elsewhere: its mailref is gone, its link stays; back with the same Message-ID, gone no more
 	 *
 	 * @return void
