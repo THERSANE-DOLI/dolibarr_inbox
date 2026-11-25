@@ -1,15 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: an answer in a separated conversation is separated for the correspondent too; « New conversation » :   1.140.0
+  - References of an answer start at the cut point: the mail program of the correspondent shows it apart.
+  - writing an answer, menu ⋯ « New conversation »: sent without In-Reply-To nor References, the quote kept.
+  - offered under the subject when the subject of an answer changes (never ticked by itself).
+
 - NEW: a new subject sent in answer to another email opens a new conversation; « Start a new conversation here » :   1.139.0
   - the answers follow the new email, a later one to an older stays; « URGENT - X », a reference kept, a typo: same.
   - by hand (level « Handle »): what leaves and stays shown first, old links unticked; undo, « Join back ».
   - Settings > Default values « New subject = new conversation » (on); doc page Conversations. Activate the module again.
-
-- FIX: a link follows the conversation only to its emails of the same subject :   1.138.2
-  - a new request sent as a reply to the previous one, subject replaced, no longer gets the pieces of the others
-    (ticket of each request on every email); « Re: », « Fwd: » and a subject retouched (« URGENT - ») keep following.
-  - links made before: « N links from another subject » in the panel, listed ticked, removed once validated, undo.
-  - the emails filed in a folder of the user (« Clients »...) were left out of their conversation for the links.
 
 - FIX: a link follows the conversation only to its emails of the same subject :   1.138.2
   - a new request sent as a reply to the previous one, subject replaced, no longer gets the pieces of the others

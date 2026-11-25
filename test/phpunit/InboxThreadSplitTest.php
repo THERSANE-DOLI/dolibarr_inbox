@@ -29,6 +29,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxthreadsplit.class.php');
+dol_include_once('/inbox/class/inboxcomposer.class.php');
 
 /**
  * Mails of the tests: Message-ID of the test domain (removed by InboxTestCase::cleanup())
@@ -225,6 +226,27 @@ class InboxThreadSplitTest extends InboxTestCase
 		$expected = substr(sha1($this->account.':n1@split.inbox-test.invalid'), 0, 32);
 		$this->assertSame($expected, (string) $this->row($a->rowid)->thread_key);
 		$this->assertSame($expected, (string) $this->row($b->rowid)->thread_key);
+	}
+
+	/**
+	 * An answer in a separated conversation: its References start at the cut point, the correspondent sees it apart
+	 *
+	 * @return void
+	 */
+	public function testReferencesFromCut()
+	{
+		$this->mailbox();
+		$x = $this->arrive('rx', 'Devis volet');
+		(new InboxThreader($this->db))->setRoot($x, InboxThreader::ROOT_USER);
+		$c = new InboxComposer($this->db);
+		$m = new ReflectionMethod($c, 'refsFromCut');
+		$m->setAccessible(true);
+		$chain = array('ra@split.inbox-test.invalid', 'rb@split.inbox-test.invalid', 'rx@split.inbox-test.invalid', 'rd@split.inbox-test.invalid');
+		$this->assertSame(array('rx@split.inbox-test.invalid', 'rd@split.inbox-test.invalid'), $m->invoke($c, $chain));
+		$this->assertSame(array('ra@split.inbox-test.invalid', 'rb@split.inbox-test.invalid'), $m->invoke($c, array_slice($chain, 0, 2)), 'no cut: unchanged');
+		// Joined back: no more a cut point
+		(new InboxThreader($this->db))->setRoot($x, InboxThreader::ROOT_JOINED);
+		$this->assertSame($chain, $m->invoke($c, $chain));
 	}
 
 	/**

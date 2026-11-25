@@ -2776,6 +2776,10 @@ InboxThreadSplitSubject = New subject = new conversation
 InboxThreadSplitSubjectHelp = An email sent in answer to another one but with another subject (a new request written by answering the previous one) opens a new conversation. « Re: », « Fwd: » and a subject only completed (« URGENT - ... ») keep the conversation.
 InboxJournal_thread_split = New conversation started
 InboxJournal_thread_join = Conversation joined back
+InboxComposeNewThread = New conversation
+InboxComposeNewThreadAsk = New subject: send it as a new conversation?
+InboxComposeNewThreadOn = New conversation: sent without link to the email answered, for the recipient too
+InboxComposeNewThreadOff = Keep the conversation
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email of the requester
 InboxSourceFieldFills_email = Email of the thirdparty and of the contact; the thirdparty is looked for on it

@@ -2776,6 +2776,10 @@ InboxThreadSplitSubject = Nouvel objet = nouvelle conversation
 InboxThreadSplitSubjectHelp = Un mail envoyé en réponse à un autre mais avec un autre objet (une nouvelle demande écrite en répondant à la précédente) ouvre une nouvelle conversation. « Re: », « TR: » et un objet seulement complété (« URGENT - ... ») gardent la conversation.
 InboxJournal_thread_split = Nouvelle conversation démarrée
 InboxJournal_thread_join = Conversation rattachée
+InboxComposeNewThread = Nouvelle conversation
+InboxComposeNewThreadAsk = Nouvel objet : l'envoyer comme une nouvelle conversation ?
+InboxComposeNewThreadOn = Nouvelle conversation : envoyé sans lien avec le mail auquel vous répondez, aussi chez le destinataire
+InboxComposeNewThreadOff = Garder la conversation
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = Email du demandeur
 InboxSourceFieldFills_email = Email du tiers et du contact ; le tiers est cherché dessus

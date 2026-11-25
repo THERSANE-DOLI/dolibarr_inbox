@@ -251,6 +251,37 @@ class InboxComposeTest extends InboxImapTestCase
 	}
 
 	/**
+	 * « New conversation » (1.139.0): an answer without In-Reply-To nor References, the mail answered still marked,
+	 * the mail sent a cut point (its copy in Sent never joins the old conversation)
+	 *
+	 * @return void
+	 */
+	public function testReplyNewThread()
+	{
+		$a = $this->ready();
+		if ($this->mailpit('/api/v1/messages', 'DELETE') === null) {
+			$this->markTestSkipped('Mailpit not started (dev/dovecot/run.sh)');
+		}
+		$identity = $this->identity($a);
+		$p = $this->db->prefix();
+		$m1 = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE message_id = 'm1".self::MARK."'");
+		$c = new InboxComposer($this->db);
+		$open = $c->open($this->admin, 'reply', (int) $m1->rowid);
+		$this->assertNotNull($open, $c->errorCode.' '.$c->error);
+		$sent = $c->send($this->admin, $open['token'], array('identity' => $identity, 'to' => $open['to'], 'cc' => array(), 'bcc' => '',
+			'subject' => 'ZzCompose new subject', 'html' => '<p>Autre demande</p>', 'quote' => 1, 'signature' => 0, 'new_thread' => 1));
+		$this->assertNotNull($sent, $c->errorCode.' '.$c->error);
+		$list = json_decode((string) $this->mailpit('/api/v1/messages'), true);
+		$raw = (string) $this->mailpit('/api/v1/message/'.$list['messages'][0]['ID'].'/raw');
+		$this->assertStringNotContainsString('In-Reply-To:', $raw);
+		$this->assertDoesNotMatchRegularExpression('/^References:/m', $raw);
+		$this->assertStringContainsString('Corps m1', quoted_printable_decode($raw), 'the quote kept');
+		$this->assertSame(1, (int) $this->db->getRow("SELECT answered FROM ".$p."inbox_mail WHERE rowid = ".((int) $m1->rowid))->answered, 'still an answer for us');
+		preg_match('/^Message-ID:\s*<([^>]+)>/mi', $raw, $mm);
+		$this->assertSame(array($mm[1] => InboxThreader::ROOT_USER), (new InboxThreader($this->db))->rootsOf(array($mm[1])));
+	}
+
+	/**
 	 * @param string $folder  Folder
 	 * @param string $subject Subject
 	 * @return int[]

@@ -2776,6 +2776,10 @@ InboxThreadSplitSubject = Neuer Betreff = neue Unterhaltung
 InboxThreadSplitSubjectHelp = Eine Mail, die als Antwort auf eine andere, aber mit einem anderen Betreff gesendet wird (eine neue Anfrage, geschrieben als Antwort auf die vorherige), öffnet eine neue Unterhaltung. « Re: », « AW: » und ein nur ergänzter Betreff (« DRINGEND - ... ») behalten die Unterhaltung.
 InboxJournal_thread_split = Neue Unterhaltung begonnen
 InboxJournal_thread_join = Unterhaltung wieder zugeordnet
+InboxComposeNewThread = Neue Unterhaltung
+InboxComposeNewThreadAsk = Neuer Betreff: als neue Unterhaltung senden?
+InboxComposeNewThreadOn = Neue Unterhaltung: ohne Verbindung zur beantworteten Mail gesendet, auch beim Empfänger
+InboxComposeNewThreadOff = Unterhaltung behalten
 # Form of a data source: glossary, ready-made sources, from a mail (1.74.0)
 InboxSourceField_email = E-Mail des Anfragenden
 InboxSourceFieldFills_email = E-Mail des Partners und des Kontakts; der Partner wird darüber gesucht

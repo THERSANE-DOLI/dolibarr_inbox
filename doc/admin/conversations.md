@@ -46,6 +46,17 @@ email, and survives moves between folders. It needs the level « Handle » on th
 of every user of the mailbox); it is written in the journal of the actions. An email without Message-ID cannot be
 separated, nor the first email of a conversation.
 
+## Separated for the correspondent too
+
+An answer written in a separated conversation carries in its headers (References) only the emails from the
+separation on: the mail program of the correspondent (Outlook, Gmail, Thunderbird...) shows it apart from the old
+emails too.
+
+Writing an answer, menu ⋯ of the writing: « New conversation ». The email is sent without the headers of an answer
+(In-Reply-To, References): a new conversation for everyone, the recipients and the quote kept; the email answered is
+still marked « Answered ». When the subject of an answer is changed, the writing offers it under the subject (never
+ticked by itself).
+
 ## The links follow the subject
 
 A piece linked to an email goes to the other emails of its conversation **of the same subject** (and to the ones

@@ -32,6 +32,8 @@ require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxreader.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxattachmentscan.class.php';
+require_once __DIR__.'/inboxmailref.class.php';
+require_once __DIR__.'/inboxthreader.class.php';
 require_once __DIR__.'/inboxfolder.class.php';
 require_once __DIR__.'/inboxprotect.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
@@ -410,6 +412,7 @@ class InboxComposer
 			$out['bcc'] = InboxMailBuilder::parseAddresses($h('Bcc'));
 			$out['subject'] = $message->subject;
 			$out['receipt'] = $h('Disposition-Notification-To') !== '' ? 1 : 0;
+			$out['new_thread'] = $h('X-Inbox-New-Thread') === '1' ? 1 : 0;
 			$identityId = (int) $h('X-Inbox-Identity');
 			$parts = self::splitDraft($message->bodyHtml !== '' ? self::inlinePictures($message) : nl2br(dol_escape_htmltag($message->bodyText)));
 			$out['html'] = $parts['body'];
@@ -1737,15 +1740,19 @@ class InboxComposer
 		$b->keepVars = (bool) $draft;
 		$b->receipt = !empty($data['receipt']);
 		$source = $state['source'] ?? null;
-		if ($source && in_array($source['mode'], array('reply', 'replyall', 'replylist', 'forward', 'forward_attach'), true)) {
+		// « New conversation » (1.139.0): an answer without In-Reply-To nor References, a new thread for everyone
+		$newThread = !empty($data['new_thread']);
+		if ($newThread) {
+			// No header of answer
+		} elseif ($source && in_array($source['mode'], array('reply', 'replyall', 'replylist', 'forward', 'forward_attach'), true)) {
 			$isReply = !in_array($source['mode'], array('forward', 'forward_attach'), true);
 			if ($isReply && (string) ($source['message_id'] ?? '') !== '') {
 				$b->inReplyTo = (string) $source['message_id'];
-				$b->references = array_merge((array) ($state['source_refs'] ?? array()), array((string) $source['message_id']));
+				$b->references = $this->refsFromCut(array_merge((array) ($state['source_refs'] ?? array()), array((string) $source['message_id'])));
 			}
 		} elseif (!empty($state['in_reply_to'])) {
 			$b->inReplyTo = (string) $state['in_reply_to'];
-			$b->references = (array) ($state['source_refs'] ?? array());
+			$b->references = $this->refsFromCut((array) ($state['source_refs'] ?? array()));
 		}
 		$total = 0;
 		foreach ((array) $state['attachments'] as $a) {
@@ -1770,9 +1777,35 @@ class InboxComposer
 				$b->extraHeaders['X-Inbox-Mode'] = (string) $source['mode'];
 				$b->extraHeaders['X-Inbox-Reply'] = '<'.((string) ($source['message_id'] ?? '')).'>';
 			}
+			if ($newThread) {
+				$b->extraHeaders['X-Inbox-New-Thread'] = '1';
+			}
 		}
 
 		return array('builder' => $b, 'account' => $account, 'identity' => $identity);
+	}
+
+	/**
+	 * References of an answer from the last cut point (1.139.0): a conversation separated in Inbox is separated for
+	 * the correspondent too, his mail program never sees the old mails in the chain
+	 *
+	 * @param string[] $refs Message-IDs, the oldest first
+	 * @return string[]
+	 */
+	protected function refsFromCut(array $refs)
+	{
+		$refs = array_values(array_filter(array_map('strval', $refs)));
+		if (!$refs) {
+			return $refs;
+		}
+		$roots = (new InboxThreader($this->db))->rootsOf($refs);
+		for ($i = count($refs) - 1; $i >= 0; $i--) {
+			if (($roots[$refs[$i]] ?? 0) > 0) {
+				return array_slice($refs, $i);
+			}
+		}
+
+		return $refs;
 	}
 
 	/**
@@ -1959,6 +1992,15 @@ class InboxComposer
 		$built = $b->build();
 		if (!$built) {
 			return $this->fail('error', $b->error);
+		}
+		// « New conversation » (1.139.0): the mail sent starts its own conversation, also in our index (else the same
+		// subject and correspondent would put it back in the old one); nothing kept for a protected mailbox
+		if (!empty($data['new_thread']) && !$account->isProtected()) {
+			$ref = (new InboxMailRef($this->db))->fetchOrCreateByMessageId((string) $built['message_id'], array('subject' => $b->subject,
+				'from_email' => (string) ($b->from['email'] ?? ''), 'date_mail' => dol_now(), 'origin' => 'inbox', 'last_account' => (int) $account->id));
+			if ($ref > 0) {
+				$this->db->query("UPDATE ".$this->db->prefix()."inbox_mailref SET thread_root = ".InboxThreader::ROOT_USER." WHERE rowid = ".((int) $ref));
+			}
 		}
 		// Pieces to record the sending on: only those offered when the writing opened (linked, readable, writable)
 		$allowed = array();

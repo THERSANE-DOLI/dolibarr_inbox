@@ -508,7 +508,86 @@
 			quote: w.quote ? 1 : 0,
 			signature: w.signature ? 1 : 0,
 			receipt: w.receipt ? 1 : 0,
+			new_thread: w.newThread && isReplyW(w) ? 1 : 0,
 		};
+	}
+
+	// ---------- New conversation (1.139.0): an answer sent without the headers of an answer ----------
+	/** An answer (not a forward, not a new mail), also when it comes back as a draft */
+	function isReplyW(w) {
+		return ['reply', 'replyall', 'replylist'].includes(w.data.source ? w.data.source.mode : w.mode);
+	}
+	/**
+	 * Same rule as the server (InboxThreader::sameSubject): letters and digits only, one contained in the other, a
+	 * reference in common, or the same numbers and a typo
+	 */
+	function subjectKey(v) {
+		let x = String(v || '').trim();
+		const prefix = /^\s*(?:re|r|tr|fw|fwd|aw|wg|sv|vs|antw|rif|rv|enc|réf|ref)\s*(?:\[\d+\]|\(\d+\))?\s*:\s*/iu;
+		while (prefix.test(x)) {
+			x = x.replace(prefix, '');
+		}
+		return x.replace(/\s+/g, ' ').trim().toLowerCase();
+	}
+	/** Characters in common of two texts, as similar_text() of PHP (longest common part, then each side of it) */
+	function similarChars(a, b) {
+		let max = 0;
+		let pa = 0;
+		let pb = 0;
+		for (let i = 0; i < a.length; i++) {
+			for (let j = 0; j < b.length; j++) {
+				let k = 0;
+				while (i + k < a.length && j + k < b.length && a[i + k] === b[j + k]) {
+					k++;
+				}
+				if (k > max) {
+					max = k;
+					pa = i;
+					pb = j;
+				}
+			}
+		}
+		return max ? max + similarChars(a.slice(0, pa), b.slice(0, pb)) + similarChars(a.slice(pa + max), b.slice(pb + max)) : 0;
+	}
+	function sameSubject(a, b) {
+		const na = subjectKey(a);
+		const nb = subjectKey(b);
+		const x = na.replace(/[^\p{L}\p{N}]+/gu, '');
+		const y = nb.replace(/[^\p{L}\p{N}]+/gu, '');
+		if (x === '' || y === '' || x === y || x.includes(y) || y.includes(x)) {
+			return true;
+		}
+		const refs = s => (s.match(/[\p{L}\p{N}][\p{L}\p{N}\-/]{4,}/gu) || []).filter(w => (w.match(/\d/g) || []).length >= 4);
+		const rb = refs(nb);
+		if (refs(na).some(r => rb.includes(r))) {
+			return true;
+		}
+		const nums = s => [...new Set(s.match(/\d+/g) || [])].sort().join(',');
+		if (nums(x) !== nums(y)) {
+			return false;
+		}
+		return similarChars(x, y) * 2 * 100 / (x.length + y.length) >= 85;
+	}
+	/** Under the subject: the option offered when the subject of an answer changed, or said when it is on */
+	function paintNewThread(w) {
+		const box = $('.ibx-js-newthread', w.dlg);
+		if (!box) {
+			return;
+		}
+		const changed = !sameSubject(w.firstSubject, $('.ibx-js-subject', w.dlg).value);
+		if (!isReplyW(w) || (!w.newThread && !changed)) {
+			box.hidden = true;
+			return;
+		}
+		box.hidden = false;
+		box.innerHTML = String(w.newThread
+			? I.html`${I.raw(ic('thread'))} <span>${t('InboxComposeNewThreadOn')}</span> <button type="button" class="ibx-linkbtn ibx-js-newthreadoff">${t('InboxComposeNewThreadOff')}</button>`
+			: I.html`${I.raw(ic('thread'))} <span>${t('InboxComposeNewThreadAsk')}</span> <button type="button" class="ibx-linkbtn ibx-js-newthreadon">${t('InboxComposeNewThread')}</button>`);
+	}
+	function setNewThread(w, on) {
+		w.newThread = on;
+		paintNewThread(w);
+		w.changed();
 	}
 	function hasContent(w) {
 		// The default template not changed (1.118.0) is no content: such a writing closes without a draft
@@ -2098,6 +2177,7 @@
 				w.receipt = !w.receipt;
 				w.changed();
 			} },
+			...(isReplyW(w) ? [{ label: t('InboxComposeNewThread'), icon: 'thread', checked: !!w.newThread, run: () => setNewThread(w, !w.newThread) }] : []),
 			{ label: t('InboxComposeSaveNow'), icon: 'drafts', run: () => save(w, true) },
 			{ label: t('InboxTemplateSaveAs'), icon: 'template', run: () => saveAsTemplate(w) },
 			...(phone ? [{ sep: true }] : []),
@@ -2870,6 +2950,7 @@
 			+ '<div class="ibx-compose__warn ibx-compose__conflict ibx-js-conflict" role="alert" tabindex="-1" hidden></div>'
 			+ rcpt('to', 'InboxTo', 'InboxComposeShortTo', false) + rcpt('cc', 'InboxComposeCcLabel', 'InboxComposeCc', !d.cc.length) + rcpt('bcc', 'InboxComposeBccLabel', 'InboxComposeBcc', !d.bcc.length)
 			+ '<div class="ibx-cfield ibx-cfield--subject"' + (d.subject ? ' data-filled' : '') + '><span class="ibx-cfield__lead"></span>' + label(w.id + '-subject', 'InboxSubject', 'InboxSubject') + '<input class="ibx-cfield__input ibx-js-subject" aria-label="' + th('InboxSubject') + '" id="' + w.id + '-subject" type="text" autocomplete="off" maxlength="998" value="' + esc(d.subject) + '"></div>'
+			+ '<div class="ibx-compose__warn ibx-compose__newthread ibx-js-newthread" role="status" hidden></div>'
 			+ '<div class="ibx-compose__tools" role="toolbar" aria-label="' + th('InboxFmtToolbar') + '" aria-controls="' + w.id + '-editor">'
 			// Phone (UX fix series): the whole toolbar shown on demand, closed by this button
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-compose__toolsclose ibx-js-toolsclose" aria-label="' + th('InboxFmtFullBarClose') + '">' + ic('close') + '</button>'
@@ -3271,7 +3352,8 @@
 			d.html = String(o.body).split(/\r?\n/).map(l => '<p>' + esc(l) + '</p>').join('');
 		}
 		const w = { id: 'ibx-cw' + (++seq), token: d.compose || d.token, mode: d.mode || mode, source: o.mail || (d.source ? d.source.mail : 0), data: d, attachments: (d.attachments || []).slice(),
-			quote: !!d.quote && !d.quote_off, signature: !d.signature_off, receipt: !!d.receipt, dirty: !!o.restore, saved: !!d.draft };
+			quote: !!d.quote && !d.quote_off, signature: !d.signature_off, receipt: !!d.receipt, dirty: !!o.restore, saved: !!d.draft,
+			newThread: !!d.new_thread, firstSubject: d.subject || '' };
 		w.token = d.token;
 		const dlg = document.createElement('dialog');
 		dlg.className = 'ibx-window ibx-compose';
@@ -3292,6 +3374,15 @@
 		paintSignature(w);
 		paintAttachments(w);
 		paintBoxWarning(w);
+		paintNewThread(w);
+		$('.ibx-js-subject', dlg).addEventListener('input', () => paintNewThread(w));
+		dlg.addEventListener('click', e => {
+			if (e.target.closest('.ibx-js-newthreadon')) {
+				setNewThread(w, true);
+			} else if (e.target.closest('.ibx-js-newthreadoff')) {
+				setNewThread(w, false);
+			}
+		});
 		if (d.quote && d.quote_off) {
 			const q = $('.ibx-js-quote', dlg);
 			q.hidden = true;
