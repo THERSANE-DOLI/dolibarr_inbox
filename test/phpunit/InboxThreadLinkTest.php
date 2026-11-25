@@ -42,16 +42,17 @@ class InboxThreadLinkTest extends InboxTestCase
 	protected $folder = 0;
 
 	/**
-	 * @param string $mid    Message-ID
-	 * @param string $thread Key of the conversation
-	 * @param int    $folder Folder (0: the inbox)
-	 * @return object         Row
+	 * @param string $mid     Message-ID
+	 * @param string $thread  Key of the conversation
+	 * @param int    $folder  Folder (0: the inbox)
+	 * @param string $subject Subject
+	 * @return object          Row
 	 */
-	protected function mail($mid, $thread, $folder = 0)
+	protected function mail($mid, $thread, $folder = 0, $subject = 'Devis')
 	{
 		$p = $this->db->prefix();
 		$this->db->query("INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, date_mail, from_email, subject, size, thread_key, date_index) VALUES ("
-			.$this->account.", ".($folder ?: $this->folder).", '".$this->db->escape($mid)."', 1, '".$this->db->escape($mid)."', '2026-11-02 10:00:00', 'client@acme.inbox-test.invalid', 'Devis', 10,"
+			.$this->account.", ".($folder ?: $this->folder).", '".$this->db->escape($mid)."', 1, '".$this->db->escape($mid)."', '2026-11-02 10:00:00', 'client@acme.inbox-test.invalid', '".$this->db->escape($subject)."', 10,"
 			." '".$this->db->escape($thread)."', '".$this->db->idate(dol_now())."')");
 
 		return $this->db->getRow("SELECT * FROM ".$p."inbox_mail WHERE rowid = ".((int) $this->db->last_insert_id($p.'inbox_mail')));
@@ -138,5 +139,78 @@ class InboxThreadLinkTest extends InboxTestCase
 		$this->assertEqualsCanonicalizing(array($soc, $soc2), array_column($this->linksOf($c), 'element'));
 
 		$this->db->query("DELETE FROM ".$p."societe WHERE rowid IN (".$soc.", ".$soc2.", ".$soc3.")");
+	}
+
+	/**
+	 * 1.136.2: same subject or not
+	 *
+	 * @return void
+	 */
+	public function testSameSubject()
+	{
+		foreach (array(
+			array('Quote 42', 'Quote 42'),
+			array('Quote 42', 'RE: TR: quote 42'),
+			array('Pickup site A // EV1', 'Re: Pickup site A // EV1 [T-0614] - request done'),
+			array('[External] RE: Pickup site A', 'pickup site a'),
+			array('Enlèvement du site A', 'ENLEVEMENT DU SITE A'),
+			array('', 'Anything'),
+			array('RE:', 'Anything'),
+			array('Re: ok', 'Anything at all'),
+		) as $same) {
+			$this->assertTrue(InboxThreadLink::sameSubject($same[0], $same[1]), $same[0].' / '.$same[1]);
+		}
+		foreach (array(
+			array('Pickup site A // EV1', 'Pickup site B // EV2'),
+			array('DGD request X1659678 country A', 'RE: DGD request X1671637 country B'),
+		) as $other) {
+			$this->assertFalse(InboxThreadLink::sameSubject($other[0], $other[1]), $other[0].' / '.$other[1]);
+		}
+	}
+
+	/**
+	 * 1.136.2: new requests sent as answers to older ones (their subject replaced) share the conversation, not its pieces
+	 *
+	 * @return void
+	 */
+	public function testPiecesFollowTheSameSubjectOnly()
+	{
+		$p = $this->db->prefix();
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$this->account = (int) $box->id;
+		(new InboxAccess($this->db))->grant($this->admin, $box->id, $this->admin->id, 0, 'manage');
+		InboxAccess::clearCache();
+		$this->db->query("INSERT INTO ".$p."inbox_folder (fk_account, path, name, delimiter, role, status) VALUES (".$this->account.", 'INBOX', 'INBOX', '.', 'inbox', 1)");
+		$this->folder = (int) $this->db->last_insert_id($p.'inbox_folder');
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_chain_a', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$socA = (int) $this->db->last_insert_id($p.'societe');
+		$this->db->query("INSERT INTO ".$p."societe (nom, entity, status, client, datec) VALUES ('inboxtest_chain_b', 1, 1, 1, '".$this->db->idate(dol_now())."')");
+		$socB = (int) $this->db->last_insert_id($p.'societe');
+
+		$a = $this->mail('c1@inbox-test.invalid', 'tkc', 0, 'Pickup site A // EV1');
+		$b = $this->mail('c2@inbox-test.invalid', 'tkc', 0, 'Pickup site B // EV2');
+		$answerA = $this->mail('c3@inbox-test.invalid', 'tkc', 0, 'Re: Pickup site A // EV1 [T-0001] - request done');
+		$threads = new InboxThreadLink($this->db);
+		$this->assertSame(1, $threads->state($a)['others'], 'only the mail of the same subject is offered');
+
+		// The piece of request A: its answer, never request B
+		(new InboxLink($this->db))->link((new InboxMailRef($this->db))->fetchOrCreate($a, $this->admin), 'societe', $socA, $this->admin);
+		$this->assertSame(1, $threads->linkThread($this->admin, $a, 'societe', $socA));
+		$this->assertSame(array($socA), array_column($this->linksOf($answerA), 'element'));
+		$this->assertSame(array(), $this->linksOf($b), 'another request of the conversation');
+
+		// The piece of request B stays on B (A and its answer are about another subject)
+		(new InboxLink($this->db))->link((new InboxMailRef($this->db))->fetchOrCreate($b, $this->admin), 'societe', $socB, $this->admin);
+		$this->assertSame(0, $threads->linkThread($this->admin, $b, 'societe', $socB));
+
+		// New mails: a third request gets nothing, the answer to B gets the piece of B only
+		$c = $this->mail('c4@inbox-test.invalid', 'tkc', 0, 'Pickup site C // EV3');
+		$this->assertSame(0, $threads->followNew($this->account, array((int) $c->rowid)));
+		$this->assertSame(array(), $this->linksOf($c));
+		$answerB = $this->mail('c5@inbox-test.invalid', 'tkc', 0, 'RE: Pickup site B // EV2');
+		$this->assertSame(1, $threads->followNew($this->account, array((int) $answerB->rowid)));
+		$this->assertSame(array($socB), array_column($this->linksOf($answerB), 'element'));
+
+		$this->db->query("DELETE FROM ".$p."societe WHERE rowid IN (".$socA.", ".$socB.")");
 	}
 }

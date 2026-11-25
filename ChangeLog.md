@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a piece linked to a mail no longer reaches the mails of its conversation about another subject :   1.136.2
+  - a new request sent as an answer to an older one, its subject replaced, shares the conversation of the older one
+    (In-Reply-To) but not its pieces: each new request got the pieces of all the previous ones, and gave them its own.
+  - same subject: equal or one inside the other, without the answer prefixes, the tags in brackets nor the accents;
+    under 4 characters, about anything as before. « Link also the N other emails » counts the same way.
+
 - FIX: mail declaring a charset unknown to PHP (« unknown-8bit »...) opens on PHP 8, no warning on PHP 7 :   1.136.1
   - PHP 8 threw a ValueError that stopped the reading of the mail (body, attachments, mail attached); PHP 7 gave a
     warning and « ? » in place of the accents, in the subject as in the text.

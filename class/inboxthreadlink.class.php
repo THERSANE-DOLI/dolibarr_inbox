@@ -24,11 +24,14 @@
 
 require_once __DIR__.'/inboxlink.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
+require_once __DIR__.'/inboxthreader.class.php';
 
 /**
  * The links made by the conversation have the origin « thread » (badge in the panel). A mail detached
  * (inbox_mailref.thread_detached, kept by Message-ID so it survives every move) loses its links of the conversation,
  * never gets new ones, and its own links never go to the others.
+ * The links go only between mails of the same subject (1.136.2, sameSubject()): a new request sent as an answer to an
+ * older one, its subject replaced, shares the conversation of the older one (In-Reply-To) but not its pieces.
  */
 class InboxThreadLink
 {
@@ -86,6 +89,35 @@ class InboxThreadLink
 	}
 
 	/**
+	 * Two mails of a conversation about the same thing: subjects equal, or one inside the other, without the answer
+	 * and forward prefixes (InboxThreader::normalizeSubject()), the tags in brackets (« [Ticket 12] »), the accents and
+	 * the punctuation. « RE: Quote 42 [T-12] - done » is about « Quote 42 »; « Pickup site B » is not about
+	 * « Pickup site A ». A subject too short to tell (under 4 characters, or empty) is about anything, as before.
+	 *
+	 * @param string $a Subject
+	 * @param string $b Subject
+	 * @return bool
+	 */
+	public static function sameSubject($a, $b)
+	{
+		$norm = function ($s) {
+			$s = InboxThreader::normalizeSubject((string) $s);
+			// A prefix may follow a tag: « [External] RE: Quote »
+			$s = InboxThreader::normalizeSubject((string) preg_replace('/\[[^\]]*\]/u', ' ', $s));
+			$s = function_exists('dol_string_unaccent') ? dol_string_unaccent($s) : $s;
+
+			return trim((string) preg_replace('/[^\p{L}\p{N}]+/u', ' ', mb_strtolower($s, 'UTF-8')));
+		};
+		$x = $norm($a);
+		$y = $norm($b);
+		if (mb_strlen($x, 'UTF-8') < 4 || mb_strlen($y, 'UTF-8') < 4) {
+			return true;
+		}
+
+		return $x === $y || mb_strpos($x, $y, 0, 'UTF-8') !== false || mb_strpos($y, $x, 0, 'UTF-8') !== false;
+	}
+
+	/**
 	 * Mailrefs detached among some
 	 *
 	 * @param int[] $mailrefIds Mailrefs
@@ -107,7 +139,7 @@ class InboxThreadLink
 	}
 
 	/**
-	 * What the panel says of the conversation of a mail
+	 * What the panel says of the conversation of a mail: the other mails a link would reach (same subject, not detached)
 	 *
 	 * @param object $row Mail
 	 * @return array{others:int,detached:bool}
@@ -117,7 +149,9 @@ class InboxThreadLink
 		$refs = new InboxMailRef($this->db);
 		$mine = $refs->forRows(array($row));
 		$detached = isset($mine[(int) $row->rowid]) && $this->detachedOf(array($mine[(int) $row->rowid]));
-		$others = $this->others($row);
+		$others = array_values(array_filter($this->others($row), function ($r) use ($row) {
+			return self::sameSubject((string) ($row->subject ?? ''), (string) $r->subject);
+		}));
 		$byRow = $refs->forRows($others);
 		$off = $this->detachedOf(array_values($byRow));
 		$n = 0;
@@ -131,7 +165,8 @@ class InboxThreadLink
 	}
 
 	/**
-	 * A piece linked to a mail: the other mails of its conversation too (not the detached ones), origin « thread »
+	 * A piece linked to a mail: the other mails of its conversation too, of the same subject and not detached, origin
+	 * « thread »
 	 *
 	 * @param User   $user      User who linked
 	 * @param object $row       Mail linked
@@ -150,6 +185,10 @@ class InboxThreadLink
 		$linker = new InboxLink($this->db);
 		$n = 0;
 		foreach ($this->others($row) as $r) {
+			// Another subject in the conversation: another request sent as an answer, not this piece
+			if (!self::sameSubject((string) ($row->subject ?? ''), (string) $r->subject)) {
+				continue;
+			}
 			$ref = $refs->fetchOrCreate($r, $user);
 			if ($ref <= 0 || $this->detachedOf(array($ref))) {
 				continue;
@@ -170,8 +209,8 @@ class InboxThreadLink
 	}
 
 	/**
-	 * Synchronisation: new mails in a linked conversation get its links (origin « thread »); the links of a detached
-	 * mail are not given
+	 * Synchronisation: new mails in a linked conversation get its links (origin « thread »), each one from a mail of the
+	 * same subject; the links of a detached mail are not given
 	 *
 	 * @param int   $accountId Mailbox
 	 * @param int[] $mailIds   New mails of the index (their conversation assigned)
@@ -214,11 +253,23 @@ class InboxThreadLink
 			if (empty($old[$key])) {
 				continue;
 			}
-			$oldRefs = array_values($refs->forRows($old[$key]));
+			$byRow = $refs->forRows($old[$key]);
+			$oldRefs = array_values($byRow);
 			$off = $this->detachedOf($oldRefs);
+			// Subjects of the mails holding each mailref: a piece goes only to a new mail of the same subject
+			$subjectsOf = array();
+			foreach ($old[$key] as $o) {
+				if (isset($byRow[(int) $o->rowid])) {
+					$subjectsOf[$byRow[(int) $o->rowid]][] = (string) $o->subject;
+				}
+			}
 			$links = array();
 			foreach ($linker->listFor(array_diff($oldRefs, array_keys($off))) as $l) {
-				$links[$l['type'].':'.$l['element']] = $l;
+				$k = $l['type'].':'.$l['element'];
+				if (!isset($links[$k])) {
+					$links[$k] = array('link' => $l, 'subjects' => array());
+				}
+				$links[$k]['subjects'] = array_merge($links[$k]['subjects'], $subjectsOf[(int) $l['mailref']] ?? array());
 			}
 			if (!$links) {
 				continue;
@@ -243,7 +294,18 @@ class InboxThreadLink
 				if ($ref <= 0 || $this->detachedOf(array($ref))) {
 					continue;
 				}
-				foreach ($links as $l) {
+				foreach ($links as $held) {
+					$l = $held['link'];
+					$same = false;
+					foreach ($held['subjects'] as $s) {
+						if (self::sameSubject((string) $r->subject, $s)) {
+							$same = true;
+							break;
+						}
+					}
+					if (!$same) {
+						continue;
+					}
 					$exists = $this->db->getRow("SELECT rowid FROM ".$p."inbox_link WHERE fk_mailref = ".((int) $ref)." AND element_type = '".$this->db->escape($l['type'])."' AND fk_element = ".((int) $l['element']));
 					if (!is_object($exists) && $linker->link($ref, $l['type'], $l['element'], null, self::ORIGIN) > 0) {
 						$made++;
