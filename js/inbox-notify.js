@@ -273,6 +273,61 @@
 		return $('.ibx-rail .ibx-js-bell');
 	}
 
+	// ---------- Ringing bell (1.136.0): rings on a new notification, then a few short reminders until the panel is opened ----------
+	const SEEN_KEY = 'inbox-notif-seen';
+	const NUDGE_MS = 30000;
+	const NUDGE_MAX = 5;
+	let nudges = 0;
+
+	/** Last notification seen in the panel (shared by the tabs, so that a page change does not ring again) */
+	function seenLast() {
+		try {
+			return parseInt(localStorage.getItem(I.scope(SEEN_KEY)) || '0', 10) || 0;
+		} catch (e) {
+			return 0;
+		}
+	}
+
+	function setSeen() {
+		nudges = NUDGE_MAX;
+		if (N.last > seenLast()) {
+			try {
+				localStorage.setItem(I.scope(SEEN_KEY), String(N.last));
+			} catch (e) {
+				// Private mode: the reminders stop in this tab only
+			}
+		}
+	}
+
+	/** Unread notifications not seen yet in the panel */
+	function unseen() {
+		return N.unread > 0 && N.last > seenLast() && !N.panel;
+	}
+
+	function reducedMotion() {
+		return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+	}
+
+	/** Restarts a one shot css animation on the element */
+	function replay(el, cls) {
+		if (!el) {
+			return;
+		}
+		el.classList.remove('is-ringing', 'is-nudging', 'is-bumping');
+		el.getBoundingClientRect(); // reflow, so that the same animation plays again (svg has no offsetWidth)
+		el.classList.add(cls);
+		el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
+	}
+
+	/** strong = a new notification (full swing), else a short reminder */
+	function ring(strong) {
+		const b = bell();
+		if (!b || reducedMotion() || document.hidden) {
+			return;
+		}
+		replay($('.ibx-icon', b), strong ? 'is-ringing' : 'is-nudging');
+	}
+
 	function paintBadge() {
 		const b = bell();
 		if (!b) {
@@ -293,11 +348,22 @@
 		if (!c) {
 			return;
 		}
-		const isNew = N.last >= 0 && (c.last || 0) > N.last && (c.unread || 0) > 0;
+		const first = N.last < 0;
+		const isNew = !first && (c.last || 0) > N.last && (c.unread || 0) > 0;
+		const grew = !first && (c.unread || 0) > N.unread;
 		N.unread = c.unread || 0;
 		N.last = c.last || 0;
 		N.at = Date.now();
 		paintBadge();
+		if (grew && !reducedMotion()) {
+			const b = bell();
+			replay(b && $('.ibx-rail__badge', b), 'is-bumping');
+		}
+		if ((isNew || first) && unseen()) {
+			// Arrival (or opening of the page with unread notifications not seen yet): rings, the reminders start again
+			nudges = 0;
+			ring(true);
+		}
 		if (typeof c.mails === 'number') {
 			N.mailFolders = new Set(c.mail_folders || []);
 			paintMails(c.mails);
@@ -476,6 +542,7 @@
 		N.items = [];
 		place();
 		bell().setAttribute('aria-expanded', 'true');
+		setSeen();
 		p.addEventListener('click', onPanelClick);
 		p.addEventListener('keydown', e => {
 			if (e.key === 'Escape') {
@@ -671,6 +738,13 @@
 				refresh();
 			}
 		}, 60000);
+		// Reminders of the bell: a short swing every 30 s, NUDGE_MAX times, while not seen (tab visible only)
+		setInterval(() => {
+			if (nudges < NUDGE_MAX && !document.hidden && unseen()) {
+				nudges++;
+				ring(false);
+			}
+		}, NUDGE_MS);
 		document.addEventListener('visibilitychange', () => {
 			if (!document.hidden && Date.now() - N.at > 50000) {
 				refresh();

@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the bell rings when a notification arrives, then reminds a few times until the panel is opened :   1.136.0
+  - a swing on arrival or on opening a page with unread notifications not seen yet, the badge bumps when it grows.
+  - then a short swing every 30 s, 5 times at most; still once the panel is opened, until the next notification.
+  - no movement when the system asks for reduced motion; the top bar of the other pages stays still.
+
 - NEW: setup page warns when the folders dev/ and test/ of a Git deployment can be read from the web :   1.135.0
   - checked from the browser (web-probe.txt, without cookies), shown only when exposed, never for a zip install;
     gives the fix: git sparse-checkout for a clone, an action after deployment for a copy, Apache / nginx.
