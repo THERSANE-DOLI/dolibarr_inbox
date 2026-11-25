@@ -44,6 +44,10 @@ mailbox in error...) rings his bell at once, in any space of Inbox (Mail, Agenda
 the browser goes at the same time. In standard mode the bell keeps its rhythm: with the list in the Mail space,
 every 60 seconds elsewhere.
 
+A new notification makes the bell swing and its badge bump. While its notifications are not seen, the bell
+reminds with a short swing every 30 seconds, 5 times at most; opening the panel stops it until the next
+notification, in every tab, even if some stay unread. Nothing moves when the system asks for reduced motion.
+
 ## Load on the server
 
 Under the intervals, « Load of the server with these settings » gives, for the users reaching a mailbox who logged

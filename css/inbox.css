@@ -352,6 +352,30 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-rail__item[aria-current="page"]::before { content: ""; position: absolute; left: -0.3125rem; top: 0.5rem; bottom: 0.5rem; width: 0.1875rem; background: var(--ibx-accent); border-radius: 2px; }
 .ibx-rail__item--later { opacity: .35; }
 .ibx-rail__badge { position: absolute; top: 0.125rem; right: 0; min-width: 1rem; height: 1rem; padding: 0 0.25rem; font-size: 0.625rem; font-weight: 700; line-height: 1rem; text-align: center; color: #fff; background: var(--ibx-danger, #c0392b); border-radius: 8px; box-shadow: 0 0 0 2px var(--ibx-bg-sunken); }
+/* Ringing bell (1.136.0, inbox-notify.js): full swing on a new notification, short one for the reminders, pivot at the top */
+@keyframes ibx-bell-ring {
+	0%, 100% { transform: rotate(0); }
+	15% { transform: rotate(14deg); }
+	30% { transform: rotate(-12deg); }
+	45% { transform: rotate(8deg); }
+	60% { transform: rotate(-5deg); }
+	75% { transform: rotate(2deg); }
+}
+@keyframes ibx-bell-nudge {
+	0%, 100% { transform: rotate(0); }
+	30% { transform: rotate(10deg); }
+	65% { transform: rotate(-7deg); }
+}
+@keyframes ibx-badge-bump {
+	0%, 100% { transform: scale(1); }
+	40% { transform: scale(1.25); }
+}
+.ibx-js-bell .ibx-icon.is-ringing { transform-origin: 50% 10%; animation: ibx-bell-ring 1s ease-in-out; }
+.ibx-js-bell .ibx-icon.is-nudging { transform-origin: 50% 10%; animation: ibx-bell-nudge .6s ease-in-out; }
+.ibx-rail__badge.is-bumping { animation: ibx-badge-bump .4s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+	.ibx-js-bell .ibx-icon.is-ringing, .ibx-js-bell .ibx-icon.is-nudging, .ibx-rail__badge.is-bumping { animation: none; }
+}
 /* Notification panel, opened by the bell of the rail */
 .ibx-notifpanel { position: fixed; z-index: 60; width: 25rem; max-width: calc(100vw - 1rem); max-height: 70vh; display: flex; flex-direction: column; background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); font-family: var(--ibx-font); font-size: var(--ibx-fs-md); color: var(--ibx-text); }
 .ibx-notifpanel__head > .ibx-btn { white-space: nowrap; flex: none; }
