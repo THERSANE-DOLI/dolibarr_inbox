@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: mail declaring a charset unknown to PHP (« unknown-8bit »...) opens on PHP 8, no warning on PHP 7 :   1.136.1
+  - PHP 8 threw a ValueError that stopped the reading of the mail (body, attachments, mail attached); PHP 7 gave a
+    warning and « ? » in place of the accents, in the subject as in the text.
+  - an encoded word in such a charset is kept as it was; a text that is not UTF-8 is read as ISO-8859-1.
+
 - NEW: the bell rings when a notification arrives, then reminds a few times until the panel is opened :   1.136.0
   - a swing on arrival or on opening a page with unread notifications not seen yet, the badge bumps when it grows.
   - then a short swing every 30 s, 5 times at most; still once the panel is opened, until the next notification.

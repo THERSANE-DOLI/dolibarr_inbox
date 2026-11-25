@@ -366,6 +366,25 @@ class InboxReadingTest extends InboxTestCase
 		$this->assertSame('café crème', InboxMimeParser::decodeWords('=?ISO-8859-1?Q?caf=E9?= cr=?utf-8?q?=C3=A8me?='));
 		$this->assertSame('Un sujet =? pas encodé ?=', InboxMimeParser::decodeWords('Un sujet =? pas encodé ?='));
 		$this->assertSame('=?UTF-8?Q?=FF?=', InboxMimeParser::decodeWords('=?UTF-8?Q?=FF?='));
+		$this->assertSame('Re: =?unknown-8bit?Q?caf=E9?= ok', InboxMimeParser::decodeWords('Re: =?unknown-8bit?Q?caf=E9?= ok'), 'charset unknown to PHP: word kept, on PHP 7 as on PHP 8');
+	}
+
+	/**
+	 * Charset unknown to PHP (« unknown-8bit ») declared by a part of a mail: PHP 8 threw a ValueError that stopped the
+	 * reading of the mail, PHP 7 gave a warning and « ? » in place of the accents. The text is read as ISO-8859-1 when
+	 * it is not UTF-8, like a part without charset
+	 *
+	 * @return void
+	 */
+	public function testUnknownCharset()
+	{
+		$this->assertSame('café', InboxMimeParser::toUtf8("caf\xE9", 'unknown-8bit'));
+		$this->assertSame('café', InboxMimeParser::toUtf8('café', 'x-unknown'), 'UTF-8 kept');
+		$this->assertSame('café', InboxMimeParser::toUtf8("caf\xE9", 'ISO-8859-1'), 'known charset converted as before');
+		$raw = "Message-ID: <reading-charset@inbox-test.invalid>\r\nFrom: a@inbox-test.invalid\r\nTo: ".self::BOX
+			."\r\nSubject: Charset\r\nDate: ".date('r')
+			."\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=unknown-8bit\r\nContent-Transfer-Encoding: 8bit\r\n\r\nUn caf\xE9 cr\xE8me\r\n";
+		$this->assertSame('Un café crème', trim(InboxMimeParser::parse($raw)->bodyText));
 	}
 
 	public function testEmojiIndexed()
