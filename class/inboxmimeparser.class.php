@@ -381,11 +381,7 @@ class InboxMimeParser
 				$bytes .= strtoupper($p[2]) === 'B' ? (string) base64_decode($p[3]) : quoted_printable_decode(str_replace('_', ' ', $p[3]));
 			}
 			if ($charset !== 'UTF-8' && $charset !== 'UTF8') {
-				try {
-					$converted = mb_convert_encoding($bytes, 'UTF-8', $charset);
-				} catch (Throwable $e) {
-					$converted = false;
-				}
+				$converted = self::convertCharset($bytes, $charset);
 				if ($converted === false) {
 					return $run[0];
 				}
@@ -448,13 +444,41 @@ class InboxMimeParser
 	{
 		$charset = strtoupper(trim($charset));
 		if ($charset !== '' && $charset !== 'UTF-8' && $charset !== 'US-ASCII') {
-			$converted = @mb_convert_encoding($content, 'UTF-8', $charset);
+			$converted = self::convertCharset($content, $charset);
 			if ($converted !== false) {
 				return $converted;
 			}
 		}
 
 		return mb_check_encoding($content, 'UTF-8') ? $content : mb_convert_encoding($content, 'UTF-8', 'ISO-8859-1');
+	}
+
+	/**
+	 * Text converted to UTF-8 from a declared charset, false when PHP does not know the charset (« unknown-8bit »,
+	 * « x-user-defined »...). PHP 7 then gives a warning and a text whose characters became « ? », PHP 8 a ValueError
+	 * that @ does not stop: both refused the same way, the caller keeps its own way out
+	 *
+	 * @param string $content Text
+	 * @param string $charset Declared charset
+	 * @return string|false Text in UTF-8, false for a charset unknown to PHP
+	 */
+	protected static function convertCharset($content, $charset)
+	{
+		$unknown = false;
+		set_error_handler(function () use (&$unknown) {
+			$unknown = true;
+
+			return true;
+		});
+		try {
+			$converted = mb_convert_encoding($content, 'UTF-8', $charset);
+		} catch (Throwable $e) {
+			$converted = false;
+		} finally {
+			restore_error_handler();
+		}
+
+		return $unknown ? false : $converted;
 	}
 
 	/**
