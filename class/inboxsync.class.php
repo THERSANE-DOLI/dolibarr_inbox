@@ -279,11 +279,14 @@ class InboxSync
 				continue;
 			}
 			$done[$f->rowid] = true;
-			$since = 0;
-			if (in_array((string) $f->role, InboxFolder::SHORT_ROLES, true)) {
-				$since = dol_now() - 30 * 86400;
-			} elseif ($maxDays > 0) {
-				$since = dol_now() - $maxDays * 86400;
+			$since = $maxDays > 0 ? dol_now() - $maxDays * 86400 : 0;
+			// Trash and junk were indexed on their last 30 days only (before 1.138.1): a cursor of then (no « all ») is
+			// emptied once, the folder indexed again in full; the mails already indexed are not read again
+			if (in_array((string) $f->role, array('trash', 'junk'), true) && (string) $f->sync_cursor !== '') {
+				$cur = json_decode((string) $f->sync_cursor, true);
+				if (is_array($cur) && !isset($cur['all'])) {
+					$f->sync_cursor = '';
+				}
 			}
 			$folderId = (int) $f->rowid;
 			$stats = $mails->folderStats($folderId);

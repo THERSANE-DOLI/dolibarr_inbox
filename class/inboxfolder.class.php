@@ -34,9 +34,6 @@ class InboxFolder
 	const STATUS_PRESENT = 1;
 	const STATUS_GONE = 9;
 
-	/** Roles whose folders are indexed on the last days only */
-	const SHORT_ROLES = array('trash', 'junk');
-
 	/** @var DoliDB */
 	protected $db;
 
