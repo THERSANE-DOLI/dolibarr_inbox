@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a folder of the server that can never be read no longer keeps its mailbox in « first synchronisation » :   1.145.0
+  - the folders where Dovecot keeps the rules (INBOX.dovecot.sieve...), shown after the first save of the rules, are
+    no longer followed when they appear: still in the tree, they can be followed by hand.
+  - a folder failing 3 passes in a row is left out of the first synchronisation, « failing » in the tab Synchro, and
+    tried again every 15 min only; a good pass counts it again. Activate the module again.
+
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
     trusted sender with a right signature header (HMAC-SHA256, at 2 days of its reception at most) is believed.

@@ -34,6 +34,15 @@ class InboxFolder
 	const STATUS_PRESENT = 1;
 	const STATUS_GONE = 9;
 
+	/** Failed passes in a row after which a folder no longer keeps its mailbox in « first synchronisation » (1.145.0) */
+	const FAILS_SET_ASIDE = 3;
+
+	/**
+	 * Where Dovecot keeps the Sieve scripts of a mailbox (1.145.0): in a Maildir++ mailbox, they show as folders of the
+	 * root after the first save of the rules (INBOX.dovecot, INBOX.dovecot.sieve...), never readable as folders of mails
+	 */
+	const SIEVE_STORAGE = array('dovecot', 'dovecot.sieve', 'dovecot.svbin', 'sieve');
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -43,6 +52,41 @@ class InboxFolder
 	public function __construct(DoliDB $db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * A storage of the Sieve scripts shown as a folder by the server: not followed when it appears (1.145.0), it stays
+	 * in the tree and can be followed by hand
+	 *
+	 * @param string $path      Path on the server
+	 * @param string $delimiter Delimiter of the server
+	 * @return bool
+	 */
+	public static function isSieveStorage($path, $delimiter)
+	{
+		$path = (string) $path;
+		$root = 'INBOX'.(string) $delimiter;
+		if ((string) $delimiter !== '' && strncasecmp($path, $root, strlen($root)) === 0) {
+			$path = substr($path, strlen($root));
+		}
+
+		return in_array($path, self::SIEVE_STORAGE, true);
+	}
+
+	/**
+	 * Condition on the folders whose first synchronisation is left (the state « first_sync » of their mailbox): a folder
+	 * that failed FAILS_SET_ASIDE passes in a row is left out until a pass on it succeeds (1.145.0)
+	 *
+	 * @param string $alias Alias of llx_inbox_folder in the query ('' for none)
+	 * @return string SQL, without AND before
+	 */
+	public static function sqlFirstSyncLeft($alias = '')
+	{
+		$a = $alias !== '' ? $alias.'.' : '';
+
+		$sql = $a."status = ".self::STATUS_PRESENT." AND ".$a."selectable = 1 AND ".$a."sync_enabled = 1";
+
+		return $sql." AND ".$a."first_sync_done = 0 AND ".$a."sync_fail_count < ".self::FAILS_SET_ASIDE;
 	}
 
 	/**
@@ -104,7 +148,9 @@ class InboxFolder
 				}
 				$this->db->query("UPDATE ".$p."inbox_folder SET ".implode(', ', $set)." WHERE rowid = ".((int) $known[$path]->rowid));
 			} else {
-				$sql = "INSERT INTO ".$p."inbox_folder (fk_account, path, ".implode(', ', array_keys($values)).", sync_enabled) VALUES (".((int) $account->id).", '".$this->db->escape($path)."', ".implode(', ', $values).", ".(!empty($f['selectable']) ? 1 : 0).")";
+				// Followed when it appears, except the storage of the Sieve scripts (its reading fails at every pass)
+				$follow = !empty($f['selectable']) && !self::isSieveStorage($path, $delimiter);
+				$sql = "INSERT INTO ".$p."inbox_folder (fk_account, path, ".implode(', ', array_keys($values)).", sync_enabled) VALUES (".((int) $account->id).", '".$this->db->escape($path)."', ".implode(', ', $values).", ".($follow ? 1 : 0).")";
 				$this->db->query($sql);
 				$stats['added']++;
 			}
@@ -151,6 +197,20 @@ class InboxFolder
 	}
 
 	/**
+	 * Count a failed pass on a folder, or start again from zero after a good one (1.145.0). Apart from saveState(): the
+	 * state of the folder is saved even before the module is activated again with its column
+	 *
+	 * @param int  $folderId Folder
+	 * @param bool $failed   The pass on it failed
+	 * @return void
+	 */
+	public function countFailure($folderId, $failed)
+	{
+		$set = $failed ? "sync_fail_count = sync_fail_count + 1" : "sync_fail_count = 0";
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET ".$set." WHERE rowid = ".((int) $folderId).($failed ? '' : " AND sync_fail_count <> 0"));
+	}
+
+	/**
 	 * Progress of the repair of the attachments (1.7.1)
 	 *
 	 * @param int $folderId Folder
@@ -172,7 +232,13 @@ class InboxFolder
 	 */
 	public function setSyncEnabled($accountId, $folderId, $enabled)
 	{
-		return (bool) $this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_enabled = ".($enabled ? 1 : 0)
-			." WHERE rowid = ".((int) $folderId)." AND fk_account = ".((int) $accountId)." AND selectable = 1");
+		$sql = " WHERE rowid = ".((int) $folderId)." AND fk_account = ".((int) $accountId)." AND selectable = 1";
+		if (!$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_enabled = ".($enabled ? 1 : 0).$sql)) {
+			return false;
+		}
+		// Followed again by hand: its failed passes counted from zero (1.145.0)
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_fail_count = 0".$sql);
+
+		return true;
 	}
 }
