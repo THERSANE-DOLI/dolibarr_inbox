@@ -9,6 +9,7 @@
 - [Mail templates](mail-templates.md): complete mail or piece of text, default templates on four levels
 - [Emails sent by Dolibarr in Sent](dolibarr-sent.md): tickets, proposals, invoices sent from a mailbox, their copy in Sent
 - [Conversations: new subject, new conversation](conversations.md): a new request sent as an answer, separate or join by hand, links that follow the subject
+- [Views: the mailboxes each one gathers, Spams](views.md): common list, own list of a view, Assigned to me always on every mailbox, the Spams view
 - [Agenda panel](agenda-panel.md)
 - [Mails sent by a site: data sources](data-sources.md)
 - [Public and shared domains](shared-domains.md)

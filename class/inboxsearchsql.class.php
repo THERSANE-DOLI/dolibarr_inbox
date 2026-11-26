@@ -282,6 +282,10 @@ class InboxSearchSql implements InboxSearchEngine
 		if (!empty($query['attachment'])) {
 			$where[] = "m.has_attachments = 1";
 		}
+		if (!empty($query['legit'])) {
+			// Junk probably legitimate (1.142.0)
+			$where[] = "m.junk_hint = 'legit'";
+		}
 		// Unified views (1.29.0): folders of these roles only, or never of those
 		$roleList = function ($roles) {
 			return implode(',', array_map(function ($r) {

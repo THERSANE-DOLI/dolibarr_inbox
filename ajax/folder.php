@@ -44,7 +44,14 @@ inboxAjaxStart(in_array($action, array('look', 'lookreset'), true));
  */
 function inboxFolderTree($accountId)
 {
-	global $db;
+	global $db, $user;
+
+	// Spams view (1.142.0): the spams arrived since the user last opened it
+	static $junkSeen = null;
+	if ($junkSeen === null) {
+		$params = new InboxUserParam($db);
+		$junkSeen = (int) $params->get($user, 'junk_seen_at');
+	}
 
 	$folders = new InboxFolder($db);
 	$rows = $folders->listForAccount((int) $accountId);
@@ -95,6 +102,8 @@ function inboxFolderTree($accountId)
 			'indexed' => (int) $f->indexed,
 			// Junk: mails probably legitimate (known sender, authenticated), a counter beside the folder
 			'legit' => $role === 'junk' && getDolGlobalInt('INBOX_JUNK_LEGIT_CHECK', 1) ? (int) (($legit = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_mail WHERE fk_folder = ".((int) $f->rowid)." AND junk_hint = 'legit'")) ? $legit->n : 0) : 0,
+			'junk_new' => $role === 'junk' ? (int) (($new = $db->getRow("SELECT COUNT(rowid) as n FROM ".$db->prefix()."inbox_mail WHERE fk_folder = ".((int) $f->rowid)
+				." AND date_received > '".$db->idate($junkSeen)."'")) ? $new->n : 0) : 0,
 			'error' => (string) $f->sync_error !== '',
 			// Colour and icon shared by the users of the mailbox ('' = by default; a special folder keeps its icon)
 			'color' => (string) InboxLook::cleanColor((string) $f->color),

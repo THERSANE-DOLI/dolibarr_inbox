@@ -1,5 +1,15 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: view « Spams »: the junk of every mailbox in one list, to find quickly an email that is not a spam :   1.142.0
+  - hidden by default (menu of the views); a grey count of the spams arrived since the last visit, no unread badge.
+  - on each line why it is there (score of the anti-spam filter, blocked sender), « Probably legitimate » chip.
+  - filter « Probably legitimate » in the view and in each junk folder; one spam per line, never conversations.
+
+- NEW: mailboxes chosen per view; « Assigned to me » always covers every mailbox read :   1.141.0
+  - My account > « Mailboxes of the views »: a grid, the common list first, then a column per view; a view changed
+    gets its own list, « Follow the common list » brings it back. « Starred »: every mailbox by default.
+  - right click on a view: « Mailboxes of this view… »; doc page Views.
+
 - NEW: an answer in a separated conversation is separated for the correspondent too; « New conversation » :   1.140.0
   - References of an answer start at the cut point: the mail program of the correspondent shows it apart.
   - writing an answer, menu ⋯ « New conversation »: sent without In-Reply-To nor References, the quote kept.

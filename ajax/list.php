@@ -164,7 +164,7 @@ function inboxListFolder($folderId, array $readable)
 
 		return $live;
 	}
-	$row = $folderId > 0 ? $db->getRow("SELECT rowid, fk_account, total, unread FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1") : null;
+	$row = $folderId > 0 ? $db->getRow("SELECT rowid, fk_account, total, unread, role FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folderId)." AND status = 1") : null;
 	inboxListLockedStop(is_object($row) ? (int) $row->fk_account : 0);
 	if (!is_object($row) || !in_array((int) $row->fk_account, $readable, true)) {
 		inboxAjaxNotFound();
@@ -220,7 +220,8 @@ function inboxListQuery()
 	$sort = explode(':', (string) inboxAjaxParam('sort', 'alphanohtml'));
 	$query['sort'] = $sort[0] ?? 'date';
 	$query['dir'] = ($sort[1] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-	foreach (array('unread', 'flagged', 'attachment') as $f) {
+	// legit (1.142.0): the junk probably legitimate (known sender, authenticated)
+	foreach (array('unread', 'flagged', 'attachment', 'legit') as $f) {
 		if ((int) inboxAjaxParam($f, 'int') === 1) {
 			$query[$f] = true;
 		}
@@ -293,6 +294,42 @@ function inboxListFulltext(array &$query, array $accounts)
 	return $out;
 }
 
+/**
+ * Why each spam is in the junk (1.142.0), when inbox knows it: the score of its anti-spam engine, or a blocked sender.
+ * The verdict of the mail server is in the headers only (read with the mail).
+ *
+ * @param array<int,array<string,mixed>> $rows Rows of the list
+ * @return array<int,array<string,mixed>>       The same, with junk_why (null when unknown)
+ */
+function inboxListJunkWhy(array $rows)
+{
+	global $db;
+
+	$ids = array_map('intval', array_column($rows, 'id'));
+	$scores = array();
+	if ($ids) {
+		foreach ((array) $db->getRows("SELECT rowid, spam_engine, spam_score, spam_required, spam_action FROM ".$db->prefix()."inbox_mail"
+			." WHERE rowid IN (".implode(',', $ids).") AND spam_engine IS NOT NULL LIMIT ".count($ids)) as $o) {
+			$scores[(int) $o->rowid] = $o;
+		}
+	}
+	dol_include_once('/inbox/class/inboxblockedsender.class.php');
+	dol_include_once('/inbox/class/inboxspamrspamd.class.php');
+	$blocked = new InboxBlockedSender($db);
+	foreach ($rows as $i => $r) {
+		$why = null;
+		$o = $scores[(int) $r['id']] ?? null;
+		if ($o && in_array((string) $o->spam_action, InboxSpamRspamd::SPAM_ACTIONS, true) && $o->spam_score !== null) {
+			$why = array('kind' => 'score', 'score' => round((float) $o->spam_score, 1), 'required' => $o->spam_required === null ? null : round((float) $o->spam_required, 1));
+		} elseif ($blocked->isBlocked((string) $r['from_email']) > 0) {
+			$why = array('kind' => 'blocked');
+		}
+		$rows[$i]['junk_why'] = $why;
+	}
+
+	return $rows;
+}
+
 /** Unified views (1.29.0): what each one lists, on top of what the user types */
 const INBOX_LIST_VIEWS = array(
 	'inbox' => array('roles' => array('inbox')),
@@ -301,6 +338,8 @@ const INBOX_LIST_VIEWS = array(
 	'mine' => array('mine' => true),
 	'sent' => array('roles' => array('sent')),
 	'drafts' => array('roles' => array('drafts')),
+	// Spams of every mailbox (1.142.0): the junk folders, one mail per line
+	'junk' => array('roles' => array('junk')),
 );
 
 switch ($action) {
@@ -354,12 +393,13 @@ switch ($action) {
 			if (!isset(INBOX_LIST_VIEWS[$view])) {
 				inboxAjaxError('Unknown view', 400);
 			}
+			// The mailboxes of the view: its own list, the common list, or all of them (InboxUnifiedView, 1.141.0)
+			dol_include_once('/inbox/class/inboxunifiedview.class.php');
 			$params = new InboxUserParam($db);
-			$out = json_decode((string) $params->get($user, 'unified_exclude'), true);
-			$accounts = array_values(array_diff($readable, array_map('intval', is_array($out) ? $out : array())));
+			$accounts = InboxUnifiedView::accounts($readable, $view, (string) $params->get($user, 'unified_exclude'), (string) $params->get($user, 'views_scope'));
 			if (is_array(inboxAjaxParam('accounts', 'none'))) {
 				// The view in one mailbox (entry « Followed » of a mailbox in the tree): that one if the user reads it,
-				// even left out of the unified views
+				// even left out of the view
 				$accounts = array_values(array_intersect($readable, array_map('intval', inboxAjaxParam('accounts', 'none'))));
 			}
 			if (!$accounts) {
@@ -406,7 +446,8 @@ switch ($action) {
 		$engine = new InboxSearchSql($db);
 		$start = microtime(true);
 		// Conversations: one line per thread, when the list is sorted by date (a search lists the mails one by one)
-		$threads = (int) inboxAjaxParam('threads', 'int') === 1 && $query['sort'] === 'date' && InboxSearchQuery::isEmpty($query);
+		// (never in the Spams view: one spam per line, 1.142.0)
+		$threads = (int) inboxAjaxParam('threads', 'int') === 1 && $query['sort'] === 'date' && InboxSearchQuery::isEmpty($query) && $view !== 'junk';
 		$cursor = (string) inboxAjaxParam('cursor', 'alphanohtml');
 		$limit = (int) (inboxAjaxParam('limit', 'int') ?: 200);
 		$page = $threads ? $engine->searchThreads($accounts, $folderId, $query, $cursor, $limit) : $engine->search($accounts, $folderId, $query, $cursor, $limit);
@@ -427,6 +468,13 @@ switch ($action) {
 		dol_include_once('/inbox/class/inboxbounce.class.php');
 		$bounces = new InboxBounce($db);
 		$bounces->decorate($page['rows']);
+		// Spams (1.142.0): why each one is in the junk, in the Spams view and in a junk folder; the user saw them
+		if ($view === 'junk' || (!empty($folder) && (string) ($folder->role ?? '') === 'junk')) {
+			$page['rows'] = inboxListJunkWhy($page['rows']);
+		}
+		if ($view === 'junk' && $cursor === '') {
+			$params->set($user, 'junk_seen_at', (string) dol_now());
+		}
 		$page['ms'] = (int) round((microtime(true) - $start) * 1000);
 		// Version of the folder read with the page: the refresh compares with it (a change made just after the
 		// page is not missed)

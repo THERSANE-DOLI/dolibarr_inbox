@@ -49,7 +49,7 @@
 		box: 0,
 		pickOpen: false,
 		q: '',
-		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false },
+		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false, legit: false },
 		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
 		chips: [],
 		soc: null,
@@ -604,7 +604,7 @@
 	}
 
 	// ---------- Unified views (1.29.0, analyse-navigation-vues.md) ----------
-	const VIEWS = [['inbox', 'inbox'], ['unread', 'unread'], ['flagged', 'star'], ['mine', 'user-circle'], ['sent', 'sent'], ['drafts', 'drafts']];
+	const VIEWS = [['inbox', 'inbox'], ['unread', 'unread'], ['flagged', 'star'], ['mine', 'user-circle'], ['sent', 'sent'], ['drafts', 'drafts'], ['junk', 'junk']];
 	function viewsShown() {
 		try {
 			const v = JSON.parse(params.views_shown || '[]');
@@ -613,7 +613,25 @@
 			return ['inbox', 'unread', 'flagged', 'mine'];
 		}
 	}
-	function viewsExcluded() {
+	/**
+	 * Mailboxes left out of a view (1.141.0), the rule of class/inboxunifiedview.class.php: never any for « Assigned
+	 * to me », else the own list of the view, else the common list (inbox, unread, sent, drafts), else none
+	 */
+	function viewExcluded(key) {
+		if (key === 'mine') {
+			return [];
+		}
+		try {
+			const own = JSON.parse(params.views_scope || '{}');
+			if (own && own[key] && Array.isArray(own[key].exclude)) {
+				return own[key].exclude.map(Number);
+			}
+		} catch (e) {
+			// A wrong value: the common list
+		}
+		if (!['inbox', 'unread', 'sent', 'drafts'].includes(key)) {
+			return [];
+		}
 		try {
 			const v = JSON.parse(params.unified_exclude || '[]');
 			return Array.isArray(v) ? v.map(Number) : [];
@@ -621,9 +639,27 @@
 			return [];
 		}
 	}
+	/**
+	 * Spams view (1.142.0), from the counters of the folders already known: the spams arrived since the user last
+	 * opened it (new), the ones probably legitimate (legit); nothing while it is open
+	 */
+	function junkCounts() {
+		const out = new Set(viewExcluded('junk'));
+		const n = { fresh: 0, legit: 0 };
+		S.folders.forEach(({ folder: f, account: a }) => {
+			if (f.role === 'junk' && !out.has(a.id)) {
+				n.fresh += f.junk_new || 0;
+				n.legit += f.legit || 0;
+			}
+		});
+		if (S.scope === 'view' && S.view === 'junk') {
+			n.fresh = 0;
+		}
+		return n;
+	}
 	/** Unread of a view, from the counters of the folders already known (no call): inbox and unread only */
 	function viewCount(key) {
-		const out = new Set(viewsExcluded());
+		const out = new Set(viewExcluded(key));
 		let n = 0;
 		S.folders.forEach(({ folder: f, account: a }) => {
 			if (out.has(a.id)) {
@@ -650,10 +686,15 @@
 			+ (open ? '<ul role="group">' + list.map(([k, icon]) => {
 				const n = ['inbox', 'unread'].includes(k) ? viewCount(k) : 0;
 				const sel = S.scope === 'view' && viewKey() === k;
+				// Spams: no unread badge (a spam is nearly always unread), a grey count of the new ones and the
+				// warning of the probably legitimate ones, as beside a junk folder
+				const jc = k === 'junk' ? junkCounts() : null;
+				const junkMarks = jc ? (jc.legit ? '<span class="ibx-tree__legit" title="' + th('InboxJunkLegitCount', jc.legit) + '">' + ic('warning') + '<span class="ibx-sr-only"> ' + th('InboxJunkLegitCount', jc.legit) + '</span></span>' : '')
+					+ (jc.fresh ? '<span class="ibx-count ibx-count--muted" title="' + th('InboxJunkNewSince', jc.fresh) + '" aria-label="' + th('InboxJunkNewSince', jc.fresh) + '">' + jc.fresh + '</span>' : '') : '';
 				return '<li role="treeitem" aria-level="2"><div class="ibx-tree__row' + (n ? ' has-unread' : '') + '" style="--ibx-depth:1" data-view="' + k + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '">'
 					+ '<span class="ibx-tree__twisty" aria-hidden="true"></span>' + ic(icon, 'ibx-tree__icon ibx-tree__icon--view')
 					+ '<span class="ibx-tree__label ibx-ellipsis">' + th('InboxView_' + k) + '</span>'
-					+ (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
+					+ junkMarks + (n ? '<span class="ibx-count" aria-label="' + th('InboxSyncUnread', n) + '">' + n + '</span>' : '') + '</div></li>';
 			}).join('') + virtual.map(vviewRowHtml).join('') + '</ul>' : '') + '</li>';
 	}
 
@@ -1022,6 +1063,8 @@
 			{ header: t('InboxView_' + key) },
 			{ icon: 'mail-opened', label: t('InboxOpen'), run: () => openView(key) },
 			{ icon: 'folders-hide', label: t('InboxViewHide'), run: () => setViewShown(key, false) },
+			// « Assigned to me » covers every mailbox read: no choice of mailboxes (1.141.0)
+			...(key !== 'mine' ? [{ icon: 'settings', label: t('InboxViewMailboxesOf'), run: () => I.go('#/settings/me/unified/' + key) }] : []),
 			{ sep: true },
 		] : [];
 		const hiddenShared = S.vviews.filter(v => v.hidden);
@@ -1047,6 +1090,15 @@
 		leaveVview();
 		S.view = base;
 		S.viewBox = box;
+		if (base === 'junk') {
+			// Seen now (the server keeps the date): the count of the new spams goes
+			S.folders.forEach(({ folder: f }) => {
+				if (f.role === 'junk') {
+					f.junk_new = 0;
+				}
+			});
+			renderTree();
+		}
 		S.scope = 'view';
 		if (S.peek) {
 			renderTree();
@@ -2029,7 +2081,7 @@
 		flag: { label: 'InboxFlagged', icon: 'star', width: '1.625rem', cell: r => '<td>' + starBtn(r) + '</td>' },
 		att: { label: 'InboxAttachments', icon: 'attachment', width: '1.625rem', cell: r => '<td>' + (r.attachments ? ic('attachment', 'ibx-faint') : '') + '</td>' },
 		from: { label: 'InboxCorrespondent', sort: 'from', width: '14rem', cell: r => '<td title="' + esc(r.from_email) + '">' + (isNew(r) ? '<span class="ibx-newdot ibx-newdot--row"><span class="ibx-sr-only">' + th('InboxNew') + ' </span></span>' : '') + (seenOf(r) ? '' : '<span class="ibx-sr-only">' + th('InboxUnread') + ' </span>') + esc(correspondent(r)) + viaHtml(r) + '</td>' },
-		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
+		subject: { label: 'InboxSubject', sort: 'subject', width: '', cell: r => '<td>' + junkHtml(r) + foundHtml(r) + threadMarks(r) + threadBadge(r) + (r.answered ? answeredMark() + ' ' : '') + (forwarded(r) ? '<span title="' + th('InboxForwarded') + '">' + ic('forward', 'ibx-faint') + '</span> ' : '') + esc(r.subject || t('InboxNoSubject')) + (S.tagsColumn ? '' : ' ' + tagsHtml(r, S.tagsDots)) + '</td>' },
 		tags: { label: 'InboxTags', width: '9rem', cell: r => '<td class="ibx-mailrow__tags">' + tagsHtml(r, S.tagsDots) + '</td>' },
 		assign: { label: 'InboxAssigned', icon: 'user-circle', width: '1.625rem', fit: true, cell: r => '<td class="ibx-mailrow__assign">' + assigneesHtml(r.assignees, '', 2) + '</td>' },
 		soc: { label: 'InboxThirdparty', width: '10rem', cell: r => '<td class="ibx-muted">' + (r.soc ? esc(socName(r.soc)) : '') + '</td>' },
@@ -2441,7 +2493,7 @@
 					+ (S.crops[r.id] ? '<span class="ibx-mailcard__snippet ibx-mailcard__crop">' + cropHtml(S.crops[r.id]) + '</span>'
 						: (r.snippet ? '<span class="ibx-mailcard__snippet ibx-ellipsis">' + esc(r.snippet) + '</span>' : ''))
 					// The people assigned last: pushed to the right (margin-left: auto), they never move the rest
-					+ '<span class="ibx-mailcard__foot">' + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis"' + (r.soc.hidden ? ' title="' + th('InboxSocHiddenHelp') + '"' : '') + '>' + ic('company') + ' ' + esc(socName(r.soc)) + '</span>' : '')
+					+ '<span class="ibx-mailcard__foot">' + junkHtml(r) + foundHtml(r) + threadBadge(r) + tagsHtml(r) + (r.soc ? ' <span class="ibx-muted ibx-ellipsis"' + (r.soc.hidden ? ' title="' + th('InboxSocHiddenHelp') + '"' : '') + '>' + ic('company') + ' ' + esc(socName(r.soc)) + '</span>' : '')
 					+ (S.scope === 'all' || S.scope === 'view' ? ' ' + boxHtml(r) : '')
 					+ assigneesHtml(r.assignees, 'ibx-mailcard__assign')
 					+ '</span>'
@@ -2638,7 +2690,29 @@
 				+ '<span>' + th(sortKey) + '</span>' + ic('chevron-down') + '</button>';
 			chip.classList.toggle('is-custom', sort !== 'date:desc');
 		}
+		renderJunkBar(f);
 		renderPills();
+	}
+
+	/** Spams view or a junk folder (1.142.0): the filter « Probably legitimate », the protected mailboxes not listed */
+	function renderJunkBar(f) {
+		const bar = $('.ibx-js-junkbar', S.el);
+		const inView = S.scope === 'view' && S.view === 'junk';
+		const inFolder = S.scope === 'folder' && f && f.folder.role === 'junk' && !(f.account.protected && f.account.protect_level === 'content');
+		if (!inView && !inFolder) {
+			bar.hidden = true;
+			bar.innerHTML = '';
+			if (S.filters.legit) {
+				S.filters.legit = false;
+			}
+			return;
+		}
+		const legit = inView ? (S.viewBox ? 0 : junkCounts().legit) : (f.folder.legit || 0);
+		const live = inView && S.accounts.some(a => a.protected && a.protect_level === 'content' && !viewExcluded('junk').includes(a.id));
+		bar.innerHTML = '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--toggle ibx-js-legitfilter" aria-pressed="' + !!S.filters.legit + '"' + (legit || S.filters.legit ? '' : ' disabled') + '>'
+			+ ic('warning') + ' ' + th('InboxFilterLegit') + (legit ? ' <span class="ibx-count ibx-count--muted">' + legit + '</span>' : '') + '</button>'
+			+ (live ? '<span class="ibx-muted ibx-junkbar__note">' + ic('lock') + ' ' + th('InboxJunkViewNoProtected') + '</span>' : '');
+		bar.hidden = false;
 	}
 
 	/** Operators of the search shown as pills under the field */
@@ -2804,7 +2878,7 @@
 				S.soc = null;
 			} });
 		}
-		const names = { unread: 'InboxFilterUnread', flagged: 'InboxFilterFlagged', attachment: 'InboxFilterAttachment', mine: 'InboxFilterMine', archived: 'InboxFilterMineArchived' };
+		const names = { unread: 'InboxFilterUnread', flagged: 'InboxFilterFlagged', attachment: 'InboxFilterAttachment', mine: 'InboxFilterMine', archived: 'InboxFilterMineArchived', legit: 'InboxFilterLegit' };
 		Object.keys(names).filter(k => S.filters[k]).forEach(k => chips.push({ html: th(names[k]), rm: () => {
 			S.filters[k] = false;
 			if (k === 'mine') {
@@ -5725,11 +5799,22 @@
 	}
 
 	// ---------- Threads ignored or watched, newsletters (lot W4 1.11.0, B4, B8) ----------
-	function threadMarks(r) {
+	/**
+	 * A spam (1.142.0): « Probably legitimate » (known sender, authenticated: a doubt, never green) and why it is in the
+	 * junk when inbox knows it (score of the anti-spam engine, blocked sender)
+	 */
+	function junkHtml(r) {
 		const e = S.folders.get(r.folder);
-		const legit = r.junk_hint === 'legit' && e && e.folder.role === 'junk';
-		return (legit ? '<span class="ibx-threadmark ibx-junklegit" title="' + th('InboxJunkLegitShort') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxJunkLegitShort') + ' </span></span>' : '')
-			+ (r.bounced ? '<span class="ibx-threadmark ibx-threadmark--bounce" title="' + th('InboxBounced') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxBounced') + ' </span></span>' : '')
+		if (!e || e.folder.role !== 'junk') {
+			return '';
+		}
+		const why = r.junk_why;
+		return (r.junk_hint === 'legit' ? '<span class="ibx-badge ibx-badge--warning ibx-junkchip" title="' + th('InboxJunkLegitShort') + '">' + ic('warning') + ' ' + th('InboxJunkLegitChip') + '</span> ' : '')
+			+ (why && why.kind === 'score' ? '<span class="ibx-muted ibx-junkwhy" title="' + th('InboxJunkWhyScoreHelp') + '">' + th(why.required !== null ? 'InboxJunkWhyScore' : 'InboxJunkWhyScoreOnly', why.score.toLocaleString(locale()), why.required !== null ? why.required.toLocaleString(locale()) : '') + '</span> ' : '')
+			+ (why && why.kind === 'blocked' ? '<span class="ibx-muted ibx-junkwhy">' + ic('block') + ' ' + th('InboxJunkWhyBlocked') + '</span> ' : '');
+	}
+	function threadMarks(r) {
+		return (r.bounced ? '<span class="ibx-threadmark ibx-threadmark--bounce" title="' + th('InboxBounced') + '">' + ic('warning') + '<span class="ibx-sr-only">' + th('InboxBounced') + ' </span></span>' : '')
 			+ (r.watched ? '<span class="ibx-threadmark ibx-threadmark--watch" title="' + th('InboxThreadWatched') + '">' + ic('watch') + '<span class="ibx-sr-only">' + th('InboxThreadWatched') + ' </span></span>' : '')
 			+ (r.ignored ? '<span class="ibx-threadmark" title="' + th('InboxThreadIgnored') + '">' + ic('ignore') + '<span class="ibx-sr-only">' + th('InboxThreadIgnored') + ' </span></span>' : '');
 	}
@@ -12397,6 +12482,8 @@
 			+ '<span class="ibx-sortchip ibx-js-sortchip" hidden></span> <span class="ibx-js-pills" hidden></span><span class="ibx-spacer"></span>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-vsave" hidden>' + ic('folder-heart') + '<span class="ibx-searchinfo__word ibx-js-vsavelabel"></span></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--ghost ibx-btn--sm ibx-js-sxclear" hidden>' + th('InboxClearSearch') + '</button></div>'
+			// Spams (1.142.0): the probably legitimate ones only, the protected mailboxes said out of the view
+			+ '<div class="ibx-junkbar ibx-js-junkbar" hidden></div>'
 			+ '<div class="ibx-sx-deepbar ibx-js-deepbar" role="status" hidden></div>'
 			+ '<div class="ibx-banner ibx-banner--info ibx-paused ibx-js-paused" role="status" hidden>' + ic('info') + '<div class="ibx-banner__text">' + th('InboxSyncPaused') + '</div>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm">' + th('InboxSyncResume') + '</button></div>'
@@ -12565,6 +12652,14 @@
 			renderListHead();
 		});
 		$('.ibx-js-refresh', el).addEventListener('click', () => refreshNow());
+		// Spams (1.142.0): the probably legitimate ones only, or all of them again
+		$('.ibx-js-junkbar', el).addEventListener('click', e => {
+			if (e.target.closest('.ibx-js-legitfilter')) {
+				S.filters.legit = !S.filters.legit;
+				sxChanged();
+				renderListHead();
+			}
+		});
 		const chip = $('.ibx-js-sortchip', el);
 		chip.addEventListener('click', e => {
 			if (e.target.closest('.ibx-js-sortdir')) {

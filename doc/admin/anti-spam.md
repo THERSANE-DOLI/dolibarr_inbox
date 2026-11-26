@@ -49,3 +49,5 @@ the controller (port 11334, its password in Settings > Anti-spam > Settings) for
 Living with another anti-spam tool: a tool that takes the known senders out of the junk (authenticated mails of the
 customers and suppliers) does not know this list; a known sender blocked here may come back to the inbox through it.
 Add the address to the blacklist of that tool as well, or turn its rescue off for that sender.
+
+The spams of every mailbox in one list: view « Spams », see [Views](views.md).
