@@ -271,11 +271,18 @@ class InboxReader
 		// declared, a source changed since); the index follows, so does its thirdparty unless chosen by hand
 		require_once __DIR__.'/inboxdatasource.class.php';
 		$sources = new InboxDataSource($this->db);
-		$found = $this->isLive() ? null : $sources->detect($headers, (string) $this->row->from_email);
+		// A signed source (1.143.0) measures the signature from the reception of this mail, never from its Date header
+		$found = $this->isLive() ? null : $sources->detect($headers, (string) $this->row->from_email, null,
+			array('received' => (int) $this->db->jdate($this->row->date_received), 'message_id' => (string) $this->row->message_id));
 		if ($found !== null || (string) ($this->row->requester_email ?? '') !== '') {
 			if ($sources->store($this->row, $found)) {
 				$this->row = $this->db->getRow("SELECT m.*, f.path AS folder_path, f.role AS folder_role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder WHERE m.rowid = ".((int) $this->row->rowid)) ?: $this->row;
 			}
+		}
+		$requester = $sources->ofRow($this->row);
+		if ($requester !== null) {
+			// Believed on the signature of the site: only its signed headers are, never the subject, text or attachments
+			$requester['signed'] = !empty($found['ok']) && !empty($found['signed']);
 		}
 
 		return array(
@@ -290,7 +297,7 @@ class InboxReader
 			'from' => array('email' => $message->fromEmail, 'name' => $message->fromName),
 			'reply_to' => $message->replyToEmail,
 			// Requester of a mail sent by a site (data sources, 1.72.0); why a source did not believe the mail
-			'requester' => $sources->ofRow($this->row),
+			'requester' => $requester,
 			'requester_refused' => is_array($found) && empty($found['ok']) ? array('label' => $found['label'], 'why' => $found['why']) : null,
 			'to' => $message->to,
 			'cc' => $message->cc,

@@ -44,6 +44,9 @@ function inboxSourceInput()
 		'label' => (string) inboxAjaxParam('label'), 'status' => (int) inboxAjaxParam('status', 'int'), 'senders' => (string) inboxAjaxParam('senders'),
 		'header_email' => (string) inboxAjaxParam('header_email'), 'header_data' => (string) inboxAjaxParam('header_data'),
 		'header_fields' => (string) inboxAjaxParam('header_fields'), 'mapping' => (string) inboxAjaxParam('mapping'), 'type' => (string) inboxAjaxParam('type', 'aZ09'),
+		// Signature (1.143.0): the key is only received, never sent back; empty keeps the saved one
+		'header_signature' => (string) inboxAjaxParam('header_signature'), 'signature_key' => (string) inboxAjaxParam('signature_key', 'none'),
+		'signature_clear' => (int) inboxAjaxParam('signature_clear', 'int'),
 	);
 }
 
@@ -86,8 +89,15 @@ switch ($action) {
 		$from = InboxSenderAuth::analyzeFrom(InboxSenderAuth::parseHeaders(implode("\r\n", array_map(function ($h) {
 			return $h[0].': '.$h[1];
 		}, $headers))));
+		// The key typed in the form, else the one saved for this source (read on the server, never sent back)
+		$key = trim($in['signature_key']);
+		if ($key === '' && empty($in['signature_clear']) && (int) inboxAjaxParam('source_id', 'int') > 0) {
+			$key = $sources->signatureKeyOf((int) inboxAjaxParam('source_id', 'int'));
+		}
 		$source = array('id' => 0, 'label' => $in['label'], 'type' => $in['type'], 'senders' => $in['senders'], 'header_email' => trim($in['header_email']),
-			'header_data' => trim($in['header_data']), 'header_fields' => $in['header_fields'], 'mapping' => $in['mapping']);
+			'header_data' => trim($in['header_data']), 'header_signature' => trim($in['header_signature']), 'signature_key' => $key,
+			'header_fields' => $in['header_fields'], 'mapping' => $in['mapping']);
+		// A test: a signature measured from now, never kept (a pasted mail is no reception)
 		$found = $sources->detect($headers, (string) $from['address'], array($source));
 		inboxAjaxReply(array('from' => (string) $from['address'], 'result' => $found));
 		// no break

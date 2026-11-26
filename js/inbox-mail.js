@@ -7205,6 +7205,8 @@
 					+ (rq.data && rq.data.company && rq.data.company !== rq.name ? '<span class="ibx-muted">' + esc(rq.data.company) + '</span>' : '')
 					+ (rq.data && rq.data.phone ? '<span class="ibx-muted">' + ic('phone') + ' ' + esc(rq.data.phone) + '</span>' : '')
 					+ (rqRef ? '<span class="ibx-muted">' + esc(t('InboxRequesterRef', rqRef)) + '</span>' : '')
+					// Believed on the signature of the site (1.143.0): what the signature proves, and what it does not
+					+ (rq.signed ? I.html`<span class="ibx-muted ibx-requester__signed" title="${t('InboxRequesterSignedHelp')}">${I.raw(ic('signature'))} ${t('InboxRequesterSigned')}</span>` : '')
 					+ (canWrite && rq.create ? '<span class="ibx-dolibar__tools"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-createrequest" data-type="' + esc(rq.create) + '">' + ic('compose') + ' ' + th('InboxRequestCreate_' + rq.create) + '</button></span>' : '')
 					+ '</span></div>' : '')
 				// A mail written by us (1.92.2): the thirdparty is the one of its recipient

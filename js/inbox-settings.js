@@ -4676,6 +4676,7 @@
 		return '<tr data-src="' + d.id + '"' + (d.status ? '' : ' class="is-off"') + '>'
 			+ '<td class="ibx-srctable__switch"><button type="button" class="ibx-switch" role="switch" data-toggle="' + d.id + '" aria-checked="' + (d.status ? 'true' : 'false') + '" aria-label="' + esc(t('InboxSourceToggle', d.label)) + '"></button></td>'
 			+ '<td><b>' + esc(d.label) + '</b>' + (d.status && !senders.length ? ' <span class="ibx-badge ibx-badge--warning" title="' + th('InboxSourceNoSender') + '">' + ic('warning') + th('InboxSourceNoEffect') + '</span>' : '')
+			+ (d.signed ? I.html` <span class="ibx-badge ibx-badge--accent" title="${t('InboxSourceSignedTitle')}">${I.raw(ic('signature'))}${t('InboxSourceSigned')}</span>` : '')
 			+ '<div class="ibx-muted">' + esc([d.header_email, d.header_data].concat((d.header_fields ? d.header_fields.split('\n') : []).map(l => l.split('=')[0].trim())).filter(Boolean).join(', ')) + '</div></td>'
 			+ '<td>' + (senders.length ? esc(senders.slice(0, 3).join(', ')) + (senders.length > 3 ? ' <span class="ibx-muted">+' + (senders.length - 3) + '</span>' : '') : '<span class="ibx-muted">' + th('InboxSourceNoSender') + '</span>') + '</td>'
 			+ '<td>' + th('InboxSourceType_' + (d.type || 'none')) + '</td>'
@@ -4713,10 +4714,14 @@
 			+ '<section class="ibx-section"><h2 class="ibx-section__title">' + ic('info') + ' ' + th('InboxSourceFormatTitle') + '</h2>'
 			+ '<p>' + th('InboxSourceFormatHelp') + '</p>'
 			+ guideCode('X-Data-Form-Email: jean.dupont@example.com\nX-Data-Form: {"firstname":"Jean","lastname":"Dupont","company":"Dupont SARL","phone":"+33 1 23 45 67 89","siren":"123456789","vat":"FR12123456789","id":"D-1042"}')
-			+ '<p class="ibx-muted">' + th('InboxSourceFormatRules') + '</p></section></div>';
+			+ '<p class="ibx-muted">' + th('InboxSourceFormatRules') + '</p>'
+			// A signed source (1.143.0): the third header and what is signed
+			+ I.html`<p>${t('InboxSourceSignatureFormatHelp')}</p>`
+			+ guideCode('X-Data-Form-Signature: t=1795620187; s=<HMAC-SHA256 (key, t + "\\n" + X-Data-Form-Email + "\\n" + X-Data-Form) in hex>')
+			+ '</section></div>';
 		main.innerHTML = html;
 		copyCodeOn(main);
-		const blank = { id: 0, label: '', status: 1, senders: '', header_email: '', header_data: '', header_fields: '', mapping: '', type: '' };
+		const blank = { id: 0, label: '', status: 1, senders: '', header_email: '', header_data: '', header_signature: '', signed: false, header_fields: '', mapping: '', type: '' };
 		$('.ibx-js-srcadd', main).addEventListener('click', () => sourceDialog(main, r, blank));
 		// « Make a data source from this mail » (menu of a mail, 1.74.0): the form opens on its analysis, once
 		if (parts && parts[0] === 'new' && +parts[1] > 0) {
@@ -4743,8 +4748,9 @@
 				sw.setAttribute('aria-checked', on ? 'true' : 'false');
 				tr.classList.toggle('is-off', !on);
 				try {
+					// The key is never sent here: the server keeps the saved one
 					await post('source', 'save', { source_id: d.id, label: d.label, status: on ? 1 : 0, senders: d.senders, header_email: d.header_email,
-						header_data: d.header_data, header_fields: d.header_fields, mapping: d.mapping, type: d.type });
+						header_data: d.header_data, header_signature: d.header_signature, header_fields: d.header_fields, mapping: d.mapping, type: d.type });
 				} catch (err) {
 					sw.setAttribute('aria-checked', on ? 'false' : 'true');
 					tr.classList.toggle('is-off', on);
@@ -4803,7 +4809,7 @@
 			+ '<textarea class="ibx-field" id="f-' + name + '" name="' + name + '" rows="' + (n || 3) + '" spellcheck="false"' + (placeholder ? ' placeholder="' + esc(placeholder) + '"' : '') + '>' + esc(value || '') + '</textarea>'
 			+ (help ? '<div class="ibx-formrow__help">' + esc(help) + '</div>' : '') + '</div></div>';
 		// Glossary: the words, then the fields with what they fill and the names understood without setting
-		const TERMS = ['header', 'sender', 'auth', 'json', 'type'];
+		const TERMS = ['header', 'sender', 'auth', 'signature', 'json', 'type'];
 		const glossary = '<details class="ibx-srcgloss"><summary>' + ic('info') + ' ' + th('InboxSourceGlossary') + '</summary><dl class="ibx-srcgloss__terms">'
 			+ TERMS.map(k => '<dt id="ibx-gloss-' + k + '">' + th('InboxSourceTerm_' + k) + '</dt><dd>' + th('InboxSourceTermHelp_' + k) + '</dd>').join('') + '</dl>'
 			+ '<table class="ibx-table ibx-srcgloss__fields" id="ibx-gloss-fields"><thead><tr><th>' + th('InboxSourceGlossField') + '</th><th>' + th('InboxSourceGlossFills') + '</th><th>' + th('InboxSourceGlossNames') + '</th></tr></thead><tbody>'
@@ -4828,6 +4834,14 @@
 			+ area('senders', t('InboxSourceSenders'), d.senders, t('InboxSourceSendersHelp'), 'noreply@monsite.fr\nboutique.example.com')
 			+ field('header_email', t('InboxSourceHeaderEmail'), d.header_email, { autocomplete: 'off', placeholder: 'X-Data-Form-Email', help: t('InboxSourceHeaderEmailHelp') })
 			+ field('header_data', t('InboxSourceHeaderData'), d.header_data, { autocomplete: 'off', placeholder: 'X-Data-Form', help: t('InboxSourceHeaderDataHelp') })
+			// Signature (1.143.0): the key is written only, never read back (« saved » or not); a new one is made by the browser
+			+ field('header_signature', t('InboxSourceHeaderSignature'), d.header_signature, { autocomplete: 'off', placeholder: 'X-Data-Form-Signature', help: t('InboxSourceHeaderSignatureHelp') })
+			+ I.html`<div class="ibx-formrow" data-field="signature_key"><label class="ibx-formrow__label" for="f-signature_key">${t('InboxSourceSignatureKey')}</label><div>`
+			+ I.html`<div class="ibx-inline ibx-srcsig"><input class="ibx-field ibx-srcsig__key" id="f-signature_key" name="signature_key" type="password" autocomplete="new-password" spellcheck="false" placeholder="${t(d.signed ? 'InboxSourceSignatureKeepPlaceholder' : 'InboxSourceSignatureKeyPlaceholder')}">`
+			+ I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-js-siggen">${I.raw(ic('key'))} ${t('InboxSourceSignatureGenerate')}</button></div>`
+			+ (d.signed ? I.html`<label class="ibx-check"><input type="checkbox" name="signature_clear"> ${t('InboxSourceSignatureClear')}</label>` : '')
+			+ I.html`<div class="ibx-formrow__help">${t(d.signed ? 'InboxSourceSignatureSet' : 'InboxSourceSignatureNone')} ${t('InboxSourceSignatureKeyHelp')}</div>`
+			+ '<div class="ibx-srcsig__new" hidden aria-live="polite"></div><div class="ibx-formrow__error" hidden></div></div></div>'
 			+ rows('header_fields', t('InboxSourceHeaderFields'), d.header_fields, t('InboxSourceHeaderFieldsRowsHelp'))
 			+ rows('mapping', t('InboxSourceMapping'), d.mapping, t('InboxSourceMappingRowsHelp'))
 			+ field('type', t('InboxSourceType'), d.type, { options: (r.types || ['']).map(v => [v, t('InboxSourceType_' + (v || 'none'))]), help: t('InboxSourceTypeHelp') })
@@ -4837,7 +4851,7 @@
 			+ '<div class="ibx-srctest__out" aria-live="polite"></div></div></div></details>'
 			+ glossary
 			+ '</form>';
-		const HELP = { label: 'type', senders: 'sender', header_email: 'header', header_data: 'json', header_fields: 'fields', mapping: 'fields', type: 'type' };
+		const HELP = { label: 'type', senders: 'sender', header_email: 'header', header_data: 'json', header_signature: 'signature', signature_key: 'signature', header_fields: 'fields', mapping: 'fields', type: 'type' };
 		const serialize = (dlg, name) => $$('[data-rows="' + name + '"] .ibx-srcrow', dlg).map(row => [$('input', row).value.trim(), $('select', row).value])
 			.filter(p => p[0] && p[1]).map(p => p[0] + ' = ' + p[1]).join('\n');
 		const values = dlg => {
@@ -4970,6 +4984,39 @@
 				});
 				senders.addEventListener('input', statusHint);
 				statusHint();
+				// A new signing key (1.143.0): made here by the browser (256 bits), shown once in its field to be copied into
+				// the site (a field scrolls, a block of code would widen the dialog on a phone), sent with the form; the
+				// server never sends a key back
+				const sigZone = $('.ibx-srcsig__new', dlg);
+				const sigInput = $('[name="signature_key"]', dlg);
+				$('.ibx-js-siggen', dlg).addEventListener('click', () => {
+					const bytes = new Uint8Array(32);
+					crypto.getRandomValues(bytes);
+					sigInput.value = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+					sigInput.type = 'text';
+					const clear = $('[name="signature_clear"]', dlg);
+					if (clear) {
+						clear.checked = false;
+					}
+					sigZone.innerHTML = I.html`<div class="ibx-notice ibx-notice--info">${I.raw(ic('info'))}<div class="ibx-notice__text">${t('InboxSourceSignatureGenerated')}`
+						+ I.html` <button type="button" class="ibx-btn ibx-btn--sm ibx-js-sigcopy">${I.raw(ic('copy'))} ${t('InboxCopy')}</button></div></div>`;
+					sigZone.hidden = false;
+					sigInput.select();
+				});
+				sigZone.addEventListener('click', async e => {
+					const b = e.target.closest('.ibx-js-sigcopy');
+					if (!b) {
+						return;
+					}
+					try {
+						await navigator.clipboard.writeText(sigInput.value);
+						b.innerHTML = I.html`${I.raw(ic('check'))} ${t('InboxCodeCopied')}`;
+					} catch (err) {
+						// No clipboard API outside https: the key selected, for Ctrl+C
+						sigInput.select();
+						b.innerHTML = I.html`${I.raw(ic('check'))} ${t('InboxCodeSelected')}`;
+					}
+				});
 				// « ? » beside each setting: its entry in the glossary
 				Object.keys(HELP).forEach(name => {
 					const label = $('[data-field="' + name + '"] .ibx-formrow__label', dlg);
