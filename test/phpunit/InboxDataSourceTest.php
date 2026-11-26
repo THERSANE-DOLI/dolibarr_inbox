@@ -240,22 +240,37 @@ class InboxDataSourceTest extends InboxTestCase
 		$this->assertSame('signature', $sources->detectRaw($replayed, self::SITE)['why'], 'a test of the settings: measured from now');
 		$genuine = $sources->detectRaw($replayed, self::SITE, array('received' => $old + 60, 'message_id' => 'first@inbox-test.invalid'));
 		$this->assertTrue($genuine['ok'], 'the genuine mail, read again later: its own reception ('.$genuine['why'].')');
-		// A signature serves one mail: its copies (same Message-ID) and its readings again are believed, another mail is a replay
+		// A signature serves one mail: its readings again and its copies (received within SIGNATURE_COPY_SECONDS) are
+		// believed; later, it is a replay, whatever its Message-ID (the sender writes it, as the Date header)
+		$late = InboxDataSource::SIGNATURE_COPY_SECONDS + 1;
 		$mail = array('received' => $now, 'message_id' => '<request1@forms.inbox-test.invalid>');
 		$found = $sources->detectRaw($signed($right), self::SITE, $mail);
 		$this->assertTrue($found['ok']);
 		$this->assertTrue($found['signed']);
 		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, $mail)['ok'], 'read again');
 		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, array('received' => $now + 30, 'message_id' => 'request1@forms.inbox-test.invalid'))['ok'], 'a copy in another mailbox');
-		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + 600, 'message_id' => 'other@evil.inbox-test.invalid'))['why'], 'same signature, another mail');
-		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + 600, 'message_id' => ''))['why'], 'same signature, a mail without Message-ID');
+		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, array('received' => $now + 20, 'message_id' => 'request1-bis@forms.inbox-test.invalid'))['ok'], 'the form sent to a second mailbox in the same second');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + $late, 'message_id' => 'request1@forms.inbox-test.invalid'))['why'], 'review of #19: the mail copied whole, Message-ID included, received later');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + $late, 'message_id' => 'other@evil.inbox-test.invalid'))['why'], 'same signature, another mail');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + $late, 'message_id' => ''))['why'], 'same signature, a mail without Message-ID');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now - $late, 'message_id' => 'request1@forms.inbox-test.invalid'))['why'], 'received before the first one seen');
+		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, $mail)['ok'], 'the genuine mail, read again after a replay');
 		$this->assertTrue($sources->detectRaw($signed($right), self::SITE)['ok'], 'a test of the settings neither checks nor keeps it');
-		$this->assertSame(2, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".$id)->n, 'one row per signed mail');
-		// Without Message-ID: the time of its reception makes the mail
+		$row = $this->db->getRow("SELECT mail_key, date_received FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".$id." AND signature = '".hash('sha256', InboxDataSource::signatureParts($right)['s'])."'");
+		$this->assertSame(array('request1@forms.inbox-test.invalid', $now), array((string) $row->mail_key, (int) $this->db->jdate($row->date_received)), 'the first reception kept');
+		// Without Message-ID: the same rule
 		$lone = InboxDataSource::sign($key, $email, $data, $now - 5);
 		$this->assertTrue($sources->detectRaw($signed($lone), self::SITE, array('received' => $now, 'message_id' => ''))['ok']);
 		$this->assertTrue($sources->detectRaw($signed($lone), self::SITE, array('received' => $now, 'message_id' => ''))['ok'], 'the same mail read again');
-		$this->assertSame('replay', $sources->detectRaw($signed($lone), self::SITE, array('received' => $now + 1, 'message_id' => ''))['why']);
+		$this->assertTrue($sources->detectRaw($signed($lone), self::SITE, array('received' => $now + 1, 'message_id' => ''))['ok'], 'a copy');
+		$this->assertSame('replay', $sources->detectRaw($signed($lone), self::SITE, array('received' => $now + $late, 'message_id' => ''))['why']);
+		$this->assertSame(3, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".$id)->n, 'one row per signed request: the genuine old one, request1, the lone one');
+		// A row kept by 1.143.0, without its reception: measured from the time of the signature
+		$old143 = InboxDataSource::sign($key, $email, $data, $now - 10);
+		$this->db->query("INSERT INTO ".$this->db->prefix()."inbox_source_signature (fk_source, signature, mail_key, date_signature, date_creation) VALUES (".$id.", '"
+			.hash('sha256', InboxDataSource::signatureParts($old143)['s'])."', 'old@forms.inbox-test.invalid', '".$this->db->idate($now - 10)."', '".$this->db->idate($now)."')");
+		$this->assertTrue($sources->detectRaw($signed($old143), self::SITE, array('received' => $now, 'message_id' => 'old@forms.inbox-test.invalid'))['ok']);
+		$this->assertSame('replay', $sources->detectRaw($signed($old143), self::SITE, array('received' => $now + $late, 'message_id' => 'old@forms.inbox-test.invalid'))['why']);
 
 		// Saved again without a key: the key stays; another header name; removed on demand
 		$base = array('label' => 'ZzSource form', 'status' => 1, 'senders' => 'forms.inbox-test.invalid', 'header_email' => 'X-Data-Form-Email', 'header_data' => 'X-Data-Form', 'type' => 'propal');
