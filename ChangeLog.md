@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: an answer to a calendar invitation (« Accepted: », « Invitation mise à jour : ») is the same subject :   1.143.1
+  - the prefixes of the calendars are removed before subjects are compared, as « Re: », in the five languages.
+  - its link to the event is no more listed « from another subject », and it opens no new conversation.
+
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
     trusted sender with a right signature header (HMAC-SHA256, at 2 days of its reception at most) is believed.
