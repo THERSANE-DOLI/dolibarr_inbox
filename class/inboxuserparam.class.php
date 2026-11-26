@@ -135,6 +135,9 @@ class InboxUserParam
 			'tree_mode' => array('auto', array('auto', 'all', 'single')),
 			'tree_box' => array('0', 'int:0:2147483647'),
 			'unified_exclude' => array('[]', 'json'),
+			// Mailboxes of each unified view with a list of its own (1.141.0, class InboxUnifiedView):
+			// {"view": {"exclude": [ids]}}; « Assigned to me » never has one
+			'views_scope' => array('{}', 'json'),
 			// Virtual views (1.31.0): the views shared with the user that he hides
 			'views_hidden' => array('[]', 'json'),
 			// Order of the folders among their brothers, per mailbox: {"<mailbox>":[folders]} (1.42.0)
@@ -169,6 +172,10 @@ class InboxUserParam
 		if (strpos($check, 'int:') === 0) {
 			list(, $min, $max) = explode(':', $check);
 			return preg_match('/^-?\d+$/', $value) && (int) $value >= (int) $min && (int) $value <= (int) $max;
+		}
+		if ($param === 'views_scope') {
+			require_once __DIR__.'/inboxunifiedview.class.php';
+			return strlen($value) <= 4000 && InboxUnifiedView::isValidScope($value);
 		}
 		if ($check === 'json') {
 			return $value === '' || (strlen($value) <= 4000 && is_array(json_decode($value, true)));

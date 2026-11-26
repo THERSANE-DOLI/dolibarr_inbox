@@ -2668,6 +2668,28 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-varpick__none { border-top: 0; margin: 0; padding: var(--ibx-s3); }
 /* Settings > Server (1.54.0): the jobs table scrolls sideways on a phone */
 .ibx-tablewrap { overflow-x: auto; }
+/* My account > mailboxes of the views (1.141.0): one row per mailbox, one column per view; the mailbox column stays
+   while the grid scrolls sideways on a phone */
+.ibx-viewgrid { width: auto; min-width: 100%; }
+.ibx-viewgrid th, .ibx-viewgrid td { text-align: center; vertical-align: top; }
+.ibx-viewgrid th[scope="row"], .ibx-viewgrid thead th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600; background: var(--ibx-bg); }
+.ibx-viewgrid th[scope="row"] .ibx-muted { font-weight: 400; }
+.ibx-viewgrid thead th { min-width: 6.5rem; }
+.ibx-viewgrid__sub { display: block; margin-top: var(--ibx-s1); font-weight: 400; font-size: var(--ibx-fs-xs, 0.75rem); color: var(--ibx-text-muted); }
+.ibx-viewgrid button.ibx-viewgrid__sub { margin-inline: auto; color: var(--ibx-accent); }
+.ibx-viewgrid .ibx-viewgrid__common { border-right: 1px solid var(--ibx-border-strong); }
+.ibx-viewgrid td.is-following input { opacity: 0.55; }
+.ibx-viewgrid .is-pointed { background: var(--ibx-accent-softer); }
+.ibx-viewgrid tbody tr:hover th[scope="row"] { background: var(--ibx-bg-pane); }
+/* A phone: the grid stays a grid (the tables of the settings are stacked there), scrolled sideways, mailbox column kept */
+@media (max-width: 39.9375rem) {
+	.ibx-table.ibx-viewgrid thead { display: table-header-group; }
+	.ibx-table.ibx-viewgrid tr { display: table-row; padding: 0; }
+	.ibx-table.ibx-viewgrid td, .ibx-table.ibx-viewgrid th { border-bottom: 1px solid var(--ibx-border); padding: var(--ibx-s2); }
+	.ibx-viewgrid thead th { min-width: 5.5rem; }
+	.ibx-viewgrid th[scope="row"], .ibx-viewgrid thead th:first-child { max-width: 8rem; overflow-wrap: break-word; box-shadow: 1px 0 0 var(--ibx-border); }
+	.ibx-viewgrid th[scope="row"] .ibx-muted { overflow-wrap: anywhere; }
+}
 .ibx-crontable td:first-child a { display: inline-flex; align-items: center; gap: var(--ibx-s1); }
 .ibx-crontable .ibx-formrow__error { max-width: 28rem; }
 

@@ -59,6 +59,7 @@ class InboxDocumentation
 				'mail_templates' => array('icon' => 'fa-file-alt', 'version' => '1.118.0', 'files' => array('en_US' => 'admin/mail-templates.md')),
 				'dolibarr_sent' => array('icon' => 'fa-paper-plane', 'version' => '1.132.0', 'files' => array('en_US' => 'admin/dolibarr-sent.md')),
 				'conversations' => array('icon' => 'fa-comments', 'version' => '1.139.0', 'files' => array('en_US' => 'admin/conversations.md')),
+				'views' => array('icon' => 'fa-layer-group', 'version' => '1.141.0', 'files' => array('en_US' => 'admin/views.md')),
 				'agenda_panel' => array('icon' => 'fa-calendar-alt', 'version' => '1.107.0', 'files' => array('en_US' => 'admin/agenda-panel.md')),
 				'new_customer' => array('icon' => 'fa-user-plus', 'version' => '1.79.0', 'files' => array('en_US' => 'admin/new-customer.md')),
 			)),

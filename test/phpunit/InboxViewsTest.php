@@ -29,6 +29,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/InboxTestCase.php';
 dol_include_once('/inbox/class/inboxsearchsql.class.php');
+dol_include_once('/inbox/class/inboxunifiedview.class.php');
 
 /**
  * Tests of the filters by role of the unified views
@@ -128,5 +129,54 @@ class InboxViewsTest extends InboxTestCase
 		$this->assertLessThan(0, $params->set($u, 'tree_mode', 'bogus'));
 		$this->assertGreaterThan(0, $params->set($u, 'tree_box', '42'));
 		$this->assertLessThan(0, $params->set($u, 'tree_box', '-1'));
+	}
+
+	/**
+	 * Mailboxes of each view (1.141.0): « Assigned to me » every mailbox read, the own list of a view, else the
+	 * common list for inbox, unread, sent and drafts, else every mailbox
+	 *
+	 * @return void
+	 */
+	public function testMailboxesOfEachView()
+	{
+		$readable = array(3, 7, 12);
+		$common = '[7]';
+		$none = '{}';
+		$this->assertSame(array(3, 7, 12), InboxUnifiedView::accounts($readable, 'mine', $common, '{"inbox":{"exclude":[3]}}'), 'assigned to me: never a mailbox left out');
+		$this->assertSame(array(3, 12), InboxUnifiedView::accounts($readable, 'inbox', $common, $none), 'inbox follows the common list');
+		$this->assertSame(array(3, 12), InboxUnifiedView::accounts($readable, 'drafts', $common, $none), 'drafts follow the common list');
+		$this->assertSame(array(3, 7, 12), InboxUnifiedView::accounts($readable, 'flagged', $common, $none), 'followed: every mailbox by default');
+		$own = '{"inbox":{"exclude":[3]},"flagged":{"exclude":[12]}}';
+		$this->assertSame(array(7, 12), InboxUnifiedView::accounts($readable, 'inbox', $common, $own), 'own list of a view, not the common one');
+		$this->assertSame(array(3, 12), InboxUnifiedView::accounts($readable, 'unread', $common, $own), 'other views keep the common list');
+		$this->assertSame(array(3, 7), InboxUnifiedView::accounts($readable, 'flagged', $common, $own));
+		$this->assertSame(array(3, 12), InboxUnifiedView::accounts(array(3, 12), 'flagged', $common, '{"flagged":{"exclude":[]}}'), 'a mailbox not read is never added');
+		$this->assertSame(array(3, 7, 12), InboxUnifiedView::accounts($readable, 'mine', $common, '{"mine":{"exclude":[3]}}'), 'a list for « mine » is never read');
+		$this->assertSame(array(3, 12), InboxUnifiedView::accounts($readable, 'inbox', $common, 'not json'), 'a wrong value: the common list');
+	}
+
+	/**
+	 * @return void
+	 */
+	public function testSettingOfTheMailboxesOfEachView()
+	{
+		$u = $this->user('views');
+		$params = new InboxUserParam($this->db);
+		$this->assertSame('{}', $params->get($u, 'views_scope'), 'no own list by default');
+		$this->assertGreaterThan(0, $params->set($u, 'views_scope', '{"inbox":{"exclude":[3]},"flagged":{"exclude":[]}}'));
+		$this->assertSame(array('inbox' => array(3), 'flagged' => array()), InboxUnifiedView::scopeOf($params->get($u, 'views_scope')));
+		$this->assertGreaterThan(0, $params->set($u, 'views_scope', '{}'), 'every view back to its default');
+		foreach (array(
+			'{"mine":{"exclude":[3]}}' => 'assigned to me has no list',
+			'{"bogus":{"exclude":[3]}}' => 'unknown view',
+			'{"inbox":{"exclude":["3"]}}' => 'ids as text',
+			'{"inbox":{"exclude":[-3]}}' => 'negative id',
+			'{"inbox":{"exclude":[3],"more":1}}' => 'unknown key',
+			'{"inbox":[3]}' => 'not an object per view',
+			'[{"exclude":[3]}]' => 'a list',
+			'not json' => 'not JSON',
+		) as $value => $why) {
+			$this->assertLessThan(0, $params->set($u, 'views_scope', $value), $why);
+		}
 	}
 }

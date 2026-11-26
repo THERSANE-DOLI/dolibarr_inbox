@@ -354,12 +354,13 @@ switch ($action) {
 			if (!isset(INBOX_LIST_VIEWS[$view])) {
 				inboxAjaxError('Unknown view', 400);
 			}
+			// The mailboxes of the view: its own list, the common list, or all of them (InboxUnifiedView, 1.141.0)
+			dol_include_once('/inbox/class/inboxunifiedview.class.php');
 			$params = new InboxUserParam($db);
-			$out = json_decode((string) $params->get($user, 'unified_exclude'), true);
-			$accounts = array_values(array_diff($readable, array_map('intval', is_array($out) ? $out : array())));
+			$accounts = InboxUnifiedView::accounts($readable, $view, (string) $params->get($user, 'unified_exclude'), (string) $params->get($user, 'views_scope'));
 			if (is_array(inboxAjaxParam('accounts', 'none'))) {
 				// The view in one mailbox (entry « Followed » of a mailbox in the tree): that one if the user reads it,
-				// even left out of the unified views
+				// even left out of the view
 				$accounts = array_values(array_intersect($readable, array_map('intval', inboxAjaxParam('accounts', 'none'))));
 			}
 			if (!$accounts) {

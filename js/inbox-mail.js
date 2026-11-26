@@ -613,7 +613,25 @@
 			return ['inbox', 'unread', 'flagged', 'mine'];
 		}
 	}
-	function viewsExcluded() {
+	/**
+	 * Mailboxes left out of a view (1.141.0), the rule of class/inboxunifiedview.class.php: never any for « Assigned
+	 * to me », else the own list of the view, else the common list (inbox, unread, sent, drafts), else none
+	 */
+	function viewExcluded(key) {
+		if (key === 'mine') {
+			return [];
+		}
+		try {
+			const own = JSON.parse(params.views_scope || '{}');
+			if (own && own[key] && Array.isArray(own[key].exclude)) {
+				return own[key].exclude.map(Number);
+			}
+		} catch (e) {
+			// A wrong value: the common list
+		}
+		if (!['inbox', 'unread', 'sent', 'drafts'].includes(key)) {
+			return [];
+		}
 		try {
 			const v = JSON.parse(params.unified_exclude || '[]');
 			return Array.isArray(v) ? v.map(Number) : [];
@@ -623,7 +641,7 @@
 	}
 	/** Unread of a view, from the counters of the folders already known (no call): inbox and unread only */
 	function viewCount(key) {
-		const out = new Set(viewsExcluded());
+		const out = new Set(viewExcluded(key));
 		let n = 0;
 		S.folders.forEach(({ folder: f, account: a }) => {
 			if (out.has(a.id)) {
@@ -1022,6 +1040,8 @@
 			{ header: t('InboxView_' + key) },
 			{ icon: 'mail-opened', label: t('InboxOpen'), run: () => openView(key) },
 			{ icon: 'folders-hide', label: t('InboxViewHide'), run: () => setViewShown(key, false) },
+			// « Assigned to me » covers every mailbox read: no choice of mailboxes (1.141.0)
+			...(key !== 'mine' ? [{ icon: 'settings', label: t('InboxViewMailboxesOf'), run: () => I.go('#/settings/me/unified/' + key) }] : []),
 			{ sep: true },
 		] : [];
 		const hiddenShared = S.vviews.filter(v => v.hidden);

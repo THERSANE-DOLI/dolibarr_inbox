@@ -5785,7 +5785,8 @@
 		target.classList.add('is-flash');
 		// Removed after the fading (also without animation: the outline of the reduced motion goes too)
 		setTimeout(() => target.classList.remove('is-flash'), 2600);
-		const first = $('input, select, button', target);
+		// The column of a view asked by the route first; never an info bubble (it would open on its own)
+		const first = $('.is-pointed input:not([disabled])', target) || $('input:not([disabled]), select, button:not(.ibx-infotip__btn)', target);
 		if (first) {
 			first.focus({ preventScroll: true });
 		}
@@ -5847,6 +5848,119 @@
 	}
 
 	// ---------- My account ----------
+	/** Views of the grid of My account, in the order of the panel; « Assigned to me » always covers every mailbox */
+	const GRID_VIEWS = ['inbox', 'unread', 'flagged', 'mine', 'sent', 'drafts'];
+	/** Views following the common list as long as they have no list of their own (class/inboxunifiedview.class.php) */
+	const COMMON_VIEWS = ['inbox', 'unread', 'sent', 'drafts'];
+
+	/**
+	 * Mailboxes of the unified views (1.141.0): one row per mailbox, the common list then one column per view. A view
+	 * of the common list follows it until one of its boxes is changed; « Follow the common list » brings it back.
+	 * @param {HTMLElement} box Container
+	 * @param {Array<object>} boxes Mailboxes of the user
+	 * @param {object} p Settings of the user (updated here after each save)
+	 * @param {string} pointed View asked by the route (#/settings/me/unified/<view>), its column marked
+	 */
+	function paintViewBoxes(box, boxes, p, pointed) {
+		const json = (v, def) => {
+			try {
+				const x = JSON.parse(v || def);
+				return x && typeof x === 'object' ? x : JSON.parse(def);
+			} catch (e) {
+				return JSON.parse(def);
+			}
+		};
+		const common = () => json(p.unified_exclude, '[]').map(Number);
+		const own = () => {
+			const x = json(p.views_scope, '{}');
+			return Array.isArray(x) ? {} : x;
+		};
+		const excluded = k => {
+			if (k === 'common') {
+				return common();
+			}
+			if (k === 'mine') {
+				return [];
+			}
+			const o = own();
+			if (o[k] && Array.isArray(o[k].exclude)) {
+				return o[k].exclude.map(Number);
+			}
+			return COMMON_VIEWS.includes(k) ? common() : [];
+		};
+		const paint = () => {
+			const o = own();
+			const head = k => {
+				let sub = '';
+				if (k === 'mine') {
+					sub = I.html`<span class="ibx-viewgrid__sub">${t('InboxViewAlwaysAll')}${I.raw(' ' + I.infotip(t('InboxView_mine'), t('InboxViewMineAllHelp')))}</span>`;
+				} else if (COMMON_VIEWS.includes(k)) {
+					sub = o[k] ? I.html`<button type="button" class="ibx-linkbtn ibx-viewgrid__sub" data-follow="${k}">${t('InboxViewFollowCommon')}</button>`
+						: I.html`<span class="ibx-viewgrid__sub">${t('InboxViewFollowsCommon')}</span>`;
+				} else {
+					sub = I.html`<span class="ibx-viewgrid__sub">${t('InboxViewAllByDefault')}</span>`;
+				}
+				return I.html`<th scope="col" class="${k === pointed ? 'is-pointed' : ''}">${t('InboxView_' + k)}${I.raw(sub)}</th>`;
+			};
+			const cell = (k, m) => {
+				const following = COMMON_VIEWS.includes(k) && !o[k];
+				const label = t('InboxViewBoxIn', m.label || m.email, k === 'common' ? t('InboxViewCommonList') : t('InboxView_' + k));
+				return I.html`<td class="${(k === pointed ? 'is-pointed ' : '') + (following ? 'is-following' : '')}"><input type="checkbox" data-view="${k}" value="${m.id}" aria-label="${label}"`
+					+ (excluded(k).includes(m.id) ? '' : ' checked') + (k === 'mine' ? ' disabled' : '') + '></td>';
+			};
+			box.innerHTML = '<table class="ibx-table ibx-viewgrid"><thead><tr>'
+				+ I.html`<th scope="col">${t('InboxMailbox')}</th><th scope="col" class="ibx-viewgrid__common">${t('InboxViewCommonList')}${I.raw(' ' + I.infotip(t('InboxViewCommonList'), t('InboxViewCommonListHelp')))}</th>`
+				+ GRID_VIEWS.map(head).join('') + '</tr></thead><tbody>'
+				+ boxes.map(m => I.html`<tr><th scope="row">${m.label || m.email}${I.raw(m.label && m.label !== m.email ? I.html`<div class="ibx-muted">${m.email}</div>` : '')}</th>`
+					+ cell('common', m).replace('<td class="', '<td class="ibx-viewgrid__common ') + GRID_VIEWS.map(k => cell(k, m)).join('') + '</tr>').join('')
+				+ '</tbody></table>';
+		};
+		const save = async (param, value) => {
+			try {
+				const r = await post('userparam', 'set', { param, value });
+				Object.assign(p, r.params || {});
+				Dolibarr.executeHook('inbox:params:changed', r.params);
+				toast(t('InboxSaved'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			paint();
+		};
+		box.addEventListener('change', e => {
+			const c = e.target.closest('input[data-view]');
+			if (!c) {
+				return;
+			}
+			const k = c.dataset.view;
+			const id = +c.value;
+			const out = excluded(k).filter(x => x !== id).concat(c.checked ? [] : [id]);
+			if (k === 'common') {
+				save('unified_exclude', JSON.stringify(out));
+				return;
+			}
+			const o = own();
+			o[k] = { exclude: out };
+			save('views_scope', JSON.stringify(o));
+		});
+		box.addEventListener('click', e => {
+			const b = e.target.closest('[data-follow]');
+			if (!b) {
+				return;
+			}
+			const o = own();
+			delete o[b.dataset.follow];
+			save('views_scope', JSON.stringify(o));
+		});
+		paint();
+		// The column asked brought into view when the grid scrolls sideways (phone)
+		const th = pointed && $('thead th.is-pointed', box);
+		if (th) {
+			requestAnimationFrame(() => {
+				box.scrollLeft = Math.max(0, th.offsetLeft - $('thead th', box).offsetWidth);
+			});
+		}
+	}
+
 	async function renderMe(main, parts) {
 		main.innerHTML = skeleton();
 		let data;
@@ -5897,17 +6011,10 @@
 				+ '</tbody></table></section>';
 		}
 		// Voice typing (1.28.0): the receivers of the voice agreed to, each one withdrawn here
-		// Unified views (1.29.0): the mailboxes they gather, each one can be left out
+		// Mailboxes of the unified views (1.29.0, per view 1.141.0): a grid filled by paintViewBoxes()
 		if (data.mailboxes.length > 1) {
-			let out = [];
-			try {
-				out = JSON.parse(p.unified_exclude || '[]').map(Number);
-			} catch (e) {
-				out = [];
-			}
 			html += '<section class="ibx-section" data-section="unified">' + title('unified') + '<p class="ibx-section__help">' + th('InboxUnifiedHelp') + '</p>'
-				+ '<div class="ibx-form ibx-js-unified">' + data.mailboxes.map(m => '<label class="ibx-check"><input type="checkbox" value="' + m.id + '"' + (out.includes(m.id) ? '' : ' checked') + '> '
-					+ esc(m.label && m.label !== m.email ? m.label + ' <' + m.email + '>' : m.email) + '</label>').join('') + '</div></section>';
+				+ '<div class="ibx-tablewrap ibx-js-unified"></div></section>';
 		}
 		html += '<section class="ibx-section ibx-js-mydictation" data-section="dictation" hidden></section>';
 		html += '<section class="ibx-section ibx-js-mydevices" data-section="devices" hidden></section>';
@@ -5948,16 +6055,7 @@
 		bindBoxOrder(main);
 		const unified = $('.ibx-js-unified', main);
 		if (unified) {
-			unified.addEventListener('change', async () => {
-				const out = $$('input[type="checkbox"]', unified).filter(c => !c.checked).map(c => +c.value);
-				try {
-					const r = await post('userparam', 'set', { param: 'unified_exclude', value: JSON.stringify(out) });
-					Dolibarr.executeHook('inbox:params:changed', r.params);
-					toast(t('InboxSaved'));
-				} catch (err) {
-					toast(err.message, { error: true });
-				}
-			});
+			paintViewBoxes(unified, data.mailboxes, p, parts && parts[0] === 'unified' ? parts[1] || '' : '');
 		}
 		const mailto = $('.ibx-js-mailto', main);
 		if (mailto) {
