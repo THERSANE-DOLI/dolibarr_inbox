@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a folder of the server that can never be read no longer keeps its mailbox in « first synchronisation » :   1.145.0
+  - the folders where Dovecot keeps the rules (INBOX.dovecot.sieve...), shown after the first save of the rules, are
+    no longer followed when they appear: still in the tree, they can be followed by hand.
+  - a folder failing 3 passes in a row is left out of the first synchronisation, « failing » in the tab Synchro, and
+    tried again every 15 min only; a good pass counts it again. Activate the module again.
+
 - FIX: a signed mail copied whole, Message-ID included, is refused as a replay :   1.144.0
   - a signature is believed again only on a mail received at most 5 minutes from its first reception (the copies of
     one mail in other folders or mailboxes); the Message-ID, written by the sender as the Date, no longer decides.

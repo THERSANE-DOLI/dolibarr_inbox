@@ -56,6 +56,8 @@ function inboxSyncState(InboxAccount $account)
 			'selectable' => (int) $f->selectable, 'sync_enabled' => (int) $f->sync_enabled, 'total' => (int) $f->total, 'unread' => (int) $f->unread,
 			'indexed' => (int) $f->indexed, 'first_sync_done' => (int) $f->first_sync_done, 'date_sync' => $f->date_sync ? (int) $db->jdate($f->date_sync) : null,
 			'error' => (string) $f->sync_error,
+			// Failed pass after pass (1.145.0): no longer counted in the first synchronisation of the mailbox
+			'set_aside' => (int) ($f->sync_fail_count ?? 0) >= InboxFolder::FAILS_SET_ASIDE ? 1 : 0,
 		);
 	}
 

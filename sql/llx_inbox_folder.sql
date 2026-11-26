@@ -37,6 +37,7 @@ CREATE TABLE llx_inbox_folder(
 	icon varchar(48) DEFAULT NULL,
 	date_sync datetime DEFAULT NULL,
 	sync_error text DEFAULT NULL,
+	sync_fail_count integer DEFAULT 0 NOT NULL,
 	status smallint DEFAULT 1 NOT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;
