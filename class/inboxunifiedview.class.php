@@ -26,7 +26,7 @@
  * - « Assigned to me »: never any left out (a mail assigned to the user must always be there);
  * - a view with its own list (user setting views_scope, {"view": {"exclude": [ids]}}): the ones of that list;
  * - else the views of the common list (inbox, unread, sent, drafts): the ones of unified_exclude;
- * - else (followed): none.
+ * - else (followed, spams): none.
  * The same rule is applied by the browser (js/inbox-mail.js viewAccounts()).
  */
 class InboxUnifiedView
@@ -35,7 +35,7 @@ class InboxUnifiedView
 	const COMMON = array('inbox', 'unread', 'sent', 'drafts');
 
 	/** Views covering every mailbox read as long as they have no list of their own */
-	const ALL = array('flagged');
+	const ALL = array('flagged', 'junk');
 
 	/** Views always covering every mailbox read: no list of their own */
 	const ALWAYS_ALL = array('mine');

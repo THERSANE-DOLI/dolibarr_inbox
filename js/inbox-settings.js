@@ -5849,7 +5849,7 @@
 
 	// ---------- My account ----------
 	/** Views of the grid of My account, in the order of the panel; « Assigned to me » always covers every mailbox */
-	const GRID_VIEWS = ['inbox', 'unread', 'flagged', 'mine', 'sent', 'drafts'];
+	const GRID_VIEWS = ['inbox', 'unread', 'flagged', 'mine', 'sent', 'drafts', 'junk'];
 	/** Views following the common list as long as they have no list of their own (class/inboxunifiedview.class.php) */
 	const COMMON_VIEWS = ['inbox', 'unread', 'sent', 'drafts'];
 
@@ -5952,11 +5952,13 @@
 			save('views_scope', JSON.stringify(o));
 		});
 		paint();
-		// The column asked brought into view when the grid scrolls sideways (phone)
+		// The column asked brought into view when the grid scrolls sideways (phone), only when it is hidden
 		const th = pointed && $('thead th.is-pointed', box);
 		if (th) {
 			requestAnimationFrame(() => {
-				box.scrollLeft = Math.max(0, th.offsetLeft - $('thead th', box).offsetWidth);
+				if (th.offsetLeft + th.offsetWidth > box.scrollLeft + box.clientWidth) {
+					box.scrollLeft = Math.max(0, th.offsetLeft - $('thead th', box).offsetWidth);
+				}
 			});
 		}
 	}

@@ -179,4 +179,37 @@ class InboxViewsTest extends InboxTestCase
 			$this->assertLessThan(0, $params->set($u, 'views_scope', $value), $why);
 		}
 	}
+
+	/**
+	 * Spams view (1.142.0): the junk folders of every mailbox, the probably legitimate ones only on demand
+	 *
+	 * @return void
+	 */
+	public function testSpamsView()
+	{
+		$a = $this->box(true);
+		$b = $this->box(true, array('email' => 'other@inbox-test.invalid'));
+		$this->mailIn($a->id, 'junk', 'a-spam');
+		$legit = $this->mailIn($b->id, 'junk', 'b-legit');
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET junk_hint = 'legit' WHERE rowid = ".((int) $legit));
+		$other = $this->mailIn($b->id, 'inbox', 'b-inbox');
+		$this->db->query("UPDATE ".$this->db->prefix()."inbox_mail SET junk_hint = 'legit' WHERE rowid = ".((int) $other));
+		$both = array((int) $a->id, (int) $b->id);
+		try {
+			$this->assertSame(array('Zz a-spam', 'Zz b-legit'), $this->found($both, array('roles' => array('junk'))), 'the junk of every mailbox, nothing else');
+			$this->assertSame(array('Zz b-legit'), $this->found($both, array('roles' => array('junk'), 'legit' => true)), 'probably legitimate only');
+			$this->assertSame(array('Zz a-spam'), $this->found(array((int) $a->id), array('roles' => array('junk'))), 'a mailbox left out is not searched');
+			// Every mailbox read by default, one left out on demand
+			$this->assertSame($both, InboxUnifiedView::accounts($both, 'junk', '['.((int) $b->id).']', '{}'), 'the common list does not apply');
+			$this->assertSame(array((int) $a->id), InboxUnifiedView::accounts($both, 'junk', '[]', '{"junk":{"exclude":['.((int) $b->id).']}}'));
+		} finally {
+			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_folder WHERE fk_account IN (".implode(',', $both).")");
+		}
+		// When the user last opened the view: a date
+		$u = $this->user('views');
+		$params = new InboxUserParam($this->db);
+		$this->assertSame('0', $params->get($u, 'junk_seen_at'));
+		$this->assertGreaterThan(0, $params->set($u, 'junk_seen_at', (string) dol_now()));
+		$this->assertLessThan(0, $params->set($u, 'junk_seen_at', 'yesterday'));
+	}
 }

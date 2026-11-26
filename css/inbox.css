@@ -1841,6 +1841,11 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 
 /* ===== Junk probably legitimate (1.15.0): an orange mark, its words for the screen readers ===== */
 .ibx-junklegit { color: var(--ibx-warning, #b26a00); }
+/* Spams view and junk folders (1.142.0): filter of the probably legitimate ones, why a mail is in the junk */
+.ibx-junkbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); padding: 0 var(--ibx-s3) var(--ibx-s2); font-size: var(--ibx-fs-xs); }
+.ibx-junkbar__note { display: inline-flex; align-items: center; gap: var(--ibx-s1); }
+.ibx-junkchip { font-size: var(--ibx-fs-xs); white-space: nowrap; }
+.ibx-junkwhy { display: inline-flex; align-items: center; gap: 0.25em; font-size: var(--ibx-fs-xs); white-space: nowrap; }
 .ibx-tree__legit { display: inline-flex; align-items: center; gap: 0.125rem; margin-left: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; color: var(--ibx-warning, #b26a00); }
 .ibx-tree__legit .ibx-icon { width: 0.875rem; height: 0.875rem; }
 
@@ -2674,7 +2679,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-viewgrid th, .ibx-viewgrid td { text-align: center; vertical-align: top; }
 .ibx-viewgrid th[scope="row"], .ibx-viewgrid thead th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600; background: var(--ibx-bg); }
 .ibx-viewgrid th[scope="row"] .ibx-muted { font-weight: 400; }
-.ibx-viewgrid thead th { min-width: 6.5rem; }
+.ibx-viewgrid thead th { min-width: 5.5rem; }
 .ibx-viewgrid__sub { display: block; margin-top: var(--ibx-s1); font-weight: 400; font-size: var(--ibx-fs-xs, 0.75rem); color: var(--ibx-text-muted); }
 .ibx-viewgrid button.ibx-viewgrid__sub { margin-inline: auto; color: var(--ibx-accent); }
 .ibx-viewgrid .ibx-viewgrid__common { border-right: 1px solid var(--ibx-border-strong); }

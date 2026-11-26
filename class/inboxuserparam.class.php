@@ -138,6 +138,8 @@ class InboxUserParam
 			// Mailboxes of each unified view with a list of its own (1.141.0, class InboxUnifiedView):
 			// {"view": {"exclude": [ids]}}; « Assigned to me » never has one
 			'views_scope' => array('{}', 'json'),
+			// Spams view (1.142.0): when the user last opened it, the spams arrived since then counted beside it
+			'junk_seen_at' => array('0', 'int:0:4102444800'),
 			// Virtual views (1.31.0): the views shared with the user that he hides
 			'views_hidden' => array('[]', 'json'),
 			// Order of the folders among their brothers, per mailbox: {"<mailbox>":[folders]} (1.42.0)
