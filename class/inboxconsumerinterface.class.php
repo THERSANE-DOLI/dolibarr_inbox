@@ -171,11 +171,12 @@ class InboxConsumerEvent
 	protected function log($action, $from = '', $to = '', $detail = '', $simulated = false)
 	{
 		require_once __DIR__.'/inboxactionlog.class.php';
+		$before = InboxActionLog::$consumer;
 		InboxActionLog::$consumer = array('code' => $this->sub['code'], 'label' => $this->sub['label'], 'simulated' => $simulated);
 		try {
 			InboxActionLog::add($this->db, $this->moduleUser(), (int) $this->account->id, $action, array($this->mail), $from, $to, 0, $detail);
 		} finally {
-			InboxActionLog::$consumer = null;
+			InboxActionLog::$consumer = $before;
 		}
 	}
 
@@ -338,11 +339,12 @@ class InboxConsumerEvent
 		}
 		require_once __DIR__.'/inboxactions.class.php';
 		require_once __DIR__.'/inboxactionlog.class.php';
+		$before = InboxActionLog::$consumer;
 		InboxActionLog::$consumer = array('code' => $this->sub['code'], 'label' => $this->sub['label'], 'simulated' => false);
 		try {
 			$res = (new InboxActions($this->db))->runAsConsumer($this->moduleUser(), $run, array((int) $this->mail->rowid), $runParams, (int) $this->account->id);
 		} finally {
-			InboxActionLog::$consumer = null;
+			InboxActionLog::$consumer = $before;
 		}
 		if (empty($res['ok'])) {
 			$this->error = (string) ($res['error'] ?: 'Action failed');

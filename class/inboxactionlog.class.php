@@ -99,7 +99,10 @@ class InboxActionLog
 			return 0;
 		}
 		$id = (int) $db->last_insert_id($db->prefix().'inbox_action_log');
-		self::$written[] = $id;
+		// The undo of the page is for the actions of its user, never for those of a module (1.146.1)
+		if ($consumer === null) {
+			self::$written[] = $id;
+		}
 
 		return $id;
 	}

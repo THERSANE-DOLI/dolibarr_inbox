@@ -648,7 +648,8 @@ class InboxActions
 		$this->counters((int) $first->fk_folder, (int) $target->rowid, $list);
 		if ($unknown) {
 			$sync = new InboxSync($this->db);
-			$sync->run($this->account((int) $first->fk_account), microtime(true) + 8, array('folder_id' => (int) $target->rowid));
+			// Never gives mails to the modules subscribed: an action of a user or of a module is running (1.146.1)
+			$sync->run($this->account((int) $first->fk_account), microtime(true) + 8, array('folder_id' => (int) $target->rowid, 'no_delivery' => true));
 			foreach ($list as $r) {
 				if (!isset($newIds[(int) $r->rowid]) && (string) $r->message_id !== '') {
 					$row = $this->db->getRow("SELECT rowid FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $target->rowid)." AND message_id = '".$this->db->escape((string) $r->message_id)."' ORDER BY sort_key DESC");

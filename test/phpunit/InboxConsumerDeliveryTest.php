@@ -428,6 +428,112 @@ class InboxConsumerDeliveryTest extends InboxImapTestCase
 	}
 
 	/**
+	 * 1.146.1: a module that kills the process (fatal error, memory, time limit) leaves its event « running »: counted
+	 * as a try when taken, recovered as an error, given up after the last try instead of being taken again for ever
+	 *
+	 * @return void
+	 */
+	public function testStoppedDeliveryEndsGivenUp()
+	{
+		$a = $this->ready();
+		$this->grant($a);
+		$this->append('INBOX', 'f1');
+		$this->sync($a);
+		$q = $this->queue($a)[0];
+		$this->assertSame('done', (string) $q->status);
+		$this->assertSame(1, (int) $q->attempts, 'the try counted when taken');
+
+		$p = $this->db->prefix();
+		$stop = function ($attempts) use ($p, $a) {
+			$this->db->query("UPDATE ".$p."inbox_consumer_event SET status = 'running', attempts = ".((int) $attempts).", date_done = NULL, next_try = '".$this->db->idate(dol_now() - 1)."'"
+				." WHERE fk_account = ".((int) $a->id));
+		};
+		$d = new InboxConsumerDelivery($this->db);
+		$stop(1);
+		$this->assertSame(0, $d->cronRun());
+		$q = $this->queue($a)[0];
+		$this->assertSame('waiting', (string) $q->status);
+		$this->assertSame(1, (int) $q->attempts);
+		$this->assertGreaterThan(dol_now(), (int) $this->db->jdate($q->next_try), 'given again later, not at once');
+		$this->assertStringContainsString('stopped', (string) $q->error);
+		$stop(5);
+		$this->assertSame(1, $d->recoverStale((int) $a->id));
+		$this->assertSame('failed', (string) $this->queue($a)[0]->status);
+		$this->assertStringContainsString('stopped', (new InboxConsumer($this->db))->grants((int) $a->id)[self::CODE]['last_error']);
+	}
+
+	/**
+	 * 1.146.1: the events of a module turned off never take the places of the others (more than a batch waiting)
+	 *
+	 * @return void
+	 */
+	public function testModuleTurnedOffDoesNotBlockTheOthers()
+	{
+		$other = array('module' => 'zzother', 'label' => 'ZzOther', 'class' => 'ZzDeliveryConsumer', 'file' => '/zzother/x.php', 'events' => array('mail.received'), 'actions' => array('read'));
+		$mine = array('module' => 'zzdeliver', 'label' => 'ZzDeliver', 'class' => 'ZzDeliveryConsumer', 'file' => '/zzdeliver/x.php', 'events' => array('mail.received'), 'actions' => array('read'));
+		InboxConsumer::useDeclarations(array(self::CODE => $mine, 'zzother' => $other));
+		$a = $this->ready();
+		$this->grant($a, array('actions' => array('read')));
+		$c = new InboxConsumer($this->db);
+		$this->assertTrue($c->save($this->admin, $a, 'zzother', array('events' => array('mail.received'), 'actions' => array(), 'mode' => 'active')), $c->error);
+		$otherId = (int) $c->grants((int) $a->id)['zzother']['id'];
+		$p = $this->db->prefix();
+		$now = $this->db->idate(dol_now() - 60);
+		for ($i = 0; $i < InboxConsumerDelivery::BATCH + 10; $i++) {
+			$this->db->query("INSERT INTO ".$p."inbox_consumer_event (entity, fk_consumer, fk_account, event, message_id, status, attempts, next_try, datec)"
+				." VALUES (1, ".$otherId.", ".((int) $a->id).", 'mail.received', 'zzother-".$i.self::MARK."', 'waiting', 0, '".$now."', '".$now."')");
+		}
+		InboxConsumer::useDeclarations(array(self::CODE => $mine));
+		$this->append('INBOX', 'o1');
+		$this->sync($a);
+		$mineRow = $this->db->getRow("SELECT e.status FROM ".$p."inbox_consumer_event as e INNER JOIN ".$p."inbox_consumer as c ON c.rowid = e.fk_consumer"
+			." WHERE c.code = '".self::CODE."' AND e.fk_account = ".((int) $a->id));
+		$this->assertSame('done', (string) $mineRow->status);
+		$waiting = $this->db->getRow("SELECT COUNT(rowid) AS n FROM ".$p."inbox_consumer_event WHERE fk_consumer = ".$otherId." AND status = 'waiting'");
+		$this->assertSame(InboxConsumerDelivery::BATCH + 10, (int) $waiting->n, 'the module turned off keeps its events waiting');
+	}
+
+	/**
+	 * 1.146.1: a synchronisation run inside handle() (a move on a server without UIDPLUS) gives nothing: no delivery
+	 * inside a delivery; the action of the module after it is still written in its name, never offered to the undo of
+	 * the page
+	 *
+	 * @return void
+	 */
+	public function testNoDeliveryInsideADelivery()
+	{
+		$a = $this->ready();
+		$this->grant($a);
+		$inbox = $this->folder($a, 'INBOX');
+		$depth = 0;
+		$max = 0;
+		ZzDeliveryConsumer::$do = function (InboxConsumerEvent $e) use ($a, $inbox, &$depth, &$max) {
+			$depth++;
+			$max = max($max, $depth);
+			(new InboxSync($this->db))->run($a, microtime(true) + 10, array('folder_id' => $inbox, 'force' => true));
+			$ok = $e->act('tag', array('add' => array('$label3')));
+			$depth--;
+			return $ok ? 1 : -1;
+		};
+		$this->append('INBOX', 'n1');
+		$this->append('INBOX', 'n2');
+		InboxActionLog::$written = array();
+		$this->sync($a);
+		$this->assertSame(1, $max, 'never a handle() inside a handle()');
+		$this->assertCount(2, ZzDeliveryConsumer::$got);
+		$this->assertSame(array('done', 'done'), array_map('strval', array_column($this->queue($a), 'status')));
+		$tags = array_values(array_filter($this->journal($a), function ($l) {
+			return (string) $l->action === 'tag';
+		}));
+		$this->assertCount(2, $tags);
+		foreach ($tags as $l) {
+			$this->assertSame(self::CODE, (string) $l->consumer, 'written in the name of the module');
+		}
+		$this->assertSame(array(), InboxActionLog::$written, 'nothing of a module offered to the undo of the page');
+		$this->assertNull(InboxActionLog::$consumer);
+	}
+
+	/**
 	 * Row of a mail once indexed, without giving anything (the switch off during the pass)
 	 *
 	 * @param InboxAccount $a  Mailbox

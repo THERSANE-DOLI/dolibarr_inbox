@@ -128,8 +128,10 @@ class InboxSync
 	 * @param InboxAccount $account  Mailbox (active)
 	 * @param int          $deadline Timestamp (microtime) not to go beyond
 	 * @param array<string,mixed> $options force (bool: even during the wait after an error, every folder now),
-	 *                                      phase (1: inbox and sent only; 2: the others and the first indexing; 0: both),
-	 *                                      folder_id (int: this folder only, now: folder open in the application)
+	 *                                     phase (1: inbox and sent only; 2: the others and the first indexing; 0: both),
+	 *                                     folder_id (int: this folder only, now: folder open in the application),
+	 *                                     no_delivery (bool: the events of the modules subscribed are written, not given:
+	 *                                     a synchronisation run by an action on mails, 1.146.1)
 	 * @return int 1 done, 0 skipped (lock, wait after an error), -1 error
 	 */
 	public function run(InboxAccount $account, $deadline, array $options = array())
@@ -152,6 +154,32 @@ class InboxSync
 		}
 		$this->blockedNew = array();
 		$this->consumerNew = array();
+		// What inbox does here is never written in the name of a module that runs an action (1.146.1)
+		$journal = class_exists('InboxActionLog', false) ? InboxActionLog::$consumer : null;
+		if ($journal !== null) {
+			InboxActionLog::$consumer = null;
+		}
+		try {
+			return $this->runLocked($account, $deadline, $force, $phase, $options);
+		} finally {
+			if ($journal !== null) {
+				InboxActionLog::$consumer = $journal;
+			}
+		}
+	}
+
+	/**
+	 * The pass and what follows it, the lock taken
+	 *
+	 * @param InboxAccount        $account  Mailbox
+	 * @param float               $deadline Microtime limit
+	 * @param bool                $force    Every folder now
+	 * @param int                 $phase    0, 1, 2
+	 * @param array<string,mixed> $options  As run()
+	 * @return int
+	 */
+	protected function runLocked(InboxAccount $account, $deadline, $force, $phase, array $options)
+	{
 		try {
 			$res = $this->pass($account, $deadline, $force, $phase, (int) ($options['folder_id'] ?? 0));
 		} finally {
@@ -185,8 +213,10 @@ class InboxSync
 			require_once __DIR__.'/inboxconsumerdelivery.class.php';
 			$delivery = new InboxConsumerDelivery($this->db);
 			$this->stats['consumer_events'] = $this->consumerNew ? $delivery->createReceived($account, $this->consumerNew) : 0;
-			$given = $delivery->deliver($account, max((float) $deadline, microtime(true) + 2));
-			$this->stats['consumer_given'] = $given['done'] + $given['skipped'];
+			if (empty($options['no_delivery'])) {
+				$given = $delivery->deliver($account, max((float) $deadline, microtime(true) + 2));
+				$this->stats['consumer_given'] = $given['done'] + $given['skipped'];
+			}
 		}
 
 		return $res;
