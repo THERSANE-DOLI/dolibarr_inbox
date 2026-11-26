@@ -68,6 +68,9 @@ class InboxConsumerDelivery
 	/** @var string Output of the scheduled job */
 	public $output = '';
 
+	/** @var bool A delivery runs in this process (1.146.1): no delivery inside it */
+	protected static $delivering = false;
+
 	/** @var array<string,InboxConsumerInterface|false> Instances of the modules during a call */
 	protected $instances = array();
 
@@ -199,43 +202,82 @@ class InboxConsumerDelivery
 	public function deliver(InboxAccount $account, $deadline)
 	{
 		$out = array('done' => 0, 'skipped' => 0, 'errors' => 0, 'left' => 0);
-		if (!InboxConsumer::enabled() || !$account->isActive() || !$account->canWorkNow() || $account->isLive()) {
+		// Never inside another delivery (1.146.1): a module that moves a mail may run a synchronisation (server without
+		// UIDPLUS), which must not give the next events inside its handle()
+		if (self::$delivering || !InboxConsumer::enabled() || !$account->isActive() || !$account->canWorkNow() || $account->isLive()) {
+			return $out;
+		}
+		$declared = InboxConsumer::declared();
+		if (!$declared) {
 			return $out;
 		}
 		$p = $this->db->prefix();
+		$this->recoverStale((int) $account->id);
 		$now = dol_now();
+		// Modules that declare themselves only (1.146.1): the events of a module turned off wait for it without taking
+		// the places of the others
+		$codes = implode(',', array_map(function ($c) {
+			return "'".$this->db->escape((string) $c)."'";
+		}, array_keys($declared)));
 		$rows = $this->db->getRows("SELECT e.rowid, e.fk_consumer, e.message_id, e.fk_mail, e.attempts, e.datec, c.code, c.actions, c.folders, c.mode"
-			." FROM ".$p."inbox_consumer_event as e INNER JOIN ".$p."inbox_consumer as c ON c.rowid = e.fk_consumer AND c.paused = 0"
+			." FROM ".$p."inbox_consumer_event as e INNER JOIN ".$p."inbox_consumer as c ON c.rowid = e.fk_consumer AND c.paused = 0 AND c.code IN (".$codes.")"
 			." WHERE e.fk_account = ".((int) $account->id)." AND e.status = '".self::STATUS_WAITING."' AND (e.next_try IS NULL OR e.next_try <= '".$this->db->idate($now)."')"
 			." ORDER BY e.rowid LIMIT ".(self::BATCH + 1));
 		if (!is_array($rows) || !$rows) {
 			return $out;
 		}
-		$declared = InboxConsumer::declared();
-		$first = true;
-		foreach ($rows as $i => $e) {
-			if ($i >= self::BATCH || (!$first && microtime(true) > $deadline)) {
-				$out['left'] = count($rows) - $i;
-				break;
+		self::$delivering = true;
+		try {
+			$first = true;
+			foreach ($rows as $i => $e) {
+				if ($i >= self::BATCH || (!$first && microtime(true) > $deadline)) {
+					$out['left'] = count($rows) - $i;
+					break;
+				}
+				$code = (string) $e->code;
+				if (!isset($declared[$code])) {
+					continue;
+				}
+				// Taken by this delivery only (the scheduled job and a page may synchronise at the same time), the try
+				// counted now (1.146.1): a module that kills the process (memory, time limit) still ends « failed »
+				$this->db->query("UPDATE ".$p."inbox_consumer_event SET status = '".self::STATUS_RUNNING."', attempts = attempts + 1, next_try = '".$this->db->idate($now + self::STALE)."'"
+					." WHERE rowid = ".((int) $e->rowid)." AND status = '".self::STATUS_WAITING."'");
+				if ((int) $this->db->affected_rows(true) !== 1) {
+					continue;
+				}
+				$e->attempts = (int) $e->attempts + 1;
+				$first = false;
+				$res = $this->deliverOne($account, $e, $declared[$code]);
+				$out[$res === 1 ? 'done' : ($res === 0 ? 'skipped' : 'errors')]++;
 			}
-			$code = (string) $e->code;
-			if (!isset($declared[$code])) {
-				// Module turned off or removed: its events wait for it
-				continue;
-			}
-			// Taken by this delivery only (the scheduled job and a page may synchronise at the same time)
-			$this->db->query("UPDATE ".$p."inbox_consumer_event SET status = '".self::STATUS_RUNNING."', next_try = '".$this->db->idate($now + self::STALE)."'"
-				." WHERE rowid = ".((int) $e->rowid)." AND status = '".self::STATUS_WAITING."'");
-			if ((int) $this->db->affected_rows(true) !== 1) {
-				continue;
-			}
-			$first = false;
-			$res = $this->deliverOne($account, $e, $declared[$code]);
-			$out[$res === 1 ? 'done' : ($res === 0 ? 'skipped' : 'errors')]++;
+		} finally {
+			self::$delivering = false;
 		}
 		$this->stats = array_merge($this->stats, $out);
 
 		return $out;
+	}
+
+	/**
+	 * Events taken by a delivery that died during handle() (fatal error, memory, time limit): counted as an error of
+	 * the module (their try was counted when taken), given again later or given up after the last try
+	 *
+	 * @param int $accountId Mailbox, 0 for every mailbox of the entity
+	 * @return int Events recovered
+	 */
+	public function recoverStale($accountId = 0)
+	{
+		global $conf;
+
+		$rows = $this->db->getRows("SELECT rowid, fk_consumer, attempts FROM ".$this->db->prefix()."inbox_consumer_event WHERE status = '".self::STATUS_RUNNING."'"
+			." AND next_try < '".$this->db->idate(dol_now())."' AND ".($accountId > 0 ? "fk_account = ".((int) $accountId) : "entity = ".((int) $conf->entity))." LIMIT 500");
+		$n = 0;
+		foreach (is_array($rows) ? $rows : array() as $e) {
+			$this->failed($e, 'Delivery stopped during handle() (fatal error, memory or time limit)');
+			$n++;
+		}
+
+		return $n;
 	}
 
 	/**
@@ -266,8 +308,9 @@ class InboxConsumerDelivery
 		require_once __DIR__.'/inboxspamcheck.class.php';
 		if ($mail->spam_check !== null && (string) $mail->spam_check === '0' && InboxSpamCheck::enabled()
 			&& (int) $this->db->jdate($e->datec) > dol_now() - InboxSpamCheck::RECENT) {
-			$this->db->query("UPDATE ".$this->db->prefix()."inbox_consumer_event SET status = '".self::STATUS_WAITING."', next_try = '".$this->db->idate(dol_now() + 60)."'"
-				." WHERE rowid = ".((int) $e->rowid));
+			// Put off, not a try of the module
+			$this->db->query("UPDATE ".$this->db->prefix()."inbox_consumer_event SET status = '".self::STATUS_WAITING."', attempts = GREATEST(0, attempts - 1),"
+				." next_try = '".$this->db->idate(dol_now() + 60)."' WHERE rowid = ".((int) $e->rowid));
 			return 0;
 		}
 		$module = $this->instance($declared);
@@ -293,6 +336,7 @@ class InboxConsumerDelivery
 		));
 		// A module never breaks the synchronisation nor the answer of a page (what it prints is dropped)
 		$level = ob_get_level();
+		$journal = InboxActionLog::$consumer;
 		ob_start();
 		$error = '';
 		$res = -1;
@@ -305,7 +349,8 @@ class InboxConsumerDelivery
 			while (ob_get_level() > $level) {
 				ob_end_clean();
 			}
-			InboxActionLog::$consumer = null;
+			// As it was before (1.146.1), never null: a delivery may run while something else writes the journal
+			InboxActionLog::$consumer = $journal;
 		}
 		if ($res === 1 || $res === 0) {
 			$this->finish($e, $res === 1 ? self::STATUS_DONE : self::STATUS_SKIPPED, '');
@@ -388,7 +433,8 @@ class InboxConsumerDelivery
 	protected function failed($e, $error)
 	{
 		$p = $this->db->prefix();
-		$attempts = (int) $e->attempts + 1;
+		// The try was counted when the event was taken (1.146.1)
+		$attempts = max(1, (int) $e->attempts);
 		$error = dol_trunc($error, 255, 'right', 'UTF-8', 1);
 		if ($attempts > count(self::DELAYS)) {
 			$this->finish($e, self::STATUS_FAILED, $error);
@@ -469,8 +515,7 @@ class InboxConsumerDelivery
 		$deadline = $start + max(10, getDolGlobalInt('INBOX_SYNC_BUDGET', 45));
 		$now = $this->db->idate(dol_now());
 		// Taken by a delivery that died: given again
-		$this->db->query("UPDATE ".$p."inbox_consumer_event SET status = '".self::STATUS_WAITING."' WHERE entity = ".((int) $conf->entity)
-			." AND status = '".self::STATUS_RUNNING."' AND next_try < '".$now."'");
+		$this->recoverStale(0);
 		$rows = $this->db->getRows("SELECT DISTINCT e.fk_account FROM ".$p."inbox_consumer_event as e INNER JOIN ".$p."inbox_account as a ON a.rowid = e.fk_account"
 			." WHERE e.entity = ".((int) $conf->entity)." AND e.status = '".self::STATUS_WAITING."' AND e.next_try <= '".$now."'"
 			." AND a.status = ".InboxAccount::STATUS_ACTIVE." AND a.protected = 0 LIMIT 500");

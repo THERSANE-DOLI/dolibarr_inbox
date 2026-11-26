@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: mails given to the modules subscribed: a module that stops the process, or one turned off, no longer blocks :   1.146.1
+  - a try is counted when the mail is taken: a module stopped by a fatal error (memory, time limit) ends « given up ».
+  - the mails of a module turned off wait without blocking the other modules of the mailbox.
+  - a move without UIDPLUS gives no mail to the modules in the middle of an action; journal of a module's action kept.
+
 - NEW: the modules allowed on a mailbox receive its new mails, and act within what was ticked :   1.146.0
   - given once at the end of the synchronisation that finds them, never the mails already there, the junk or the
     trash; a module in error never stops it, its mail is given again 4 times; scheduled job every 5 min.
