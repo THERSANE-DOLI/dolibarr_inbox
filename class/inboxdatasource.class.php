@@ -41,8 +41,10 @@ require_once __DIR__.'/inboxreader.class.php';
  * signature is the HMAC-SHA256 of « t + "\n" + header of the address + "\n" + header of the data » (values as written,
  * one of them may be empty), with its time t: « t=<unix time>; s=<hex> », accepted at SIGNATURE_DAYS of the reception
  * of the mail at most: the time written by the mail server of the mailbox (IMAP INTERNALDATE), never the Date header,
- * which the sender writes. A signature serves one mail only: seen again on a mail of another Message-ID, it is a replay,
- * refused (table inbox_source_signature, kept as long as the source: the requester is read again at each reading).
+ * which the sender writes. A signature serves one mail only: seen again on a mail received more than
+ * SIGNATURE_COPY_SECONDS away from its first reception, it is a replay, refused (table inbox_source_signature, kept as
+ * long as the source: the requester is read again at each reading). The Message-ID never tells a copy from a replay:
+ * the sender writes it, as the Date header (1.144.0).
  * It covers these two headers only: the headers « one per field » are not read on a signed mail, and the subject, the
  * text and the attachments are not signed (the panel of the mail says so). The key is stored with dolEncrypt(), never
  * sent to the browser (typed, or made by the browser, then only « set »).
@@ -95,6 +97,12 @@ class InboxDataSource
 
 	/** Days between the time of a signature and the reception of the mail, at most (an old signed header copied on another mail) */
 	const SIGNATURE_DAYS = 2;
+
+	/**
+	 * Seconds between the receptions of one signature, at most (1.144.0): the copies of one mail (another folder keeps
+	 * its INTERNALDATE, another mailbox receives it within seconds). Later, it is a replay, whatever its Message-ID
+	 */
+	const SIGNATURE_COPY_SECONDS = 300;
 
 	/** A signing key: 32 to 128 characters, letters, digits and + / = _ - (hexadecimal or base64) */
 	const SIGNATURE_KEY = '/^[A-Za-z0-9+\/=_-]{32,128}$/';
@@ -251,8 +259,9 @@ class InboxDataSource
 	 * @return array{ok:bool,why:string,source:int,label:string,type:string,email:string,name:string,signed:bool,data:array<string,string>}|null
 	 *         Null when no source has this sender; ok false with why: auth (not authenticated, nor signed), signature
 	 *         (signature of a signed source wrong, or too far from the reception), replay (signature already used by a
-	 *         mail of another Message-ID), json (data unreadable), twice (a header given twice), noemail (no valid
-	 *         address of the requester). signed: believed on its signature (the subject, the text, the attachments are not)
+	 *         mail received more than SIGNATURE_COPY_SECONDS away), json (data unreadable), twice (a header given
+	 *         twice), noemail (no valid address of the requester). signed: believed on its signature (the subject, the
+	 *         text, the attachments are not)
 	 */
 	public function detect(array $headers, $fromEmail, $sources = null, $mail = null)
 	{
@@ -290,7 +299,7 @@ class InboxDataSource
 					$out['why'] = 'signature';
 					return $out;
 				}
-				if ($mail !== null && !$this->firstUse((int) $source['id'], $sig[0], self::mailKey($mail, $received))) {
+				if ($mail !== null && !$this->firstUse((int) $source['id'], $sig[0], self::messageIdOf($mail), $received)) {
 					$out['why'] = 'replay';
 					return $out;
 				}
@@ -733,31 +742,18 @@ class InboxDataSource
 	}
 
 	/**
-	 * What makes one mail of its copies (the same mail in two mailboxes or two folders): its Message-ID, else the time
-	 * of its reception
+	 * A signature used by one mail only: kept on its first use with the reception of that mail, refused on a mail
+	 * received more than SIGNATURE_COPY_SECONDS away (a replay). The copies of one mail and its readings again keep its
+	 * reception; its Message-ID is kept for information only, since the sender writes it. The signatures are kept as long
+	 * as their source, since the requester is read again at each reading of a mail: one row per signed request.
 	 *
-	 * @param array{received?:int,message_id?:string} $mail     Mail
-	 * @param int                                     $received Its reception
-	 * @return string
+	 * @param int    $sourceId  Source
+	 * @param string $value     Value of the header of the signature (right)
+	 * @param string $messageId Message-ID of the mail ('' without)
+	 * @param int    $received  Reception of the mail (receivedOf())
+	 * @return bool              True: first use, or the same mail again
 	 */
-	protected static function mailKey($mail, $received)
-	{
-		$mid = self::messageIdOf($mail);
-
-		return $mid !== '' ? dol_trunc($mid, 255, 'right', 'UTF-8', 1) : 'received:'.((int) $received);
-	}
-
-	/**
-	 * A signature used by this mail only: kept on its first use, refused on a mail of another key (a replay). The
-	 * signatures are kept as long as their source, since the requester is read again at each reading of a mail: one
-	 * row per signed request.
-	 *
-	 * @param int    $sourceId Source
-	 * @param string $value    Value of the header of the signature (right)
-	 * @param string $mailKey  mailKey()
-	 * @return bool             True: first use, or the same mail again
-	 */
-	protected function firstUse($sourceId, $value, $mailKey)
+	protected function firstUse($sourceId, $value, $messageId, $received)
 	{
 		$parts = self::signatureParts($value);
 		if ($parts === null) {
@@ -766,22 +762,25 @@ class InboxDataSource
 		$p = $this->db->prefix();
 		$hash = hash('sha256', $parts['s']);
 		$where = " WHERE fk_source = ".((int) $sourceId)." AND signature = '".$this->db->escape($hash)."'";
-		$r = $this->db->getRow("SELECT mail_key FROM ".$p."inbox_source_signature".$where);
+		$r = $this->db->getRow("SELECT date_received, date_signature FROM ".$p."inbox_source_signature".$where);
 		if (!is_object($r)) {
-			$ok = $this->db->query("INSERT INTO ".$p."inbox_source_signature (fk_source, signature, mail_key, date_signature, date_creation) VALUES ("
-				.((int) $sourceId).", '".$this->db->escape($hash)."', '".$this->db->escape($mailKey)."', '".$this->db->idate($parts['t'])."', '".$this->db->idate(dol_now())."')");
+			$ok = $this->db->query("INSERT INTO ".$p."inbox_source_signature (fk_source, signature, mail_key, date_signature, date_received, date_creation) VALUES ("
+				.((int) $sourceId).", '".$this->db->escape($hash)."', '".$this->db->escape(dol_trunc((string) $messageId, 255, 'right', 'UTF-8', 1))."', '"
+				.$this->db->idate($parts['t'])."', '".$this->db->idate((int) $received)."', '".$this->db->idate(dol_now())."')");
 			if ($ok) {
 				return true;
 			}
 			// Written in between by another copy of the mail (unique key): read again
-			$r = $this->db->getRow("SELECT mail_key FROM ".$p."inbox_source_signature".$where);
+			$r = $this->db->getRow("SELECT date_received, date_signature FROM ".$p."inbox_source_signature".$where);
 			if (!is_object($r)) {
 				dol_syslog(__METHOD__.' signature not kept: '.$this->db->lasterror(), LOG_WARNING);
 				return false;
 			}
 		}
+		// A row kept before 1.144.0 without its reception: the time of the signature
+		$first = (int) $this->db->jdate($r->date_received ?: $r->date_signature);
 
-		return (string) $r->mail_key === (string) $mailKey;
+		return abs((int) $received - $first) <= self::SIGNATURE_COPY_SECONDS;
 	}
 
 	/**

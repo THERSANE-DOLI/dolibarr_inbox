@@ -260,7 +260,9 @@ class InboxSync
 				}
 			}
 			foreach (array_merge($first, $others) as $f) {
-				if (!(int) $f->first_sync_done) {
+				// A folder that fails pass after pass (1.145.0) is tried again at its usual pace only, not for its
+				// first indexing at every pass: a good pass counts its failures from zero, the first indexing goes on
+				if (!(int) $f->first_sync_done && (int) ($f->sync_fail_count ?? 0) < InboxFolder::FAILS_SET_ASIDE) {
 					$queue[] = array($f, true);
 				}
 			}
@@ -268,6 +270,7 @@ class InboxSync
 		$maxDays = (int) $account->sync_max_days;
 		$firstSyncLeft = false;
 		$done = array();
+		$failed = array();
 		$reports = array();
 		foreach ($queue as $item) {
 			list($f, $backfill) = $item;
@@ -303,8 +306,14 @@ class InboxSync
 			));
 			if ($res === null) {
 				$folders->saveState($folderId, array('sync_error' => $connector->getError()));
+				// Once per pass (a folder may be read twice in a pass: changes, then first indexing)
+				if (!isset($failed[$folderId])) {
+					$failed[$folderId] = true;
+					$folders->countFailure($folderId, true);
+				}
 				continue;
 			}
+			$folders->countFailure($folderId, false);
 			if ($res['reset']) {
 				$mails->clearFolder($folderId);
 			}
@@ -376,7 +385,8 @@ class InboxSync
 			// One folder: the state of the mailbox is the business of the full passes
 			return 1;
 		}
-		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND status = 1 AND selectable = 1 AND sync_enabled = 1 AND first_sync_done = 0");
+		// A folder that fails pass after pass no longer counts (1.145.0): it stays shown in error in the tab Synchro
+		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND ".InboxFolder::sqlFirstSyncLeft());
 		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
 
 		return 1;
@@ -467,7 +477,7 @@ class InboxSync
 	 */
 	public function progress($accountId)
 	{
-		$row = $this->db->getRow("SELECT SUM(indexed) AS i, SUM(total) AS t, COUNT(rowid) AS n, SUM(CASE WHEN first_sync_done = 0 AND sync_enabled = 1 AND selectable = 1 THEN 1 ELSE 0 END) AS left_n"
+		$row = $this->db->getRow("SELECT SUM(indexed) AS i, SUM(total) AS t, COUNT(rowid) AS n, SUM(CASE WHEN ".InboxFolder::sqlFirstSyncLeft()." THEN 1 ELSE 0 END) AS left_n"
 			." FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $accountId)." AND status = 1");
 
 		return array('indexed' => (int) ($row->i ?? 0), 'total' => (int) ($row->t ?? 0), 'folders' => (int) ($row->n ?? 0), 'first_sync_left' => (int) ($row->left_n ?? 0));
