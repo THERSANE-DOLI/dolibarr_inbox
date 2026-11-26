@@ -2753,6 +2753,28 @@ InboxSourceTestRun = Prova
 InboxSourceTestNotSender = Il mittente %s non è un mittente attendibile di questa fonte.
 InboxSourceTestOk = Richiedente: %s (%s)
 InboxSourceRefused_auth = Mittente non autenticato (né DMARC né DKIM del suo dominio): le intestazioni non sono credute.
+# Signed data sources (1.143.0)
+InboxSourceRefused_signature = Firma errata, o a più di 2 giorni dalla ricezione dell'email: le intestazioni non sono credute.
+InboxSourceHeaderSignature = Intestazione della firma
+InboxSourceHeaderSignatureHelp = Intestazione in cui il sito scrive la sua firma. Vuota: X-Data-Form-Signature.
+InboxSourceSignatureKey = Chiave di firma
+InboxSourceSignatureKeyPlaceholder = Incolla la chiave del sito, o generane una
+InboxSourceSignatureKeepPlaceholder = Chiave salvata mantenuta: digitane una nuova per sostituirla
+InboxSourceSignatureGenerate = Genera una chiave
+InboxSourceSignatureGenerated = Nuova chiave, creata dal tuo browser: copiala ora nelle impostazioni del sito. Una volta salvata, non viene più mostrata.
+InboxSourceSignatureClear = Rimuovi la chiave
+InboxSourceSignatureSet = Una chiave è salvata (non viene più mostrata).
+InboxSourceSignatureNone = Nessuna chiave: le intestazioni sono credute solo su un'email autenticata.
+InboxSourceSignatureKeyHelp = Con una chiave, un'email firmata di un mittente fidato è creduta senza l'autenticazione del suo mittente: per i server di posta che non ne scrivono, o un sito che invia tramite il server della casella. La firma prova solo l'indirizzo e i dati, mai l'oggetto, il testo né gli allegati dell'email. Da 32 a 128 lettere, cifre o + / = _ -.
+InboxSourceSigned = Firmata
+InboxSourceSignedTitle = Il sito firma le sue intestazioni con la chiave di questa fonte
+InboxSourceErrorSignatureKey = La chiave di firma richiede da 32 a 128 lettere, cifre o + / = _ -.
+InboxSourceSignatureFormatHelp = Una fonte firmata aggiunge una terza intestazione: t è l'ora della firma (tempo Unix), s l'HMAC-SHA256 in esadecimale, con la chiave della fonte, di t, un a capo, il valore dell'intestazione dell'indirizzo, un a capo e il valore dell'intestazione dei dati. È accettata fino a 2 giorni dalla ricezione dell'email, su una sola email; le intestazioni « una per campo » non sono lette su un'email firmata. Solo queste intestazioni sono provate: mettere il numero della richiesta nei dati (chiave id o ref, mostrata nel pannello) e leggere quanto richiesto sul sito piuttosto che nel corpo.
+InboxSourceTerm_signature = Firmata
+InboxSourceTermHelp_signature = Il sito e la fonte condividono una chiave: il sito firma con essa le intestazioni di ogni email, e una firma corretta prova che l'email viene dal sito anche quando il server di posta non verifica nulla. Senza chiave, la fonte richiede un mittente autenticato.
+InboxSourceRefused_replay = Firma già usata da un'altra email (intestazione firmata copiata): le intestazioni non sono credute.
+InboxRequesterSigned = Firmato dal sito: solo richiedente e dati
+InboxRequesterSignedHelp = La firma del sito prova il richiedente e i dati delle sue intestazioni. L'oggetto, il testo e gli allegati dell'email non sono firmati: leggerli come quelli di qualsiasi email.
 InboxSourceRefused_json = L'intestazione dei dati non è un oggetto JSON leggibile (una riga, al massimo 2000 caratteri).
 InboxSourceRefused_twice = Un'intestazione della fonte è scritta due volte nella mail: non viene creduto nulla.
 InboxSourceRefused_noemail = Nessun indirizzo valido del richiedente nelle intestazioni.

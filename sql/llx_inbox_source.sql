@@ -25,6 +25,8 @@ CREATE TABLE llx_inbox_source(
 	senders text DEFAULT NULL,
 	header_email varchar(64) DEFAULT NULL,
 	header_data varchar(64) DEFAULT NULL,
+	header_signature varchar(64) DEFAULT NULL,
+	signature_key text DEFAULT NULL,
 	header_fields text DEFAULT NULL,
 	mapping text DEFAULT NULL,
 	request_type varchar(32) DEFAULT NULL,

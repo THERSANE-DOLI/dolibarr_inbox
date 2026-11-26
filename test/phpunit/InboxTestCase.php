@@ -158,6 +158,8 @@ abstract class InboxTestCase extends TestCase
 		}
 		// Data sources (1.72.0) of the tests
 		$db->query("DELETE FROM ".$p."inbox_source WHERE label LIKE 'ZzSource%'");
+		// Their signatures seen (1.143.0): left by a source removed above
+		$db->query("DELETE FROM ".$p."inbox_source_signature WHERE fk_source NOT IN (SELECT rowid FROM ".$p."inbox_source)");
 		if (class_exists('InboxDataSource')) {
 			InboxDataSource::reset();
 		}
