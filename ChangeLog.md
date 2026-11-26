@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a signed mail copied whole, Message-ID included, is refused as a replay :   1.144.0
+  - a signature is believed again only on a mail received at most 5 minutes from its first reception (the copies of
+    one mail in other folders or mailboxes); the Message-ID, written by the sender as the Date, no longer decides.
+  - the same form sent to two mailboxes in the same second is believed in both. Activate the module again.
+
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
     trusted sender with a right signature header (HMAC-SHA256, at 2 days of its reception at most) is believed.
