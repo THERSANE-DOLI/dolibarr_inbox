@@ -30,6 +30,86 @@ if (PHP_SAPI !== 'cli') {
 dol_include_once('/inbox/class/inboxsync.class.php');
 dol_include_once('/inbox/class/connector/inboximapresponse.class.php');
 dol_include_once('/inbox/class/inboxlink.class.php');
+dol_include_once('/inbox/class/connector/inboxconnector.class.php');
+
+/**
+ * A mail server whose folders are given by the test, empty, some of them failing at every reading (as the storage of
+ * the Sieve scripts of Dovecot, 1.145.0): no server needed
+ */
+class InboxSyncFakeConnector extends InboxConnector
+{
+	/** @var array<int,array<string,mixed>> Folders of the server, as listFolders() gives them */
+	public static $folders = array();
+	/** @var array<string,bool> Paths whose reading fails */
+	public static $failing = array();
+	/** @var array<string,int> Readings asked per path */
+	public static $reads = array();
+
+	/** @return string[] */
+	protected function supportedCapabilities()
+	{
+		return array(self::CAP_READ, self::CAP_FOLDERS, self::CAP_CHANGES);
+	}
+	/** @return string */
+	public static function getCode()
+	{
+		return 'zzsyncfake';
+	}
+	/** @return bool */
+	public function connect()
+	{
+		return true;
+	}
+	/** @return void */
+	public function disconnect()
+	{
+	}
+	/** @return array<string,mixed> */
+	public function testConnection()
+	{
+		return array('ok' => true, 'duration' => 0.0, 'info' => array());
+	}
+	/** @return array<int,array<string,mixed>> */
+	public function listFolders()
+	{
+		return self::$folders;
+	}
+	/**
+	 * @param string              $folder  Folder path
+	 * @param string              $cursor  Cursor
+	 * @param array<string,mixed> $options Options
+	 * @return array<string,mixed>|null
+	 */
+	public function getChanges($folder, $cursor, array $options = array())
+	{
+		self::$reads[$folder] = (self::$reads[$folder] ?? 0) + 1;
+		if (!empty(self::$failing[$folder])) {
+			$this->error = 'STATUS without answer';
+			return null;
+		}
+
+		return array('cursor' => (string) json_encode(array('done' => 1)), 'reset' => false, 'new' => array(), 'changed' => array(), 'deleted' => array(),
+			'more' => false, 'total' => 0, 'unread' => 0);
+	}
+	/**
+	 * @param string $folder   Folder path
+	 * @param string $remoteId Identifier
+	 * @return string|null
+	 */
+	public function fetchRaw($folder, $remoteId)
+	{
+		return null;
+	}
+	/**
+	 * @param string        $messageId Message-ID
+	 * @param string[]|null $folders   Folders
+	 * @return array<string,string>|null
+	 */
+	public function findByMessageId($messageId, $folders = null)
+	{
+		return null;
+	}
+}
 
 /**
  * Tests of InboxSync, InboxFolder, InboxMail, InboxContactMatcher
@@ -630,5 +710,120 @@ class InboxSyncTest extends InboxTestCase
 		$conf->global->INBOX_GONE_LINKED_DAYS = '365';
 		$this->assertSame(2, $refs->shed(), 'a shorter delay');
 		unset($conf->global->INBOX_GONE_LINKED_DAYS);
+	}
+
+	/**
+	 * 1.145.0: the storage of the Sieve scripts that Dovecot shows as folders is not followed when it appears, it stays
+	 * in the tree; a choice made by hand is kept at the next reading of the folders
+	 *
+	 * @return void
+	 */
+	public function testSieveStorageNotFollowed()
+	{
+		$yes = array(array('INBOX.dovecot.sieve', '.'), array('INBOX.dovecot', '.'), array('INBOX.dovecot.svbin', '.'), array('INBOX.sieve', '.'),
+			array('inbox.dovecot.sieve', '.'), array('dovecot.sieve', '/'), array('sieve', '/'), array('INBOX/dovecot.sieve', '/'), array('sieve', ''));
+		foreach ($yes as $c) {
+			$this->assertTrue(InboxFolder::isSieveStorage($c[0], $c[1]), $c[0].' '.$c[1]);
+		}
+		$no = array(array('INBOX', '.'), array('INBOX.Sieve', '.'), array('INBOX.Archives.sieve', '.'), array('INBOX.dovecot.sieve.old', '.'),
+			array('INBOX.sieve', '/'), array('Clients/sieve', '/'));
+		foreach ($no as $c) {
+			$this->assertFalse(InboxFolder::isSieveStorage($c[0], $c[1]), $c[0].' '.$c[1]);
+		}
+
+		$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$f = function ($path, $selectable = true) {
+			return array('path' => $path, 'name' => $path, 'delimiter' => '.', 'selectable' => $selectable, 'role' => $path === 'INBOX' ? 'inbox' : '', 'flags' => array());
+		};
+		$list = array($f('INBOX'), $f('INBOX.dovecot', false), $f('INBOX.dovecot.sieve'), $f('INBOX.Clients'));
+		$folders = new InboxFolder($this->db);
+		$folders->syncTree($a, $list);
+		$rows = array();
+		foreach ($folders->listForAccount($a->id) as $r) {
+			$rows[$r->path] = $r;
+		}
+		$this->assertCount(4, $rows, 'every folder in the tree');
+		foreach (array('INBOX' => 1, 'INBOX.Clients' => 1, 'INBOX.dovecot' => 0, 'INBOX.dovecot.sieve' => 0) as $path => $followed) {
+			$this->assertSame($followed, (int) $rows[$path]->sync_enabled, $path);
+		}
+		$this->assertTrue($folders->setSyncEnabled($a->id, (int) $rows['INBOX.dovecot.sieve']->rowid, true));
+		$folders->syncTree($a, $list);
+		$this->assertSame('1', (string) $this->db->getRow("SELECT sync_enabled FROM ".$this->db->prefix()."inbox_folder WHERE rowid = ".((int) $rows['INBOX.dovecot.sieve']->rowid))->sync_enabled, 'followed by hand: kept');
+	}
+
+	/**
+	 * 1.145.0: a folder whose reading fails pass after pass no longer keeps its mailbox in « first synchronisation »;
+	 * it stays in error, is tried again at its pace, and counts again once read
+	 *
+	 * @return void
+	 */
+	public function testFailingFolderSetAside()
+	{
+		$prop = new ReflectionProperty('InboxConnectorFactory', 'connectors');
+		if (PHP_VERSION_ID < 80100) {
+			$prop->setAccessible(true);
+		}
+		$saved = $prop->getValue();
+		$connectors = InboxConnectorFactory::getConnectors();
+		$connectors['zzsyncfake'] = array('class' => 'InboxSyncFakeConnector', 'file' => '/inbox/test/phpunit/InboxSyncTest.php', 'label' => 'Fake', 'family' => 'mail', 'icon' => 'mail');
+		$prop->setValue(null, $connectors);
+		$f = function ($path, $role = '') {
+			return array('path' => $path, 'name' => $path, 'delimiter' => '.', 'selectable' => true, 'role' => $role, 'flags' => array());
+		};
+		InboxSyncFakeConnector::$folders = array($f('INBOX', 'inbox'), $f('INBOX.Sent', 'sent'), $f('INBOX.dovecot.sieve'), $f('INBOX.ZzBroken'));
+		InboxSyncFakeConnector::$failing = array('INBOX.dovecot.sieve' => true, 'INBOX.ZzBroken' => true);
+		InboxSyncFakeConnector::$reads = array();
+		try {
+			$a = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE, 'connector' => 'zzsyncfake'));
+			$s = new InboxSync($this->db);
+			$p = $this->db->prefix();
+			$pass = function () use ($s, $a) {
+				$a->fetch($a->id);
+				$this->assertSame(1, $s->run($a, microtime(true) + 20, array('force' => true)), $s->error);
+				$a->loadSyncState();
+
+				return (string) $a->sync_state;
+			};
+			$broken = function () use ($p, $a) {
+				return $this->db->getRow("SELECT rowid, sync_fail_count, sync_error, first_sync_done FROM ".$p."inbox_folder WHERE fk_account = ".((int) $a->id)." AND path = 'INBOX.ZzBroken'");
+			};
+
+			$this->assertSame('first_sync', $pass(), 'failed once: still waited for');
+			$this->assertArrayNotHasKey('INBOX.dovecot.sieve', InboxSyncFakeConnector::$reads, 'the storage of Sieve is not read');
+			$this->assertSame(2, InboxSyncFakeConnector::$reads['INBOX.ZzBroken'], 'changes, then first indexing');
+			$this->assertSame(1, (int) $broken()->sync_fail_count, 'one failure counted per pass');
+			$this->assertSame('STATUS without answer', (string) $broken()->sync_error);
+			$this->assertSame(1, $s->progress($a->id)['first_sync_left']);
+			for ($i = 2; $i < InboxFolder::FAILS_SET_ASIDE; $i++) {
+				$this->assertSame('first_sync', $pass(), 'failed '.$i.' times');
+			}
+			$this->assertSame('ok', $pass(), 'failed '.InboxFolder::FAILS_SET_ASIDE.' passes in a row: the mailbox no longer waits for it');
+			$this->assertSame(InboxFolder::FAILS_SET_ASIDE, (int) $broken()->sync_fail_count);
+			$this->assertSame(0, $s->progress($a->id)['first_sync_left']);
+			$this->assertSame('STATUS without answer', (string) $broken()->sync_error, 'still shown in error');
+
+			InboxSyncFakeConnector::$reads = array();
+			$this->assertSame('ok', $pass());
+			$this->assertSame(1, InboxSyncFakeConnector::$reads['INBOX.ZzBroken'], 'tried again at its pace, no longer for its first indexing');
+
+			// Readable again: its failures counted from zero, its first indexing done
+			unset(InboxSyncFakeConnector::$failing['INBOX.ZzBroken']);
+			$this->assertSame('ok', $pass());
+			$row = $broken();
+			$this->assertSame(0, (int) $row->sync_fail_count);
+			$this->assertSame(1, (int) $row->first_sync_done);
+			$this->assertSame('', (string) $row->sync_error);
+
+			// Followed again by hand: counted from zero
+			$this->db->query("UPDATE ".$p."inbox_folder SET sync_fail_count = ".InboxFolder::FAILS_SET_ASIDE.", first_sync_done = 0 WHERE rowid = ".((int) $row->rowid));
+			$this->assertSame(0, $s->progress($a->id)['first_sync_left']);
+			$this->assertTrue((new InboxFolder($this->db))->setSyncEnabled($a->id, (int) $row->rowid, true));
+			$this->assertSame(0, (int) $broken()->sync_fail_count);
+			$this->assertSame(1, $s->progress($a->id)['first_sync_left']);
+		} finally {
+			$prop->setValue(null, $saved);
+			InboxSyncFakeConnector::$folders = array();
+			InboxSyncFakeConnector::$failing = array();
+		}
 	}
 }
