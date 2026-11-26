@@ -3553,11 +3553,15 @@
 			html += '<table class="ibx-table"><thead><tr><th>' + th('InboxFolder') + '</th><th>' + th('InboxSyncFollowed') + '</th><th>' + th('InboxSyncMails') + '</th><th>'
 				+ th('InboxSyncIndexed') + '</th><th>' + th('InboxSyncLastPass') + '</th></tr></thead><tbody>'
 				+ st.folders.map(f => '<tr><td>' + (f.role === 'inbox' ? th('InboxFolderRoleInbox') : esc(f.label) + (f.role ? ' <span class="ibx-muted">(' + th(roleKey(f.role)) + ')</span>' : ''))
-					+ (f.error ? '<div class="ibx-formrow__error">' + esc(f.error) + '</div>' : '') + '</td>'
+					+ (f.error ? '<div class="ibx-formrow__error">' + esc(f.error) + '</div>' : '')
+					+ (f.set_aside && f.sync_enabled && !f.first_sync_done ? '<div class="ibx-muted">' + th('InboxSyncFolderSetAsideHelp') + '</div>' : '') + '</td>'
 					+ '<td>' + (f.selectable ? '<button type="button" class="ibx-switch" role="switch" data-folder="' + f.id + '" aria-checked="' + (f.sync_enabled ? 'true' : 'false')
 						+ '" aria-label="' + th('InboxSyncFollowed') + ' ' + esc(f.label) + '"></button>' : '<span class="ibx-muted">-</span>') + '</td>'
 					+ '<td>' + esc(f.total.toLocaleString(I.locale())) + (f.unread ? ' <span class="ibx-muted">(' + th('InboxSyncUnread', f.unread) + ')</span>' : '') + '</td>'
-					+ '<td>' + (f.sync_enabled ? esc(f.indexed.toLocaleString(I.locale())) + (f.first_sync_done ? '' : ' <span class="ibx-status ibx-status--warning">' + th('InboxSyncInProgress') + '</span>') : '<span class="ibx-muted">-</span>') + '</td>'
+					+ '<td>' + (f.sync_enabled ? esc(f.indexed.toLocaleString(I.locale())) + (f.first_sync_done ? ''
+						// Failed pass after pass (1.145.0): left out of the first synchronisation, said under its name
+						: f.set_aside ? ' <span class="ibx-status ibx-status--error">' + th('InboxSyncFolderSetAside') + '</span>'
+						: ' <span class="ibx-status ibx-status--warning">' + th('InboxSyncInProgress') + '</span>') : '<span class="ibx-muted">-</span>') + '</td>'
 					+ '<td class="ibx-muted">' + (f.date_sync ? esc(ago(f.date_sync)) : '-') + '</td></tr>').join('')
 				+ '</tbody></table>';
 		}

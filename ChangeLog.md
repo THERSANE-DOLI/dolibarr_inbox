@@ -1,8 +1,22 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-- FIX: an answer to a calendar invitation (« Accepted: », « Invitation mise à jour : ») is the same subject :   1.143.1
+- FIX: an answer to a calendar invitation (« Accepted: », « Invitation mise à jour : ») is the same subject :   1.145.2
   - the prefixes of the calendars are removed before subjects are compared, as « Re: », in the five languages.
   - its link to the event is no more listed « from another subject », and it opens no new conversation.
+
+- FIX: a section after the buttons of a form no longer touches them (tab Synchro, Data sources) :   1.145.1
+  - the space between two sections above its title, on a computer and a phone.
+
+- FIX: a folder of the server that can never be read no longer keeps its mailbox in « first synchronisation » :   1.145.0
+  - the folders where Dovecot keeps the rules (INBOX.dovecot.sieve...), shown after the first save of the rules, are
+    no longer followed when they appear: still in the tree, they can be followed by hand.
+  - a folder failing 3 passes in a row is left out of the first synchronisation, « failing » in the tab Synchro, and
+    tried again every 15 min only; a good pass counts it again. Activate the module again.
+
+- FIX: a signed mail copied whole, Message-ID included, is refused as a replay :   1.144.0
+  - a signature is believed again only on a mail received at most 5 minutes from its first reception (the copies of
+    one mail in other folders or mailboxes); the Message-ID, written by the sender as the Date, no longer decides.
+  - the same form sent to two mailboxes in the same second is believed in both. Activate the module again.
 
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a

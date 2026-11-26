@@ -120,7 +120,7 @@ class InboxConversationTest extends InboxTestCase
 		$this->assertSame('devis brides dn80', InboxThreader::normalizeSubject('RE: TR: Re[2]: Fwd: AW: Devis  brides DN80'));
 		$this->assertSame('réf. commande', InboxThreader::normalizeSubject('Réf: Réf. commande'), 'only the prefix « Réf: » goes');
 		$this->assertSame('', InboxThreader::normalizeSubject('RE:'));
-		// Prefixes of the calendars on an invitation and its answers (1.143.1)
+		// Prefixes of the calendars on an invitation and its answers (1.145.2)
 		$this->assertSame('réunion de chantier', InboxThreader::normalizeSubject('Invitation mise à jour : Réunion de chantier'));
 		$this->assertSame('site meeting', InboxThreader::normalizeSubject('RE: Tentatively accepted: Site meeting'));
 		$this->assertSame('baustellenbesprechung', InboxThreader::normalizeSubject('Mit Vorbehalt angenommen: Baustellenbesprechung'));

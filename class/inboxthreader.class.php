@@ -83,7 +83,7 @@ class InboxThreader
 		$s = trim((string) $subject);
 		$prefix = '/^\s*(?:re|r|tr|fw|fwd|aw|wg|sv|vs|antw|rif|rv|enc|réf|ref)\s*(?:\[\d+\]|\(\d+\))?\s*:\s*/iu';
 		// A calendar puts its own prefix before the title of the event, in the language of each correspondent: an
-		// answer « Accepté : X » to « Invitation mise à jour : X » is the same subject (1.143.1)
+		// answer « Accepté : X » to « Invitation mise à jour : X » is the same subject (1.145.2)
 		$calendar = '/^\s*(?:'.implode('|', array(
 			'updated\s+invitation', 'invitation\s+mise\s+à\s+jour', 'aktualisierte\s+einladung', 'invito\s+aggiornato', 'invitación\s+actualizada',
 			'invitation', 'einladung', 'invito', 'invitación',
