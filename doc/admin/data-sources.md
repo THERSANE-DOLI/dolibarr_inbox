@@ -38,9 +38,10 @@ such header). The name of the header can be changed on the source.
 - A wrong signature, or one more than 2 days away from the **reception** of the mail, is refused: the authentication is
   never tried instead. The reception is the time written by the mail server of the mailbox (IMAP `INTERNALDATE`), never
   the `Date` header, which the sender writes. Without the signature header, the rule of the unsigned sources applies.
-- A signature serves one mail only. The same signature on a mail of another `Message-ID` (a signed header copied on a
-  new mail) is refused as a replay; the copies of one mail in several mailboxes or folders share their `Message-ID` and
-  stay believed. The signatures seen are kept as long as the source.
+- A signature serves one mail only. Its first reception is kept; the same signature on a mail received more than
+  5 minutes away (a signed header copied on a new mail, even with the `Message-ID` of the first one, which the sender
+  writes too) is refused as a replay. The copies of one mail in other folders keep its reception, in other mailboxes
+  they arrive within seconds: they stay believed. The signatures seen are kept as long as the source.
 - The signature covers the address and the data headers only: the headers « one per field » are not read on a signed
   mail, and **the subject, the text and the attachments are not signed**. The panel of the mail says « Signed by the
   site: requester and data only ». Put the number of the request in the signed data (key `id` or `ref`, shown in the
