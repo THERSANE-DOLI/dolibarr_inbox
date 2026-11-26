@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
+  - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
+    trusted sender with a right signature header (HMAC-SHA256, at 2 days of its date at most) is believed.
+  - a wrong signature is refused, without trying the authentication; without one, the rule of the unsigned sources.
+  - Settings > Data sources, doc page Data sources (section Signed sources). Activate the module again.
+
 - NEW: view « Spams »: the junk of every mailbox in one list, to find quickly an email that is not a spam :   1.142.0
   - hidden by default (menu of the views); a grey count of the spams arrived since the last visit, no unread badge.
   - on each line why it is there (score of the anti-spam filter, blocked sender), « Probably legitimate » chip.

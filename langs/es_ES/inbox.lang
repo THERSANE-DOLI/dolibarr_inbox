@@ -2753,6 +2753,25 @@ InboxSourceTestRun = Probar
 InboxSourceTestNotSender = El remitente %s no es un remitente de confianza de esta fuente.
 InboxSourceTestOk = Solicitante: %s (%s)
 InboxSourceRefused_auth = Remitente no autenticado (ni DMARC ni DKIM de su dominio): no se cree en las cabeceras.
+# Signed data sources (1.143.0)
+InboxSourceRefused_signature = Firma incorrecta, o a más de 2 días de la fecha del correo: no se cree en las cabeceras.
+InboxSourceHeaderSignature = Cabecera de la firma
+InboxSourceHeaderSignatureHelp = Cabecera en la que el sitio escribe su firma. Vacía: X-Data-Form-Signature.
+InboxSourceSignatureKey = Clave de firma
+InboxSourceSignatureKeyPlaceholder = Pegue la clave del sitio, o genere una
+InboxSourceSignatureKeepPlaceholder = Clave guardada conservada: escriba una nueva para sustituirla
+InboxSourceSignatureGenerate = Generar una clave
+InboxSourceSignatureGenerated = Clave nueva, creada por su navegador: cópiela ahora en los ajustes del sitio. Una vez guardada, no se vuelve a mostrar.
+InboxSourceSignatureClear = Quitar la clave
+InboxSourceSignatureSet = Hay una clave guardada (ya no se muestra).
+InboxSourceSignatureNone = Sin clave: solo se cree en las cabeceras de un correo autenticado.
+InboxSourceSignatureKeyHelp = Con una clave, se cree en un correo firmado de un remitente de confianza sin la autenticación de su remitente: para los servidores de correo que no escriben ninguna, o un sitio que envía por el servidor del buzón. De 32 a 128 letras, cifras o + / = _ -.
+InboxSourceSigned = Firmada
+InboxSourceSignedTitle = El sitio firma sus cabeceras con la clave de esta fuente
+InboxSourceErrorSignatureKey = La clave de firma necesita de 32 a 128 letras, cifras o + / = _ -.
+InboxSourceSignatureFormatHelp = Una fuente firmada añade una tercera cabecera: t es la hora de la firma (tiempo Unix), s el HMAC-SHA256 en hexadecimal, con la clave de la fuente, de t, un salto de línea, el valor de la cabecera de la dirección, un salto de línea y el valor de la cabecera de los datos. Se acepta hasta 2 días de la fecha del correo; las cabeceras « una por campo » no se leen en un correo firmado.
+InboxSourceTerm_signature = Firmada
+InboxSourceTermHelp_signature = El sitio y la fuente comparten una clave: el sitio firma con ella las cabeceras de cada correo, y una firma correcta prueba que el correo viene del sitio aunque el servidor de correo no verifique nada. Sin clave, la fuente necesita un remitente autenticado.
 InboxSourceRefused_json = La cabecera de datos no es un objeto JSON legible (una línea, 2000 caracteres como máximo).
 InboxSourceRefused_twice = Una cabecera de la fuente aparece dos veces en el correo: no se cree nada.
 InboxSourceRefused_noemail = Ninguna dirección válida del solicitante en las cabeceras.

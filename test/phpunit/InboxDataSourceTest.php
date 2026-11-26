@@ -181,6 +181,69 @@ class InboxDataSourceTest extends InboxTestCase
 	}
 
 	/**
+	 * 1.143.0: a signed source believes a right signature without the authentication of the sender
+	 *
+	 * @return void
+	 */
+	public function testSignedSource()
+	{
+		$key = str_repeat('ab12', 16);
+		$sources = new InboxDataSource($this->db);
+		$this->assertLessThan(0, $sources->save($this->admin, 0, array('label' => 'ZzSource short', 'header_data' => 'X-A', 'signature_key' => 'tooshort')), 'a key too short');
+		$this->assertLessThan(0, $sources->save($this->admin, 0, array('label' => 'ZzSource name', 'header_data' => 'X-A', 'header_signature' => 'X Sig')), 'not a header name');
+		$id = $this->source(array('signature_key' => $key));
+
+		// Stored encrypted, never in the list of the settings
+		$stored = $this->db->getRow("SELECT signature_key FROM ".$this->db->prefix()."inbox_source WHERE rowid = ".$id)->signature_key;
+		$this->assertNotSame($key, $stored);
+		$this->assertSame($key, $sources->signatureKeyOf($id));
+		$listed = array_column($sources->fetchAll(), null, 'id');
+		$this->assertTrue($listed[$id]['signed']);
+		$this->assertArrayNotHasKey('signature_key', $listed[$id]);
+		$this->assertStringNotContainsString($key, json_encode($sources->fetchAll()));
+		$this->assertEqualsCanonicalizing(array('X-DATA-FORM-EMAIL', 'X-DATA-FORM', 'X-FORM-TOWN', 'X-DATA-FORM-SIGNATURE', 'DATE', 'AUTHENTICATION-RESULTS', 'RECEIVED-SPF'), $sources->syncHeaders());
+
+		$email = 'jean.dupont@client.inbox-test.invalid';
+		$data = '{"firstname":"Jean","lastname":"Dupont","company":"Dupont SARL"}';
+		$now = (int) dol_now();
+		$date = 'Date: '.date('r', $now)."\r\n";
+		$signed = function ($sig, $auth = '') use ($email, $data, $date) {
+			return self::head($date.'X-Data-Form-Email: '.$email."\r\nX-Data-Form: ".$data."\r\nX-Form-Town: Lyon\r\n".($sig !== '' ? 'X-Data-Form-Signature: '.$sig."\r\n" : ''), $auth);
+		};
+
+		// A right signature, without any authentication: believed; the header « one per field » is not signed, not read
+		$found = $sources->detectRaw($signed(InboxDataSource::sign($key, $email, $data, $now)), self::SITE);
+		$this->assertTrue($found['ok']);
+		$this->assertSame($email, $found['email']);
+		$this->assertSame('Dupont SARL', $found['data']['company']);
+		$this->assertArrayNotHasKey('town', $found['data']);
+		// Another key, data changed after the signature, too old, unreadable: refused
+		$this->assertSame('signature', $sources->detectRaw($signed(InboxDataSource::sign(str_repeat('cd34', 16), $email, $data, $now)), self::SITE)['why']);
+		$this->assertSame('signature', $sources->detectRaw($signed(InboxDataSource::sign($key, $email, '{"company":"Other"}', $now)), self::SITE)['why']);
+		$this->assertSame('signature', $sources->detectRaw($signed(InboxDataSource::sign($key, $email, $data, $now - 3 * 86400)), self::SITE)['why']);
+		$this->assertSame('signature', $sources->detectRaw($signed('t='.$now.'; s=nope'), self::SITE)['why']);
+		// The signature header twice (a right one added after a wrong one...): refused
+		$right = InboxDataSource::sign($key, $email, $data, $now);
+		$this->assertSame('twice', $sources->detectRaw($signed('t='.$now.'; s='.str_repeat('0', 64)."\r\nX-Data-Form-Signature: ".$right), self::SITE)['why']);
+		// A wrong signature on an authenticated mail: still refused, the authentication is never tried instead
+		$this->assertSame('signature', $sources->detectRaw($signed('t='.$now.'; s='.str_repeat('0', 64), 'default'), self::SITE)['why']);
+		// Without a signature: the rule of the unsigned sources
+		$this->assertSame('auth', $sources->detectRaw($signed(''), self::SITE)['why']);
+		$this->assertTrue($sources->detectRaw($signed('', 'default'), self::SITE)['ok']);
+
+		// Saved again without a key: the key stays; another header name; removed on demand
+		$base = array('label' => 'ZzSource form', 'status' => 1, 'senders' => 'forms.inbox-test.invalid', 'header_email' => 'X-Data-Form-Email', 'header_data' => 'X-Data-Form', 'type' => 'propal');
+		$this->assertSame($id, $sources->save($this->admin, $id, $base + array('header_signature' => 'X-Site-Sig')));
+		$this->assertSame($key, $sources->signatureKeyOf($id));
+		$this->assertContains('X-SITE-SIG', $sources->syncHeaders());
+		$this->assertTrue($sources->detectRaw(self::head($date.'X-Data-Form-Email: '.$email."\r\nX-Data-Form: ".$data."\r\nX-Site-Sig: ".InboxDataSource::sign($key, $email, $data, $now)."\r\n", ''), self::SITE)['ok']);
+		$this->assertSame($id, $sources->save($this->admin, $id, $base + array('signature_clear' => 1)));
+		$this->assertSame('', $sources->signatureKeyOf($id));
+		$this->assertFalse(array_column($sources->fetchAll(), null, 'id')[$id]['signed']);
+		$this->assertSame('auth', $sources->detectRaw($signed(InboxDataSource::sign($key, $email, $data, $now)), self::SITE)['why'], 'no key: a signature proves nothing');
+	}
+
+	/**
 	 * 1.74.0: the analysis of a mail of a site, the glossary, a usual key ignored on purpose
 	 *
 	 * @return void

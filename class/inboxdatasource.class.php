@@ -34,6 +34,14 @@ require_once __DIR__.'/inboxreader.class.php';
  * pictures, InboxReader::authPass): a header written by anybody else never changes the requester. Nothing is ever
  * written in Dolibarr from them: the thirdparty is looked for on the address of the requester, the creation pages are
  * filled, the answer goes to the requester; the user validates.
+ *
+ * Or signed (1.143.0): a source given a key shared with its site believes a mail of a trusted sender whose signature
+ * header is right, without the authentication of the sender. Some mail servers write no Authentication-Results, and a
+ * site often sends through the mail server of the mailbox itself, without DKIM: no source could work there. The
+ * signature is the HMAC-SHA256 of « t + "\n" + header of the address + "\n" + header of the data » (values as written,
+ * one of them may be empty), with its time t: « t=<unix time>; s=<hex> », accepted at SIGNATURE_DAYS of the date of the
+ * mail at most. It covers these two headers only: the headers « one per field » are not read on a signed mail. The key
+ * is stored with dolEncrypt(), never sent to the browser (typed, or made by the browser, then only « set »).
  */
 class InboxDataSource
 {
@@ -78,6 +86,15 @@ class InboxDataSource
 	/** Sources of one entity */
 	const MAX_SOURCES = 50;
 
+	/** Header of the signature when the source names none (1.143.0) */
+	const SIGNATURE_HEADER = 'X-Data-Form-Signature';
+
+	/** Days between the time of a signature and the date of the mail, at most (an old signed header copied on another mail) */
+	const SIGNATURE_DAYS = 2;
+
+	/** A signing key: 32 to 128 characters, letters, digits and + / = _ - (hexadecimal or base64) */
+	const SIGNATURE_KEY = '/^[A-Za-z0-9+\/=_-]{32,128}$/';
+
 	/** @var DoliDB */
 	protected $db;
 
@@ -104,7 +121,7 @@ class InboxDataSource
 	{
 		global $conf;
 
-		$rows = $this->db->getRows("SELECT rowid, code, label, status, senders, header_email, header_data, header_fields, mapping, request_type FROM ".$this->db->prefix()."inbox_source"
+		$rows = $this->db->getRows("SELECT rowid, code, label, status, senders, header_email, header_data, header_signature, signature_key, header_fields, mapping, request_type FROM ".$this->db->prefix()."inbox_source"
 			." WHERE entity = ".((int) $conf->entity)." ORDER BY label, rowid LIMIT ".self::MAX_SOURCES);
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
@@ -115,6 +132,8 @@ class InboxDataSource
 	}
 
 	/**
+	 * A source as the settings see it: whether it has a signing key, never the key
+	 *
 	 * @param object $r Row
 	 * @return array<string,mixed>
 	 */
@@ -123,8 +142,25 @@ class InboxDataSource
 		return array(
 			'id' => (int) $r->rowid, 'code' => (string) $r->code, 'label' => (string) $r->label, 'status' => (int) $r->status,
 			'senders' => (string) $r->senders, 'header_email' => (string) $r->header_email, 'header_data' => (string) $r->header_data,
+			'header_signature' => (string) ($r->header_signature ?? ''), 'signed' => (string) ($r->signature_key ?? '') !== '',
 			'header_fields' => (string) $r->header_fields, 'mapping' => (string) $r->mapping, 'type' => (string) $r->request_type,
 		);
+	}
+
+	/**
+	 * Signing key of a saved source, in clear (detection and test on the server only)
+	 *
+	 * @param int $id Source
+	 * @return string '' when none
+	 */
+	public function signatureKeyOf($id)
+	{
+		global $conf;
+
+		$row = $this->db->getRow("SELECT signature_key FROM ".$this->db->prefix()."inbox_source WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity));
+		$stored = is_object($row) ? (string) $row->signature_key : '';
+
+		return $stored === '' ? '' : (string) dolDecrypt($stored);
 	}
 
 	/**
@@ -142,10 +178,12 @@ class InboxDataSource
 		}
 		$out = array();
 		// Module updated but not reactivated yet: no table, no source
-		$rows = $this->db->getRows("SELECT rowid, code, label, status, senders, header_email, header_data, header_fields, mapping, request_type FROM ".$this->db->prefix()."inbox_source"
+		$rows = $this->db->getRows("SELECT rowid, code, label, status, senders, header_email, header_data, header_signature, signature_key, header_fields, mapping, request_type FROM ".$this->db->prefix()."inbox_source"
 			." WHERE entity = ".$entity." AND status = 1 ORDER BY rowid LIMIT ".self::MAX_SOURCES);
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$s = self::shape($r);
+			// In clear for detect(), on the server only (shape() never carries it)
+			$s['signature_key'] = (string) ($r->signature_key ?? '') === '' ? '' : (string) dolDecrypt((string) $r->signature_key);
 			$s['sender_list'] = self::parseSenders($s['senders']);
 			$s['field_list'] = self::parsePairs($s['header_fields'], true);
 			$s['key_list'] = self::parsePairs($s['mapping']);
@@ -169,8 +207,8 @@ class InboxDataSource
 	}
 
 	/**
-	 * Headers the synchronisation asks the server in addition, when a source is active: the ones of the sources and
-	 * the results of the authentication
+	 * Headers the synchronisation asks the server in addition, when a source is active: the ones of the sources, the
+	 * results of the authentication, and for a signed source its signature and the date of the mail
 	 *
 	 * @return string[] Names, upper case
 	 */
@@ -178,7 +216,12 @@ class InboxDataSource
 	{
 		$names = array();
 		foreach ($this->active() as $s) {
-			foreach (array_merge(array($s['header_email'], $s['header_data']), array_keys($s['field_list'])) as $h) {
+			$own = array_merge(array($s['header_email'], $s['header_data']), array_keys($s['field_list']));
+			if ($s['signature_key'] !== '') {
+				$own[] = self::signatureHeaderOf($s);
+				$names['DATE'] = true;
+			}
+			foreach ($own as $h) {
 				if ($h !== '' && self::validHeaderName($h)) {
 					$names[strtoupper($h)] = true;
 				}
@@ -199,8 +242,9 @@ class InboxDataSource
 	 * @param string                              $fromEmail Address of the sender
 	 * @param array<int,array<string,mixed>>|null $sources   Sources to try (null: the active ones)
 	 * @return array{ok:bool,why:string,source:int,label:string,type:string,email:string,name:string,data:array<string,string>}|null
-	 *         Null when no source has this sender; ok false with why: auth (not authenticated), json (data unreadable),
-	 *         twice (a header given twice), noemail (no valid address of the requester)
+	 *         Null when no source has this sender; ok false with why: auth (not authenticated, nor signed), signature
+	 *         (signature of a signed source wrong or too old), json (data unreadable), twice (a header given twice),
+	 *         noemail (no valid address of the requester)
 	 */
 	public function detect(array $headers, $fromEmail, $sources = null)
 	{
@@ -217,7 +261,29 @@ class InboxDataSource
 		}
 		$out = array('ok' => false, 'why' => '', 'source' => (int) $source['id'], 'label' => (string) $source['label'], 'type' => (string) $source['type'],
 			'email' => '', 'name' => '', 'data' => array());
-		if (!InboxReader::authPass(InboxReader::authResults($headers), $from)) {
+		// Signed source (1.143.0): a right signature stands for the authentication of the sender; a wrong one never
+		// falls back on it. Without a signature, the rule of the unsigned sources.
+		$signed = false;
+		$key = (string) ($source['signature_key'] ?? '');
+		if ($key !== '') {
+			$sig = self::values($headers, self::signatureHeaderOf($source));
+			if (count($sig) > 1) {
+				$out['why'] = 'twice';
+				return $out;
+			}
+			if ($sig) {
+				$first = function ($name) use ($headers) {
+					$v = $name !== '' ? self::values($headers, $name) : array();
+					return $v ? trim($v[0]) : '';
+				};
+				if (!self::signatureValid($key, $sig[0], $first((string) $source['header_email']), $first((string) $source['header_data']), self::mailTime($headers))) {
+					$out['why'] = 'signature';
+					return $out;
+				}
+				$signed = true;
+			}
+		}
+		if (!$signed && !InboxReader::authPass(InboxReader::authResults($headers), $from)) {
 			$out['why'] = 'auth';
 			return $out;
 		}
@@ -244,7 +310,8 @@ class InboxDataSource
 				}
 			}
 		}
-		foreach ($source['field_list'] ?? self::parsePairs((string) $source['header_fields'], true) as $h => $field) {
+		// The signature covers the headers of the address and of the data only: one header per field is not read then
+		foreach ($signed ? array() : ($source['field_list'] ?? self::parsePairs((string) $source['header_fields'], true)) as $h => $field) {
 			$values = self::values($headers, $h);
 			if (count($values) > 1) {
 				$out['why'] = 'twice';
@@ -496,6 +563,18 @@ class InboxDataSource
 		if (!in_array($type, self::TYPES, true)) {
 			$type = '';
 		}
+		// Signature (1.143.0): a key typed replaces the saved one, « clear » removes it, nothing typed keeps it
+		$headerSignature = trim((string) ($in['header_signature'] ?? ''));
+		if ($headerSignature !== '' && !self::validHeaderName($headerSignature)) {
+			$this->error = $langs->transnoentities('InboxSourceErrorHeader', $headerSignature);
+			return -1;
+		}
+		$newKey = trim((string) ($in['signature_key'] ?? ''));
+		if ($newKey !== '' && !preg_match(self::SIGNATURE_KEY, $newKey)) {
+			$this->error = $langs->transnoentities('InboxSourceErrorSignatureKey');
+			return -1;
+		}
+		$keySql = $newKey !== '' ? "'".$this->db->escape(dolEncrypt($newKey))."'" : (!empty($in['signature_clear']) ? 'NULL' : '');
 		$e = function ($v) {
 			return $v === '' ? 'NULL' : "'".$this->db->escape($v)."'";
 		};
@@ -510,7 +589,8 @@ class InboxDataSource
 		$p = $this->db->prefix();
 		if ($id > 0) {
 			$sql = "UPDATE ".$p."inbox_source SET label = ".$e($label).", status = ".$status.", senders = ".$e($sendersText).", header_email = ".$e($headerEmail).",";
-			$sql .= " header_data = ".$e($headerData).", header_fields = ".$e($fieldsText).", mapping = ".$e($keysText).", request_type = ".$e($type).", fk_user_modif = ".((int) $user->id);
+			$sql .= " header_data = ".$e($headerData).", header_signature = ".$e($headerSignature).($keySql !== '' ? ", signature_key = ".$keySql : '').",";
+			$sql .= " header_fields = ".$e($fieldsText).", mapping = ".$e($keysText).", request_type = ".$e($type).", fk_user_modif = ".((int) $user->id);
 			$sql .= " WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity);
 			if (!$this->db->query($sql)) {
 				$this->error = $this->db->lasterror();
@@ -527,8 +607,9 @@ class InboxDataSource
 			$this->error = $langs->transnoentities('InboxSourceErrorMany', self::MAX_SOURCES);
 			return -1;
 		}
-		$sql = "INSERT INTO ".$p."inbox_source (entity, code, label, status, senders, header_email, header_data, header_fields, mapping, request_type, date_creation, fk_user_creat)";
+		$sql = "INSERT INTO ".$p."inbox_source (entity, code, label, status, senders, header_email, header_data, header_signature, signature_key, header_fields, mapping, request_type, date_creation, fk_user_creat)";
 		$sql .= " VALUES (".((int) $conf->entity).", ".$e((string) ($in['code'] ?? '')).", ".$e($label).", ".$status.", ".$e($sendersText).", ".$e($headerEmail).", ".$e($headerData).",";
+		$sql .= " ".$e($headerSignature).", ".($keySql !== '' ? $keySql : 'NULL').",";
 		$sql .= " ".$e($fieldsText).", ".$e($keysText).", ".$e($type).", '".$this->db->idate(dol_now())."', ".((int) $user->id).")";
 		if (!$this->db->query($sql)) {
 			$this->error = $this->db->lasterror();
@@ -578,6 +659,72 @@ class InboxDataSource
 		self::reset();
 
 		return $this->db->query("DELETE FROM ".$this->db->prefix()."inbox_source WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity)) ? 1 : -1;
+	}
+
+	/**
+	 * Header of the signature of a source
+	 *
+	 * @param array<string,mixed> $source Source
+	 * @return string
+	 */
+	public static function signatureHeaderOf(array $source)
+	{
+		$h = trim((string) ($source['header_signature'] ?? ''));
+
+		return $h !== '' ? $h : self::SIGNATURE_HEADER;
+	}
+
+	/**
+	 * Date of a mail (its Date header), else now
+	 *
+	 * @param array<int,array{0:string,1:string}> $headers Headers
+	 * @return int Timestamp
+	 */
+	protected static function mailTime(array $headers)
+	{
+		$v = self::values($headers, 'Date');
+		$t = $v ? strtotime(trim($v[0])) : false;
+
+		return $t !== false ? (int) $t : (int) dol_now();
+	}
+
+	/**
+	 * Signature of the headers of a source, as a site writes it: « t=<unix time>; s=<hex HMAC-SHA256> »
+	 *
+	 * @param string   $key   Signing key of the source
+	 * @param string   $email Value of the header of the address ('' without)
+	 * @param string   $data  Value of the header of the data ('' without)
+	 * @param int|null $time  Time of the signature (null: now)
+	 * @return string
+	 */
+	public static function sign($key, $email, $data, $time = null)
+	{
+		$t = $time === null ? (int) dol_now() : (int) $time;
+
+		return 't='.$t.'; s='.hash_hmac('sha256', $t."\n".trim((string) $email)."\n".trim((string) $data), (string) $key);
+	}
+
+	/**
+	 * A signature right for these headers, and given at SIGNATURE_DAYS of the date of the mail at most
+	 *
+	 * @param string $key      Signing key of the source
+	 * @param string $value    Value of the header of the signature
+	 * @param string $email    Value of the header of the address ('' without)
+	 * @param string $data     Value of the header of the data ('' without)
+	 * @param int    $mailTime Date of the mail
+	 * @return bool
+	 */
+	public static function signatureValid($key, $value, $email, $data, $mailTime)
+	{
+		if ((string) $key === '' || !preg_match('/(?:^|;)\s*t\s*=\s*(\d{9,11})\s*(?:;|$)/', (string) $value, $t) || !preg_match('/(?:^|;)\s*s\s*=\s*([0-9a-fA-F]{64})\s*(?:;|$)/', (string) $value, $s)) {
+			return false;
+		}
+		if (abs((int) $t[1] - (int) $mailTime) > self::SIGNATURE_DAYS * 86400) {
+			return false;
+		}
+		$expected = hash_hmac('sha256', $t[1]."\n".trim((string) $email)."\n".trim((string) $data), (string) $key);
+
+		return hash_equals($expected, strtolower($s[1]));
 	}
 
 	/**
