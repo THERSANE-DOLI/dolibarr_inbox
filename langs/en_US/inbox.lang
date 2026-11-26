@@ -2754,7 +2754,7 @@ InboxSourceTestNotSender = The sender %s is not a trusted sender of this source.
 InboxSourceTestOk = Requester: %s (%s)
 InboxSourceRefused_auth = Sender not authenticated (no DMARC nor DKIM of its domain): the headers are not believed.
 # Signed data sources (1.143.0)
-InboxSourceRefused_signature = Signature wrong, or more than 2 days away from the date of the email: the headers are not believed.
+InboxSourceRefused_signature = Signature wrong, or more than 2 days away from the reception of the email: the headers are not believed.
 InboxSourceHeaderSignature = Signature header
 InboxSourceHeaderSignatureHelp = Header the site writes its signature in. Empty: X-Data-Form-Signature.
 InboxSourceSignatureKey = Signing key
@@ -2765,13 +2765,16 @@ InboxSourceSignatureGenerated = New key, made by your browser: copy it now into 
 InboxSourceSignatureClear = Remove the key
 InboxSourceSignatureSet = A key is saved (never shown again).
 InboxSourceSignatureNone = No key: the headers are believed on an authenticated email only.
-InboxSourceSignatureKeyHelp = With a key, a signed email of a trusted sender is believed without the authentication of its sender: for the mail servers that write none, or a site that sends through the mail server of the mailbox. 32 to 128 letters, digits or + / = _ -.
+InboxSourceSignatureKeyHelp = With a key, a signed email of a trusted sender is believed without the authentication of its sender: for the mail servers that write none, or a site that sends through the mail server of the mailbox. The signature proves the address and the data only, never the subject, the text nor the attachments of the email. 32 to 128 letters, digits or + / = _ -.
 InboxSourceSigned = Signed
 InboxSourceSignedTitle = The site signs its headers with the key of this source
 InboxSourceErrorSignatureKey = The signing key needs 32 to 128 letters, digits or + / = _ -.
-InboxSourceSignatureFormatHelp = A signed source adds a third header: t is the time of the signature (Unix time), s the HMAC-SHA256 in hexadecimal, with the key of the source, of t, a line break, the value of the address header, a line break and the value of the data header. It is accepted up to 2 days from the date of the email; the headers « one per field » are not read on a signed email.
+InboxSourceSignatureFormatHelp = A signed source adds a third header: t is the time of the signature (Unix time), s the HMAC-SHA256 in hexadecimal, with the key of the source, of t, a line break, the value of the address header, a line break and the value of the data header. It is accepted up to 2 days from the reception of the email, on one email only; the headers « one per field » are not read on a signed email. Only these headers are proven: put the number of the request in the data (key id or ref, shown in the panel), and read what was asked in the site rather than in the body.
 InboxSourceTerm_signature = Signed
 InboxSourceTermHelp_signature = The site and the source share a key: the site signs the headers of each email with it, and a right signature proves the email comes from the site even when the mail server checks nothing. Without a key, the source needs an authenticated sender.
+InboxSourceRefused_replay = Signature already used by another email (a signed header copied): the headers are not believed.
+InboxRequesterSigned = Signed by the site: requester and data only
+InboxRequesterSignedHelp = The signature of the site proves the requester and the data of its headers. The subject, the text and the attachments of the email are not signed: read them as those of any email.
 InboxSourceRefused_json = The data header is not a readable JSON object (one line, 2000 characters at most).
 InboxSourceRefused_twice = A header of the source is written twice in the email: nothing is believed.
 InboxSourceRefused_noemail = No valid address of the requester in the headers.

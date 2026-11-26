@@ -39,9 +39,13 @@ require_once __DIR__.'/inboxreader.class.php';
  * header is right, without the authentication of the sender. Some mail servers write no Authentication-Results, and a
  * site often sends through the mail server of the mailbox itself, without DKIM: no source could work there. The
  * signature is the HMAC-SHA256 of « t + "\n" + header of the address + "\n" + header of the data » (values as written,
- * one of them may be empty), with its time t: « t=<unix time>; s=<hex> », accepted at SIGNATURE_DAYS of the date of the
- * mail at most. It covers these two headers only: the headers « one per field » are not read on a signed mail. The key
- * is stored with dolEncrypt(), never sent to the browser (typed, or made by the browser, then only « set »).
+ * one of them may be empty), with its time t: « t=<unix time>; s=<hex> », accepted at SIGNATURE_DAYS of the reception
+ * of the mail at most: the time written by the mail server of the mailbox (IMAP INTERNALDATE), never the Date header,
+ * which the sender writes. A signature serves one mail only: seen again on a mail of another Message-ID, it is a replay,
+ * refused (table inbox_source_signature, kept as long as the source: the requester is read again at each reading).
+ * It covers these two headers only: the headers « one per field » are not read on a signed mail, and the subject, the
+ * text and the attachments are not signed (the panel of the mail says so). The key is stored with dolEncrypt(), never
+ * sent to the browser (typed, or made by the browser, then only « set »).
  */
 class InboxDataSource
 {
@@ -89,7 +93,7 @@ class InboxDataSource
 	/** Header of the signature when the source names none (1.143.0) */
 	const SIGNATURE_HEADER = 'X-Data-Form-Signature';
 
-	/** Days between the time of a signature and the date of the mail, at most (an old signed header copied on another mail) */
+	/** Days between the time of a signature and the reception of the mail, at most (an old signed header copied on another mail) */
 	const SIGNATURE_DAYS = 2;
 
 	/** A signing key: 32 to 128 characters, letters, digits and + / = _ - (hexadecimal or base64) */
@@ -218,8 +222,8 @@ class InboxDataSource
 		foreach ($this->active() as $s) {
 			$own = array_merge(array($s['header_email'], $s['header_data']), array_keys($s['field_list']));
 			if ($s['signature_key'] !== '') {
+				// Its time is measured from the reception (INTERNALDATE, fetched anyway), never from the Date header
 				$own[] = self::signatureHeaderOf($s);
-				$names['DATE'] = true;
 			}
 			foreach ($own as $h) {
 				if ($h !== '' && self::validHeaderName($h)) {
@@ -241,12 +245,16 @@ class InboxDataSource
 	 * @param array<int,array{0:string,1:string}> $headers   Headers (InboxReader::headers)
 	 * @param string                              $fromEmail Address of the sender
 	 * @param array<int,array<string,mixed>>|null $sources   Sources to try (null: the active ones)
-	 * @return array{ok:bool,why:string,source:int,label:string,type:string,email:string,name:string,data:array<string,string>}|null
+	 * @param array<string,mixed>|null            $mail      For a signed source: received (IMAP INTERNALDATE; 0: the
+	 *                                                       one of the index for its Message-ID) and message_id. Null
+	 *                                                       (a test of the settings): now, the signature not kept
+	 * @return array{ok:bool,why:string,source:int,label:string,type:string,email:string,name:string,signed:bool,data:array<string,string>}|null
 	 *         Null when no source has this sender; ok false with why: auth (not authenticated, nor signed), signature
-	 *         (signature of a signed source wrong or too old), json (data unreadable), twice (a header given twice),
-	 *         noemail (no valid address of the requester)
+	 *         (signature of a signed source wrong, or too far from the reception), replay (signature already used by a
+	 *         mail of another Message-ID), json (data unreadable), twice (a header given twice), noemail (no valid
+	 *         address of the requester). signed: believed on its signature (the subject, the text, the attachments are not)
 	 */
-	public function detect(array $headers, $fromEmail, $sources = null)
+	public function detect(array $headers, $fromEmail, $sources = null, $mail = null)
 	{
 		$from = strtolower(trim((string) $fromEmail));
 		$source = null;
@@ -260,7 +268,7 @@ class InboxDataSource
 			return null;
 		}
 		$out = array('ok' => false, 'why' => '', 'source' => (int) $source['id'], 'label' => (string) $source['label'], 'type' => (string) $source['type'],
-			'email' => '', 'name' => '', 'data' => array());
+			'email' => '', 'name' => '', 'signed' => false, 'data' => array());
 		// Signed source (1.143.0): a right signature stands for the authentication of the sender; a wrong one never
 		// falls back on it. Without a signature, the rule of the unsigned sources.
 		$signed = false;
@@ -276,11 +284,18 @@ class InboxDataSource
 					$v = $name !== '' ? self::values($headers, $name) : array();
 					return $v ? trim($v[0]) : '';
 				};
-				if (!self::signatureValid($key, $sig[0], $first((string) $source['header_email']), $first((string) $source['header_data']), self::mailTime($headers))) {
+				// Measured from the reception, written by our mail server: the Date header is the sender's
+				$received = $this->receivedOf($mail);
+				if (!self::signatureValid($key, $sig[0], $first((string) $source['header_email']), $first((string) $source['header_data']), $received)) {
 					$out['why'] = 'signature';
 					return $out;
 				}
+				if ($mail !== null && !$this->firstUse((int) $source['id'], $sig[0], self::mailKey($mail, $received))) {
+					$out['why'] = 'replay';
+					return $out;
+				}
 				$signed = true;
+				$out['signed'] = true;
 			}
 		}
 		if (!$signed && !InboxReader::authPass(InboxReader::authResults($headers), $from)) {
@@ -427,17 +442,18 @@ class InboxDataSource
 	/**
 	 * Requester of a raw header (synchronisation: the headers asked only)
 	 *
-	 * @param string $rawHeader Raw header
-	 * @param string $fromEmail Sender
+	 * @param string                                       $rawHeader Raw header
+	 * @param string                                       $fromEmail Sender
+	 * @param array{received?:int,message_id?:string}|null $mail      See detect()
 	 * @return array<string,mixed>|null See detect()
 	 */
-	public function detectRaw($rawHeader, $fromEmail)
+	public function detectRaw($rawHeader, $fromEmail, $mail = null)
 	{
 		if (!$this->active()) {
 			return null;
 		}
 
-		return $this->detect(InboxReader::headers(rtrim((string) $rawHeader)."\n\n"), $fromEmail);
+		return $this->detect(InboxReader::headers(rtrim((string) $rawHeader)."\n\n"), $fromEmail, null, $mail);
 	}
 
 	/**
@@ -657,8 +673,14 @@ class InboxDataSource
 		global $conf;
 
 		self::reset();
+		if (!$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_source WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity))) {
+			return -1;
+		}
+		// The signatures seen go with their source (none left when the source was of another entity)
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".((int) $id)
+			." AND NOT EXISTS (SELECT 1 FROM ".$this->db->prefix()."inbox_source as s WHERE s.rowid = ".((int) $id).")");
 
-		return $this->db->query("DELETE FROM ".$this->db->prefix()."inbox_source WHERE rowid = ".((int) $id)." AND entity = ".((int) $conf->entity)) ? 1 : -1;
+		return 1;
 	}
 
 	/**
@@ -675,17 +697,106 @@ class InboxDataSource
 	}
 
 	/**
-	 * Date of a mail (its Date header), else now
+	 * Reception of a mail, as our side knows it: the time given (IMAP INTERNALDATE, written by the mail server of the
+	 * mailbox), else the first reception of its Message-ID in the index, else now. Never its Date header: the sender
+	 * writes it, and a replay would only have to copy t into it.
 	 *
-	 * @param array<int,array{0:string,1:string}> $headers Headers
+	 * @param array{received?:int,message_id?:string}|null $mail Mail (null: now)
 	 * @return int Timestamp
 	 */
-	protected static function mailTime(array $headers)
+	protected function receivedOf($mail)
 	{
-		$v = self::values($headers, 'Date');
-		$t = $v ? strtotime(trim($v[0])) : false;
+		if (!empty($mail['received']) && (int) $mail['received'] > 0) {
+			return (int) $mail['received'];
+		}
+		$mid = self::messageIdOf($mail);
+		if ($mid !== '') {
+			$r = $this->db->getRow("SELECT MIN(date_received) as d FROM ".$this->db->prefix()."inbox_mail WHERE message_id = '".$this->db->escape($mid)."'");
+			$t = is_object($r) && $r->d ? (int) $this->db->jdate($r->d) : 0;
+			if ($t > 0) {
+				return $t;
+			}
+		}
 
-		return $t !== false ? (int) $t : (int) dol_now();
+		return (int) dol_now();
+	}
+
+	/**
+	 * Message-ID of a mail, without its angle brackets ('' without)
+	 *
+	 * @param array{received?:int,message_id?:string}|null $mail Mail
+	 * @return string
+	 */
+	protected static function messageIdOf($mail)
+	{
+		return trim((string) ($mail['message_id'] ?? ''), " \t<>");
+	}
+
+	/**
+	 * What makes one mail of its copies (the same mail in two mailboxes or two folders): its Message-ID, else the time
+	 * of its reception
+	 *
+	 * @param array{received?:int,message_id?:string} $mail     Mail
+	 * @param int                                     $received Its reception
+	 * @return string
+	 */
+	protected static function mailKey($mail, $received)
+	{
+		$mid = self::messageIdOf($mail);
+
+		return $mid !== '' ? dol_trunc($mid, 255, 'right', 'UTF-8', 1) : 'received:'.((int) $received);
+	}
+
+	/**
+	 * A signature used by this mail only: kept on its first use, refused on a mail of another key (a replay). The
+	 * signatures are kept as long as their source, since the requester is read again at each reading of a mail: one
+	 * row per signed request.
+	 *
+	 * @param int    $sourceId Source
+	 * @param string $value    Value of the header of the signature (right)
+	 * @param string $mailKey  mailKey()
+	 * @return bool             True: first use, or the same mail again
+	 */
+	protected function firstUse($sourceId, $value, $mailKey)
+	{
+		$parts = self::signatureParts($value);
+		if ($parts === null) {
+			return false;
+		}
+		$p = $this->db->prefix();
+		$hash = hash('sha256', $parts['s']);
+		$where = " WHERE fk_source = ".((int) $sourceId)." AND signature = '".$this->db->escape($hash)."'";
+		$r = $this->db->getRow("SELECT mail_key FROM ".$p."inbox_source_signature".$where);
+		if (!is_object($r)) {
+			$ok = $this->db->query("INSERT INTO ".$p."inbox_source_signature (fk_source, signature, mail_key, date_signature, date_creation) VALUES ("
+				.((int) $sourceId).", '".$this->db->escape($hash)."', '".$this->db->escape($mailKey)."', '".$this->db->idate($parts['t'])."', '".$this->db->idate(dol_now())."')");
+			if ($ok) {
+				return true;
+			}
+			// Written in between by another copy of the mail (unique key): read again
+			$r = $this->db->getRow("SELECT mail_key FROM ".$p."inbox_source_signature".$where);
+			if (!is_object($r)) {
+				dol_syslog(__METHOD__.' signature not kept: '.$this->db->lasterror(), LOG_WARNING);
+				return false;
+			}
+		}
+
+		return (string) $r->mail_key === (string) $mailKey;
+	}
+
+	/**
+	 * Time and HMAC of a header of signature « t=<unix time>; s=<hex> »
+	 *
+	 * @param string $value Value of the header
+	 * @return array{t:int,s:string}|null Null when unreadable
+	 */
+	public static function signatureParts($value)
+	{
+		if (!preg_match('/(?:^|;)\s*t\s*=\s*(\d{9,11})\s*(?:;|$)/', (string) $value, $t) || !preg_match('/(?:^|;)\s*s\s*=\s*([0-9a-fA-F]{64})\s*(?:;|$)/', (string) $value, $s)) {
+			return null;
+		}
+
+		return array('t' => (int) $t[1], 's' => strtolower($s[1]));
 	}
 
 	/**
@@ -705,26 +816,27 @@ class InboxDataSource
 	}
 
 	/**
-	 * A signature right for these headers, and given at SIGNATURE_DAYS of the date of the mail at most
+	 * A signature right for these headers, and given at SIGNATURE_DAYS of the reception of the mail at most
 	 *
 	 * @param string $key      Signing key of the source
 	 * @param string $value    Value of the header of the signature
 	 * @param string $email    Value of the header of the address ('' without)
 	 * @param string $data     Value of the header of the data ('' without)
-	 * @param int    $mailTime Date of the mail
+	 * @param int    $received Reception of the mail (receivedOf(), never its Date header)
 	 * @return bool
 	 */
-	public static function signatureValid($key, $value, $email, $data, $mailTime)
+	public static function signatureValid($key, $value, $email, $data, $received)
 	{
-		if ((string) $key === '' || !preg_match('/(?:^|;)\s*t\s*=\s*(\d{9,11})\s*(?:;|$)/', (string) $value, $t) || !preg_match('/(?:^|;)\s*s\s*=\s*([0-9a-fA-F]{64})\s*(?:;|$)/', (string) $value, $s)) {
+		$parts = self::signatureParts($value);
+		if ((string) $key === '' || $parts === null) {
 			return false;
 		}
-		if (abs((int) $t[1] - (int) $mailTime) > self::SIGNATURE_DAYS * 86400) {
+		if (abs($parts['t'] - (int) $received) > self::SIGNATURE_DAYS * 86400) {
 			return false;
 		}
-		$expected = hash_hmac('sha256', $t[1]."\n".trim((string) $email)."\n".trim((string) $data), (string) $key);
+		$expected = hash_hmac('sha256', $parts['t']."\n".trim((string) $email)."\n".trim((string) $data), (string) $key);
 
-		return hash_equals($expected, strtolower($s[1]));
+		return hash_equals($expected, $parts['s']);
 	}
 
 	/**

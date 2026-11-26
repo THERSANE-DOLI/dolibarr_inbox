@@ -2,8 +2,10 @@
 
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
-    trusted sender with a right signature header (HMAC-SHA256, at 2 days of its date at most) is believed.
+    trusted sender with a right signature header (HMAC-SHA256, at 2 days of its reception at most) is believed.
   - a wrong signature is refused, without trying the authentication; without one, the rule of the unsigned sources.
+  - measured from the reception (IMAP INTERNALDATE), never the Date header; a signature serves one mail (« replay »).
+  - the panel says what is signed: the requester and its data, never the subject, the text or the attachments.
   - Settings > Data sources, doc page Data sources (section Signed sources). Activate the module again.
 
 - NEW: view « Spams »: the junk of every mailbox in one list, to find quickly an email that is not a spam :   1.142.0

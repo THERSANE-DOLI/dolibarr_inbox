@@ -97,6 +97,7 @@ switch ($action) {
 		$source = array('id' => 0, 'label' => $in['label'], 'type' => $in['type'], 'senders' => $in['senders'], 'header_email' => trim($in['header_email']),
 			'header_data' => trim($in['header_data']), 'header_signature' => trim($in['header_signature']), 'signature_key' => $key,
 			'header_fields' => $in['header_fields'], 'mapping' => $in['mapping']);
+		// A test: a signature measured from now, never kept (a pasted mail is no reception)
 		$found = $sources->detect($headers, (string) $from['address'], array($source));
 		inboxAjaxReply(array('from' => (string) $from['address'], 'result' => $found));
 		// no break

@@ -201,7 +201,7 @@ class InboxDataSourceTest extends InboxTestCase
 		$this->assertTrue($listed[$id]['signed']);
 		$this->assertArrayNotHasKey('signature_key', $listed[$id]);
 		$this->assertStringNotContainsString($key, json_encode($sources->fetchAll()));
-		$this->assertEqualsCanonicalizing(array('X-DATA-FORM-EMAIL', 'X-DATA-FORM', 'X-FORM-TOWN', 'X-DATA-FORM-SIGNATURE', 'DATE', 'AUTHENTICATION-RESULTS', 'RECEIVED-SPF'), $sources->syncHeaders());
+		$this->assertEqualsCanonicalizing(array('X-DATA-FORM-EMAIL', 'X-DATA-FORM', 'X-FORM-TOWN', 'X-DATA-FORM-SIGNATURE', 'AUTHENTICATION-RESULTS', 'RECEIVED-SPF'), $sources->syncHeaders(), 'no Date: the reception is our time');
 
 		$email = 'jean.dupont@client.inbox-test.invalid';
 		$data = '{"firstname":"Jean","lastname":"Dupont","company":"Dupont SARL"}';
@@ -230,6 +230,32 @@ class InboxDataSourceTest extends InboxTestCase
 		// Without a signature: the rule of the unsigned sources
 		$this->assertSame('auth', $sources->detectRaw($signed(''), self::SITE)['why']);
 		$this->assertTrue($sources->detectRaw($signed('', 'default'), self::SITE)['ok']);
+		$this->assertFalse($sources->detectRaw($signed('', 'default'), self::SITE)['signed'], 'believed on its authentication, not signed');
+
+		// Review of the PR: measured from the reception, never from the Date header the sender writes. An old signed pair
+		// put on a new mail whose Date says the time of the signature: refused once received more than 2 days later
+		$old = $now - 3 * 86400;
+		$replayed = self::head('Date: '.date('r', $old)."\r\nX-Data-Form-Email: ".$email."\r\nX-Data-Form: ".$data."\r\nX-Data-Form-Signature: ".InboxDataSource::sign($key, $email, $data, $old)."\r\n", '');
+		$this->assertSame('signature', $sources->detectRaw($replayed, self::SITE, array('received' => $now, 'message_id' => 'new@inbox-test.invalid'))['why'], 'Date = t, received 3 days later');
+		$this->assertSame('signature', $sources->detectRaw($replayed, self::SITE)['why'], 'a test of the settings: measured from now');
+		$genuine = $sources->detectRaw($replayed, self::SITE, array('received' => $old + 60, 'message_id' => 'first@inbox-test.invalid'));
+		$this->assertTrue($genuine['ok'], 'the genuine mail, read again later: its own reception ('.$genuine['why'].')');
+		// A signature serves one mail: its copies (same Message-ID) and its readings again are believed, another mail is a replay
+		$mail = array('received' => $now, 'message_id' => '<request1@forms.inbox-test.invalid>');
+		$found = $sources->detectRaw($signed($right), self::SITE, $mail);
+		$this->assertTrue($found['ok']);
+		$this->assertTrue($found['signed']);
+		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, $mail)['ok'], 'read again');
+		$this->assertTrue($sources->detectRaw($signed($right), self::SITE, array('received' => $now + 30, 'message_id' => 'request1@forms.inbox-test.invalid'))['ok'], 'a copy in another mailbox');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + 600, 'message_id' => 'other@evil.inbox-test.invalid'))['why'], 'same signature, another mail');
+		$this->assertSame('replay', $sources->detectRaw($signed($right), self::SITE, array('received' => $now + 600, 'message_id' => ''))['why'], 'same signature, a mail without Message-ID');
+		$this->assertTrue($sources->detectRaw($signed($right), self::SITE)['ok'], 'a test of the settings neither checks nor keeps it');
+		$this->assertSame(2, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".$id)->n, 'one row per signed mail');
+		// Without Message-ID: the time of its reception makes the mail
+		$lone = InboxDataSource::sign($key, $email, $data, $now - 5);
+		$this->assertTrue($sources->detectRaw($signed($lone), self::SITE, array('received' => $now, 'message_id' => ''))['ok']);
+		$this->assertTrue($sources->detectRaw($signed($lone), self::SITE, array('received' => $now, 'message_id' => ''))['ok'], 'the same mail read again');
+		$this->assertSame('replay', $sources->detectRaw($signed($lone), self::SITE, array('received' => $now + 1, 'message_id' => ''))['why']);
 
 		// Saved again without a key: the key stays; another header name; removed on demand
 		$base = array('label' => 'ZzSource form', 'status' => 1, 'senders' => 'forms.inbox-test.invalid', 'header_email' => 'X-Data-Form-Email', 'header_data' => 'X-Data-Form', 'type' => 'propal');
@@ -241,6 +267,9 @@ class InboxDataSourceTest extends InboxTestCase
 		$this->assertSame('', $sources->signatureKeyOf($id));
 		$this->assertFalse(array_column($sources->fetchAll(), null, 'id')[$id]['signed']);
 		$this->assertSame('auth', $sources->detectRaw($signed(InboxDataSource::sign($key, $email, $data, $now)), self::SITE)['why'], 'no key: a signature proves nothing');
+		// The signatures seen go with their source
+		$this->assertSame(1, $sources->delete($id));
+		$this->assertSame(0, (int) $this->db->getRow("SELECT COUNT(*) as n FROM ".$this->db->prefix()."inbox_source_signature WHERE fk_source = ".$id)->n);
 	}
 
 	/**

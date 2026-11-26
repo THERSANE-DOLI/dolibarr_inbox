@@ -35,16 +35,23 @@ break, the value of the address header, a line break and the value of the data h
 such header). The name of the header can be changed on the source.
 
 - A mail of a trusted sender with a right signature is believed without the authentication of its sender.
-- A wrong signature, or one more than 2 days away from the `Date` of the mail, is refused: the authentication is never
-  tried instead. Without the signature header, the rule of the unsigned sources applies.
+- A wrong signature, or one more than 2 days away from the **reception** of the mail, is refused: the authentication is
+  never tried instead. The reception is the time written by the mail server of the mailbox (IMAP `INTERNALDATE`), never
+  the `Date` header, which the sender writes. Without the signature header, the rule of the unsigned sources applies.
+- A signature serves one mail only. The same signature on a mail of another `Message-ID` (a signed header copied on a
+  new mail) is refused as a replay; the copies of one mail in several mailboxes or folders share their `Message-ID` and
+  stay believed. The signatures seen are kept as long as the source.
 - The signature covers the address and the data headers only: the headers « one per field » are not read on a signed
-  mail.
+  mail, and **the subject, the text and the attachments are not signed**. The panel of the mail says « Signed by the
+  site: requester and data only ». Put the number of the request in the signed data (key `id` or `ref`, shown in the
+  panel): what was asked (quantities, delivery...) is then read in the site, where nobody could change it, rather than
+  in the body of the mail.
 
 In PHP, for example where the site builds its notification:
 
 ```php
 $email = 'jean.dupont@example.com';
-$data = json_encode(array('firstname' => 'Jean', 'lastname' => 'Dupont', 'company' => 'Dupont SARL'));
+$data = json_encode(array('firstname' => 'Jean', 'lastname' => 'Dupont', 'company' => 'Dupont SARL', 'id' => 'D-1042'));
 $t = time();
 $headers[] = 'X-Data-Form-Email: '.$email;
 $headers[] = 'X-Data-Form: '.$data;

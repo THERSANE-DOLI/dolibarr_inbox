@@ -17,3 +17,14 @@
 -- a signed mail is believed without the authentication of its sender, for the mail servers that write none
 ALTER TABLE llx_inbox_source ADD COLUMN header_signature varchar(64) DEFAULT NULL AFTER header_data;
 ALTER TABLE llx_inbox_source ADD COLUMN signature_key text DEFAULT NULL AFTER header_signature;
+
+-- 1.143.0: a signature serves one mail only (a replay on a mail of another Message-ID is refused)
+CREATE TABLE llx_inbox_source_signature(
+	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
+	fk_source integer NOT NULL,
+	signature char(64) NOT NULL,
+	mail_key varchar(255) NOT NULL,
+	date_signature datetime NOT NULL,
+	date_creation datetime NOT NULL
+) ENGINE=innodb;
+ALTER TABLE llx_inbox_source_signature ADD UNIQUE INDEX uk_inbox_source_signature (fk_source, signature);

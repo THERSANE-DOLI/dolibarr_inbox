@@ -2754,7 +2754,7 @@ InboxSourceTestNotSender = L'expéditeur %s n'est pas un expéditeur de confianc
 InboxSourceTestOk = Demandeur : %s (%s)
 InboxSourceRefused_auth = Expéditeur non authentifié (ni DMARC ni DKIM de son domaine) : les en-têtes ne sont pas crus.
 # Signed data sources (1.143.0)
-InboxSourceRefused_signature = Signature fausse, ou à plus de 2 jours de la date du mail : les en-têtes ne sont pas crus.
+InboxSourceRefused_signature = Signature fausse, ou à plus de 2 jours de la réception du mail : les en-têtes ne sont pas crus.
 InboxSourceHeaderSignature = En-tête de signature
 InboxSourceHeaderSignatureHelp = En-tête où le site écrit sa signature. Vide : X-Data-Form-Signature.
 InboxSourceSignatureKey = Clé de signature
@@ -2765,13 +2765,16 @@ InboxSourceSignatureGenerated = Nouvelle clé, fabriquée par votre navigateur :
 InboxSourceSignatureClear = Retirer la clé
 InboxSourceSignatureSet = Une clé est enregistrée (elle n'est plus affichée).
 InboxSourceSignatureNone = Pas de clé : les en-têtes ne sont crus que sur un mail authentifié.
-InboxSourceSignatureKeyHelp = Avec une clé, un mail signé d'un expéditeur de confiance est cru sans l'authentification de son expéditeur : pour les serveurs de messagerie qui n'en écrivent aucune, ou un site qui envoie par le serveur de la boîte. 32 à 128 lettres, chiffres ou + / = _ -.
+InboxSourceSignatureKeyHelp = Avec une clé, un mail signé d'un expéditeur de confiance est cru sans l'authentification de son expéditeur : pour les serveurs de messagerie qui n'en écrivent aucune, ou un site qui envoie par le serveur de la boîte. La signature prouve l'adresse et les données seulement, jamais le sujet, le texte ni les pièces jointes du mail. 32 à 128 lettres, chiffres ou + / = _ -.
 InboxSourceSigned = Signée
 InboxSourceSignedTitle = Le site signe ses en-têtes avec la clé de cette source
 InboxSourceErrorSignatureKey = La clé de signature doit compter 32 à 128 lettres, chiffres ou + / = _ -.
-InboxSourceSignatureFormatHelp = Une source signée ajoute un troisième en-tête : t est l'heure de la signature (temps Unix), s le HMAC-SHA256 en hexadécimal, avec la clé de la source, de t, un saut de ligne, la valeur de l'en-tête de l'adresse, un saut de ligne et la valeur de l'en-tête des données. Elle est acceptée jusqu'à 2 jours de la date du mail ; les en-têtes « un par champ » ne sont pas lus sur un mail signé.
+InboxSourceSignatureFormatHelp = Une source signée ajoute un troisième en-tête : t est l'heure de la signature (temps Unix), s le HMAC-SHA256 en hexadécimal, avec la clé de la source, de t, un saut de ligne, la valeur de l'en-tête de l'adresse, un saut de ligne et la valeur de l'en-tête des données. Elle est acceptée jusqu'à 2 jours de la réception du mail, sur un seul mail ; les en-têtes « un par champ » ne sont pas lus sur un mail signé. Seuls ces en-têtes sont prouvés : mettez le numéro de la demande dans les données (clé id ou ref, affichée dans le panneau), et lisez ce qui est demandé sur le site plutôt que dans le corps.
 InboxSourceTerm_signature = Signée
 InboxSourceTermHelp_signature = Le site et la source partagent une clé : le site signe avec elle les en-têtes de chaque mail, et une signature juste prouve que le mail vient du site, même quand le serveur de messagerie ne vérifie rien. Sans clé, la source demande un expéditeur authentifié.
+InboxSourceRefused_replay = Signature déjà utilisée par un autre mail (en-tête signé recopié) : les en-têtes ne sont pas crus.
+InboxRequesterSigned = Signé par le site : demandeur et données seulement
+InboxRequesterSignedHelp = La signature du site prouve le demandeur et les données de ses en-têtes. Le sujet, le texte et les pièces jointes du mail ne sont pas signés : lisez-les comme ceux de n'importe quel mail.
 InboxSourceRefused_json = L'en-tête des données n'est pas un objet JSON lisible (une ligne, 2000 caractères au plus).
 InboxSourceRefused_twice = Un en-tête de la source est écrit deux fois dans le mail : rien n'est cru.
 InboxSourceRefused_noemail = Aucune adresse valide du demandeur dans les en-têtes.

@@ -1214,7 +1214,8 @@ class InboxComposer
 		}
 		// Mail sent by a site for a requester (data sources, 1.72.0): the answer goes to the requester, never to the site
 		require_once __DIR__.'/inboxdatasource.class.php';
-		$found = $mine ? null : (new InboxDataSource($this->db))->detect($headers, $from['email']);
+		// A signed source: the reception of this mail in the index, by its Message-ID (1.143.0)
+		$found = $mine ? null : (new InboxDataSource($this->db))->detect($headers, $from['email'], null, array('message_id' => (string) $message->messageId));
 		if (!empty($found['ok'])) {
 			$replyTo = array(array('email' => (string) $found['email'], 'name' => (string) $found['name']));
 		}

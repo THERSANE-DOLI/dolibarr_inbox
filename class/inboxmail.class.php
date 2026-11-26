@@ -121,7 +121,9 @@ class InboxMail
 				if ($this->sources === null) {
 					$this->sources = new InboxDataSource($this->db);
 				}
-				$requester = $this->sources->detectRaw((string) $m['source_header'], (string) $m['from_email']);
+				// A signed source measures the signature from the reception (IMAP INTERNALDATE) and keeps it for this mail
+				$requester = $this->sources->detectRaw((string) $m['source_header'], (string) $m['from_email'],
+					array('received' => (int) ($m['date_received'] ?? 0), 'message_id' => (string) ($m['message_id'] ?? '')));
 			}
 			$match = $this->matcher->match(!empty($requester['ok']) ? (string) $requester['email'] : (string) $m['from_email']);
 			$date = function ($ts) {

@@ -2754,7 +2754,7 @@ InboxSourceTestNotSender = Der Absender %s ist kein vertrauenswürdiger Absender
 InboxSourceTestOk = Anfragender: %s (%s)
 InboxSourceRefused_auth = Absender nicht authentifiziert (weder DMARC noch DKIM seiner Domain): den Headern wird nicht geglaubt.
 # Signed data sources (1.143.0)
-InboxSourceRefused_signature = Signatur falsch oder mehr als 2 Tage vom Datum der E-Mail entfernt: den Headern wird nicht geglaubt.
+InboxSourceRefused_signature = Signatur falsch oder mehr als 2 Tage vom Empfang der E-Mail entfernt: den Headern wird nicht geglaubt.
 InboxSourceHeaderSignature = Header der Signatur
 InboxSourceHeaderSignatureHelp = Header, in den die Website ihre Signatur schreibt. Leer: X-Data-Form-Signature.
 InboxSourceSignatureKey = Signaturschlüssel
@@ -2765,13 +2765,16 @@ InboxSourceSignatureGenerated = Neuer Schlüssel, von Ihrem Browser erzeugt: kop
 InboxSourceSignatureClear = Schlüssel entfernen
 InboxSourceSignatureSet = Ein Schlüssel ist gespeichert (wird nicht mehr angezeigt).
 InboxSourceSignatureNone = Kein Schlüssel: den Headern wird nur bei einer authentifizierten E-Mail geglaubt.
-InboxSourceSignatureKeyHelp = Mit einem Schlüssel wird einer signierten E-Mail eines vertrauenswürdigen Absenders auch ohne Authentifizierung des Absenders geglaubt: für Mailserver, die keine schreiben, oder eine Website, die über den Mailserver des Postfachs sendet. 32 bis 128 Buchstaben, Ziffern oder + / = _ -.
+InboxSourceSignatureKeyHelp = Mit einem Schlüssel wird einer signierten E-Mail eines vertrauenswürdigen Absenders auch ohne Authentifizierung des Absenders geglaubt: für Mailserver, die keine schreiben, oder eine Website, die über den Mailserver des Postfachs sendet. Die Signatur beweist nur die Adresse und die Daten, nie den Betreff, den Text oder die Anhänge der E-Mail. 32 bis 128 Buchstaben, Ziffern oder + / = _ -.
 InboxSourceSigned = Signiert
 InboxSourceSignedTitle = Die Website signiert ihre Header mit dem Schlüssel dieser Quelle
 InboxSourceErrorSignatureKey = Der Signaturschlüssel braucht 32 bis 128 Buchstaben, Ziffern oder + / = _ -.
-InboxSourceSignatureFormatHelp = Eine signierte Quelle fügt einen dritten Header hinzu: t ist der Zeitpunkt der Signatur (Unix-Zeit), s der HMAC-SHA256 in Hexadezimal, mit dem Schlüssel der Quelle, von t, einem Zeilenumbruch, dem Wert des Adress-Headers, einem Zeilenumbruch und dem Wert des Daten-Headers. Sie wird bis zu 2 Tage vom Datum der E-Mail angenommen; die Header « einer pro Feld » werden bei einer signierten E-Mail nicht gelesen.
+InboxSourceSignatureFormatHelp = Eine signierte Quelle fügt einen dritten Header hinzu: t ist der Zeitpunkt der Signatur (Unix-Zeit), s der HMAC-SHA256 in Hexadezimal, mit dem Schlüssel der Quelle, von t, einem Zeilenumbruch, dem Wert des Adress-Headers, einem Zeilenumbruch und dem Wert des Daten-Headers. Sie wird bis zu 2 Tage nach dem Empfang der E-Mail angenommen, für eine einzige E-Mail; die Header « einer pro Feld » werden bei einer signierten E-Mail nicht gelesen. Nur diese Header sind bewiesen: die Nummer der Anfrage in die Daten schreiben (Schlüssel id oder ref, im Bereich angezeigt) und das Angefragte auf der Website lesen statt im Text der E-Mail.
 InboxSourceTerm_signature = Signiert
 InboxSourceTermHelp_signature = Website und Quelle teilen einen Schlüssel: die Website signiert damit die Header jeder E-Mail, und eine richtige Signatur beweist, dass die E-Mail von der Website kommt, auch wenn der Mailserver nichts prüft. Ohne Schlüssel braucht die Quelle einen authentifizierten Absender.
+InboxSourceRefused_replay = Signatur bereits von einer anderen E-Mail verwendet (kopierter signierter Header): den Headern wird nicht geglaubt.
+InboxRequesterSigned = Von der Website signiert: nur Anfragender und Daten
+InboxRequesterSignedHelp = Die Signatur der Website beweist den Anfragenden und die Daten ihrer Header. Betreff, Text und Anhänge der E-Mail sind nicht signiert: wie bei jeder anderen E-Mail lesen.
 InboxSourceRefused_json = Der Daten-Header ist kein lesbares JSON-Objekt (eine Zeile, höchstens 2000 Zeichen).
 InboxSourceRefused_twice = Ein Header der Quelle steht zweimal in der Mail: es wird nichts geglaubt.
 InboxSourceRefused_noemail = Keine gültige Adresse des Anfragenden in den Headern.
