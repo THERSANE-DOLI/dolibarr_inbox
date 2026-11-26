@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a section after the buttons of a form no longer touches them (tab Synchro, Data sources) :   1.145.1
+  - the space between two sections above its title, on a computer and a phone.
+
 - FIX: a folder of the server that can never be read no longer keeps its mailbox in « first synchronisation » :   1.145.0
   - the folders where Dovecot keeps the rules (INBOX.dovecot.sieve...), shown after the first save of the rules, are
     no longer followed when they appear: still in the tree, they can be followed by hand.

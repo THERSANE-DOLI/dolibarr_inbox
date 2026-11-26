@@ -817,6 +817,9 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-formfoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); padding-top: var(--ibx-s3); margin-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
 .ibx-formfoot__spacer { flex: 1; }
 .ibx-formfoot > .ibx-formfoot__spacer ~ .ibx-btn--primary { margin-left: auto; }
+/* A section after the buttons (tab Synchro, Data sources): the space between two sections, its title no longer
+   touches the buttons */
+.ibx-formfoot + .ibx-section { margin-top: var(--ibx-s5); }
 .ibx-password { display: flex; gap: var(--ibx-s2); align-items: center; }
 .ibx-color { width: 2.5rem; height: 2rem; padding: 0.125rem; border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius); background: var(--ibx-bg); cursor: pointer; }
 
