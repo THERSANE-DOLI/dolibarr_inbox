@@ -536,6 +536,10 @@ class InboxAccount extends CommonObject
 				return -2;
 			}
 		}
+		// Queue of the modules subscribed (1.146.0): its table is missing until the module is activated again
+		if ($this->db->DDLDescTable($this->db->prefix().'inbox_consumer_event')) {
+			$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_consumer_event WHERE fk_account = ".((int) $this->id));
+		}
 		$result = $this->deleteCommon($user, $notrigger);
 		if ($result < 0) {
 			$this->db->rollback();

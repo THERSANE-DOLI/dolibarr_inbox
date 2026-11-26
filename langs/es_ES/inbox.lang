@@ -3818,6 +3818,21 @@ InboxConsumersSetupDeclared = Módulos que se declaran
 InboxConsumersSetupCounts = Buzones: %s activos, %s en prueba, %s en pausa
 InboxConsumersSetupWhere = Número de buzones por módulo. Las autorizaciones se dan en la ficha de cada buzón.
 
+# Correos dados a los módulos suscritos (1.146.0)
+InboxCronConsumers = Inbox: correos dados a los módulos suscritos
+InboxCronConsumersComment = Vuelve a dar a los módulos suscritos los correos que no pudieron tratar, y los que la sincronización no tuvo tiempo de dar (los correos nuevos los da ella misma)
+InboxConsumerLastOk = Último correo tratado: %s
+InboxConsumerWaiting = %s correo(s) en espera
+InboxConsumerFailed = %s correo(s) abandonado(s) tras 5 intentos
+InboxJournalModule = módulo
+InboxJournalSimulated = prueba, no hecho
+InboxJournal_consumer_read = Contenido leído
+InboxJournal_consumer_seen = Leído o no leído
+InboxJournal_consumer_link = Vinculado a una ficha
+InboxJournal_consumer_draft = Respuesta preparada en los borradores
+InboxJournalSeenOn = marcado como leído
+InboxJournalSeenOff = marcado como no leído
+
 # Documentation tab of the setup (1.113.0)
 InboxDocTab = Documentación técnica
 InboxDocIntro = La documentación de Inbox, por tema (en inglés): para los administradores, luego para los desarrolladores de módulos. Las mismas páginas están en la carpeta doc/ del módulo.

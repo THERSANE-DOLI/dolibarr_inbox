@@ -8,8 +8,8 @@ written in the journal of the mailbox. How it looks for them: [Modules subscribe
 There is no trigger `INBOX_MAIL_RECEIVED`, on purpose: a trigger of Dolibarr reaches every module enabled, with no
 way to limit it to the mailboxes where a module was allowed.
 
-State: since 1.112.0 a module declares itself and is allowed; the mails are not given to it yet (next version).
-What follows already holds for the delivery to come.
+State: since 1.112.0 a module declares itself and is allowed; since 1.146.0 the mails are given to it. The guards
+of the next versions (automatic pause after errors, limits per hour, sending by the module) are not there yet.
 
 ## Declare the module
 
@@ -75,25 +75,70 @@ dol_include_once('/inbox/class/inboxconsumerinterface.class.php');
 
 class MyModuleInboxConsumer implements InboxConsumerInterface
 {
+	public function __construct($db)
+	{
+		$this->db = $db;
+	}
+
 	public function handle(InboxConsumerEvent $event)
 	{
 		if (stripos($event->headers['subject'], 'request') === false) {
 			return 0;	// not for this module
 		}
-		// ... create the ticket
-		return 1;	// handled; -1: error, the event is given again later
+		$body = $event->body();	// null when « read » is not ticked: $event->error says why
+		// ... create the ticket, with the user chosen in the setup of your module
+		$event->link('ticket', $ticketId);
+		$event->act('archive');
+		return 1;	// handled; -1 (or an exception): error, the event is given again later
 	}
 }
 ```
 
+The class is built once per delivery with `new MyModuleInboxConsumer($db)`.
+
+### The event
+
 `InboxConsumerEvent`: `event`, `consumer` (the code), `accountId`, `accountEmail`, `messageId` (the same when the mail
 is moved), `mailId`, `folder`, `headers` (`from`, `to`, `cc`, `subject`, `date`, `in_reply_to`), `test` (mode test:
-the actions are only written in the journal). Reading the body and acting on the mail go through the event, within
-what the managers ticked (methods given with the delivery).
+the actions are only written in the journal).
 
-The records your module creates in Dolibarr (tickets, thirdparties) are created with the user your module chooses,
-usually one set in its own setup: Inbox gives no user. In the journal of the mailbox, the actions of the module show
-under its name.
+What the module may do goes through the event, within what the managers ticked. A method refused returns `null` or
+`false` and says why in `$event->error`:
+
+| Method | Needs | Gives / does |
+|---|---|---|
+| `can($action)` | | the managers ticked this action |
+| `body()` | `read` | `array('text' => ..., 'html' => ...)`, the HTML cleaned by `InboxSafe::html()` |
+| `attachments()` | `read` | list of `array('name', 'mime', 'size', 'content')`, the pictures inside the text left out |
+| `folders()` | | the folders of the mailbox by row: `path`, `name`, `role` (to choose a target) |
+| `act('seen', array('on' => false))` | `seen` | read (default) or unread |
+| `act('tag', array('add' => array(...), 'remove' => array(...)))` | `tag` | keywords of the mail |
+| `act('move', array('folder' => $rowid))` | `move` | to a folder of this mailbox only |
+| `act('archive')`, `act('junk')`, `act('trash')`, `act('inbox')` | `move` | the folders of these roles; never a deletion for good |
+| `link($type, $id)` | `link` | link to a record of Dolibarr (`societe`, `ticket`, `commande`...) |
+| `draft($html, $subject = '')` | `draft` | a reply to the sender in the Drafts folder, never sent: a person reads it and sends it |
+
+The reading of the content is written once per event in the journal, every action too, in the name of the module.
+In test mode, `act()`, `link()` and `draft()` do nothing and return `true`: the journal shows what the module would
+have done (« test, not done »).
+
+The values of the mail are data from outside: what your module writes in Dolibarr goes through `InboxSafe`
+([Data of a mail: one door](mail-data.md)).
+
+### When the module is called
+
+- At the end of the synchronisation pass that found the mail (every minute, or at once when someone has the mailbox
+  open), after the blocked senders and the spams went to the junk: a mail in the junk or the trash is never given.
+- A mail still to be judged by the anti-spam engine of Inbox waits for its judgement.
+- Once per mail and subscription: the same mail seen in another folder is not given twice.
+- `handle()` returns 1 (handled) or 0 (not for this module): done. -1, an exception or a PHP error: given again
+  after 1 min, 5 min, 15 min, 1 h, then given up (« failed », counted in the section Modules of the mailbox). The
+  synchronisation is never stopped by a module, and what it prints is dropped.
+- What the pass had no time for is given at the next pass, or by the scheduled job « Inbox: mails given to the
+  modules subscribed » (every 5 minutes), which also gives again the events in error.
+- Paused: the events wait and are given at the resume. Authorization removed: its events are dropped. Module turned
+  off: its events wait for it. Switch of the instance off: no event, the queue is emptied.
+- Mailbox protected with its password: given only while someone has it unlocked (the scheduled job cannot read it).
 
 ## What a module gets in return
 

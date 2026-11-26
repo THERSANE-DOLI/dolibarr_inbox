@@ -3818,6 +3818,21 @@ InboxConsumersSetupDeclared = Modules that declare themselves
 InboxConsumersSetupCounts = Mailboxes: %s active, %s in test, %s paused
 InboxConsumersSetupWhere = Count of mailboxes for each module. The authorizations are given in the card of each mailbox.
 
+# Mails given to the modules subscribed (1.146.0)
+InboxCronConsumers = Inbox: mails given to the modules subscribed
+InboxCronConsumersComment = Gives again to the modules subscribed the mails they failed to handle, and the ones the synchronisation had no time for (it gives the new mails itself)
+InboxConsumerLastOk = Last mail handled: %s
+InboxConsumerWaiting = %s mail(s) waiting
+InboxConsumerFailed = %s mail(s) given up after 5 tries
+InboxJournalModule = module
+InboxJournalSimulated = test, not done
+InboxJournal_consumer_read = Content read
+InboxJournal_consumer_seen = Read or unread
+InboxJournal_consumer_link = Linked to a record
+InboxJournal_consumer_draft = Reply prepared in the drafts
+InboxJournalSeenOn = marked as read
+InboxJournalSeenOff = marked as unread
+
 # Documentation tab of the setup (1.113.0)
 InboxDocTab = Technical documentation
 InboxDocIntro = The documentation of Inbox, by theme (in English): for the administrators, then for the developers of modules. The same pages are in the folder doc/ of the module.

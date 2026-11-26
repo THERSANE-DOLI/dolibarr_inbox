@@ -1082,9 +1082,10 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join', 'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft'];
 	async function tabJournal(box, account) {
-		const f = { user: 0, what: '', from: '', to: '', q: '' };
+		// Author: a user (id), or a module subscribed (1.146.0, « c:code »)
+		const f = { user: 0, consumer: '', what: '', from: '', to: '', q: '' };
 		let offset = 0;
 		let lines = [];
 		box.innerHTML = '<p class="ibx-section__help">' + th('InboxJournalHelp') + '</p>'
@@ -1099,12 +1100,22 @@
 		const day = v => v ? Math.floor(new Date(v + 'T00:00:00').getTime() / 1000) : 0;
 		const paint = more => {
 			if (!lines.length) {
-				list.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div>' + th(f.user || f.what || f.from || f.to || f.q ? 'InboxJournalNoMatch' : 'InboxActionsJournalEmpty') + '</div></div>';
+				list.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div>' + th(f.user || f.consumer || f.what || f.from || f.to || f.q ? 'InboxJournalNoMatch' : 'InboxActionsJournalEmpty') + '</div></div>';
 				return;
 			}
 			const where = l => {
-				if (l.action === 'tag') {
+				if (l.action === 'tag' || l.action === 'consumer_link') {
 					return esc(l.from) + ' · <span class="ibx-mono">' + esc(l.detail) + '</span>';
+				}
+				if (l.action === 'consumer_read') {
+					return esc(l.from);
+				}
+				if (l.action === 'consumer_draft') {
+					// Folder of the draft, and the address answered
+					return esc(l.to) + ' · ' + esc(l.detail);
+				}
+				if (l.action === 'consumer_seen') {
+					return esc(l.from) + ' · ' + th(l.detail === 'unread' ? 'InboxJournalSeenOff' : 'InboxJournalSeenOn');
 				}
 				if (l.action === 'assign' || l.action === 'unassign') {
 					return esc(l.detail);
@@ -1140,8 +1151,10 @@
 				return esc(l.from) + ' → ' + (l.account_to ? '<b>' + esc(l.account_to) + '</b> / ' : '') + esc(l.to);
 			};
 			list.innerHTML = '<table class="ibx-table ibx-journal"><thead><tr><th>' + th('InboxJournalDate') + '</th><th>' + th('InboxJournalWho') + '</th><th>' + th('InboxJournalAction') + '</th><th>' + th('InboxJournalMails') + '</th><th>' + th('InboxJournalWhere') + '</th></tr></thead><tbody>'
-				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString(I.locale())) + '</td><td>' + esc(l.user) + '</td>'
-					+ '<td>' + th('InboxJournal_' + l.action) + (l.undone ? ' <span class="ibx-badge">' + th('InboxJournalUndone') + '</span>' : '') + (l.incoming ? ' <span class="ibx-badge">' + th('InboxJournalIncoming') + '</span>' : '') + '</td>'
+				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString(I.locale())) + '</td><td>' + esc(l.user)
+					+ (l.consumer ? ' <span class="ibx-badge">' + th('InboxJournalModule') + '</span>' : '') + '</td>'
+					+ '<td>' + th('InboxJournal_' + l.action) + (l.simulated ? ' <span class="ibx-badge ibx-badge--warning">' + th('InboxJournalSimulated') + '</span>' : '')
+					+ (l.undone ? ' <span class="ibx-badge">' + th('InboxJournalUndone') + '</span>' : '') + (l.incoming ? ' <span class="ibx-badge">' + th('InboxJournalIncoming') + '</span>' : '') + '</td>'
 					+ '<td>' + (l.nb > 1 ? '<b>' + th('InboxJournalNbMails', l.nb) + '</b>' + (l.subject ? '<div class="ibx-muted ibx-ellipsis">' + th('InboxJournalFirst', l.subject) + '</div>' : '')
 						: '<span class="ibx-ellipsis" title="' + esc(l.message_id) + '">' + esc(l.subject || l.message_id || '') + '</span>') + '</td>'
 					+ '<td>' + where(l) + '</td></tr>').join('')
@@ -1160,7 +1173,7 @@
 			}
 			let res;
 			try {
-				res = await api('action', 'journal', { id: account.id, user: f.user, what: f.what, from: day(f.from), to: f.to ? day(f.to) + 86400 : 0, q: f.q, offset }, { method: 'POST' });
+				res = await api('action', 'journal', { id: account.id, user: f.user, consumer: f.consumer, what: f.what, from: day(f.from), to: f.to ? day(f.to) + 86400 : 0, q: f.q, offset }, { method: 'POST' });
 			} catch (err) {
 				if (mine === seq) {
 					list.replaceChildren(errorBox(err, () => load(false)));
@@ -1173,7 +1186,8 @@
 			lines = append ? lines.concat(res.lines) : res.lines;
 			const who = $('#j-user', box);
 			if (who.options.length === 1) {
-				res.authors.forEach(a => who.insertAdjacentHTML('beforeend', '<option value="' + a.id + '">' + esc(a.name) + '</option>'));
+				res.authors.forEach(a => who.insertAdjacentHTML('beforeend', '<option value="' + (a.consumer ? 'c:' + esc(a.consumer) : a.id) + '">' + esc(a.name)
+					+ (a.consumer ? ' (' + th('InboxJournalModule') + ')' : '') + '</option>'));
 			}
 			paint(res.more);
 		};
@@ -1186,7 +1200,13 @@
 			}, 300);
 		});
 		[['#j-user', 'user'], ['#j-what', 'what'], ['#j-from', 'from'], ['#j-to', 'to']].forEach(([sel, k]) => $(sel, box).addEventListener('change', e => {
-			f[k] = k === 'user' ? +e.target.value : e.target.value;
+			if (k === 'user') {
+				const v = e.target.value;
+				f.consumer = v.startsWith('c:') ? v.slice(2) : '';
+				f.user = f.consumer ? 0 : +v;
+			} else {
+				f[k] = e.target.value;
+			}
 			load(false);
 		}));
 		load(false);

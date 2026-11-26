@@ -17,7 +17,8 @@
 /**
  * Modules subscribed to a mailbox (1.112.0), section Modules of the card (tab Reception): the modules installed that
  * want to react to the mails of this mailbox, what the managers allow each one, pause and removal. Nothing runs until
- * a manager allows it; everything is written in the journal of the mailbox (tab Access).
+ * a manager allows it; everything is written in the journal of the mailbox (tab Access). The mails are given to the
+ * modules since 1.146.0: last activity, mails waiting and given up shown on each line.
  */
 (function () {
 	'use strict';
@@ -62,6 +63,17 @@
 		const where = g.folders.length ? t('InboxConsumerFoldersSome', g.folders.length) : t('InboxConsumerFoldersAll');
 		return html`<div class="ibx-muted">${what.join(', ')} · ${where}</div>
 			<div class="ibx-muted">${t('InboxConsumerGrantedBy', g.user || '-', new Date(g.date * 1000).toLocaleDateString(I.locale()))}</div>`;
+	}
+
+	/** What the module did lately (1.146.0): last mail handled, mails waiting, mails given up after the last try */
+	function activity(g) {
+		if (!g) {
+			return '';
+		}
+		const q = g.queue || { waiting: 0, failed: 0 };
+		return html`${g.last_ok && html`<div class="ibx-muted">${t('InboxConsumerLastOk', new Date(g.last_ok * 1000).toLocaleString(I.locale()))}</div>`}
+			${q.waiting > 0 && html`<div class="ibx-muted">${t('InboxConsumerWaiting', q.waiting)}</div>`}
+			${q.failed > 0 && html`<div><span class="ibx-badge ibx-badge--warning">${t('InboxConsumerFailed', q.failed)}</span></div>`}`;
 	}
 
 	/** Something the module asks since the decision of the managers */
@@ -118,7 +130,7 @@
 				const g = c.grant;
 				return html`<tr>
 					<td><b>${c.label}</b>${c.purpose && html`<div class="ibx-muted">${c.purpose}</div>`}${!c.declared && html`<div class="ibx-muted">${t('InboxConsumerGoneHelp')}</div>`}${grantSummary(c)}</td>
-					<td>${stateBadge(c)}${g && hasPending(c) && html` <span class="ibx-badge ibx-badge--warning">${t('InboxConsumerPending')}</span>`}${g && g.last_error && html`<div class="ibx-formrow__error">${g.last_error}</div>`}</td>
+					<td>${stateBadge(c)}${g && hasPending(c) && html` <span class="ibx-badge ibx-badge--warning">${t('InboxConsumerPending')}</span>`}${activity(g)}${g && g.last_error && html`<div class="ibx-formrow__error">${g.last_error}</div>`}</td>
 					<td class="ibx-table__actions">${rowButtons(c, i, blocked)}</td>
 				</tr>`;
 			})}</tbody></table>`;

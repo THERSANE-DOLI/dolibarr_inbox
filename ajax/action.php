@@ -38,6 +38,8 @@ if ($action === 'journal') {
 	}
 	$filters = array(
 		'user' => (int) inboxAjaxParam('user', 'int'),
+		// A module subscribed (1.146.0): the code of its declaration
+		'consumer' => (string) inboxAjaxParam('consumer', 'aZ09'),
 		'action' => (string) inboxAjaxParam('what', 'aZ09'),
 		'from' => (int) inboxAjaxParam('from', 'int'),
 		'to' => (int) inboxAjaxParam('to', 'int'),

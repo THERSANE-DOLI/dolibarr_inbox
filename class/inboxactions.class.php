@@ -97,6 +97,49 @@ class InboxActions
 	}
 
 	/**
+	 * Action of a module subscribed to the mailbox (1.146.0), checked by InboxConsumerEvent against what the managers
+	 * ticked: the access of a user is replaced by the subscription. Read / unread, tags, a move of the mails inside
+	 * their mailbox (archive, junk, trash are folders of it), never a deletion for good nor another mailbox.
+	 *
+	 * @param User                $user      User of the action (id 0: the journal names the module, InboxActionLog::$consumer)
+	 * @param string              $action    seen, tag, move, archive
+	 * @param int[]               $mailIds   Rows of the index, all of the mailbox $accountId
+	 * @param array<string,mixed> $params    As run()
+	 * @param int                 $accountId Mailbox of the subscription
+	 * @return array{ok:bool,count:int,undo:array<int,array<string,mixed>>,error:string,ids:array<int,int>,rest:int[]}
+	 */
+	public function runAsConsumer(User $user, $action, array $mailIds, array $params, $accountId)
+	{
+		$refused = array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => '', 'ids' => array(), 'rest' => array());
+		if (!in_array($action, array('seen', 'tag', 'move', 'archive'), true)) {
+			$refused['error'] = 'Unknown action';
+			return $refused;
+		}
+		$mailIds = array_slice(array_values(array_unique(array_filter(array_map('intval', $mailIds)))), 0, self::MAX);
+		$p = $this->db->prefix();
+		$own = $mailIds ? $this->db->getRows("SELECT rowid FROM ".$p."inbox_mail WHERE rowid IN (".implode(',', $mailIds).") AND fk_account = ".((int) $accountId)." LIMIT ".(self::MAX + 1)) : array();
+		if (!$mailIds || !is_array($own) || count($own) !== count($mailIds)) {
+			$refused['error'] = 'InboxMailNotFound';
+			return $refused;
+		}
+		if ($action === 'move') {
+			$target = $this->db->getRow("SELECT fk_account FROM ".$p."inbox_folder WHERE rowid = ".((int) ($params['folder'] ?? 0)));
+			if (!is_object($target) || (int) $target->fk_account !== (int) $accountId) {
+				$refused['error'] = 'InboxErrorFolderNotFound';
+				return $refused;
+			}
+		}
+		// Never a folded conversation: the mails given, nothing more
+		unset($params['expand']);
+		$this->system = true;
+		try {
+			return $this->run($user, $action, $mailIds, $params);
+		} finally {
+			$this->system = false;
+		}
+	}
+
+	/**
 	 * Journal of the changes (1.121.0): the lists open by the other users follow at once. Numbers only.
 	 *
 	 * @param User                $user     User
