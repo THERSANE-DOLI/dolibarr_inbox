@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: an answer to a calendar invitation (« Accepted: », « Invitation mise à jour : ») is the same subject :   1.145.2
+  - the prefixes of the calendars are removed before subjects are compared, as « Re: », in the five languages.
+  - its link to the event is no more listed « from another subject », and it opens no new conversation.
+
 - FIX: a section after the buttons of a form no longer touches them (tab Synchro, Data sources) :   1.145.1
   - the space between two sections above its title, on a computer and a phone.
 

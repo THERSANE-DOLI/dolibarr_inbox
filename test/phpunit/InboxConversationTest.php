@@ -120,6 +120,11 @@ class InboxConversationTest extends InboxTestCase
 		$this->assertSame('devis brides dn80', InboxThreader::normalizeSubject('RE: TR: Re[2]: Fwd: AW: Devis  brides DN80'));
 		$this->assertSame('réf. commande', InboxThreader::normalizeSubject('Réf: Réf. commande'), 'only the prefix « Réf: » goes');
 		$this->assertSame('', InboxThreader::normalizeSubject('RE:'));
+		// Prefixes of the calendars on an invitation and its answers (1.145.2)
+		$this->assertSame('réunion de chantier', InboxThreader::normalizeSubject('Invitation mise à jour : Réunion de chantier'));
+		$this->assertSame('site meeting', InboxThreader::normalizeSubject('RE: Tentatively accepted: Site meeting'));
+		$this->assertSame('baustellenbesprechung', InboxThreader::normalizeSubject('Mit Vorbehalt angenommen: Baustellenbesprechung'));
+		$this->assertSame('accepted offer', InboxThreader::normalizeSubject('Accepted offer'), 'a word without « : » stays');
 		// The other side of a mail, never the mailbox (1.53.1)
 		$own = array('box@inbox-test.invalid', 'alias@inbox-test.invalid');
 		$this->assertSame(array('sophie@example.invalid'), InboxThreader::correspondents('Sophie@Example.invalid', 'Box <box@inbox-test.invalid>', '', $own), 'received: the sender');

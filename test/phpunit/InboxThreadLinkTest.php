@@ -161,6 +161,10 @@ class InboxThreadLinkTest extends InboxTestCase
 			'cancel and replace' => array('Re: INTERINOX - Devis DVV2603662', 'Annule et remplace Devis DVV2603662'),
 			'the order of a quote' => array('RE: Offre de prix THERSANE DEVIS2606219', 'THERSANE DEVIS2606219 // BC 9RJ3885'),
 			'a typo fixed' => array('Fermeture exceptionelle', 'Rappel : Fermeture exceptionnelle'),
+			'an answer to an invitation' => array('Invitation mise à jour : Réunion de chantier', 'Accepté : Réunion de chantier'),
+			'an answer declined' => array('Invitation : Réunion de chantier', 'Refusé : Réunion de chantier'),
+			'an answer in English' => array('Updated invitation: Site meeting', 'Tentatively accepted: Site meeting'),
+			'an event cancelled' => array('Invitation: Site meeting', 'Canceled event: Site meeting'),
 		);
 		foreach ($same as $why => $pair) {
 			$this->assertTrue(InboxThreadLink::sameSubject($pair[0], $pair[1]), $why);
@@ -172,6 +176,7 @@ class InboxThreadLinkTest extends InboxTestCase
 			'another grade' => array('DEMANDE DE PRIX ROND 304L', 'DEMANDE DE PRIX ROND 316L'),
 			'another site' => array('CHANTIER 22607015 EMMI DESSERTS', 'CHANTIER 22607017 EMMI DESSERTS'),
 			'another purchase order' => array('THERSANE 4403526578', 'THERSANE 4403527849'),
+			'another event' => array('Invitation : Réunion de chantier 12', 'Accepté : Réunion de chantier 14'),
 		);
 		foreach ($other as $why => $pair) {
 			$this->assertFalse(InboxThreadLink::sameSubject($pair[0], $pair[1]), $why);
