@@ -62,6 +62,13 @@ class InboxConsumerEvent
 	/** @var string Message-ID of the mail */
 	public $messageId = '';
 
+	/**
+	 * @var string Key of the mail (1.146.2): its Message-ID, else « fp:<sha1> » (date, sender, subject, size), the same
+	 *      in every copy and after a move. Keep it with what your module made: a mail moved long after, or put back in
+	 *      a folder of the subscription, may be given again
+	 */
+	public $key = '';
+
 	/** @var int Row of the mail in the index of inbox when the event was made */
 	public $mailId = 0;
 

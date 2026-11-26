@@ -162,6 +162,7 @@ class InboxConsumerDeliveryTest extends InboxImapTestCase
 		$this->assertCount(1, ZzDeliveryConsumer::$got, 'given once over four passes');
 		$e = ZzDeliveryConsumer::$got[0];
 		$this->assertSame('mail.received', $e->event);
+		$this->assertSame('n1'.self::MARK, $e->key, 'the key of a mail with a Message-ID is its Message-ID');
 		$this->assertSame(self::CODE, $e->consumer);
 		$this->assertSame((int) $a->id, $e->accountId);
 		$this->assertSame('ZzAct n1', $e->headers['subject']);
@@ -531,6 +532,57 @@ class InboxConsumerDeliveryTest extends InboxImapTestCase
 		}
 		$this->assertSame(array(), InboxActionLog::$written, 'nothing of a module offered to the undo of the page');
 		$this->assertNull(InboxActionLog::$consumer);
+	}
+
+	/**
+	 * 1.146.2: a mail without Message-ID moved by another mail program (new row in the index) is not given again: its
+	 * key is the print of its date, sender, subject and size, given to the module
+	 *
+	 * @return void
+	 */
+	public function testMailWithoutMessageIdNotGivenTwice()
+	{
+		global $conf;
+
+		// A mail without Message-ID may be judged spam by the engine of the test server: not what is tested here
+		$spam = getDolGlobalString('INBOX_RSPAMD_ENABLED');
+		$conf->global->INBOX_RSPAMD_ENABLED = 0;
+		$a = $this->ready();
+		$this->grant($a);
+		$p = $this->imap();
+		$subject = 'ZzNoId '.dol_now();
+		$p->appendMessage('INBOX', "From: Robot <robot@example.invalid>\r\nTo: ".self::BOX."\r\nSubject: ".$subject."\r\nDate: ".date('r', mktime(9, 0, 0, 3, 15, 2025))."\r\n\r\nSans identifiant\r\n");
+		try {
+			$this->sync($a);
+			$this->assertCount(1, ZzDeliveryConsumer::$got);
+			$key = ZzDeliveryConsumer::$got[0]->key;
+			$this->assertStringStartsWith('fp:', $key);
+			$this->assertSame('', ZzDeliveryConsumer::$got[0]->messageId);
+			$this->assertSame($key, (string) $this->queue($a)[0]->message_id);
+			// Moved by another mail program: a new row in the index, in another folder of the subscription
+			$before = (int) $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."inbox_mail WHERE fk_account = ".((int) $a->id)." AND subject = '".$this->db->escape($subject)."'")->rowid;
+			$p->selectFolder('INBOX');
+			$uids = (array) $p->search(array('SUBJECT', '"'.$subject.'"'), true);
+			$this->assertCount(1, $uids);
+			$p->requestAndResponse('UID MOVE', array((string) reset($uids), 'INBOX.ZzActA'));
+			$this->sync($a);
+			$after = $this->db->getRow("SELECT m.rowid, f.path FROM ".$this->db->prefix()."inbox_mail as m INNER JOIN ".$this->db->prefix()."inbox_folder as f ON f.rowid = m.fk_folder"
+				." WHERE m.fk_account = ".((int) $a->id)." AND m.subject = '".$this->db->escape($subject)."'");
+			$this->assertSame('INBOX.ZzActA', (string) $after->path);
+			$this->assertNotSame($before, (int) $after->rowid, 'a new row in the index');
+			$this->assertCount(1, ZzDeliveryConsumer::$got, 'not given again');
+			$this->assertCount(1, $this->queue($a));
+		} finally {
+			$conf->global->INBOX_RSPAMD_ENABLED = $spam;
+			// No Message-ID of the tests: removed by its subject (the copy in INBOX.ZzActA goes with the folder)
+			foreach (array('INBOX', 'INBOX.Junk') as $folder) {
+				$p->selectFolder($folder);
+				foreach ((array) $p->search(array('SUBJECT', '"'.$subject.'"'), true) as $u) {
+					$p->requestAndResponse('UID STORE', array((string) $u, '+FLAGS.SILENT', '(\\Deleted)'));
+				}
+				$p->expunge();
+			}
+		}
 	}
 
 	/**

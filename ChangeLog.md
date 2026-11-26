@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a mail without Message-ID moved by another mail program is no longer given twice to the modules subscribed :   1.146.2
+  - its key in the queue is the print of its date, sender, subject and size, as for the links, not its row.
+  - the key is given to the module ($event->key) to leave a mail already handled (doc page Modules subscribed, dev).
+
 - FIX: mails given to the modules subscribed: a module that stops the process, or one turned off, no longer blocks :   1.146.1
   - a try is counted when the mail is taken: a module stopped by a fatal error (memory, time limit) ends « given up ».
   - the mails of a module turned off wait without blocking the other modules of the mailbox.

@@ -105,16 +105,26 @@ class InboxConsumerDelivery
 	}
 
 	/**
-	 * Key of a mail in the queue: its Message-ID (the same after a move), its row when it has none
+	 * Key of a mail in the queue, given to the module (InboxConsumerEvent::$key): its Message-ID, or for a mail without
+	 * one the print of its date, sender, subject and size, « fp:<sha1> » (1.146.2, the key of the links of the mails):
+	 * the same in every copy of the mail, after a move by another mail program too. Its row only when the print cannot
+	 * be made.
 	 *
-	 * @param object $row Row of the index (rowid, message_id)
+	 * @param object $row Row of the index (rowid, message_id, date_mail, from_email, subject, size)
 	 * @return string
 	 */
 	public static function keyOf($row)
 	{
-		$id = trim((string) $row->message_id);
+		global $db;
 
-		return $id !== '' ? dol_trunc($id, 255, 'right', 'UTF-8', 1) : 'mail:'.((int) $row->rowid);
+		$id = trim((string) $row->message_id);
+		if ($id !== '') {
+			return dol_trunc($id, 255, 'right', 'UTF-8', 1);
+		}
+		require_once __DIR__.'/inboxmailref.class.php';
+		$key = (new InboxMailRef($db))->keyOf($row);
+
+		return $key !== '' ? $key : 'mail:'.((int) $row->rowid);
 	}
 
 	/**
@@ -141,7 +151,7 @@ class InboxConsumerDelivery
 		$p = $this->db->prefix();
 		$rows = array();
 		foreach (array_chunk($mailIds, 500) as $chunk) {
-			$part = $this->db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.date_received, f.role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
+			$part = $this->db->getRows("SELECT m.rowid, m.fk_folder, m.message_id, m.date_received, m.date_mail, m.from_email, m.subject, m.size, f.role FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
 				." WHERE m.rowid IN (".implode(',', $chunk).") AND m.fk_account = ".((int) $account->id)." LIMIT 501");
 			$rows = array_merge($rows, is_array($part) ? $part : array());
 		}
@@ -323,6 +333,7 @@ class InboxConsumerDelivery
 		$event->accountId = (int) $account->id;
 		$event->accountEmail = (string) $account->email;
 		$event->messageId = (string) $mail->message_id;
+		$event->key = (string) $e->message_id;
 		$event->mailId = (int) $mail->rowid;
 		$event->folder = (string) $mail->folder_path;
 		$event->headers = array(
@@ -377,6 +388,17 @@ class InboxConsumerDelivery
 		if (strpos($key, 'mail:') === 0) {
 			$row = $this->db->getRow($select." WHERE m.rowid = ".((int) substr($key, 5))." AND m.fk_account = ".((int) $accountId));
 			return is_object($row) ? $row : null;
+		}
+		if (strpos($key, 'fp:') === 0) {
+			// Without Message-ID (1.146.2): its row when still there, else the copy with the same print (moved)
+			$rows = $this->db->getRows($select." WHERE m.fk_account = ".((int) $accountId)." AND (m.message_id IS NULL OR m.message_id = '')"
+				." ORDER BY CASE WHEN m.rowid = ".((int) $e->fk_mail)." THEN 0 WHEN f.role IN ('trash', 'junk') THEN 2 ELSE 1 END, m.rowid DESC LIMIT 2000");
+			foreach (is_array($rows) ? $rows : array() as $row) {
+				if (self::keyOf($row) === $key) {
+					return $row;
+				}
+			}
+			return null;
 		}
 		$row = $this->db->getRow($select." WHERE m.fk_account = ".((int) $accountId)." AND m.message_id = '".$this->db->escape($key)."'"
 			." ORDER BY CASE WHEN m.rowid = ".((int) $e->fk_mail)." THEN 0 WHEN f.role IN ('trash', 'junk') THEN 2 ELSE 1 END, m.rowid DESC");
