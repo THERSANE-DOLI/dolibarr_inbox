@@ -21,6 +21,7 @@ CREATE TABLE llx_inbox_action_log(
 	fk_account integer NOT NULL,
 	fk_user integer NOT NULL,
 	user_name varchar(255) DEFAULT NULL,
+	consumer varchar(64) DEFAULT NULL,
 	action varchar(32) NOT NULL,
 	nb integer DEFAULT 1 NOT NULL,
 	message_id varchar(255) DEFAULT NULL,
@@ -30,5 +31,6 @@ CREATE TABLE llx_inbox_action_log(
 	fk_account_to integer DEFAULT NULL,
 	detail varchar(255) DEFAULT NULL,
 	undone smallint DEFAULT 0 NOT NULL,
+	simulated smallint DEFAULT 0 NOT NULL,
 	date_action datetime NOT NULL
 ) ENGINE=innodb;

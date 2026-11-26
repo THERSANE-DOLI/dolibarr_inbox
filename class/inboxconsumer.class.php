@@ -34,6 +34,7 @@ require_once __DIR__.'/inboxaccount.class.php';
  * InboxConsumerInterface.
  *
  * Nothing runs until a manager of the mailbox allows it (section Modules of the mailbox), and only what was ticked.
+ * The mails are given to the modules by InboxConsumerDelivery (1.146.0).
  * This is not a security barrier: a module is PHP with every right on the base. It is a control of what runs
  * automatically on a mailbox, seen by its managers and written in its journal (analyse-modules-abonnes.md §1.2).
  */
@@ -438,6 +439,9 @@ class InboxConsumer
 			return false;
 		}
 		$g = $grants[$code];
+		// Its queue goes with it (1.146.0)
+		require_once __DIR__.'/inboxconsumerdelivery.class.php';
+		(new InboxConsumerDelivery($this->db))->dropConsumer((int) $g['id']);
 		(new InboxAccountLog($this->db))->add((int) $account->id, $user, self::LOG_REVOKE,
 			array('code' => $code, 'label' => $this->labelOf($code), 'events' => $g['events'], 'actions' => $g['actions'], 'folders' => $g['folders'], 'mode' => $g['mode']), null);
 
@@ -461,6 +465,9 @@ class InboxConsumer
 		if (!$this->db->query("UPDATE ".$this->db->prefix()."inbox_consumer SET paused = 1, pause_reason = '".self::PAUSE_PROTECTED."' WHERE fk_account = ".((int) $accountId)." AND paused = 0")) {
 			return false;
 		}
+		// Nothing may run in the background on it any more: the mails still to give are dropped (1.146.0)
+		require_once __DIR__.'/inboxconsumerdelivery.class.php';
+		(new InboxConsumerDelivery($this->db))->dropWaiting((int) $accountId);
 		$codes = array_map(function ($r) {
 			return (string) $r->code;
 		}, $rows);

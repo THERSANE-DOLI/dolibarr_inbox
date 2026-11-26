@@ -51,7 +51,7 @@ class modInbox extends DolibarrModules
 		$this->descriptionlong = "ModuleInboxDescLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '1.145.2';
+		$this->version = '1.146.0';
 		// Last version published (Setup > Modules > Check the last version): the site of inbox answers the version
 		// of the latest GitHub release as plain text, kept 10 minutes; no download counted, nothing stored
 		$this->url_last_version = 'https://inbox.techsane.fr/api/download.php?version';
@@ -201,6 +201,23 @@ class modInbox extends DolibarrModules
 			'status' => 1,
 			'test' => 'isModEnabled("inbox")',
 			'priority' => 70,
+		);
+
+		// Modules subscribed to the mailboxes (1.146.0): the mails given again after an error of a module, and the ones
+		// the synchronisation had no time for (it gives them itself at the end of each pass)
+		$this->cronjobs[] = array(
+			'label' => 'InboxCronConsumers',
+			'jobtype' => 'method',
+			'class' => '/inbox/class/inboxconsumerdelivery.class.php',
+			'objectname' => 'InboxConsumerDelivery',
+			'method' => 'cronRun',
+			'parameters' => '',
+			'comment' => 'InboxCronConsumersComment',
+			'frequency' => 5,
+			'unitfrequency' => 60,
+			'status' => 1,
+			'test' => 'isModEnabled("inbox")',
+			'priority' => 45,
 		);
 
 		$this->rights = array();

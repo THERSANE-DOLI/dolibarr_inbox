@@ -46,6 +46,12 @@ function inboxConsumerReply(InboxAccount $account, InboxConsumer $consumers)
 
 	$declared = InboxConsumer::declared();
 	$grants = $consumers->grants((int) $account->id);
+	// Mails waiting for each module, given up after the last try (1.146.0)
+	dol_include_once('/inbox/class/inboxconsumerdelivery.class.php');
+	$queue = (new InboxConsumerDelivery($db))->counts((int) $account->id);
+	foreach ($grants as $code => $g) {
+		$grants[$code]['queue'] = isset($queue[$code]) ? $queue[$code] : array('waiting' => 0, 'failed' => 0);
+	}
 	$names = array();
 	$name = function ($id) use ($db, $langs, &$names) {
 		if ($id <= 0) {

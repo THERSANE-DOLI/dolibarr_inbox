@@ -151,6 +151,7 @@ class InboxSync
 			return 0;
 		}
 		$this->blockedNew = array();
+		$this->consumerNew = array();
 		try {
 			$res = $this->pass($account, $deadline, $force, $phase, (int) ($options['folder_id'] ?? 0));
 		} finally {
@@ -176,12 +177,26 @@ class InboxSync
 				$this->stats['spam'] = $spam->checkPending($user, (int) $account->id, $deadline - 0.5)['moved'];
 			}
 		}
+		// Modules subscribed (1.146.0): the new mails written in their queue once the blocked senders and the spams
+		// are in the junk, then given to them now (a few seconds at least), the rest at the next pass or by the
+		// scheduled job. A module never stops the synchronisation (InboxConsumerDelivery).
+		require_once __DIR__.'/inboxconsumer.class.php';
+		if (InboxConsumer::enabled()) {
+			require_once __DIR__.'/inboxconsumerdelivery.class.php';
+			$delivery = new InboxConsumerDelivery($this->db);
+			$this->stats['consumer_events'] = $this->consumerNew ? $delivery->createReceived($account, $this->consumerNew) : 0;
+			$given = $delivery->deliver($account, max((float) $deadline, microtime(true) + 2));
+			$this->stats['consumer_given'] = $given['done'] + $given['skipped'];
+		}
 
 		return $res;
 	}
 
 	/** @var int[] New mails of the inbox in this pass (blocked senders, 1.85.0) */
 	protected $blockedNew = array();
+
+	/** @var int[] New mails of this pass in the folders that may give events to the modules subscribed (1.146.0) */
+	protected $consumerNew = array();
 
 	/**
 	 * @param InboxAccount $account  Mailbox
@@ -322,6 +337,11 @@ class InboxSync
 			// New mails of the inbox (never the first indexing of the older ones): checked against the blocked senders
 			if ((string) $f->role === 'inbox' && !$backfill && $mails->lastNewIds) {
 				$this->blockedNew = array_merge($this->blockedNew, array_map('intval', $mails->lastNewIds));
+			}
+			// Modules subscribed (1.146.0): the new mails of any folder but Sent, Drafts, Junk, Trash (a rule of the
+			// server puts a mail at once in « Tickets »), never the first indexing
+			if (!$backfill && $mails->lastNewIds && !in_array((string) $f->role, array('sent', 'drafts', 'junk', 'trash'), true)) {
+				$this->consumerNew = array_merge($this->consumerNew, array_map('intval', $mails->lastNewIds));
 			}
 			// Delivery reports among the new mails (1.25.0): their start read (the report comes before the original),
 			// linked to the mail sent; never in Sent or Drafts. Read at the end of the pass, once the copy in Sent of

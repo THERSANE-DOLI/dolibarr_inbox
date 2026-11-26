@@ -29,13 +29,20 @@ class InboxActionLog
 {
 	/** Actions of the journal */
 	const ACTIONS = array('move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign',
-		'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join');
+		'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join',
+		'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft');
 
 	/** @var int[] Lines written during this request (given back to the browser for the undo) */
 	public static $written = array();
 
 	/** @var bool Do not write (the undo marks the line it cancels instead) */
 	public static $paused = false;
+
+	/**
+	 * @var array{code:string,label:string,simulated:bool}|null A module subscribed acts (1.146.0): the lines written
+	 *      meanwhile are in its name (no user), simulated in test mode. Set by InboxConsumerEvent around an action
+	 */
+	public static $consumer = null;
 
 	/**
 	 * Write a line
@@ -70,6 +77,10 @@ class InboxActionLog
 			$n = max(1, (int) $first->nb);
 		}
 		$name = trim($user->firstname.' '.$user->lastname);
+		$consumer = self::$consumer;
+		if ($consumer !== null) {
+			$name = (string) $consumer['label'];
+		}
 		$s = function ($v, $len = 255) use ($db) {
 			$v = (string) $v;
 			return $v === '' ? 'NULL' : "'".$db->escape(dol_trunc($v, $len, 'right', 'UTF-8', 1))."'";
@@ -78,10 +89,11 @@ class InboxActionLog
 		// Folders as people read them (« INBOX / Clients / Été »), the path of the server is modified UTF-7
 		$from = self::readable($db, (int) $accountId, (string) $from);
 		$to = self::readable($db, $accountTo ? (int) $accountTo : (int) $accountId, (string) $to);
-		$sql = "INSERT INTO ".$db->prefix()."inbox_action_log (entity, fk_account, fk_user, user_name, action, nb, message_id, subject, folder_from, folder_to, fk_account_to,"
-			." detail, undone, date_action) VALUES (".((int) $conf->entity).", ".((int) $accountId).", ".((int) $user->id).", ".$s($name !== '' ? $name : $user->login).","
+		$sql = "INSERT INTO ".$db->prefix()."inbox_action_log (entity, fk_account, fk_user, user_name, consumer, action, nb, message_id, subject, folder_from, folder_to, fk_account_to,"
+			." detail, undone, simulated, date_action) VALUES (".((int) $conf->entity).", ".((int) $accountId).", ".($consumer !== null ? 0 : (int) $user->id).", ".$s($name !== '' ? $name : $user->login).","
+			." ".($consumer !== null ? $s($consumer['code'], 64) : 'NULL').","
 			." '".$db->escape(substr((string) $action, 0, 32))."', ".$n.", ".($n === 1 ? $s($first->message_id ?? '') : 'NULL').", ".$s($subject).", ".$s($from).", ".$s($to).","
-			." ".($accountTo ? (int) $accountTo : 'NULL').", ".$s($detail).", 0, '".$db->idate(dol_now())."')";
+			." ".($accountTo ? (int) $accountTo : 'NULL').", ".$s($detail).", 0, ".($consumer !== null && !empty($consumer['simulated']) ? 1 : 0).", '".$db->idate(dol_now())."')";
 		if (!$db->query($sql)) {
 			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_WARNING);
 			return 0;
@@ -236,8 +248,11 @@ class InboxActionLog
 		$p = $db->prefix();
 		$limit = max(1, min(200, (int) $limit));
 		$where = " WHERE l.entity = ".((int) $conf->entity)." AND (l.fk_account = ".((int) $accountId)." OR l.fk_account_to = ".((int) $accountId).")";
-		if (!empty($filters['user'])) {
-			$where .= " AND l.fk_user = ".((int) $filters['user']);
+		if (!empty($filters['consumer'])) {
+			// A module subscribed (1.146.0): its lines only
+			$where .= " AND l.consumer = '".$db->escape((string) $filters['consumer'])."'";
+		} elseif (!empty($filters['user'])) {
+			$where .= " AND l.fk_user = ".((int) $filters['user'])." AND l.consumer IS NULL";
 		}
 		if (!empty($filters['action']) && in_array($filters['action'], self::ACTIONS, true)) {
 			$where .= " AND l.action = '".$db->escape($filters['action'])."'";
@@ -252,7 +267,7 @@ class InboxActionLog
 			$q = $db->escape($db->escapeforlike(trim((string) $filters['q'])));
 			$where .= " AND (l.subject LIKE '%".$q."%' OR l.message_id LIKE '%".$q."%')";
 		}
-		$rows = $db->getRows("SELECT l.rowid, l.fk_user, l.user_name, l.action, l.nb, l.message_id, l.subject, l.folder_from, l.folder_to, l.fk_account, l.fk_account_to, l.detail,"
+		$rows = $db->getRows("SELECT l.rowid, l.fk_user, l.user_name, l.consumer, l.simulated, l.action, l.nb, l.message_id, l.subject, l.folder_from, l.folder_to, l.fk_account, l.fk_account_to, l.detail,"
 			." l.undone, l.date_action, a.label as account_to_label FROM ".$p."inbox_action_log as l LEFT JOIN ".$p."inbox_account as a ON a.rowid = l.fk_account_to"
 			.$where." ORDER BY l.date_action DESC, l.rowid DESC".$db->plimit($limit + 1, max(0, (int) $offset)));
 		$lines = array();
@@ -262,6 +277,7 @@ class InboxActionLog
 				'action' => (string) $r->action, 'nb' => (int) $r->nb, 'message_id' => (string) $r->message_id, 'subject' => (string) $r->subject,
 				'from' => (string) $r->folder_from, 'to' => (string) $r->folder_to, 'account_to' => (int) $r->fk_account_to === (int) $accountId ? '' : (string) $r->account_to_label,
 				'incoming' => (int) $r->fk_account !== (int) $accountId, 'detail' => (string) $r->detail, 'undone' => (int) $r->undone,
+				'consumer' => (string) $r->consumer, 'simulated' => (int) $r->simulated,
 			);
 		}
 		$more = count($lines) > $limit;
@@ -274,15 +290,15 @@ class InboxActionLog
 	 *
 	 * @param DoliDB $db        Database handler
 	 * @param int    $accountId Mailbox
-	 * @return array<int,array{id:int,name:string}>
+	 * @return array<int,array{id:int,name:string,consumer:string}> A module subscribed (1.146.0): id 0, its code
 	 */
 	public static function authors(DoliDB $db, $accountId)
 	{
-		$rows = $db->getRows("SELECT fk_user, MAX(user_name) as name FROM ".$db->prefix()."inbox_action_log WHERE fk_account = ".((int) $accountId)
-			." GROUP BY fk_user ORDER BY name LIMIT 500");
+		$rows = $db->getRows("SELECT fk_user, consumer, MAX(user_name) as name FROM ".$db->prefix()."inbox_action_log WHERE fk_account = ".((int) $accountId)
+			." GROUP BY fk_user, consumer ORDER BY name LIMIT 500");
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			$out[] = array('id' => (int) $r->fk_user, 'name' => (string) $r->name);
+			$out[] = array('id' => (int) $r->fk_user, 'name' => (string) $r->name, 'consumer' => (string) $r->consumer);
 		}
 
 		return $out;

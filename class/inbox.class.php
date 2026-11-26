@@ -522,6 +522,9 @@ class Inbox
 		// Notifications of the bell (INBOX_NOTIFICATION_DAYS)
 		require_once __DIR__.'/inboxnotification.class.php';
 		InboxNotification::purge($this->db);
+		// Queue of the modules subscribed (1.146.0): rows given or given up, 30 days
+		require_once __DIR__.'/inboxconsumerdelivery.class.php';
+		InboxConsumerDelivery::purge($this->db);
 		// Journal of the changes for the quicker refresh (1.121.0): 24 h
 		require_once __DIR__.'/inboxevent.class.php';
 		(new InboxEvent($this->db))->purge();

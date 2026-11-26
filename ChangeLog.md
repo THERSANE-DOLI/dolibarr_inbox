@@ -1,5 +1,12 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: the modules allowed on a mailbox receive its new mails, and act within what was ticked :   1.146.0
+  - given once at the end of the synchronisation that finds them, never the mails already there, the junk or the
+    trash; a module in error never stops it, its mail is given again 4 times; scheduled job every 5 min.
+  - read, read / unread, tags, move, link to a record, reply prepared in the drafts: written in the journal in the
+    name of the module, « test, not done » in test mode; last activity and mails waiting on its line.
+  - doc pages Modules subscribed (admin, dev) completed. Activate the module again.
+
 - FIX: an answer to a calendar invitation (« Accepted: », « Invitation mise à jour : ») is the same subject :   1.145.2
   - the prefixes of the calendars are removed before subjects are compared, as « Re: », in the five languages.
   - its link to the event is no more listed « from another subject », and it opens no new conversation.

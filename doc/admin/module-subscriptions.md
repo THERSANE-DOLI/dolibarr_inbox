@@ -76,10 +76,20 @@ Settings > Mailboxes > the mailbox > Access, « Journal of the changes »: « Mo
 paused », « Module running again », « Authorization removed », « Modules paused, mailbox protected with its
 content », with who did it and when.
 
-## State of the feature
+## What happens then
 
-Version 1.112.0 prepares the authorizations: the modules declare themselves and are allowed, but no mail is given
-to them yet. The delivery of the mails, then the guards (automatic pause after errors, limits, sending) come with
-the next versions.
+From 1.146.0 the mails are given to the modules allowed:
+
+- each new mail of the mailbox (or of the folders chosen) is given once, at the end of the synchronisation that
+  found it; never the mails already there when the module was allowed, never a mail in the junk or the trash;
+- on the line of the module: the last mail it handled, the mails waiting, the mails given up after 5 tries (a module
+  in error never stops the synchronisation, its mails are given again after 1 min, 5 min, 15 min, 1 h);
+- in the journal of the mailbox (tab Access), every action of the module in its name, with the badge « module »;
+  in test mode, its actions with the badge « test, not done »; the filter « Who » lists the modules;
+- the scheduled job « Inbox: mails given to the modules subscribed » (every 5 minutes) gives again the mails in
+  error and the ones the synchronisation had no time for.
+
+The guards of the next versions (automatic pause after errors, limit per hour, sending by a module) are not there
+yet: watch the line of the module and the journal.
 
 For the developers of modules: [Subscribe a module to the mailboxes](../dev/consumers.md).

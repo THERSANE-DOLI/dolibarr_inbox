@@ -3818,6 +3818,21 @@ InboxConsumersSetupDeclared = Moduli che si dichiarano
 InboxConsumersSetupCounts = Caselle: %s attive, %s in test, %s in pausa
 InboxConsumersSetupWhere = Numero di caselle per ogni modulo. Le autorizzazioni si danno nella scheda di ogni casella.
 
+# Mail date ai moduli abbonati (1.146.0)
+InboxCronConsumers = Inbox: mail date ai moduli abbonati
+InboxCronConsumersComment = Ridà ai moduli abbonati le mail che non sono riusciti a gestire, e quelle per cui la sincronizzazione non ha avuto tempo (le nuove mail le dà lei stessa)
+InboxConsumerLastOk = Ultima mail gestita: %s
+InboxConsumerWaiting = %s mail in attesa
+InboxConsumerFailed = %s mail abbandonate dopo 5 tentativi
+InboxJournalModule = modulo
+InboxJournalSimulated = test, non eseguito
+InboxJournal_consumer_read = Contenuto letto
+InboxJournal_consumer_seen = Letto o non letto
+InboxJournal_consumer_link = Collegato a una scheda
+InboxJournal_consumer_draft = Risposta preparata nelle bozze
+InboxJournalSeenOn = segnato come letto
+InboxJournalSeenOff = segnato come non letto
+
 # Documentation tab of the setup (1.113.0)
 InboxDocTab = Documentazione tecnica
 InboxDocIntro = La documentazione di Inbox, per tema (in inglese): per gli amministratori, poi per gli sviluppatori di moduli. Le stesse pagine sono nella cartella doc/ del modulo.

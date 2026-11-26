@@ -101,7 +101,7 @@ abstract class InboxTestCase extends TestCase
 		}
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$db->query("DELETE FROM ".$p."inbox_mail_address WHERE fk_mail IN (SELECT rowid FROM ".$p."inbox_mail WHERE fk_account = ".((int) $r->rowid).")");
-			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification', 'inbox_template_account', 'inbox_consumer') as $t) {
+			foreach (array('inbox_mail', 'inbox_folder', 'inbox_account_access', 'inbox_account_log', 'inbox_identity', 'inbox_tag', 'inbox_userparam', 'inbox_action_log', 'inbox_outbox', 'inbox_notification', 'inbox_template_account', 'inbox_consumer', 'inbox_consumer_event') as $t) {
 				$db->query("DELETE FROM ".$p.$t." WHERE fk_account = ".((int) $r->rowid));
 			}
 		}
