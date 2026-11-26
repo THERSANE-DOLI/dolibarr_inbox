@@ -99,8 +99,23 @@ The class is built once per delivery with `new MyModuleInboxConsumer($db)`.
 ### The event
 
 `InboxConsumerEvent`: `event`, `consumer` (the code), `accountId`, `accountEmail`, `messageId` (the same when the mail
-is moved), `mailId`, `folder`, `headers` (`from`, `to`, `cc`, `subject`, `date`, `in_reply_to`), `test` (mode test:
-the actions are only written in the journal).
+is moved), `key` (see below), `mailId`, `folder`, `headers` (`from`, `to`, `cc`, `subject`, `date`, `in_reply_to`),
+`test` (mode test: the actions are only written in the journal).
+
+### Handle a mail once: `$event->key`
+
+`key` identifies the mail whatever its place: its Message-ID, or for a mail without one (some automats) `fp:` and a
+print of its date, sender, subject and size. It is the same in every copy of the mail and after a move.
+
+Inbox gives a mail once per subscription, but it keeps that memory 30 days: a mail moved later by another mail
+program into a folder of the subscription is given again. Keep the key with what your module made, and leave a mail
+already handled:
+
+```php
+if ($this->ticketOfMail($event->key)) {
+	return 0;	// already handled
+}
+```
 
 What the module may do goes through the event, within what the managers ticked. A method refused returns `null` or
 `false` and says why in `$event->error`:
