@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a section after the buttons of a form no longer touches them (tab Synchro, Data sources) :   1.145.1
+  - the space between two sections above its title, on a computer and a phone.
+
 - NEW: a data source may sign its headers, for the mail servers that write no authentication of the sender :   1.143.0
   - a key shared with the site (typed, or made by the browser, stored with dolEncrypt(), never sent back): a mail of a
     trusted sender with a right signature header (HMAC-SHA256, at 2 days of its reception at most) is believed.
