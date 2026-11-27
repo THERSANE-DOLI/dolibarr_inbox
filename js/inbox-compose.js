@@ -636,6 +636,7 @@
 		}
 		writings.splice(writings.indexOf(w), 1);
 		place();
+		popupDone();
 	}
 
 	/** Close: the draft kept on the server when something was typed */
@@ -1036,6 +1037,7 @@
 		clearInterval(b.timer);
 		b.el.remove();
 		bars.delete(b.id);
+		popupDone();
 	}
 	async function dispatch(b) {
 		b.sending = true;
@@ -2941,6 +2943,8 @@
 		return '<div class="ibx-compose__grip ibx-compose__grip--n" data-grip="n" aria-hidden="true"></div><div class="ibx-compose__grip ibx-compose__grip--w" data-grip="w" aria-hidden="true"></div>'
 			+ '<div class="ibx-compose__grip ibx-compose__grip--nw" data-grip="nw" aria-hidden="true"></div>'
 			+ '<div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis ibx-js-wtitle" id="' + w.id + '-title"></span>'
+			// In a window of its own (1.148.0): the writing moves there, nothing lost; never from such a window itself
+			+ (I.canOpenWindow && I.canOpenWindow() ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cdetach ibx-compose__wbtn" title="' + th('InboxComposeDetach') + '" aria-label="' + th('InboxComposeDetach') + '">' + ic('external') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cmin ibx-compose__wbtn" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cmax ibx-compose__wbtn" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cclose" title="' + th('InboxComposeClose') + '" aria-label="' + th('InboxComposeClose') + '">' + ic('close') + '</button></div>'
@@ -3222,6 +3226,10 @@
 		}
 		$('.ibx-js-cclose', dlg).addEventListener('click', () => close(w));
 		$('.ibx-js-cmin', dlg).addEventListener('click', () => minimize(w));
+		const detachBtn = $('.ibx-js-cdetach', dlg);
+		if (detachBtn) {
+			detachBtn.addEventListener('click', () => detach(w));
+		}
 		$('.ibx-js-cmax', dlg).addEventListener('click', () => {
 			dlg.classList.toggle('ibx-window--maximized');
 			place();
@@ -3317,8 +3325,14 @@
 	 * @param {object} o {mode: new|reply|replyall|replylist|forward|forward_attach|draft, mail, account, to, cc, subject}
 	 * @returns {Promise<object|null>}
 	 */
-	async function compose(o) {
+	async function compose(o, e) {
 		o = o || {};
+		// Ctrl+click, middle click (1.148.0): in a window of its own; in the page when the browser blocks it
+		if (e && I.wantsWindow && I.wantsWindow(e) && !o.restore) {
+			if (await composeWindow(o)) {
+				return null;
+			}
+		}
 		const mode = o.mode || 'new';
 		const same = o.mail ? writings.find(x => x.source === o.mail && x.mode === mode) : null;
 		if (same) {
@@ -3356,7 +3370,7 @@
 			newThread: !!d.new_thread, firstSubject: d.subject || '' };
 		w.token = d.token;
 		const dlg = document.createElement('dialog');
-		dlg.className = 'ibx-window ibx-compose';
+		dlg.className = 'ibx-window ibx-compose' + (I.popup ? ' ibx-window--maximized ibx-compose--popup' : '');
 		dlg.setAttribute('aria-labelledby', w.id + '-title');
 		w.dlg = dlg;
 		dlg.innerHTML = html(w);
@@ -3523,6 +3537,163 @@
 		}
 	});
 	window.addEventListener('resize', () => place());
+
+	// ---------- Writing in a window of its own (1.148.0) ----------
+	/**
+	 * Ctrl+click on « New mail », « Reply »...: the same writing in a browser window of its own
+	 * (index.php?window=compose). Only what opens it goes in the address (mode, mail, mailbox, recipient).
+	 * @param {object} o As compose()
+	 * @returns {Promise<boolean>} false: blocked by the browser
+	 */
+	async function composeWindow(o) {
+		const q = new URLSearchParams({ window: 'compose', mode: o.mode || 'new' });
+		if (o.mail) {
+			q.set('mail', String(o.mail));
+		}
+		if (o.account) {
+			q.set('account', String(o.account));
+		}
+		if (o.to) {
+			q.set('to', String(o.to));
+		}
+		return !!(await I.openWindow(location.pathname + '?' + q.toString(), 'compose'));
+	}
+
+	/** Channel of the writings moved to a window of their own: the page gives, the window takes (nothing on the disk) */
+	const handoffChannel = () => ('BroadcastChannel' in window ? new BroadcastChannel(I.scope('inbox-handoff')) : null);
+
+	/**
+	 * ⧉ of a writing: it moves to a window of its own with what was typed, its recipients, its attachments (same
+	 * writing on the server). Removed from the page only once the window has it; kept there otherwise.
+	 * @param {object} w Writing
+	 */
+	async function detach(w) {
+		const bc = handoffChannel();
+		if (!bc || w.sending) {
+			return;
+		}
+		const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+		let done = false;
+		const stop = () => {
+			clearTimeout(timer);
+			bc.close();
+		};
+		const timer = setTimeout(() => {
+			if (!done) {
+				stop();
+				toast(t('InboxComposeHandoffFailed'), { error: true });
+			}
+		}, 10000);
+		bc.onmessage = ev => {
+			const msg = ev.data || {};
+			if (msg.id !== id) {
+				return;
+			}
+			if (msg.type === 'ask') {
+				const d = data(w);
+				bc.postMessage({ type: 'give', id, data: Object.assign({}, w.data, {
+					token: w.token, compose: w.token, identity: d.identity, to: d.to, cc: d.cc, bcc: d.bcc, subject: d.subject, html: d.html,
+					quote_off: w.quote ? 0 : 1, signature_off: w.signature ? 0 : 1, receipt: d.receipt, new_thread: d.new_thread, attachments: w.attachments.filter(a => !a.pending),
+					detached: { mode: w.mode, source: w.source, saved: !!w.saved, dirty: !!w.dirty },
+				}) });
+			} else if (msg.type === 'taken') {
+				// The window has it: gone from the page, never closed on the server (the same writing goes on there)
+				done = true;
+				stop();
+				w.closed = true;
+				dictateStop(w);
+				finish(w);
+			}
+		};
+		if (!await I.openWindow(location.pathname + '?window=compose&handoff=' + encodeURIComponent(id), 'compose')) {
+			stop();
+		}
+	}
+
+	/** A window of its own: closed once nothing is left in it (writing, bar of a sending), the toast seen first */
+	let popupTimer = 0;
+	function popupDone() {
+		if (!I.popup) {
+			return;
+		}
+		clearTimeout(popupTimer);
+		popupTimer = setTimeout(() => {
+			if (!writings.length && !bars.size) {
+				window.close();
+			}
+		}, 1500);
+	}
+
+	/** Title of a window of its own: the subject, else « New mail » */
+	function popupTitle() {
+		const w = writings[0];
+		const subject = w ? $('.ibx-js-subject', w.dlg).value.trim() : '';
+		document.title = (subject || t('InboxNewMail')) + ' - ' + t('InboxAppName');
+	}
+
+	/** Said in the empty window when the writing could not open */
+	function popupFailed(text) {
+		$('#ibx-app').innerHTML = '<div class="ibx-empty">' + ic('warning', 'ibx-empty__icon') + '<div>' + esc(text) + '</div></div>';
+	}
+
+	Dolibarr.on('inbox:app:popup', async ctx => {
+		if (ctx.kind !== 'compose') {
+			return;
+		}
+		const q = ctx.params;
+		document.title = t('InboxNewMail') + ' - ' + t('InboxAppName');
+		if (!I.ctx('INBOX_CAN_SEND', false)) {
+			popupFailed(t('InboxComposeNoIdentity'));
+			return;
+		}
+		let w = null;
+		const handoff = q.get('handoff') || '';
+		if (handoff) {
+			const bc = handoffChannel();
+			const d = bc ? await new Promise(resolve => {
+				const timer = setTimeout(() => resolve(null), 8000);
+				bc.onmessage = ev => {
+					const msg = ev.data || {};
+					if (msg.id === handoff && msg.type === 'give') {
+						clearTimeout(timer);
+						resolve(msg.data);
+					}
+				};
+				bc.postMessage({ type: 'ask', id: handoff });
+			}) : null;
+			if (!d) {
+				if (bc) {
+					bc.close();
+				}
+				popupFailed(t('InboxComposeHandoffFailed'));
+				return;
+			}
+			w = await compose({ restore: d, mail: d.detached.source, mode: d.detached.mode });
+			if (w) {
+				w.mode = d.detached.mode;
+				w.source = d.detached.source;
+				w.saved = d.detached.saved;
+				w.dirty = d.detached.dirty;
+				bc.postMessage({ type: 'taken', id: handoff });
+			}
+			bc.close();
+		} else {
+			w = await compose({ mode: q.get('mode') || 'new', mail: +(q.get('mail') || 0), account: +(q.get('account') || 0), to: q.get('to') || '' });
+		}
+		if (!w) {
+			popupFailed(t('InboxComposeHandoffFailed'));
+			return;
+		}
+		popupTitle();
+		$('.ibx-js-subject', w.dlg).addEventListener('input', popupTitle);
+	});
+	// Closed by the browser with something not saved: the browser asks first (a sending in its delay leaves anyway)
+	window.addEventListener('beforeunload', e => {
+		if (I.popup && writings.some(x => x.dirty && !x.closed && hasContent(x))) {
+			e.preventDefault();
+			e.returnValue = '';
+		}
+	});
 
 	I.compose = compose;
 	/**

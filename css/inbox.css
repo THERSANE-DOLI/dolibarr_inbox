@@ -1860,6 +1860,9 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-compose__grip--w { top: 0.75rem; bottom: 0; left: 0; width: 0.375rem; cursor: ew-resize; }
 .ibx-compose__grip--nw { top: 0; left: 0; width: 0.75rem; height: 0.75rem; cursor: nwse-resize; }
 .ibx-window--maximized .ibx-compose__grip { display: none; }
+/* A writing in a window of its own (1.148.0, index.php?window=compose): the whole window, no rail, nothing to resize */
+.ibx-html--popup .ibx-compose.ibx-window--maximized { inset: 0 !important; border: 0; border-radius: 0; box-shadow: none; }
+.ibx-html--popup .ibx-compose__wbtn { display: none !important; }
 /* Fields of the writing (lot W6): one per line, the name of the field inside while empty (John, 2026-11-07).
    A row: lead (the ✕ of Cc / Bcc) · label (long and short words) · value · extra (buttons Cc / Bcc) */
 .ibx-cfield { position: relative; display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2rem; padding: 0 var(--ibx-s3) 0 var(--ibx-s1); border-bottom: 1px solid var(--ibx-border); cursor: text; }

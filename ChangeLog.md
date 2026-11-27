@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: Ctrl+click opens an attachment or a writing in a browser window of its own :   1.148.0
+  - attachment: PDF, picture, office document by the viewer of another module (no more download); ⧉ in the preview.
+  - « New mail », « Reply », « Reply all », « Forward »: the writing alone in the window, closed after the sending;
+    ⧉ of a writing moves it there with its text and attachments. Middle click too, not on a phone.
+
 - FIX: answer to a mail whose References are separated by commas (Foxmail...): draft and sending no longer refused :   1.147.2
   - the ids are read between their angle brackets, as the index does; the drafts already opened are repaired.
   - a wrong id in References / In-Reply-To is left out of the mail instead of stopping it (GitHub issue #25).

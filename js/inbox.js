@@ -627,16 +627,27 @@
 			},
 		};
 	})();
+	// A window of its own (1.148.0): index.php?window=compose is a writing alone, opened by Ctrl+click. Never the leader
+	// tab (no synchronisation, no refresh, no bell from there), no rail nor spaces.
+	const popup = (() => {
+		try {
+			return new URLSearchParams(location.search).get('window') === 'compose' ? 'compose' : '';
+		} catch (e) {
+			return '';
+		}
+	})();
 	// Leader tab (the only one that will poll the server from lot W2): Web Locks, else every tab is its own leader
 	let isLeader = false;
-	if (navigator.locks && navigator.locks.request) {
+	if (popup) {
+		// not a candidate
+	} else if (navigator.locks && navigator.locks.request) {
 		navigator.locks.request(scope('inbox-leader'), () => {
 			isLeader = true;
 			Dolibarr.executeHook('inbox:app:leader', {});
 			return new Promise(() => {});
 		});
 	} else {
-		isLeader = true;
+		isLeader = !popup;
 	}
 	channel.on(msg => {
 		if (msg.type === 'session' && msg.token) {
@@ -822,10 +833,65 @@
 
 	// Mail space: js/inbox-mail.js (lot W3), registered first so that it is the default space
 
+	// ---------- Windows of their own (1.148.0): Ctrl+click on an attachment, on « New mail », « Reply »... ----------
+	/** Size of a window of each kind the first time: an A4 page read in its width, a writing */
+	const WINDOW_SIZES = { attachment: [1100, 0.9], compose: [960, 0.86] };
+	/** Can a window of its own open here: not on a phone (one window, no Ctrl), not from such a window itself */
+	function canOpenWindow() {
+		return !popup && !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 900);
+	}
+	/** Ctrl+click (Cmd on a Mac) or middle click: what asks for a window of its own */
+	function wantsWindow(e) {
+		return !!e && (e.ctrlKey || e.metaKey || e.button === 1) && canOpenWindow();
+	}
+	/** Place of a window of this kind: the last one of this browser, else centred */
+	function windowFeatures(kind) {
+		const [maxW, ratioH] = WINDOW_SIZES[kind] || WINDOW_SIZES.attachment;
+		const sw = screen.availWidth || window.outerWidth;
+		const sh = screen.availHeight || window.outerHeight;
+		let g = null;
+		try {
+			g = JSON.parse(localStorage.getItem(scope('inbox-window:' + kind)) || 'null');
+		} catch (e) {
+			g = null;
+		}
+		const w = Math.round(Math.min(sw, g && g.w > 200 ? g.w : Math.min(maxW, sw * 0.9)));
+		const h = Math.round(Math.min(sh, g && g.h > 200 ? g.h : sh * ratioH));
+		const left = g && Number.isFinite(g.x) ? g.x : Math.round((screen.availLeft || 0) + (sw - w) / 2);
+		const top = g && Number.isFinite(g.y) ? g.y : Math.round((screen.availTop || 0) + (sh - h) / 2);
+		return 'popup,width=' + w + ',height=' + h + ',left=' + left + ',top=' + top;
+	}
+	/** This window of its own remembers its size and place for the next one of its kind */
+	function rememberWindow(kind) {
+		try {
+			localStorage.setItem(scope('inbox-window:' + kind), JSON.stringify({ w: window.outerWidth, h: window.outerHeight, x: window.screenX, y: window.screenY }));
+		} catch (e) {
+			// private window: centred again next time
+		}
+	}
+	/**
+	 * A browser window of its own, without tabs nor menu. Opened on the next turn: Chrome makes a tab of a window
+	 * opened while Ctrl or the middle button is down; the gesture of the user stays valid.
+	 * @param {string} url  Address (about:blank to fill it later)
+	 * @param {string} kind attachment, compose
+	 * @returns {Promise<Window|null>} null: blocked by the browser (said)
+	 */
+	async function openWindow(url, kind) {
+		await new Promise(resolve => setTimeout(resolve, 0));
+		const win = window.open(url, '_blank', windowFeatures(kind));
+		if (!win) {
+			toast(t('InboxWindowBlocked'), { error: true, duration: 8000 });
+			return null;
+		}
+		return win;
+	}
+
 	// ---------- Tool of the JS context ----------
 	const inbox = {
 		ctx, ctxJson, locale, size, rights, esc, html, raw, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
 		go: hash => router.go(hash),
+		/** Windows of their own (1.148.0): popup = 'compose' in such a window, '' in the application */
+		popup, openWindow, wantsWindow, canOpenWindow, rememberWindow,
 		route: () => router.parse(),
 		isLeader: () => isLeader,
 		/** Number of this tab (X-Inbox-Origin) */
@@ -1084,6 +1150,14 @@
 		applyDisplay(ctxJson('INBOX_PARAMS_JSON', {}));
 		tooltips();
 		Dolibarr.executeHook('inbox:app:init', { inbox });
+		if (popup) {
+			// A writing alone (1.148.0): js/inbox-compose.js opens it on inbox:app:popup
+			document.documentElement.classList.add('ibx-html--popup');
+			$('#ibx-app').removeAttribute('data-loading');
+			window.addEventListener('pagehide', () => rememberWindow(popup));
+			Dolibarr.executeHook('inbox:app:popup', { inbox, kind: popup, params: new URLSearchParams(location.search) });
+			return;
+		}
 		renderRail();
 		$('#ibx-app').removeAttribute('data-loading');
 		window.addEventListener('hashchange', () => router.render());
