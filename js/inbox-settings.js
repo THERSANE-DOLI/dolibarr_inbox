@@ -3894,6 +3894,10 @@
 				['INBOX_UNSUBSCRIBE', 'g-unsub', 'InboxUnsubscribeSetting', ['oneclick', 'mail', 'off']]].map(([k, id, label, values]) => '<div class="ibx-formrow"><label class="ibx-formrow__label" for="' + id + '">' + th(label) + '</label><div>'
 				+ '<select class="ibx-field ibx-field--medium" id="' + id + '" data-name="' + k + '">' + values.map(v => '<option value="' + v + '"' + (v === s[k] ? ' selected' : '') + '>' + th(label + '_' + v) + '</option>').join('') + '</select>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
+			// Pictures of our own domains shown without a click (1.149.0), on by default
+			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxImagesOwnDomains') + '</span><div>'
+			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_IMAGES_OWN_DOMAINS" aria-checked="' + (s.INBOX_IMAGES_OWN_DOMAINS === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxImagesOwnDomains') + '"></button>'
+			+ '<div class="ibx-formrow__help">' + th('InboxImagesOwnDomainsHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxBankCheckSetting') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_BANK_CHECK" aria-checked="' + (s.INBOX_BANK_CHECK === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxBankCheckSetting') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxBankCheckSettingHelp') + '</div>'

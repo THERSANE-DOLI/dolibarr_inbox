@@ -398,4 +398,27 @@ class InboxSafeTest extends TestCase
 		}
 		$this->assertStringNotContainsStringIgnoringCase('<script', $html, $name);
 	}
+
+	/**
+	 * Hosts of the remote pictures (1.149.0): img, background, url() of a style; only the ones a CSP can name
+	 *
+	 * @return void
+	 */
+	public function testRemoteHosts()
+	{
+		$html = '<img src="https://WWW.Example.org/logo.png"><img src="http://cdn.example.net:8080/a.gif">'
+			.'<td background="https://bg.example.com/b.jpg" style="background:url(\'https://css.example.com/c.png\') no-repeat, url(https://css2.example.com/d.png)">x</td>'
+			.'<img src="https://user:pw@login.example.com/x.png"><img src="https://[::1]/x.png"><img src="https://exämple.de/x.png">'
+			.'<img src="cid:abc"><img src="data:image/png;base64,iVBORw0KGgo=">';
+		$remote = false;
+		$hosts = null;
+		InboxMimeParser::safeHtml($html, array(), $remote, $hosts);
+		$this->assertTrue($remote);
+		$this->assertSame(array('www.example.org', 'cdn.example.net:8080', 'bg.example.com', 'css.example.com', 'css2.example.com'), array_values($hosts));
+
+		$remote = true;
+		InboxMimeParser::safeHtml('<p>no picture</p>', array(), $remote, $hosts);
+		$this->assertFalse($remote);
+		$this->assertSame(array(), $hosts);
+	}
 }

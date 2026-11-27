@@ -12,6 +12,7 @@
 - [Views: the mailboxes each one gathers, Spams](views.md): common list, own list of a view, Assigned to me always on every mailbox, the Spams view
 - [Agenda panel](agenda-panel.md)
 - [Mails sent by a site: data sources](data-sources.md)
+- [Remote pictures: blocked, shown, always shown](remote-pictures.md): on a click, always for a sender, a domain or a host, our own domains
 - [Public and shared domains](shared-domains.md)
 - [Blocked senders and anti-spam](anti-spam.md): blocked senders, Sieve, Rspamd beside Dolibarr
 - [New customer from a mail](new-customer.md)

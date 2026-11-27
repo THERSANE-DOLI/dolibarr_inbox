@@ -38,7 +38,7 @@ dol_include_once('/inbox/class/inboxcomposer.class.php');
 class InboxQuoteSecurityTest extends InboxTestCase
 {
 	/** Settings of the tests */
-	const SETTINGS = array('INBOX_QUOTE_REMOTE_IMAGES', 'INBOX_IMAGES_ALWAYS', 'INBOX_UNSUBSCRIBE', 'INBOX_BANK_CHECK');
+	const SETTINGS = array('INBOX_QUOTE_REMOTE_IMAGES', 'INBOX_IMAGES_ALWAYS', 'INBOX_IMAGES_OWN_DOMAINS', 'INBOX_UNSUBSCRIBE', 'INBOX_BANK_CHECK');
 
 	/** @var array<string,mixed> */
 	protected $saved = array();
@@ -155,6 +155,47 @@ class InboxQuoteSecurityTest extends InboxTestCase
 		$this->assertFalse($reader->imagesAllowed($this->admin, 'news@f1.inbox-test.invalid'), 'never: each mail on a click');
 		$this->set('INBOX_IMAGES_ALWAYS', 'anything');
 		$this->assertSame('domain', InboxReader::imagesAlwaysMode(), 'an unknown value is the default');
+	}
+
+	/**
+	 * Hosts of the pictures (1.149.0): our own domains and the hosts chosen, whoever sends; the CSP of the frame
+	 *
+	 * @return void
+	 */
+	public function testImageHosts()
+	{
+		$p = $this->db->prefix();
+		$this->box(true);
+		$reader = new InboxReader($this->db);
+		$hosts = array('inbox-test.invalid' => 'inbox-test.invalid', 'www.inbox-test.invalid' => 'www.inbox-test.invalid',
+			'cdn.f1.inbox-test.invalid' => 'cdn.f1.inbox-test.invalid', 'img.f1.invalid:8443' => 'img.f1.invalid:8443', 'evil-inbox-test.invalid' => 'evil-inbox-test.invalid');
+		$allowed = $reader->imageHostsAllowed($this->admin, $hosts);
+		$this->assertSame('own', $allowed['inbox-test.invalid'] ?? '', 'domain of a mailbox');
+		$this->assertSame('own', $allowed['www.inbox-test.invalid'] ?? '', 'its subdomains');
+		$this->assertSame('own', $allowed['cdn.f1.inbox-test.invalid'] ?? '');
+		$this->assertArrayNotHasKey('evil-inbox-test.invalid', $allowed, 'a name ending the same is not a subdomain');
+		$this->assertArrayNotHasKey('img.f1.invalid:8443', $allowed);
+
+		// Turned off: only the hosts chosen by the user
+		$this->set('INBOX_IMAGES_OWN_DOMAINS', '0');
+		$this->assertSame(array(), $reader->imageHostsAllowed($this->admin, $hosts));
+		$this->db->query("INSERT INTO ".$p."inbox_image_allow (fk_user, address, date_creation) VALUES (".((int) $this->admin->id).", 'cdn.f1.inbox-test.invalid', '".$this->db->idate(dol_now())."')");
+		$this->assertSame(array('cdn.f1.inbox-test.invalid' => 'user'), $reader->imageHostsAllowed($this->admin, $hosts), 'exact host only');
+		$this->assertFalse($reader->imagesAllowed($this->admin, 'news@cdn.f1.inbox-test.invalid'), 'a host is not a sender');
+		$this->set('INBOX_IMAGES_ALWAYS', 'never');
+		$this->assertSame(array(), $reader->imageHostsAllowed($this->admin, $hosts), 'never: the choices of the users stop');
+		$this->set('INBOX_IMAGES_OWN_DOMAINS', '1');
+		$this->assertSame('own', $reader->imageHostsAllowed($this->admin, $hosts)['inbox-test.invalid'] ?? '', 'never: our own domains still shown');
+
+		// CSP: both schemes, the port kept, nothing else written
+		$this->assertSame(' https://a.invalid http://a.invalid https://b.invalid:8443 http://b.invalid:8443',
+			InboxReader::imageHostsCsp(array('a.invalid' => 'own', 'b.invalid:8443' => 'user', "x.invalid; script-src *" => 'user')));
+		$this->assertSame('', InboxReader::imageHostsCsp(array()));
+
+		// Hosts of trackers only: never offered
+		$html = '<img src="https://t.invalid/o.gif" width="1" height="1"><img src="https://mixed.invalid/open?u=1" width="1">';
+		$html .= '<img src="https://mixed.invalid/logo.png" width="90"><img src="https://logo.invalid/a.png">';
+		$this->assertSame(array('t.invalid' => true), InboxReader::trackerHosts($html));
 	}
 
 	/**

@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: remote pictures allowed by their host, not only by their sender; our own domains shown without a click :   1.149.0
+  - « Always show » offers « Always for the pictures of <host> »: the exact host, whoever sends the email.
+  - the pictures of the domains of the mailboxes (subdomains too, never a public mail service) are shown, switch
+    in Settings > Security, on by default; the banner says which hosts are shown; doc page Remote pictures.
+
 - NEW: Ctrl+click opens an attachment or a writing in a browser window of its own :   1.148.0
   - attachment: PDF, picture, office document by the viewer of another module (no more download); ⧉ in the preview.
   - « New mail », « Reply », « Reply all », « Forward »: the writing alone in the window, closed after the sending;

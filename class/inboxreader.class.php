@@ -245,8 +245,9 @@ class InboxReader
 		}
 		$remote = false;
 		$trackers = 0;
+		$remoteHosts = array();
 		if ($message->bodyHtml !== '') {
-			InboxMimeParser::safeHtml($message->bodyHtml, array(), $remote);
+			InboxMimeParser::safeHtml($message->bodyHtml, array(), $remote, $remoteHosts);
 			$trackers = self::countTrackers($message->bodyHtml);
 		}
 		$params = new InboxUserParam($this->db);
@@ -259,6 +260,14 @@ class InboxReader
 		// server to prove it, the journal of the mails sent does)
 		$alwaysOk = $passed || $this->isOwnMail();
 		$allowImages = $remote && $alwaysOk && $this->imagesAllowed($user, (string) $this->row->from_email);
+		// Hosts of the pictures (1.149.0): our own domains and the hosts chosen by the user are shown whoever sends
+		$hostsAllowed = $remote ? $this->imageHostsAllowed($user, $remoteHosts) : array();
+		$hostsView = array();
+		$trackerHosts = $remote ? self::trackerHosts($message->bodyHtml) : array();
+		foreach ($remoteHosts as $h) {
+			// A host of trackers only stays blocked: never offered for « Always »
+			$hostsView[] = array('host' => $h, 'allowed' => $hostsAllowed[$h] ?? '', 'tracker' => !empty($trackerHosts[$h]));
+		}
 		// Recognized domains (1.59.0): the sender (authenticated only) and the links, lookalikes of the list
 		require_once __DIR__.'/inboxtrusteddomain.class.php';
 		$trusted = new InboxTrustedDomain($this->db);
@@ -309,7 +318,9 @@ class InboxReader
 			'size' => strlen($raw),
 			'body' => array('html' => $message->bodyHtml !== '', 'text' => $message->bodyText !== '', 'remote' => $remote, 'trackers' => $trackers, 'images' => $allowImages,
 				// « Always show » offered for: domain (sender or domain), sender, never (setting 1.78.0)
-				'always' => self::imagesAlwaysMode(), 'always_ok' => $alwaysOk),
+				'always' => self::imagesAlwaysMode(), 'always_ok' => $alwaysOk,
+				// Hosts of the remote pictures, each with why it is shown: own (domain of a mailbox), user (chosen), '' (blocked)
+				'hosts' => $hostsView),
 			'attachments' => $attachments,
 			'headers' => $headers,
 			'auth' => $auth,
@@ -613,6 +624,72 @@ class InboxReader
 			." AND address IN (".implode(', ', $addresses).")");
 
 		return is_object($row);
+	}
+
+	/**
+	 * Hosts of remote pictures shown without a click, whoever sends the mail: the domains of the mailboxes and their
+	 * subdomains (setting INBOX_IMAGES_OWN_DOMAINS, on by default: loading a picture from our own server tells nothing
+	 * to anyone outside; never a public mail service nor a shared platform), and the hosts the user chose (a row of inbox_image_allow without « @ », exact host only: a
+	 * shared host of a CDN is never widened to its whole domain). The setting « never » of « Always show » stops the
+	 * choices of the users, not the own domains.
+	 *
+	 * @param User                 $user  User
+	 * @param array<string,string> $hosts Hosts of the pictures of the mail
+	 * @return array<string,string> host => own|user, for the allowed hosts only
+	 */
+	public function imageHostsAllowed(User $user, array $hosts)
+	{
+		$out = array();
+		if (!$hosts) {
+			return $out;
+		}
+		if (getDolGlobalInt('INBOX_IMAGES_OWN_DOMAINS', 1)) {
+			require_once __DIR__.'/inboxtrusteddomain.class.php';
+			$own = (new InboxTrustedDomain($this->db))->ownDomains();
+			foreach ($hosts as $h) {
+				$name = preg_replace('/:[0-9]+$/', '', $h);
+				foreach ($own as $d) {
+					// A mailbox on an open service (gmail.com...) does not make the pictures of everyone there ours
+					if ($d !== '' && !InboxTrustedDomain::isOpenService($d) && ($name === $d || substr($name, -strlen('.'.$d)) === '.'.$d)) {
+						$out[$h] = 'own';
+						break;
+					}
+				}
+			}
+		}
+		$asked = array_diff(array_values($hosts), array_keys($out));
+		if ($asked && self::imagesAlwaysMode() !== 'never') {
+			$list = array();
+			foreach ($asked as $h) {
+				$list[] = "'".$this->db->escape($h)."'";
+			}
+			$rows = $this->db->getRows("SELECT address FROM ".$this->db->prefix()."inbox_image_allow WHERE fk_user = ".((int) $user->id)
+				." AND address IN (".implode(', ', $list).") LIMIT 100");
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$out[(string) $r->address] = 'user';
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * CSP source list of the remote pictures of a mail shown without a click (hosts checked by InboxSafe: letters,
+	 * digits, dots, dashes and a port only, nothing that could end the directive)
+	 *
+	 * @param array<string,string> $allowed host => own|user
+	 * @return string Sources, each with a leading space, or ''
+	 */
+	public static function imageHostsCsp(array $allowed)
+	{
+		$out = '';
+		foreach (array_keys($allowed) as $h) {
+			if (preg_match('/^[a-z0-9.-]+(:[0-9]{1,5})?$/', (string) $h)) {
+				$out .= ' https://'.$h.' http://'.$h;
+			}
+		}
+
+		return $out;
 	}
 
 	/**
@@ -1129,6 +1206,33 @@ class InboxReader
 		}
 
 		return $n;
+	}
+
+	/**
+	 * Hosts that serve only trackers in this HTML (1.149.0): never offered for « Always for the pictures of »
+	 *
+	 * @param string $html HTML of the mail
+	 * @return array<string,bool> host => true
+	 */
+	public static function trackerHosts($html)
+	{
+		$seen = array();
+		if (!preg_match_all('/<img\b[^>]*>/i', (string) $html, $m)) {
+			return array();
+		}
+		foreach ($m[0] as $tag) {
+			if (!preg_match('/\bsrc\s*=\s*["\']?\s*(https?:[^"\'\s>]+)/i', $tag, $src)) {
+				continue;
+			}
+			$parts = parse_url(html_entity_decode($src[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+			if (!is_array($parts) || empty($parts['host'])) {
+				continue;
+			}
+			$host = strtolower(rtrim((string) $parts['host'], '.')).(isset($parts['port']) ? ':'.((int) $parts['port']) : '');
+			$seen[$host] = ($seen[$host] ?? true) && self::isTracker($tag);
+		}
+
+		return array_filter($seen);
 	}
 
 	/**
