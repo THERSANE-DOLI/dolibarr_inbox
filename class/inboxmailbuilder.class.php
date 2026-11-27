@@ -107,6 +107,61 @@ class InboxMailBuilder
 	}
 
 	/**
+	 * Message-IDs of a References / In-Reply-To header, or of a list already split (1.147.2)
+	 *
+	 * The ids between angle brackets are taken, as the index does: what separates them (spaces, the commas of
+	 * Foxmail and some others, the « phrases » of the old syntax of RFC 5322) is left. A value without angle brackets
+	 * (an id kept bare, a list saved by an older version with « id>, » in it) is split on the spaces, commas and
+	 * semicolons.
+	 *
+	 * @param string|array<int,mixed> $value Header value, or list of ids
+	 * @return string[] Without the angle brackets, each one once, in their order
+	 */
+	public static function messageIds($value)
+	{
+		$ids = array();
+		foreach ((array) $value as $part) {
+			$part = (string) $part;
+			if (strpos($part, '<') !== false && preg_match_all('/<([^<>\s]{1,250})>/', $part, $m)) {
+				$found = $m[1];
+			} else {
+				$found = array_map(function ($r) {
+					return trim($r, " \t\r\n<>");
+				}, preg_split('/[\s,;]+/', $part, -1, PREG_SPLIT_NO_EMPTY));
+			}
+			foreach ($found as $id) {
+				if ($id !== '' && strlen($id) <= 250 && !in_array($id, $ids, true)) {
+					$ids[] = $id;
+				}
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Message-IDs the mail library accepts: a wrong one is left, not the whole mail refused (1.147.2)
+	 *
+	 * @param string[] $ids Ids without angle brackets
+	 * @return string[]
+	 */
+	protected static function acceptedIds(array $ids)
+	{
+		$validator = Swift_DependencyContainer::getInstance()->lookup('email.validator');
+		$rule = class_exists('Egulias\EmailValidator\Validation\MessageIDValidation') ? new Egulias\EmailValidator\Validation\MessageIDValidation() : new Egulias\EmailValidator\Validation\RFCValidation();
+		$ok = array();
+		foreach ($ids as $id) {
+			if ($validator->isValid($id, $rule)) {
+				$ok[] = $id;
+			} else {
+				dol_syslog(__METHOD__.' message id left: '.$id, LOG_WARNING);
+			}
+		}
+
+		return $ok;
+	}
+
+	/**
 	 * Addresses typed or pasted ("Name <a@b.c>, d@e.f; ...") => list, each one checked
 	 *
 	 * @param string|array<int,mixed> $value Text, or list of strings / {email,name}
@@ -366,12 +421,12 @@ class InboxMailBuilder
 			if ($this->replyTo !== '' && filter_var($this->replyTo, FILTER_VALIDATE_EMAIL)) {
 				$message->setReplyTo($this->replyTo);
 			}
-			if ($this->inReplyTo !== '') {
-				$headers->addIdHeader('In-Reply-To', trim($this->inReplyTo, " \t<>"));
+			// A wrong id in the chain (separator kept by an older version, odd mail program) is left, never blocks
+			$inReplyTo = self::acceptedIds(self::messageIds($this->inReplyTo));
+			if ($inReplyTo) {
+				$headers->addIdHeader('In-Reply-To', $inReplyTo[0]);
 			}
-			$refs = array_values(array_unique(array_filter(array_map(function ($r) {
-				return trim((string) $r, " \t<>");
-			}, $this->references))));
+			$refs = self::acceptedIds(self::messageIds((array) $this->references));
 			if (count($refs) > self::MAX_REFERENCES) {
 				$refs = array_merge(array($refs[0]), array_slice($refs, -(self::MAX_REFERENCES - 1)));
 			}

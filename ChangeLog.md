@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: answer to a mail whose References are separated by commas (Foxmail...): draft and sending no longer refused :   1.147.2
+  - the ids are read between their angle brackets, as the index does; the drafts already opened are repaired.
+  - a wrong id in References / In-Reply-To is left out of the mail instead of stopping it (GitHub issue #25).
+
 - FIX: journal of a mailbox: what inbox does by itself is written « Inbox (automatic) », not as a user :   1.147.1
   - blocked senders and spams put in the junk, known senders taken out of it: the user whose page or job ran the
     synchronisation was named; a choice « Inbox (automatic) » in the filter « Who ». Lines already written stay.
