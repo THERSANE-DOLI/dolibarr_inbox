@@ -71,3 +71,43 @@ an `icon` (usage name) and a `url` inside Dolibarr. The panel reads that address
   has something to show; keep the answer so that the hook gives no block the next time.
 
 Every text is escaped by the panel. Check the rights in the page: the hook runs for any mail the user opens.
+
+## Viewers of the attachments
+
+Inbox shows itself only what a mail needs to be read: PDF and pictures (by the browser), text, CSV, zip, attached
+email. Every other format is shown by a module: never add a reader of a file format to Inbox, write or complete a
+viewer module. DocStudio, the free viewer recommended by the setup page of Inbox, implements this hook for PDF,
+pictures and office files: look at it before writing your own. DocStudio is the viewer code that once lived in
+Inbox, taken out into a module of its own so that every document of Dolibarr (files of the cards, DMS) benefits from
+it, not only the attachments of the mails.
+
+Hook `inboxAttachmentViewers`, context `inboxattachment`, called when a mail with attachments is opened.
+`$parameters` gives `mail` (row of the index) and `attachments`: part => `part`, `name`, `extension` (lower case),
+`size`. The method answers, for the parts it can show, a list of viewers in `$this->results['inboxAttachmentViewers']`
+and, for « Annotate and file », a list of editors in `$this->results['inboxAttachmentEditors']`:
+
+```php
+public function inboxAttachmentViewers($parameters, &$object, &$action, $hookmanager)
+{
+	$viewers = array();
+	foreach ($parameters['attachments'] as $part => $a) {
+		if ($a['extension'] === 'dwg') {
+			$viewers[$part][] = array('code' => 'mymodule_dwg', 'label' => 'Plan viewer',
+				'url' => dol_buildpath('/mymodule/view.php', 1).'?mail='.(int) $parameters['mail'].'&part='.(int) $part);
+		}
+	}
+	$this->results['inboxAttachmentViewers'] = $viewers;
+	return 0;
+}
+```
+
+- `url` must be a relative address of this site (`/...`): any other one is dropped, as an entry without `label`.
+  `code` keeps only `a-z`, `0-9` and `_`; `label` is cut at 80 characters. Inbox opens the first viewer of a part in
+  its preview (« Open with… » lists the others).
+- Inbox adds `force=1` to the address when the user opens an attachment not scanned by the antivirus anyway; to an
+  editor address, it adds `record_type` and `record_id`, the piece chosen by the user.
+- The page of the module loads the attachment with `InboxAttachmentFile` (`class/inboxattachmentfile.class.php`),
+  with the user who asks: `load($user, $mail, $part, $force)` checks the access to the mailbox and the antivirus
+  (an infected file is never given), then `getFileName()`, `getSize()`, `getContent()`. Read only: an editor puts
+  its new file in the documents of the piece with `fileToRecord()` (same checks and link to the mail as « Put in the
+  documents of »). Never a path nor an address of the mail server.

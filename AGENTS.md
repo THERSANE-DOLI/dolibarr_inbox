@@ -16,6 +16,18 @@ Read before changing anything:
   plug in through hooks (PHP `inbox…`, context `inbox`; JS `inbox:<object>:<action>`). Examples in the docs never cite
   a real external module. The modules of the core of Dolibarr (Agenda, Third parties, Tickets, Antivirus...) are part
   of the platform: Inbox may read them and test them with `isModEnabled()`.
+- **Inbox does not grow new file viewers.** The preview of Inbox shows only what a mail needs to be read: PDF and
+  pictures (by the browser), text, CSV, zip, attached email. Every other format (office documents, spreadsheets,
+  plans, 3D...) is shown by a viewer module through the hook `inboxAttachmentViewers`
+  ([doc/dev/extend-application.md](doc/dev/extend-application.md#viewers-of-the-attachments)), because a document
+  attached to an invoice or a third party deserves the same viewer as one received by mail. Before writing a reader,
+  look at **DocStudio** (free, GPL, the viewer the setup page of Inbox already recommends:
+  [github.com/THERSANE-DOLI/dolibarr_docstudio](https://github.com/THERSANE-DOLI/dolibarr_docstudio)): it already
+  shows and edits PDF, images and office files (Word, Excel, PowerPoint). DocStudio is the viewer code that once
+  lived in Inbox, taken out into a module of its own so that every document of Dolibarr benefits from it, not only
+  the attachments of the mails: putting a viewer back into Inbox would undo that. A missing format is a pull request on
+  DocStudio (or on your own viewer module), not on Inbox. Naming DocStudio here is the one exception to the rule
+  above: a recommendation, never a test or a dependency in the code.
 - **No trigger broadcast for the mails received**: a module that acts on mails goes through the module
   subscriptions ([doc/dev/consumers.md](doc/dev/consumers.md)).
 - **Every value of a mail goes through one door** before it is shown or written: `InboxSafe` in PHP,
@@ -67,6 +79,8 @@ Read before changing anything:
 - [ ] Coding style of Dolibarr on the PHP files changed:
       `phpcs --standard=<dolibarr>/dev/setup/codesniffer/ruleset.xml <files>`; `php -l` on each.
 - [ ] `node --check` on each JavaScript file changed.
+- [ ] No new reader of a file format in Inbox: a format to preview goes into a viewer module (see « Inbox does not
+      grow new file viewers »).
 - [ ] A PHP file added in `dev/` or `test/` starts with the guard `if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }`
       (these folders stay in the Git branches): `php dev/check-cli-guard.php`, also run by the CI.
 - [ ] Icons changed: `php dev/build-icons.php`.
