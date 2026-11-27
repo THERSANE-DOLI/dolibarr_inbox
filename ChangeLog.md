@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Ctrl+A in the source of an email selected every email of the list (then Delete deleted them all) :   1.149.1
+  - in a window of inbox or a dialog, the keys of the mail list (Ctrl+A, A, Delete, J, M, 1 to 9...) no longer act.
+  - Ctrl+A in the source, a text or a CSV attachment selects its text only; a click in a window gives it the focus.
+
 - NEW: remote pictures allowed by their host, not only by their sender; our own domains shown without a click :   1.149.0
   - « Always show » offers « Always for the pictures of <host> »: the exact host, whoever sends the email.
   - the pictures of the domains of the mailboxes (subdomains too, never a public mail service) are shown, switch

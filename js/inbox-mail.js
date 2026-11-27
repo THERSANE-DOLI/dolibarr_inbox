@@ -10785,7 +10785,10 @@
 				if (!res.ok) {
 					throw new Error(res.statusText);
 				}
-				body.innerHTML = '<pre class="ibx-viewer__text">' + esc(await res.text()) + '</pre>';
+				w.sourceText = await res.text();
+				// Focusable (1.149.1): a click in the text keeps the keys in the window, Ctrl+A selects the source only
+				body.innerHTML = '<pre class="ibx-viewer__text ibx-js-selectall" tabindex="0">' + esc(w.sourceText) + '</pre>';
+				$('.ibx-js-selectall', body).focus({ preventScroll: true });
 			} catch (err) {
 				body.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
 			}
@@ -10863,7 +10866,7 @@
 		} else if (a.kind === 'text' || a.kind === 'csv') {
 			try {
 				const res = await attApi(m, a.part, 'text', force);
-				body.innerHTML = top + (a.kind === 'csv' ? csvTable(res.text) : '<pre class="ibx-viewer__text">' + esc(res.text) + '</pre>') + (res.truncated ? '<p class="ibx-muted ibx-viewer__pad">' + th('InboxTruncated') + '</p>' : '');
+				body.innerHTML = top + (a.kind === 'csv' ? csvTable(res.text) : '<pre class="ibx-viewer__text ibx-js-selectall" tabindex="0">' + esc(res.text) + '</pre>') + (res.truncated ? '<p class="ibx-muted ibx-viewer__pad">' + th('InboxTruncated') + '</p>' : '');
 			} catch (err) {
 				body.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
 			}
@@ -10922,7 +10925,7 @@
 			row.push(cell);
 			rows.push(row);
 		}
-		return '<div class="ibx-viewer__pad"><table class="ibx-table ibx-table--csv"><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
+		return '<div class="ibx-viewer__pad"><table class="ibx-table ibx-table--csv ibx-js-selectall" tabindex="0"><tbody>' + rows.map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
 	}
 
 	function front(w) {
@@ -11030,6 +11033,10 @@
 	}
 	function bindWindow(w) {
 		const dlg = w.dlg;
+		// A click anywhere in the window gives it the focus (1.149.1): the keys of the mail list no longer act behind it
+		if (!dlg.hasAttribute('tabindex')) {
+			dlg.tabIndex = -1;
+		}
 		dlg.addEventListener('pointerdown', () => front(w));
 		dlg.addEventListener('click', e => {
 			const b = e.target.closest('button');
@@ -12258,12 +12265,34 @@
 		presenceTimer = setTimeout(() => poll(), 800);
 	}
 
+	/** Whole text of an element selected, nothing else of the page */
+	function selectContents(el) {
+		const range = document.createRange();
+		range.selectNodeContents(el);
+		const sel = window.getSelection();
+		sel.removeAllRanges();
+		sel.addRange(range);
+	}
+
 	function inField(e) {
 		const el = e.target;
 		return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) && !(el.classList && el.classList.contains('ibx-js-check'));
 	}
 	function onKey(e, fromFrame) {
 		if (!S.el || S.el.closest('[hidden]') || e.defaultPrevented) {
+			return;
+		}
+		// Inside a window of inbox or a dialog: the keys of the mail list never act there (a Ctrl+A then Delete
+		// read in the source of a mail deleted every mail of the list). Ctrl+A selects the text of the window only.
+		const box = !fromFrame && e.target && e.target.closest ? e.target.closest('dialog, .ibx-window') : null;
+		if (box) {
+			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'a' || e.key === 'A') && !inField(e)) {
+				const text = $('.ibx-js-selectall', box);
+				if (text) {
+					e.preventDefault();
+					selectContents(text);
+				}
+			}
 			return;
 		}
 		if (e.ctrlKey && e.shiftKey && (e.key === 'K' || e.key === 'k')) {
