@@ -46,6 +46,9 @@ class InboxFolder
 	/** @var DoliDB */
 	protected $db;
 
+	/** @var bool|null The column sync_fail_count is there (1.145.0), read once per request */
+	protected static $failCount = null;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -74,19 +77,36 @@ class InboxFolder
 	}
 
 	/**
-	 * Condition on the folders whose first synchronisation is left (the state « first_sync » of their mailbox): a folder
-	 * that failed FAILS_SET_ASIDE passes in a row is left out until a pass on it succeeds (1.145.0)
+	 * The column sync_fail_count is there (1.145.0): files may be replaced before the module is activated again
 	 *
+	 * @param DoliDB $db Database handler
+	 * @return bool
+	 */
+	public static function hasFailCount(DoliDB $db)
+	{
+		if (self::$failCount === null) {
+			self::$failCount = (bool) $db->query("SELECT sync_fail_count FROM ".$db->prefix()."inbox_folder WHERE 1 = 0");
+		}
+
+		return self::$failCount;
+	}
+
+	/**
+	 * Condition on the folders whose first synchronisation is left (the state « first_sync » of their mailbox): a folder
+	 * that failed FAILS_SET_ASIDE passes in a row is left out until a pass on it succeeds (1.145.0). Without the column
+	 * (module not activated again yet), the condition of before: no folder set aside, never a query that fails
+	 *
+	 * @param DoliDB $db    Database handler
 	 * @param string $alias Alias of llx_inbox_folder in the query ('' for none)
 	 * @return string SQL, without AND before
 	 */
-	public static function sqlFirstSyncLeft($alias = '')
+	public static function sqlFirstSyncLeft(DoliDB $db, $alias = '')
 	{
 		$a = $alias !== '' ? $alias.'.' : '';
 
-		$sql = $a."status = ".self::STATUS_PRESENT." AND ".$a."selectable = 1 AND ".$a."sync_enabled = 1";
+		$sql = $a."status = ".self::STATUS_PRESENT." AND ".$a."selectable = 1 AND ".$a."sync_enabled = 1 AND ".$a."first_sync_done = 0";
 
-		return $sql." AND ".$a."first_sync_done = 0 AND ".$a."sync_fail_count < ".self::FAILS_SET_ASIDE;
+		return self::hasFailCount($db) ? $sql." AND ".$a."sync_fail_count < ".self::FAILS_SET_ASIDE : $sql;
 	}
 
 	/**
@@ -198,7 +218,7 @@ class InboxFolder
 
 	/**
 	 * Count a failed pass on a folder, or start again from zero after a good one (1.145.0). Apart from saveState(): the
-	 * state of the folder is saved even before the module is activated again with its column
+	 * state of the folder is saved even before the module is activated again with its column (then nothing done here)
 	 *
 	 * @param int  $folderId Folder
 	 * @param bool $failed   The pass on it failed
@@ -206,8 +226,24 @@ class InboxFolder
 	 */
 	public function countFailure($folderId, $failed)
 	{
+		if (!self::hasFailCount($this->db)) {
+			return;
+		}
 		$set = $failed ? "sync_fail_count = sync_fail_count + 1" : "sync_fail_count = 0";
 		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET ".$set." WHERE rowid = ".((int) $folderId).($failed ? '' : " AND sync_fail_count <> 0"));
+	}
+
+	/**
+	 * Failures of the folders of a mailbox counted from zero (1.145.0): index rebuilt, every folder tried again
+	 *
+	 * @param int $accountId Mailbox
+	 * @return void
+	 */
+	public function resetFailures($accountId)
+	{
+		if (self::hasFailCount($this->db)) {
+			$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_fail_count = 0 WHERE fk_account = ".((int) $accountId)." AND sync_fail_count <> 0");
+		}
 	}
 
 	/**
@@ -237,7 +273,9 @@ class InboxFolder
 			return false;
 		}
 		// Followed again by hand: its failed passes counted from zero (1.145.0)
-		$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_fail_count = 0".$sql);
+		if (self::hasFailCount($this->db)) {
+			$this->db->query("UPDATE ".$this->db->prefix()."inbox_folder SET sync_fail_count = 0".$sql);
+		}
 
 		return true;
 	}

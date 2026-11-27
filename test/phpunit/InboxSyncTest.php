@@ -42,6 +42,8 @@ class InboxSyncFakeConnector extends InboxConnector
 	public static $folders = array();
 	/** @var array<string,bool> Paths whose reading fails */
 	public static $failing = array();
+	/** @var array<string,bool> Paths whose first indexing only fails (their changes are read) */
+	public static $failingBackfill = array();
 	/** @var array<string,int> Readings asked per path */
 	public static $reads = array();
 
@@ -83,12 +85,15 @@ class InboxSyncFakeConnector extends InboxConnector
 	public function getChanges($folder, $cursor, array $options = array())
 	{
 		self::$reads[$folder] = (self::$reads[$folder] ?? 0) + 1;
-		if (!empty(self::$failing[$folder])) {
+		if (!empty(self::$failing[$folder]) || (!empty($options['backfill']) && !empty(self::$failingBackfill[$folder]))) {
 			$this->error = 'STATUS without answer';
 			return null;
 		}
 
-		return array('cursor' => (string) json_encode(array('done' => 1)), 'reset' => false, 'new' => array(), 'changed' => array(), 'deleted' => array(),
+		// First indexing failing: its changes read, the folder not indexed in full yet
+		$done = empty(self::$failingBackfill[$folder]) ? array('done' => 1) : array('uid' => 1);
+
+		return array('cursor' => (string) json_encode($done), 'reset' => false, 'new' => array(), 'changed' => array(), 'deleted' => array(),
 			'more' => false, 'total' => 0, 'unread' => 0);
 	}
 	/**
@@ -820,10 +825,26 @@ class InboxSyncTest extends InboxTestCase
 			$this->assertTrue((new InboxFolder($this->db))->setSyncEnabled($a->id, (int) $row->rowid, true));
 			$this->assertSame(0, (int) $broken()->sync_fail_count);
 			$this->assertSame(1, $s->progress($a->id)['first_sync_left']);
+
+			// Changes read, first indexing failed in the same pass: a failure all the same, set aside after 3 passes
+			InboxSyncFakeConnector::$failingBackfill = array('INBOX.ZzBroken' => true);
+			for ($i = 1; $i < InboxFolder::FAILS_SET_ASIDE; $i++) {
+				$this->assertSame('first_sync', $pass());
+				$this->assertSame($i, (int) $broken()->sync_fail_count, 'the good reading of its changes does not count it from zero');
+			}
+			$this->assertSame('ok', $pass());
+			$this->assertSame(InboxFolder::FAILS_SET_ASIDE, (int) $broken()->sync_fail_count);
+			InboxSyncFakeConnector::$failingBackfill = array();
+
+			// Index rebuilt: every folder tried again, its failures counted from zero
+			(new InboxFolder($this->db))->resetFailures($a->id);
+			$this->assertSame(0, (int) $broken()->sync_fail_count);
+			$this->assertSame(1, $s->progress($a->id)['first_sync_left']);
 		} finally {
 			$prop->setValue(null, $saved);
 			InboxSyncFakeConnector::$folders = array();
 			InboxSyncFakeConnector::$failing = array();
+			InboxSyncFakeConnector::$failingBackfill = array();
 		}
 	}
 }

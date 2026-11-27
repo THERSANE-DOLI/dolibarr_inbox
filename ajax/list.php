@@ -738,7 +738,7 @@ switch ($action) {
 			// A first indexing is left: state « first_sync », or a folder not indexed yet (index rebuilt, folder followed
 			// again, mailbox just enabled); a folder that fails pass after pass is left out (1.145.0)
 			$firstLeft = "(sync_state = 'first_sync' OR EXISTS (SELECT f.rowid FROM ".$db->prefix()."inbox_folder as f WHERE f.fk_account = ".$db->prefix()."inbox_account.rowid"
-				." AND ".InboxFolder::sqlFirstSyncLeft('f')."))";
+				." AND ".InboxFolder::sqlFirstSyncLeft($db, 'f')."))";
 			$rows = $db->getRows("SELECT rowid FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', $readable).") AND status = ".InboxAccount::STATUS_ACTIVE
 				." AND (date_sync IS NULL OR date_sync < '".$db->idate(dol_now() - 60)."' OR ".$firstLeft.") ORDER BY date_sync ASC LIMIT 100");
 			foreach (is_array($rows) ? $rows : array() as $r) {

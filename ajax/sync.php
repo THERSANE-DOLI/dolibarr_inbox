@@ -96,6 +96,8 @@ switch ($action) {
 			$mail->clearFolder((int) $f->rowid);
 		}
 		$db->query("UPDATE ".$db->prefix()."inbox_folder SET sync_cursor = NULL, indexed = 0, first_sync_done = 0, oldest_indexed = NULL WHERE fk_account = ".((int) $account->id));
+		// Every folder tried again for its first indexing, the ones that failed pass after pass too (1.145.0)
+		$folders->resetFailures((int) $account->id);
 		inboxAjaxReply(inboxSyncState($account));
 		// no break
 

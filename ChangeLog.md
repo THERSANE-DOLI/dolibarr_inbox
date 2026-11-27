@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a folder whose first indexing fails while its changes are read could keep its mailbox in « first synchronisation » :   1.151.3
+  - its failures are counted from zero at the end of a pass only when no reading of it failed.
+  - files replaced before the module is activated again: no query on the missing column; « Rebuild the index » tries
+    every folder again.
+
 - FIX: the size of a window was taken only inside its edges :   1.151.2
   - the grips go 6 px past every edge and corner, as in the desktop (CSS only).
 
