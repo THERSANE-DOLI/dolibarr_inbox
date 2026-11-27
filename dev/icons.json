@@ -67,6 +67,7 @@
 		"thread": ["messages", "outline"],
 		"minimize": ["minus", "outline"],
 		"maximize": ["arrows-maximize", "outline"],
+		"restore": ["arrows-minimize", "outline"],
 		"download": ["download", "outline"],
 		"download-all": ["file-zip", "outline"],
 		"open": ["eye", "outline"],

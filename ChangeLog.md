@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: windows of the page snapped to the edges of the screen :   1.151.0
+  - dragged by the bar against the left or right edge: half of the screen; against the top: whole screen.
+  - a snapped or maximized window stays movable and resizable; dragged again, it takes back its size of before.
+
 - NEW: button « Copy the source » in the window of the source of an email :   1.150.0
   - the whole source in one click, enabled once loaded; the toast does not repeat it.
 

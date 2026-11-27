@@ -11012,7 +11012,8 @@
 		front(w);
 	}
 	function saveGeometry(w) {
-		if (w.dlg.classList.contains('ibx-window--maximized') || !w.dlg.isConnected || !w.dlg.open) {
+		// Snapped or maximized (1.151.0): the size of before is the one kept
+		if (w.dlg.classList.contains('ibx-window--maximized') || w.dlg.dataset.snap || !w.dlg.isConnected || !w.dlg.open) {
 			return;
 		}
 		const r = w.dlg.getBoundingClientRect();
@@ -11054,7 +11055,7 @@
 			} else if (b.classList.contains('ibx-js-wmin')) {
 				minimize(w);
 			} else if (b.classList.contains('ibx-js-wmax')) {
-				dlg.classList.toggle('ibx-window--maximized');
+				I.toggleMaxWindow(dlg);
 			} else if (b.classList.contains('ibx-js-wout')) {
 				// The same file in a window of its own (opened anyway here: anyway there), then this preview closed
 				openInWindow(w.mail, w.index, { viewer: w.viewer, force: !!w.forced }).then(ok => ok && closeWindow(w));
@@ -11087,6 +11088,8 @@
 			}
 			e.preventDefault();
 			e.stopPropagation();
+			// Snapped: resized, it is no longer (the size given is kept)
+			I.unsnapKeep(dlg);
 			const dir = g.dataset.wgrip;
 			const r0 = dlg.getBoundingClientRect();
 			const x0 = e.clientX;
@@ -11127,31 +11130,17 @@
 			g.addEventListener('pointermove', move);
 			g.addEventListener('pointerup', up);
 		});
-		// Move by the title bar
+		// Move by the title bar; against an edge of the screen, snapped to it (1.151.0)
 		dlg.addEventListener('pointerdown', e => {
 			const bar = e.target.closest('.ibx-window__bar');
-			if (!bar || e.target.closest('button') || dlg.classList.contains('ibx-window--maximized')) {
+			if (!bar || e.button !== 0 || e.target.closest('button') || dlg.classList.contains('ibx-window--maximized')) {
 				return;
 			}
-			const r = dlg.getBoundingClientRect();
-			const dx = e.clientX - r.left;
-			const dy = e.clientY - r.top;
-			bar.setPointerCapture(e.pointerId);
-			const move = ev => {
-				dlg.style.left = Math.max(0, Math.min(window.innerWidth - 80, ev.clientX - dx)) + 'px';
-				dlg.style.top = Math.max(0, Math.min(window.innerHeight - 36, ev.clientY - dy)) + 'px';
-			};
-			const up = () => {
-				bar.removeEventListener('pointermove', move);
-				bar.removeEventListener('pointerup', up);
-				saveGeometry(w);
-			};
-			bar.addEventListener('pointermove', move);
-			bar.addEventListener('pointerup', up);
+			I.dragWindow(dlg, bar, e, { onDone: () => saveGeometry(w) });
 		});
 		dlg.addEventListener('dblclick', e => {
-			if (e.target.closest('.ibx-window__bar') && !e.target.closest('button')) {
-				dlg.classList.toggle('ibx-window--maximized');
+			if (e.target.closest('.ibx-window__bar') && !e.target.closest('button') && !dlg.classList.contains('ibx-window--maximized')) {
+				I.toggleMaxWindow(dlg);
 			}
 		});
 		// Size changed (grips, maximized): kept

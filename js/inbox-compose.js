@@ -3230,10 +3230,29 @@
 		if (detachBtn) {
 			detachBtn.addEventListener('click', () => detach(w));
 		}
-		$('.ibx-js-cmax', dlg).addEventListener('click', () => {
-			dlg.classList.toggle('ibx-window--maximized');
+		/*
+		 * Whole screen, or back (1.151.0): the geometry inline (still movable and resizable); a writing kept in the row
+		 * at the bottom right goes back to it
+		 */
+		const toggleMax = () => {
+			if (dlg.classList.contains('ibx-window--maximized')) {
+				return;
+			}
+			if (dlg.dataset.snap === 'max' && w.dockedBefore) {
+				I.snapWindow(dlg, null);
+				w.dockedBefore = false;
+				w.moved = false;
+				Object.assign(dlg.style, { left: '', top: '', right: '', bottom: '' });
+			} else {
+				if (!dlg.dataset.snap) {
+					w.dockedBefore = !w.moved;
+				}
+				w.moved = true;
+				I.toggleMaxWindow(dlg);
+			}
 			place();
-		});
+		};
+		$('.ibx-js-cmax', dlg).addEventListener('click', toggleMax);
 		dlg.addEventListener('keydown', e => {
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && params.send_shortcut !== 'off') {
 				e.preventDefault();
@@ -3251,29 +3270,25 @@
 		dlg.addEventListener('cancel', e => {
 			e.preventDefault();
 		});
-		// The bar moves the window (pointer); a moved window keeps its place
+		// The bar moves the window (pointer); a moved window keeps its place; against an edge, snapped (1.151.0)
 		const bar = $('.ibx-window__bar', dlg);
 		bar.addEventListener('pointerdown', e => {
-			if (e.target.closest('button') || dlg.classList.contains('ibx-window--maximized') || window.innerWidth < 640) {
+			if (e.button !== 0 || e.target.closest('button') || dlg.classList.contains('ibx-window--maximized') || window.innerWidth < 640) {
 				return;
 			}
-			const r = dlg.getBoundingClientRect();
-			const dx = e.clientX - r.left;
-			const dy = e.clientY - r.top;
-			bar.setPointerCapture(e.pointerId);
-			const move = ev => {
-				w.moved = true;
-				dlg.style.right = 'auto';
-				dlg.style.bottom = 'auto';
-				dlg.style.left = Math.max(0, Math.min(ev.clientX - dx, window.innerWidth - 120)) + 'px';
-				dlg.style.top = Math.max(0, Math.min(ev.clientY - dy, window.innerHeight - 40)) + 'px';
-			};
-			const up = () => {
-				bar.removeEventListener('pointermove', move);
-				bar.removeEventListener('pointerup', up);
-			};
-			bar.addEventListener('pointermove', move);
-			bar.addEventListener('pointerup', up);
+			I.dragWindow(dlg, bar, e, {
+				minVisible: 120,
+				onMove: () => {
+					w.moved = true;
+					w.dockedBefore = false;
+				},
+				onDone: () => place(),
+			});
+		});
+		bar.addEventListener('dblclick', e => {
+			if (!e.target.closest('button') && window.innerWidth >= 640) {
+				toggleMax();
+			}
 		});
 		paintTitle();
 		// Size from the top, the left, or the top left corner; kept for the next writings
@@ -3282,6 +3297,11 @@
 				return;
 			}
 			e.preventDefault();
+			// Snapped: resized, it is no longer (the size given is kept, the place too)
+			if (dlg.dataset.snap) {
+				I.unsnapKeep(dlg);
+				w.dockedBefore = false;
+			}
 			const r0 = dlg.getBoundingClientRect();
 			const x0 = e.clientX;
 			const y0 = e.clientY;

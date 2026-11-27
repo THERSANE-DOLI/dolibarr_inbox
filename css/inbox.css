@@ -645,6 +645,14 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-wgrip--nw { top: 0; left: 0; cursor: nwse-resize; } .ibx-wgrip--se { bottom: 0; right: 0; cursor: nwse-resize; }
 .ibx-wgrip--ne { top: 0; right: 0; cursor: nesw-resize; } .ibx-wgrip--sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .ibx-window--maximized .ibx-wgrip { display: none; }
+/* Snapped to an edge (1.151.0): the zone shown while the window is dragged, the halves without rounded corners */
+.ibx-snap-preview {
+	position: fixed; z-index: 55; pointer-events: none; border: 2px solid var(--ibx-accent); border-radius: var(--ibx-radius);
+	background: color-mix(in srgb, var(--ibx-accent) 14%, transparent); transition: left var(--ibx-dur), top var(--ibx-dur), width var(--ibx-dur), height var(--ibx-dur);
+}
+.ibx-window[data-snap="left"], .ibx-window[data-snap="right"] { border-radius: 0; }
+.ibx-window.is-dragged { user-select: none; }
+.ibx-window.is-dragged iframe { pointer-events: none; }
 /* Window of a module opened modal by another one (1.48.0): what is under it is out of reach */
 .ibx-backdrop { position: fixed; inset: 0; z-index: 64; background: rgb(18 18 24 / 62%); }
 .ibx-window.ibx-window--modal { z-index: 66; }

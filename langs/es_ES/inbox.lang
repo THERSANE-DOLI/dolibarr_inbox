@@ -641,6 +641,7 @@ InboxMailZoom = Texto de los correos: %s %%
 InboxMarkRead = Marcar como leído
 InboxMarkUnread = Marcar como no leído
 InboxMaximize = Maximizar
+InboxRestoreSize = Restaurar el tamaño
 InboxMinimize = Minimizar
 InboxMoreActions = Más acciones
 InboxMailActions = Acciones del correo

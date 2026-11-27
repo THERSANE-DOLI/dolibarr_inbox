@@ -886,12 +886,181 @@
 		return win;
 	}
 
+	// ---------- Windows snapped to the edges (1.151.0) ----------
+	/*
+	 * A window of the page dragged by its bar against the left or right edge of the screen takes the half of it, against
+	 * the top edge the whole of it (the rail stays seen); a translucent zone shows it before the release. The geometry
+	 * is written inline (no class with !important): a snapped or maximized window stays movable and resizable. Dragged
+	 * again, it takes back its size of before under the pointer; resized, it keeps the size given. The phone and the
+	 * window of its own keep the class ibx-window--maximized (whole screen, nothing to move).
+	 */
+	const SNAP_EDGE = 8;
+	let snapPreview = null;
+	/** px of a length of the CSS (rem of the root) */
+	function cssPx(name) {
+		const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+		const n = parseFloat(v) || 0;
+		return v.endsWith('rem') ? n * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : n;
+	}
+	/**
+	 * @param {string} zone left, right, max
+	 * @returns {{x: number, y: number, w: number, h: number}}
+	 */
+	function snapRect(zone) {
+		const W = window.innerWidth;
+		const H = window.innerHeight;
+		if (zone === 'max') {
+			const gap = cssPx('--ibx-s3');
+			const x = (popup ? 0 : cssPx('--ibx-rail-w')) + gap;
+			return { x: Math.round(x), y: Math.round(gap), w: Math.round(W - x - gap), h: Math.round(H - 2 * gap) };
+		}
+		const half = Math.round(W / 2);
+		return zone === 'left' ? { x: 0, y: 0, w: half, h: H } : { x: half, y: 0, w: W - half, h: H };
+	}
+	/** Zone under the pointer while a window is dragged: null away from the edges */
+	function snapZone(ev) {
+		if (ev.clientY <= SNAP_EDGE) {
+			return 'max';
+		}
+		if (ev.clientX <= SNAP_EDGE) {
+			return 'left';
+		}
+		return ev.clientX >= window.innerWidth - 1 - SNAP_EDGE ? 'right' : null;
+	}
+	function showSnapPreview(zone) {
+		if (!zone) {
+			if (snapPreview) {
+				snapPreview.remove();
+				snapPreview = null;
+			}
+			return;
+		}
+		if (!snapPreview) {
+			snapPreview = document.createElement('div');
+			snapPreview.className = 'ibx-snap-preview';
+			snapPreview.setAttribute('aria-hidden', 'true');
+			document.body.appendChild(snapPreview);
+		}
+		const r = snapRect(zone);
+		Object.assign(snapPreview.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
+	}
+	function applyRect(dlg, r) {
+		Object.assign(dlg.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px', right: 'auto', bottom: 'auto' });
+	}
+	/**
+	 * Snap a window (zone) or take it out of its snapping (null: back to the geometry of before)
+	 * @param {HTMLElement} dlg Window
+	 * @param {string|null} zone left, right, max, null
+	 * @param {boolean} [keep] With null: the geometry of now is kept (resized by hand)
+	 * @param {DOMRect} [from] With a zone: the geometry of before (where a drag started), else the one of now
+	 */
+	function snapWindow(dlg, zone, keep, from) {
+		if (zone) {
+			if (!dlg.dataset.snap) {
+				const r = from || dlg.getBoundingClientRect();
+				dlg._ibxBefore = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+			}
+			dlg.dataset.snap = zone;
+			applyRect(dlg, snapRect(zone));
+		} else if (dlg.dataset.snap) {
+			delete dlg.dataset.snap;
+			if (dlg._ibxBefore && !keep) {
+				applyRect(dlg, dlg._ibxBefore);
+			}
+		}
+		const max = dlg.querySelector('.ibx-js-wmax, .ibx-js-cmax');
+		if (max) {
+			const label = th(zone === 'max' ? 'InboxRestoreSize' : 'InboxMaximize');
+			max.title = label;
+			max.setAttribute('aria-label', label);
+			max.innerHTML = ic(zone === 'max' ? 'restore' : 'maximize');
+		}
+	}
+	/** Maximize button, double click on the bar: whole screen, or back to the size of before */
+	function toggleMaxWindow(dlg) {
+		snapWindow(dlg, dlg.dataset.snap === 'max' ? null : 'max');
+	}
+	/** Resized by hand: no longer snapped, the size given is kept */
+	function unsnapKeep(dlg) {
+		if (dlg.dataset.snap) {
+			snapWindow(dlg, null, true);
+		}
+	}
+	/**
+	 * Drag a window by its bar, with the snapping to the edges
+	 * @param {HTMLElement} dlg Window
+	 * @param {HTMLElement} bar Element that has the pointer
+	 * @param {PointerEvent} e pointerdown
+	 * @param {object} [o] {minVisible: px kept on screen (80), onMove(), onDone(zone)}
+	 */
+	function dragWindow(dlg, bar, e, o) {
+		o = o || {};
+		const keep = o.minVisible || 80;
+		let r = dlg.getBoundingClientRect();
+		// Where the window was: its geometry of before once snapped
+		let from = r;
+		let dx = e.clientX - r.left;
+		const dy = e.clientY - r.top;
+		const x0 = e.clientX;
+		const y0 = e.clientY;
+		let started = false;
+		let zone = null;
+		bar.setPointerCapture(e.pointerId);
+		const move = ev => {
+			// A click on the bar (focus, double click) moves nothing
+			if (!started && Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 4) {
+				return;
+			}
+			if (!started) {
+				started = true;
+				dlg.classList.add('is-dragged');
+				// Snapped: back to its size of before, under the pointer at the same share of its width
+				if (dlg.dataset.snap && dlg._ibxBefore) {
+					const b = dlg._ibxBefore;
+					const share = Math.min(1, Math.max(0, dx / r.width));
+					snapWindow(dlg, null);
+					dx = Math.round(b.w * share);
+					r = { width: b.w, height: b.h };
+					from = { left: ev.clientX - dx, top: ev.clientY - dy, width: b.w, height: b.h };
+				}
+				if (o.onMove) {
+					o.onMove();
+				}
+			}
+			Object.assign(dlg.style, { right: 'auto', bottom: 'auto' });
+			dlg.style.left = Math.max(0, Math.min(window.innerWidth - keep, ev.clientX - dx)) + 'px';
+			dlg.style.top = Math.max(0, Math.min(window.innerHeight - 36, ev.clientY - dy)) + 'px';
+			zone = snapZone(ev);
+			showSnapPreview(zone);
+		};
+		const up = () => {
+			bar.removeEventListener('pointermove', move);
+			bar.removeEventListener('pointerup', up);
+			bar.removeEventListener('pointercancel', up);
+			dlg.classList.remove('is-dragged');
+			showSnapPreview(null);
+			if (started && zone) {
+				snapWindow(dlg, zone, false, from);
+			}
+			if (started && o.onDone) {
+				o.onDone(zone);
+			}
+		};
+		bar.addEventListener('pointermove', move);
+		bar.addEventListener('pointerup', up);
+		bar.addEventListener('pointercancel', up);
+	}
+	// The screen changes size: the snapped windows follow
+	window.addEventListener('resize', () => document.querySelectorAll('[data-snap]').forEach(d => applyRect(d, snapRect(d.dataset.snap))));
+
 	// ---------- Tool of the JS context ----------
 	const inbox = {
 		ctx, ctxJson, locale, size, rights, esc, html, raw, t, th, ic, api, post, upload, toast, dialog, confirmDialog, mount, changed, applyDisplay, registerSpace, channel, scope, setTitleCount, infotip, term, thTerms,
 		go: hash => router.go(hash),
 		/** Windows of their own (1.148.0): popup = 'compose' in such a window, '' in the application */
 		popup, openWindow, wantsWindow, canOpenWindow, rememberWindow,
+		/** Windows of the page snapped to the edges (1.151.0) */
+		dragWindow, snapWindow, toggleMaxWindow, unsnapKeep,
 		route: () => router.parse(),
 		isLeader: () => isLeader,
 		/** Number of this tab (X-Inbox-Origin) */
