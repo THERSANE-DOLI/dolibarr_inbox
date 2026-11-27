@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the size of a window was taken only inside its edges :   1.151.2
+  - the grips go 6 px past every edge and corner, as in the desktop (CSS only).
+
 - FIX: a writing could be resized only by its top and left edges :   1.151.1
   - every edge and corner now; by the bottom or the right it leaves the row at the bottom right.
 
