@@ -21,8 +21,8 @@
  * \brief   Attachments of a mail: verdict of the antivirus, preview, download, all in a .zip
  *
  * mode = check (JSON: verdict and warnings; part = -1 for all), inline (PDF and pictures only, for the preview),
- * download, text (JSON: beginning of a text file), list (JSON: files of a .zip, never unpacked on disk), zip (every
- * attachment except the infected ones). A file « not scanned » (antivirus off or file too big) is served only with
+ * download, text (JSON: beginning of a text file), list (JSON: files of a .zip, never unpacked on disk), sheet (JSON:
+ * first rows of each sheet of a spreadsheet), zip (every attachment except the infected ones). A file « not scanned » (antivirus off or file too big) is served only with
  * force=1, after the user read the warning; an infected file is never served.
  */
 

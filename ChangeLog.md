@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: spreadsheets (xls, xlsx, ods) shown in the preview of an attachment :   1.152.0
+  - the first rows of each sheet (1000 rows, 100 columns), one tab per sheet, numbers and dates as their format
+    shows them, with the look of their author: fonts, colours, backgrounds, borders, alignment, widths of the
+    columns, merged cells. No formula computed again, no picture.
+  - read on the server without unpacking the file, bounded in size and time; a file protected by a password says
+    so. Every colour, size and line of the file is checked by the server and by the page.
+  - the viewer of another module (« Open with… ») keeps the first place when there is one. Doc page Inbox
+    application (section Spreadsheets in the preview).
+
 - FIX: a folder whose first indexing fails while its changes are read could keep its mailbox in « first synchronisation » :   1.151.3
   - its failures are counted from zero at the end of a pass only when no reading of it failed.
   - files replaced before the module is activated again: no query on the missing column; « Rebuild the index » tries

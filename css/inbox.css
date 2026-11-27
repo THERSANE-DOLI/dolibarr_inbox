@@ -1153,6 +1153,23 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 .ibx-viewer__img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; }
 .ibx-viewer__img.is-actual { max-width: none; max-height: none; }
 .ibx-table--csv td { white-space: nowrap; border: 1px solid var(--ibx-border); padding: 0.125rem var(--ibx-s2); font-size: var(--ibx-fs-sm); }
+/* Spreadsheet in the preview (1.152.0): one tab per sheet, the grid scrolls under the letters and beside the numbers.
+   A table of its own, not an ibx-table: a grid stays a grid on a phone, where the rows of an ibx-table become cards.
+   The cells are a white sheet in both themes: they carry the colours of their author, set by the page from the
+   looks the server gives (classes ibx-sheet__k…, see sheetCss() in inbox-mail.js) */
+.ibx-sheet { flex: 1; min-height: 0; display: flex; flex-direction: column; --ibx-sheet-paper: #fff; --ibx-sheet-ink: #000; --ibx-sheet-line: #d9d9d9; }
+.ibx-sheet > .ibx-tabs { flex: none; margin: 0; padding: 0 var(--ibx-s2); }
+.ibx-sheet__grid { flex: 1; min-height: 0; overflow: auto; }
+.ibx-sheet__note { flex: none; margin: 0; padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); font-size: var(--ibx-fs-sm); }
+.ibx-sheet__table { table-layout: fixed; width: max-content; border-collapse: separate; border-spacing: 0; font-size: var(--ibx-fs-sm); line-height: 1.35; }
+.ibx-sheet__table:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ibx-accent); }
+.ibx-sheet__table th, .ibx-sheet__table td { border: 0; border-right: 1px solid var(--ibx-border); border-bottom: 1px solid var(--ibx-border); overflow: hidden; }
+.ibx-sheet__table td { height: 1.25rem; padding: 1px 3px; color: var(--ibx-sheet-ink); background: var(--ibx-sheet-paper); border-color: var(--ibx-sheet-line); text-overflow: ellipsis; white-space: pre; vertical-align: bottom; text-align: left; }
+.ibx-sheet__table td.is-number { text-align: right; font-variant-numeric: tabular-nums; }
+.ibx-sheet__table th { position: sticky; z-index: 1; padding: 0.125rem var(--ibx-s1); font-weight: 400; text-align: center; color: var(--ibx-text-muted); background: var(--ibx-bg-pane); user-select: none; }
+.ibx-sheet__table thead th { top: 0; }
+.ibx-sheet__table tbody th { left: 0; }
+.ibx-sheet__table thead th:first-child { left: 0; z-index: 2; }
 .ibx-menu .ibx-menu__item > .ibx-icon:last-child:not(.ibx-menu__icon) { margin-left: auto; color: var(--ibx-accent); }
 
 @media (max-width: 79.9375rem) {

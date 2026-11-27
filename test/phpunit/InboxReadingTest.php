@@ -523,6 +523,12 @@ class InboxReadingTest extends InboxTestCase
 		$this->assertSame('pdf', InboxMimeParser::kind("garbage\n%PDF-1.7"));
 		$this->assertSame('zip', InboxReader::previewKind(array('content' => $zip, 'name' => 'dossier.zip', 'mime' => 'application/zip')));
 		$this->assertSame('other', InboxReader::previewKind(array('content' => $zip, 'name' => 'plan.docx', 'mime' => '')));
+		// Spreadsheets (1.152.0): by signature and name, a text renamed .xlsx is not one
+		$this->assertSame('sheet', InboxReader::previewKind(array('content' => $zip, 'name' => 'Tarifs.XLSX', 'mime' => '')));
+		$this->assertSame('sheet', InboxReader::previewKind(array('content' => $zip, 'name' => 'stock.ods', 'mime' => '')));
+		$this->assertSame('sheet', InboxReader::previewKind(array('content' => "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1....", 'name' => 'old.xls', 'mime' => '')));
+		$this->assertSame('other', InboxReader::previewKind(array('content' => "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1....", 'name' => 'letter.doc', 'mime' => '')));
+		$this->assertNotSame('sheet', InboxReader::previewKind(array('content' => 'a;b', 'name' => 'fake.xlsx', 'mime' => '')));
 		$this->assertSame('image', InboxReader::previewKind(array('content' => "\x89PNG....", 'name' => 'x.jpg', 'mime' => '')));
 		$this->assertSame('csv', InboxReader::previewKind(array('content' => "a;b\n1;2", 'name' => 'liste.csv', 'mime' => '')));
 		$this->assertSame('mail', InboxReader::previewKind(array('content' => 'From: x', 'name' => 'a.eml', 'mime' => 'message/rfc822')));

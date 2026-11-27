@@ -13,8 +13,8 @@ Ctrl+click (Cmd on a Mac) or middle click opens a browser window of its own, wit
 as in the installed application. A plain click keeps everything in the page.
 
 - **Attachment**: a PDF or a picture shown by the browser; an office document or any file another module can show
-  (« Open with… »), shown by the first such viewer. What Inbox alone shows (text, CSV, zip, attached email) stays in
-  its preview. The antivirus first: a file not scanned or infected opens in the preview, which says why. The button
+  (« Open with… »), shown by the first such viewer. What Inbox alone shows (text, CSV, zip, attached email, and a
+  spreadsheet when no module shows it) stays in its preview. The antivirus first: a file not scanned or infected opens in the preview, which says why. The button
   ⧉ of the preview does the same, then closes the preview. Never a download: only the Download button downloads.
 - **Writing**: « New mail », « Reply », « Reply all », « Forward » and the other ways to write from the menu ⋯
   (`index.php?window=compose&mode=reply&mail=<row>`). The window holds the writing alone (no rail, never the leader
@@ -41,6 +41,35 @@ A snapped or maximized window stays movable and resizable: dragged by its bar, i
 the pointer; resized by an edge, it keeps the size given. The Maximize button becomes « Restore the size ». The size
 kept for the next window of the same kind is the one of before the snapping. A writing maximized from the row at the
 bottom right goes back to it. On a phone and in a window of its own, nothing changes (whole screen).
+
+## Spreadsheets in the preview (1.152.0)
+
+An attached spreadsheet opens in the preview as the other files Inbox shows itself, without any other module nor
+office suite on the server:
+
+- **Formats**: `xlsx`, `xlsm`, `xltx`, `xltm` (Excel 2007 and later), `xls`, `xlt` (Excel 97-2003, and Excel 5/95),
+  `ods`, `ots` (LibreOffice, OpenDocument). Not shown: `xlsb`, Numbers, a file protected by a password (the preview
+  says so and offers the download).
+- **What is shown**: the first 1000 rows and 100 columns of each sheet, one tab per sheet (the hidden ones too: a
+  file received by mail has nothing to hide from its reader), the letters of the columns and the numbers of the rows.
+  A note under the grid says when a sheet is cut: the whole file is one click away (Download).
+- **Values kept in the file**: the result of each formula, never computed again; numbers, percentages, amounts and
+  dates as the format of the cell asks, written for the language of the user (`1 234,50 €`, `27/11/2026`).
+- **The look of the author**: bold, italic, underlined and struck texts, size and colour of the text,
+  background of the cells, borders (thin, medium, thick, dashed, dotted, double), alignment, texts on several lines,
+  widths of the columns, merged cells; a long text goes over the empty cells that follow it. The cells are a white
+  sheet in the light and in the dark theme, as in a spreadsheet. Not shown: the fonts themselves, the heights of the
+  rows, the conditional formats, the patterns and gradients (first colour only), the rotated texts, the pictures, the
+  charts, the frozen panes. No macro: nothing of the file runs, and nothing of it is written into the page as it is
+  (colours, sizes and lines are checked by the server, then again by the page).
+- **Same guards as every attachment**: the antivirus first, the rights on the mailbox checked again by the server.
+  The file is read in memory, never unpacked on disk, and the reading stops by itself on a file made to exhaust the
+  server (bounded number of cells, of text and of time).
+- **Another module shows spreadsheets** (an office server declared by the hook `inboxAttachmentViewers`): its
+  viewer keeps the first place, in the preview and in a window of its own, as before; the preview of Inbox is used
+  only when there is none. « Open with… » still lists every viewer.
+
+Works the same for the files of a writing (checked before the sending).
 
 ## Several entities (multicompany)
 
