@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxSenderCheckTest.php
  * \ingroup inbox
- * \brief   Lot W5 1.15.0: imitation of a known sender, junk probably legitimate
+ * \brief   Lot W5 1.15.0: imitation of a known sender, junk probably legitimate; known senders out of the junk (1.147.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -63,6 +63,7 @@ class InboxSenderCheckTest extends InboxImapTestCase
 		global $conf;
 
 		$conf->global->INBOX_AUTH_SERVERS = $this->servers;
+		unset($conf->global->INBOX_JUNK_RESCUE, $conf->global->INBOX_JUNK_RESCUE_SINCE);
 		parent::tearDown();
 	}
 
@@ -122,5 +123,65 @@ class InboxSenderCheckTest extends InboxImapTestCase
 		$row = $this->db->getRow("SELECT junk_hint, junk_check FROM ".$p."inbox_mail WHERE message_id = 'jk2".self::MARK."'");
 		$this->assertSame('', (string) $row->junk_hint, 'an unknown sender');
 		$this->assertSame(1, (int) $row->junk_check, 'checked once');
+	}
+
+	/**
+	 * @param string $id   Local part of the Message-ID
+	 * @param string $auth Results of the trusted server
+	 * @return string Raw mail of the known sender
+	 */
+	protected function knownMail($id, $auth)
+	{
+		return "Authentication-Results: ".self::SERVER."; ".$auth."\r\nMessage-ID: <".$id.self::MARK.">\r\nFrom: Boss <".self::BOSS.">\r\nTo: ".self::BOX
+			."\r\nSubject: ZzAct ".$id."\r\nDate: ".date('r')."\r\n\r\nCommande\r\n";
+	}
+
+	/**
+	 * Known senders taken out of the junk (1.147.0): authenticated, arrived since the switch, never $Junk
+	 *
+	 * @return void
+	 */
+	public function testRescueOfTheJunk()
+	{
+		global $conf;
+
+		$a = $this->ready();
+		$ok = 'dkim=pass header.d=client.inbox-test.invalid; dmarc=pass header.from=client.inbox-test.invalid';
+		$bad = 'dkim=fail header.d=client.inbox-test.invalid; spf=fail smtp.mailfrom=evil.invalid; dmarc=fail header.from=client.inbox-test.invalid';
+		$p = $this->db->prefix();
+
+		// Switch off: pointed out only
+		$this->imap()->appendMessage('INBOX.Junk', $this->knownMail('jr0', $ok));
+		$this->sync($a);
+		$this->assertNotEmpty($this->onServer('INBOX.Junk', 'jr0'), 'switch off: stays in the junk');
+
+		$conf->global->INBOX_JUNK_RESCUE = '1';
+		$conf->global->INBOX_JUNK_RESCUE_SINCE = (string) (dol_now() - 3600);
+		$this->imap()->appendMessage('INBOX.Junk', $this->knownMail('jr1', $ok));
+		$this->imap()->appendMessage('INBOX.Junk', $this->knownMail('jr2', $ok), array('$Junk'));
+		$this->imap()->appendMessage('INBOX.Junk', $this->knownMail('jr3', $ok), null, date('d-M-Y H:i:s O', dol_now() - 30 * 86400));
+		$this->imap()->appendMessage('INBOX.Junk', $this->knownMail('jr4', $bad));
+		$this->append('INBOX.Junk', 'jr5');
+		$this->sync($a);
+
+		$uids = $this->onServer('INBOX', 'jr1');
+		$this->assertCount(1, $uids, 'known and authenticated: back to the inbox');
+		$this->assertEmpty($this->onServer('INBOX.Junk', 'jr1'));
+		$this->assertStringContainsString('$NotJunk', $this->flagsOnServer('INBOX', $uids[0]));
+		$this->assertSame($this->folder($a, 'INBOX'), (int) $this->row($a, 'jr1')->fk_folder, 'the index follows');
+		$this->assertSame(0, (int) $this->row($a, 'jr1')->seen, 'still unread');
+		$log = $this->db->getRow("SELECT action, folder_from, folder_to FROM ".$p."inbox_action_log WHERE fk_account = ".((int) $a->id)." AND action = 'rescue'");
+		$this->assertIsObject($log, 'written in the journal');
+		$this->assertStringContainsString('Junk', (string) $log->folder_from);
+
+		foreach (array('jr2' => 'marked as junk by someone', 'jr3' => 'arrived before the switch', 'jr4' => 'not authenticated', 'jr5' => 'unknown sender', 'jr0' => 'checked before the switch') as $id => $why) {
+			$this->assertNotEmpty($this->onServer('INBOX.Junk', $id), $id.': '.$why);
+			$this->assertEmpty($this->onServer('INBOX', $id), $id.': '.$why);
+		}
+		$this->assertSame('legit', (string) $this->db->getRow("SELECT junk_hint FROM ".$p."inbox_mail WHERE message_id = 'jr3".self::MARK."'")->junk_hint, 'still pointed out');
+
+		// Without trusted servers nothing moves
+		$conf->global->INBOX_AUTH_SERVERS = '';
+		$this->assertFalse(InboxKnownSenders::rescueEnabled());
 	}
 }

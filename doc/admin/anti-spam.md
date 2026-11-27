@@ -46,8 +46,28 @@ the controller (port 11334, its password in Settings > Anti-spam > Settings) for
   give Rspamd a local resolver (unbound) before turning them on; Spamhaus is free only for a low volume and non
   commercial use (else its DQS key in `local.d/rbl.conf`).
 
-Living with another anti-spam tool: a tool that takes the known senders out of the junk (authenticated mails of the
-customers and suppliers) does not know this list; a known sender blocked here may come back to the inbox through it.
-Add the address to the blacklist of that tool as well, or turn its rescue off for that sender.
+Known senders taken out of the junk (1.147.0, off by default): Settings > Anti-spam > Settings, switch « Take the
+known senders out of the junk » (`INBOX_JUNK_RESCUE`). At the synchronisation, an email of the junk whose sender is
+known to Dolibarr (exact address of an active customer or supplier, of one of their active contacts, of an active
+user) and authenticated by a trusted receiving server goes back to the inbox with the keyword `$NotJunk`, as « Not
+junk » would do. Journal of the mailbox: « Taken out of the junk (known sender, authenticated) ».
+
+- It uses the check « Point out the emails probably legitimate » (`INBOX_JUNK_LEGIT_CHECK`) and the trusted
+  receiving servers (`INBOX_AUTH_SERVERS`): without them, nothing moves. A known sender not authenticated (probable
+  imitation) is never moved.
+- Only the emails arrived since the switch was turned on (`INBOX_JUNK_RESCUE_SINCE`, written at that moment) and in
+  the last 7 days: the past of the junk, or of a mailbox added later, is left as it is (the chip « Probably
+  legitimate » and the view « Spams » show it).
+- Never a blocked sender, never an email with the keyword `$Junk`: marked as junk by someone, in inbox or in another
+  mail program. An email moved by hand into the junk folder without that keyword is taken out again: use « Junk ».
+- Not learned by the anti-spam engine of inbox (nobody decided it). The modules subscribed to the mailbox get it as a
+  new email of the inbox.
+- Protected mailboxes: done by the session that unlocked the mailbox, as its synchronisation; never with the level
+  « content ».
+
+Living with another anti-spam tool: a tool that takes the known senders out of the junk does not know the list of
+the blocked senders; a known sender blocked here may come back to the inbox through it. Add the address to the
+blacklist of that tool as well, or let inbox take the known senders out of the junk and turn that tool's own rescue
+off.
 
 The spams of every mailbox in one list: view « Spams », see [Views](views.md).

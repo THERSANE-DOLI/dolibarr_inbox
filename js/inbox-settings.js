@@ -1082,7 +1082,7 @@
 	}
 
 	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
-	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join', 'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft'];
+	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join', 'rescue', 'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft'];
 	async function tabJournal(box, account) {
 		// Author: a user (id), or a module subscribed (1.146.0, « c:code »)
 		const f = { user: 0, consumer: '', what: '', from: '', to: '', q: '' };
@@ -3987,7 +3987,10 @@
 				+ '<div class="ibx-formrow__help">' + th('InboxAntispamBlockedSwitchHelp') + '</div></div></div></section>'
 				+ '<section class="ibx-section" data-section="junk"><h2 class="ibx-section__title">' + ic('junk') + ' ' + th('InboxAntispamJunk') + '</h2>'
 				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamLegit') + '</span><div>' + sw('INBOX_JUNK_LEGIT_CHECK', t('InboxAntispamLegit'))
-				+ '<div class="ibx-formrow__help">' + th('InboxAntispamLegitHelp') + '</div></div></div></section>'
+				+ '<div class="ibx-formrow__help">' + th('InboxAntispamLegitHelp') + '</div></div></div>'
+				// Known senders, authenticated, taken out of the junk by the synchronisation (1.147.0)
+				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamRescue') + '</span><div>' + sw('INBOX_JUNK_RESCUE', t('InboxAntispamRescue'))
+				+ '<div class="ibx-formrow__help">' + th('InboxAntispamRescueHelp', t('InboxAntispamLegit')) + '</div></div></div></section>'
 				+ '<section class="ibx-section" data-section="server"><h2 class="ibx-section__title">' + ic('server') + ' ' + th('InboxAntispamServer') + '</h2>'
 				+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAntispamServerVerdict') + '</span><div>' + sw('INBOX_SPAM_SERVER_VERDICT', t('InboxAntispamServerVerdict'))
 				+ '<div class="ibx-formrow__help">' + th('InboxAntispamServerVerdictHelp') + '</div>'

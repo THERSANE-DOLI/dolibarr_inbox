@@ -39,6 +39,15 @@ class InboxKnownSenders
 	/** @var array<string,array{socid:int,contactid:int,userid:int}|null> Address => sender (null = not known), read once per request */
 	protected $cache = array();
 
+	/** @var int[] Mails found probably legitimate by the last checkJunk() */
+	public $lastLegit = array();
+
+	/** @var int[] Rows of the mails put back in the inbox by the last rescue() */
+	public $lastRescued = array();
+
+	/** Days a mail of the junk stays taken out when it is known and authenticated (older: already looked at, or the past of a new mailbox) */
+	const RESCUE_DAYS = 7;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -179,6 +188,7 @@ class InboxKnownSenders
 		$p = $this->db->prefix();
 		$rows = $this->db->getRows("SELECT rowid, remote_id, from_email FROM ".$p."inbox_mail WHERE fk_folder = ".((int) $folderId)." AND junk_check = 0 ORDER BY rowid DESC LIMIT 100");
 		$found = 0;
+		$this->lastLegit = array();
 		require_once __DIR__.'/inboxblockedsender.class.php';
 		$blocked = new InboxBlockedSender($this->db);
 		foreach (is_array($rows) ? $rows : array() as $r) {
@@ -197,6 +207,7 @@ class InboxKnownSenders
 				if ($res['state'] === 'legit') {
 					$hint = "'legit'";
 					$found++;
+					$this->lastLegit[] = (int) $r->rowid;
 				} elseif ($res['state'] === 'imitation') {
 					$hint = "'imitation'";
 				}
@@ -206,5 +217,60 @@ class InboxKnownSenders
 		}
 
 		return $found;
+	}
+
+	/**
+	 * Is the rescue of the junk on: the switch, the check « probably legitimate » it uses, trusted servers
+	 *
+	 * @return bool
+	 */
+	public static function rescueEnabled()
+	{
+		return getDolGlobalInt('INBOX_JUNK_RESCUE') && getDolGlobalInt('INBOX_JUNK_LEGIT_CHECK', 1) && self::trustedServers();
+	}
+
+	/**
+	 * Synchronisation: the mails of the junk of a known sender, authenticated, go back to the inbox (keyword $NotJunk), as
+	 * a person would do with « Not junk ». Only a mail arrived since the switch was turned on and in the last days;
+	 * never a blocked sender, never a mail that someone or a tool marked as junk ($Junk: « Junk » of inbox, of another
+	 * mail program).
+	 *
+	 * @param User  $user      User of the job (journal)
+	 * @param int   $accountId Mailbox
+	 * @param int[] $mailIds   Mails of its junk found probably legitimate
+	 * @return int Mails moved
+	 */
+	public function rescue(User $user, $accountId, array $mailIds)
+	{
+		$this->lastRescued = array();
+		$mailIds = array_values(array_unique(array_filter(array_map('intval', $mailIds))));
+		if (!$mailIds || !self::rescueEnabled()) {
+			return 0;
+		}
+		$since = max(getDolGlobalInt('INBOX_JUNK_RESCUE_SINCE'), dol_now() - self::RESCUE_DAYS * 86400);
+		$p = $this->db->prefix();
+		$rows = $this->db->getRows("SELECT m.rowid, m.from_email, m.keywords FROM ".$p."inbox_mail as m INNER JOIN ".$p."inbox_folder as f ON f.rowid = m.fk_folder"
+			." WHERE m.fk_account = ".((int) $accountId)." AND f.role = 'junk' AND m.junk_hint = 'legit' AND m.date_received >= '".$this->db->idate($since)."'"
+			." AND m.rowid IN (".implode(',', $mailIds).") LIMIT 500");
+		require_once __DIR__.'/inboxblockedsender.class.php';
+		$blocked = new InboxBlockedSender($this->db);
+		$ids = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			if (stripos(' '.(string) $r->keywords.' ', ' $Junk ') !== false || $blocked->isBlocked((string) $r->from_email)) {
+				continue;
+			}
+			$ids[] = (int) $r->rowid;
+		}
+		if (!$ids) {
+			return 0;
+		}
+		require_once __DIR__.'/inboxactions.class.php';
+		$res = (new InboxActions($this->db))->runAsSystem($user, 'rescue', $ids);
+		if (!$res['ok']) {
+			dol_syslog(__METHOD__.' '.$res['error'], LOG_WARNING);
+		}
+		$this->lastRescued = array_values(array_map('intval', $res['ids']));
+
+		return (int) $res['count'];
 	}
 }

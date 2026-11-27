@@ -76,16 +76,17 @@ class InboxActions
 
 	/**
 	 * Action of inbox itself, not of a user: the mails of a blocked sender put away by the synchronisation (1.85.0).
-	 * The access of the user is not checked (he is the user of the job); only « blocked » (junk) is allowed.
+	 * The access of the user is not checked (he is the user of the job); only these moves to or from the junk.
 	 *
 	 * @param User   $user    User written in the journal
-	 * @param string $action  blocked (blocked sender), spam (judged spam by the engine of inbox, 1.88.0)
+	 * @param string $action  blocked (blocked sender), spam (judged spam by the engine of inbox, 1.88.0), rescue (a known
+	 *                        sender, authenticated, taken out of the junk, 1.147.0)
 	 * @param int[]  $mailIds Rows of the index
 	 * @return array{ok:bool,count:int,undo:array<int,array<string,mixed>>,error:string,ids:array<int,int>,rest:int[]}
 	 */
 	public function runAsSystem(User $user, $action, array $mailIds)
 	{
-		if (!in_array($action, array('blocked', 'spam'), true)) {
+		if (!in_array($action, array('blocked', 'spam', 'rescue'), true)) {
 			return array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => 'Unknown action', 'ids' => array(), 'rest' => array());
 		}
 		$this->system = true;
@@ -252,6 +253,14 @@ class InboxActions
 					// Blocked sender (1.85.0), judged spam by the engine of inbox (1.88.0): junk, written as such in the
 					// journal; by inbox itself only
 					$res = $this->system ? $this->junk($user, $list, true, $action) : null;
+					if ($res === null && !$this->system) {
+						$this->error = 'Unknown action';
+					}
+					break;
+				case 'rescue':
+					// A known sender, authenticated, taken out of the junk by inbox itself (1.147.0): back to the inbox,
+					// $NotJunk, written as such in the journal; never learned by the engine (no person decided it)
+					$res = $this->system ? $this->junk($user, $list, false, $action) : null;
 					if ($res === null && !$this->system) {
 						$this->error = 'Unknown action';
 					}
