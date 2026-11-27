@@ -19,7 +19,7 @@ A mail sent with `CMailFile` from the address of a mailbox gets its copy in Sent
 Pages:
 
 - [Principles](principles.md): the rules of every change (read this first)
-- [Extend the application](extend-application.md): files of a module in the application, header, styles, indicators of the card of the thirdparty
+- [Extend the application](extend-application.md): files of a module in the application, header, styles, indicators of the card of the thirdparty, viewers of the attachments
 - [Agenda panel for modules](agenda.md): your agenda instead of the one of Dolibarr, actions of a mail, invitations, events of your own, JS hooks
 - [New customer: hook for modules](new-customer.md)
 - [Subscribe a module to the mailboxes](consumers.md): react to the mails of the mailboxes where the managers allow it
