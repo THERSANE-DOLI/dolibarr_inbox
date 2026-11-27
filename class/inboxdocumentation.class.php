@@ -49,7 +49,7 @@ class InboxDocumentation
 		$this->menu = array(
 			'InboxDocGroupStart' => array('icon' => 'fa-rocket', 'pages' => array(
 				'install' => array('icon' => 'fa-download', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/install.md')),
-				'application' => array('icon' => 'fa-inbox', 'version' => '1.0.0', 'files' => array('en_US' => 'admin/application.md')),
+				'application' => array('icon' => 'fa-inbox', 'version' => '1.148.0', 'files' => array('en_US' => 'admin/application.md')),
 				'reactivity' => array('icon' => 'fa-bolt', 'version' => '1.122.0', 'files' => array('en_US' => 'admin/reactivity.md')),
 				'push' => array('icon' => 'fa-broadcast-tower', 'version' => '1.124.0', 'files' => array('en_US' => 'admin/push.md')),
 				'mailto_links' => array('icon' => 'fa-at', 'version' => '1.123.0', 'files' => array('en_US' => 'admin/mailto-links.md')),

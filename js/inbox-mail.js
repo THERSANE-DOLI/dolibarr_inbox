@@ -8850,22 +8850,22 @@
 		// user may send (the identity of the mailbox that got the mail chosen first, by the server)
 		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
 		if (m.folder_role === 'drafts') {
-			list.push({ id: 'editdraft', icon: 'compose', label: t('InboxEditDraft'), button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'draft', mail: m.id }) });
+			list.push({ id: 'editdraft', icon: 'compose', label: t('InboxEditDraft'), button: true, disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'draft', mail: m.id }, e) });
 		} else {
 			const listPost = (m.headers || []).some(h => String(h[0]).toLowerCase() === 'list-post' && /mailto:/i.test(h[1]));
 			list.push(
-				{ id: 'reply', icon: 'reply', label: t('InboxReply'), key: 'R', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'reply', mail: m.id }) },
-				{ id: 'replyall', icon: 'reply-all', label: t('InboxReplyAll'), key: 'Maj+R', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'replyall', mail: m.id }) },
-				{ id: 'forward', icon: 'forward', label: t('InboxForward'), key: 'Ctrl+L', button: true, disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'forward', mail: m.id }) },
+				{ id: 'reply', icon: 'reply', label: t('InboxReply'), key: 'R', button: true, disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'reply', mail: m.id }, e) },
+				{ id: 'replyall', icon: 'reply-all', label: t('InboxReplyAll'), key: 'Maj+R', button: true, disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'replyall', mail: m.id }, e) },
+				{ id: 'forward', icon: 'forward', label: t('InboxForward'), key: 'Ctrl+L', button: true, disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'forward', mail: m.id }, e) },
 			);
 			if (listPost) {
-				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'replylist', mail: m.id }) });
+				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'replylist', mail: m.id }, e) });
 			}
-			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'forward_attach', mail: m.id }) });
+			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'forward_attach', mail: m.id }, e) });
 			// B19 (lot W6 1.18.0): the very mail sent again to someone else; a mail written again as a new one
 			list.push({ id: 'redirect', icon: 'redirect', label: t('InboxRedirect'), disabled: !!noSend, reason: noSend, run: () => redirectDialog(m) });
 		}
-		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: () => I.compose({ mode: 'editnew', mail: m.id }) });
+		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'editnew', mail: m.id }, e) });
 		// Rule made from this mail (lot W8 1.23.0): its sender and subject in the editor of the rules of the mailbox
 		if (m.level === 'manage' && m.from && m.from.email && I.rules) {
 			// The editor over the mail (the mail stays read); the rules of the mailbox in the panel on the right
@@ -8967,7 +8967,8 @@
 			if (b && b.getAttribute('aria-disabled') !== 'true') {
 				closeMenu();
 				anchor.focus();
-				items[+b.dataset.i].run();
+				// The event too: Ctrl+click on « Forward as attachment »... opens a window of its own (1.148.0)
+				items[+b.dataset.i].run(e);
 			}
 		});
 		box.addEventListener('keydown', e => {
@@ -9178,7 +9179,7 @@
 			+ '</div>';
 	}
 	function bindQuickReply(root) {
-		$$('[data-qr]', root).forEach(b => b.addEventListener('click', () => I.compose({ mode: b.dataset.qr, mail: +b.dataset.mail })));
+		$$('[data-qr]', root).forEach(b => onOpen(b, e => I.compose({ mode: b.dataset.qr, mail: +b.dataset.mail }, e)));
 	}
 
 	function renderMail(m) {
@@ -9515,14 +9516,35 @@
 		}
 	}
 
+	/**
+	 * A click on a button that may open a window of its own (1.148.0): the event goes to fn (Ctrl+click), the middle
+	 * click too (no automatic scrolling started by its press)
+	 * @param {Element} el Button
+	 * @param {Function} fn Called with the event
+	 */
+	function onOpen(el, fn) {
+		el.addEventListener('click', fn);
+		el.addEventListener('mousedown', e => {
+			if (e.button === 1) {
+				e.preventDefault();
+			}
+		});
+		el.addEventListener('auxclick', e => {
+			if (e.button === 1) {
+				e.preventDefault();
+				fn(e);
+			}
+		});
+	}
+
 	/** Buttons of the actions of the open mail (head of the reading pane or of the conversation) */
 	function bindActions(root) {
-		$$('.ibx-js-action', root).forEach(b => b.addEventListener('click', () => {
+		$$('.ibx-js-action', root).forEach(b => onOpen(b, e => {
 			const a = actions(S.mail).find(x => x.id === b.dataset.action);
 			if (a && a.disabled) {
 				toast(a.reason || a.label, { error: true });
 			} else if (a) {
-				a.run();
+				a.run(e);
 			}
 		}));
 		const more = $('.ibx-js-more', root);
@@ -9627,7 +9649,7 @@
 						if (down) {
 							guardedDownload(m, a);
 						} else if (ctrl) {
-							openInTab(m, +tileEl.dataset.att);
+							openInWindow(m, +tileEl.dataset.att);
 						} else {
 							openViewer({ mail: m, index: +tileEl.dataset.att });
 						}
@@ -9637,8 +9659,8 @@
 				if (e.target.closest('.ibx-js-attdownload')) {
 					guardedDownload(m, a);
 				} else if (e.ctrlKey || e.metaKey) {
-					// Ctrl+click (Cmd on a Mac): in a new tab (1.45.0)
-					openInTab(m, +tileEl.dataset.att);
+					// Ctrl+click (Cmd on a Mac): in a window of its own (1.148.0, a new tab since 1.45.0)
+					openInWindow(m, +tileEl.dataset.att);
 				} else {
 					openViewer({ mail: m, index: +tileEl.dataset.att });
 				}
@@ -9651,12 +9673,12 @@
 				}
 			}, true);
 			scanAttachments(m, pane);
-			// Middle click: in a new tab too
+			// Middle click: in a window of its own too
 			$('.ibx-attachments', pane).addEventListener('auxclick', e => {
 				const tileEl = e.button === 1 && !e.target.closest('.ibx-js-attdownload') ? e.target.closest('[data-att]') : null;
 				if (tileEl) {
 					e.preventDefault();
-					openInTab(m, +tileEl.dataset.att);
+					openInWindow(m, +tileEl.dataset.att);
 				}
 			});
 		}
@@ -10427,41 +10449,58 @@
 	}
 	/** Opening of a PDF by the viewer of the browser: the width of the page, no panel of thumbnails when it obeys */
 	const PDF_OPEN = '#view=FitH&zoom=page-width&pagemode=none&navpanes=0';
+	/** Kinds inbox shows itself in its preview only: no page of their own for a window */
+	const PREVIEW_ONLY = ['mail', 'text', 'csv', 'zip'];
 	/**
-	 * A PDF or a picture in a new tab (Ctrl+click, middle click, menu, 1.45.0): the antivirus first, as for the preview;
-	 * the tab is opened at once (a tab opened after waiting is blocked by the browser), closed if the file may not be
-	 * shown, the warning then in the viewer. Another kind is downloaded (a browser shows nothing else).
+	 * An attachment in a browser window of its own (Ctrl+click, middle click, menu, ⧉ of the preview, 1.148.0; a new
+	 * tab from 1.45.0): a PDF or a picture shown by the browser, another kind by the viewer of another module (office
+	 * server...). The antivirus first, as for the preview: not scanned or infected, the window closes and the preview
+	 * says why. What inbox alone shows (text, CSV, zip, attached mail), a phone, a blocked window: the preview.
+	 * Never a download.
 	 * @param {object} m Mail
 	 * @param {number} index Attachment
+	 * @param {object} [o] {viewer: one of « Open with… », force: opened anyway in the preview, no second check}
+	 * @returns {Promise<boolean>} true when the file went to the window
 	 */
-	async function openInTab(m, index) {
+	async function openInWindow(m, index, o) {
+		o = o || {};
 		const a = m.attachments[index];
-		if (!a || (a.kind !== 'pdf' && a.kind !== 'image')) {
-			if (a) {
-				guardedDownload(m, a);
+		if (!a) {
+			return false;
+		}
+		const force = !!o.force;
+		let viewer = o.viewer || null;
+		if (!viewer && a.kind !== 'pdf' && a.kind !== 'image' && !PREVIEW_ONLY.includes(a.kind)) {
+			viewer = ((await viewersOf(m))[a.part] || [])[0] || null;
+		}
+		if ((!viewer && a.kind !== 'pdf' && a.kind !== 'image') || !I.canOpenWindow()) {
+			openViewer({ mail: m, index, viewer });
+			return false;
+		}
+		const win = await I.openWindow('about:blank', 'attachment');
+		if (!win) {
+			openViewer({ mail: m, index, viewer });
+			return false;
+		}
+		win.opener = null;
+		if (!force) {
+			let v;
+			try {
+				v = await attApi(m, a.part, 'check');
+			} catch (err) {
+				win.close();
+				toast(err.message, { error: true });
+				return false;
 			}
-			return;
+			if (v.blocked || v.warn) {
+				win.close();
+				openViewer({ mail: m, index, viewer });
+				return false;
+			}
 		}
-		const tab = window.open('about:blank', '_blank');
-		if (!tab) {
-			openViewer({ mail: m, index });
-			return;
-		}
-		tab.opener = null;
-		let v;
-		try {
-			v = await attApi(m, a.part, 'check');
-		} catch (err) {
-			tab.close();
-			toast(err.message, { error: true });
-			return;
-		}
-		if (v.blocked || v.warn) {
-			tab.close();
-			openViewer({ mail: m, index });
-			return;
-		}
-		tab.location.href = attUrl(m, a, 'inline', false) + (a.kind === 'pdf' ? PDF_OPEN : '');
+		const url = viewer ? viewer.url + (force ? '&force=1' : '') : attUrl(m, a, 'inline', force) + (a.kind === 'pdf' ? PDF_OPEN : '');
+		win.location.href = new URL(url, location.href).href;
+		return true;
 	}
 
 	/**
@@ -10671,6 +10710,8 @@
 		w.dlg.innerHTML = '<div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis">' + esc(title) + ' <span class="ibx-window__sub">' + esc(sub) + '</span></span>'
 			+ (!w.source && list.length > 1 ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wprev" aria-label="' + th('InboxPrevious') + '">' + ic('chevron-left') + '</button><span class="ibx-muted">' + (w.index + 1) + '/' + list.length + '</span>'
 				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wnext" aria-label="' + th('InboxNext') + '">' + ic('chevron-right') + '</button>' : '')
+			// In a window of its own, then this preview closed (1.148.0): not for what inbox alone shows
+			+ (!w.source && !m.compose && list[w.index] && !PREVIEW_ONLY.includes(list[w.index].kind) && I.canOpenWindow() ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wout" title="' + th('InboxOpenInWindow') + '" aria-label="' + th('InboxOpenInWindow') + '">' + ic('external') + '</button>' : '')
 			+ (!w.source ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wdownload" title="' + th('InboxDownload') + '" aria-label="' + th('InboxDownload') + '">' + ic('download') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmin" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
@@ -10703,10 +10744,8 @@
 		body.removeAttribute('aria-busy');
 		if (v.blocked) {
 			body.innerHTML = '<div class="ibx-viewer__pad">' + banner('danger', 'virus', th('InboxAttInfected', v.message)) + '</div>';
-			const dl = $('.ibx-js-wdownload', w.dlg);
-			if (dl) {
-				dl.remove();
-			}
+			// Neither downloaded nor opened elsewhere
+			w.dlg.querySelectorAll('.ibx-js-wdownload, .ibx-js-wout').forEach(x => x.remove());
 			return;
 		}
 		const warnings = (v.warnings || []).map(k => banner('warning', 'warning', th(k))).join('');
@@ -10943,6 +10982,9 @@
 				minimize(w);
 			} else if (b.classList.contains('ibx-js-wmax')) {
 				dlg.classList.toggle('ibx-window--maximized');
+			} else if (b.classList.contains('ibx-js-wout')) {
+				// The same file in a window of its own (opened anyway here: anyway there), then this preview closed
+				openInWindow(w.mail, w.index, { viewer: w.viewer, force: !!w.forced }).then(ok => ok && closeWindow(w));
 			} else if (b.classList.contains('ibx-js-wdownload')) {
 				guardedDownload(w.mail, w.mail.attachments[w.index]);
 			} else if (b.classList.contains('ibx-js-wprev') || b.classList.contains('ibx-js-wnext')) {
@@ -11495,7 +11537,7 @@
 		const annotate = box && editor ? [{ icon: 'compose', label: t('InboxAnnotateFile'), run: () => annotateStart(box, m, a, editor) }] : [];
 		menu(el, [
 			{ icon: 'open', label: t('InboxOpen'), run: () => openViewer({ mail: m, index }) },
-		].concat(others, a.kind === 'pdf' || a.kind === 'image' ? [{ icon: 'external', label: t('InboxOpenNewTab'), key: 'Ctrl+clic', run: () => openInTab(m, index) }] : [], [
+		].concat(others, (a.kind === 'pdf' || a.kind === 'image' || (others.length && !PREVIEW_ONLY.includes(a.kind))) && I.canOpenWindow() ? [{ icon: 'external', label: t('InboxOpenInWindow'), key: 'Ctrl+clic', run: () => openInWindow(m, index) }] : [], [
 			{ icon: 'download', label: t('InboxDownload'), run: () => guardedDownload(m, a) },
 		]).concat(box ? [{ sep: true }].concat(pieces.map(l => ({ icon: l.icon, label: t('InboxAttachTo', l.ref || l.kind), run: () => attachToPiece(box, m, a, l.type, l.id) })),
 			[{ icon: 'link', label: t('InboxAttachToOther'), run: () => linkDialog(box, { attach: { m, a } }) }], annotate) : [], [HINT()]), at || rectPoint(el));
@@ -12324,8 +12366,11 @@
 		const e = r ? S.folders.get(r.folder) : null;
 		return r && !(e && e.folder.role === 'drafts') ? r.id : 0;
 	}
-	/** New mail, from the mailbox of the folder open (its default identity) */
-	function newMail() {
+	/**
+	 * New mail, from the mailbox of the folder open (its default identity)
+	 * @param {Event} [e] Click (Ctrl+click: in a window of its own, 1.148.0)
+	 */
+	function newMail(e) {
 		if (!I.compose) {
 			return;
 		}
@@ -12334,7 +12379,7 @@
 			return;
 		}
 		const f = currentFolder();
-		I.compose({ mode: 'new', account: f ? f.account.id : 0 });
+		I.compose({ mode: 'new', account: f ? f.account.id : 0 }, e);
 	}
 
 	function keysHelp() {
@@ -12511,7 +12556,7 @@
 
 	function bindLayout() {
 		const el = S.el;
-		$$('.ibx-js-compose', el).forEach(b => b.addEventListener('click', () => newMail()));
+		$$('.ibx-js-compose', el).forEach(b => onOpen(b, e => newMail(e)));
 		// Display of the panel of the folders (1.40.0): the size of the folders, kept for the user
 		$$('.ibx-js-treemenu', el).forEach(b => b.addEventListener('click', () => menu(b, [
 			{ header: t('InboxFoldersDisplay') },
