@@ -2940,8 +2940,8 @@
 			+ (kind === 'to' ? '<span class="ibx-cfield__extra"><button type="button" class="ibx-cfield__toggle ibx-js-showrow" data-show="cc"' + (d.cc.length ? ' hidden' : '') + ' title="' + th('InboxComposeAddCc') + '">' + th('InboxComposeCc') + '</button>'
 				+ '<button type="button" class="ibx-cfield__toggle ibx-js-showrow" data-show="bcc"' + (d.bcc.length ? ' hidden' : '') + ' title="' + th('InboxComposeAddBcc') + '">' + th('InboxComposeBcc') + '</button></span>' : '')
 			+ '<ul class="ibx-rcpt__sug" id="' + w.id + '-' + kind + '-sug" role="listbox" hidden></ul></div>';
-		return '<div class="ibx-compose__grip ibx-compose__grip--n" data-grip="n" aria-hidden="true"></div><div class="ibx-compose__grip ibx-compose__grip--w" data-grip="w" aria-hidden="true"></div>'
-			+ '<div class="ibx-compose__grip ibx-compose__grip--nw" data-grip="nw" aria-hidden="true"></div>'
+		// Every edge and corner (1.151.1; the top, the left and their corner before)
+		return ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'].map(dir => '<div class="ibx-compose__grip ibx-compose__grip--' + dir + '" data-grip="' + dir + '" aria-hidden="true"></div>').join('')
 			+ '<div class="ibx-window__bar"><span class="ibx-window__title ibx-ellipsis ibx-js-wtitle" id="' + w.id + '-title"></span>'
 			// In a window of its own (1.148.0): the writing moves there, nothing lost; never from such a window itself
 			+ (I.canOpenWindow && I.canOpenWindow() ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-cdetach ibx-compose__wbtn" title="' + th('InboxComposeDetach') + '" aria-label="' + th('InboxComposeDetach') + '">' + ic('external') + '</button>' : '')
@@ -3291,7 +3291,10 @@
 			}
 		});
 		paintTitle();
-		// Size from the top, the left, or the top left corner; kept for the next writings
+		/*
+		 * Size from every edge and corner; kept for the next writings. In the row at the bottom right the window grows
+		 * from the top and the left; by the bottom or the right it leaves the row (moved, 1.151.1)
+		 */
 		$$('.ibx-compose__grip', dlg).forEach(g => g.addEventListener('pointerdown', e => {
 			if (dlg.classList.contains('ibx-window--maximized')) {
 				return;
@@ -3306,8 +3309,21 @@
 			const x0 = e.clientX;
 			const y0 = e.clientY;
 			const dir = g.dataset.grip;
+			if (!w.moved && /[es]/.test(dir)) {
+				w.moved = true;
+				w.dockedBefore = false;
+				Object.assign(dlg.style, { left: Math.round(r0.left) + 'px', top: Math.round(r0.top) + 'px', right: 'auto', bottom: 'auto' });
+			}
 			g.setPointerCapture(e.pointerId);
 			const move = ev => {
+				if (dir.includes('e')) {
+					w.width = Math.round(Math.max(320, Math.min(window.innerWidth - r0.left, r0.width + ev.clientX - x0)));
+					dlg.style.width = w.width + 'px';
+				}
+				if (dir.includes('s')) {
+					w.height = Math.round(Math.max(260, Math.min(window.innerHeight - r0.top, r0.height + ev.clientY - y0)));
+					dlg.style.height = w.height + 'px';
+				}
 				if (dir.includes('w')) {
 					const width = Math.max(320, Math.min(r0.right - 8, r0.width + x0 - ev.clientX));
 					w.width = Math.round(width);

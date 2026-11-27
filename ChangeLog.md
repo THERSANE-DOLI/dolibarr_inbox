@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a writing could be resized only by its top and left edges :   1.151.1
+  - every edge and corner now; by the bottom or the right it leaves the row at the bottom right.
+
 - NEW: windows of the page snapped to the edges of the screen :   1.151.0
   - dragged by the bar against the left or right edge: half of the screen; against the top: whole screen.
   - a snapped or maximized window stays movable and resizable; dragged again, it takes back its size of before.

@@ -1864,11 +1864,14 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 
 /* ===== Writing (lot W6 1.16.0): floating window, recipients as chips, editor, signature, quote ===== */
 .ibx-compose { right: var(--ibx-s4); bottom: 0; width: 35rem; height: min(36rem, calc(100vh - 4rem)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; resize: none; }
-/* Grips: the window is anchored at the bottom right, it grows from the top and the left */
+/* Grips on every edge and corner (1.151.1): in the row at the bottom right it grows from the top and the left */
 .ibx-compose__grip { position: absolute; z-index: 6; touch-action: none; }
-.ibx-compose__grip--n { top: 0; left: 0.75rem; right: 0; height: 0.375rem; cursor: ns-resize; }
-.ibx-compose__grip--w { top: 0.75rem; bottom: 0; left: 0; width: 0.375rem; cursor: ew-resize; }
-.ibx-compose__grip--nw { top: 0; left: 0; width: 0.75rem; height: 0.75rem; cursor: nwse-resize; }
+.ibx-compose__grip--n, .ibx-compose__grip--s { left: 0.75rem; right: 0.75rem; height: 0.375rem; cursor: ns-resize; }
+.ibx-compose__grip--e, .ibx-compose__grip--w { top: 0.75rem; bottom: 0.75rem; width: 0.375rem; cursor: ew-resize; }
+.ibx-compose__grip--n { top: 0; } .ibx-compose__grip--s { bottom: 0; } .ibx-compose__grip--e { right: 0; } .ibx-compose__grip--w { left: 0; }
+.ibx-compose__grip--nw, .ibx-compose__grip--ne, .ibx-compose__grip--sw, .ibx-compose__grip--se { width: 0.75rem; height: 0.75rem; }
+.ibx-compose__grip--nw { top: 0; left: 0; cursor: nwse-resize; } .ibx-compose__grip--se { bottom: 0; right: 0; cursor: nwse-resize; }
+.ibx-compose__grip--ne { top: 0; right: 0; cursor: nesw-resize; } .ibx-compose__grip--sw { bottom: 0; left: 0; cursor: nesw-resize; }
 .ibx-window--maximized .ibx-compose__grip { display: none; }
 /* A writing in a window of its own (1.148.0, index.php?window=compose): the whole window, no rail, nothing to resize */
 .ibx-html--popup .ibx-compose.ibx-window--maximized { inset: 0 !important; border: 0; border-radius: 0; box-shadow: none; }
