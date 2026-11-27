@@ -35,9 +35,9 @@ inboxAjaxNeedAdmin();
  * administrator of Dolibarr only, written even though it is the default (a missing or unknown right is read as
  * dolibarr_admin): a setting added or changed without a right is never opened to more people than meant.
  * Optional: right_error (message of the refusal), clears (constants removed when it changes), clears_on_host (removed
- * when the host of its address changes).
+ * when the host of its address changes), stamp_on (constant given the date when it is turned on).
  *
- * @return array<string,array{default:string,check:string|string[],right?:string,right_error?:string,clears?:string[],clears_on_host?:string[]}>
+ * @return array<string,array{default:string,check:string|string[],right?:string,right_error?:string,clears?:string[],clears_on_host?:string[],stamp_on?:string}>
  */
 function inboxGeneralSettings()
 {
@@ -86,6 +86,9 @@ function inboxGeneralSettings()
 		// Anti-spam (1.85.0): blocked senders, « probably legitimate » in the junk
 		'INBOX_BLOCKED_SENDERS' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		'INBOX_JUNK_LEGIT_CHECK' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
+		// Known senders, authenticated, taken out of the junk by the synchronisation (1.147.0): off by default, only the mails
+		// arrived since it was turned on (date kept in INBOX_JUNK_RESCUE_SINCE)
+		'INBOX_JUNK_RESCUE' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1', 'stamp_on' => 'INBOX_JUNK_RESCUE_SINCE'),
 		// Verdict of the anti-spam filter of the server read in the headers (1.86.1)
 		'INBOX_SPAM_SERVER_VERDICT' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Anti-spam engine of inbox (1.88.0): Rspamd beside Dolibarr; its password in ajax/rspamd.php (never sent back)
@@ -189,6 +192,10 @@ switch ($action) {
 			}
 			foreach ($clears as $const) {
 				dolibarr_del_const($db, $const, $conf->entity);
+			}
+			// Date of the turning on, for a setting that acts only on what comes after it
+			if (!empty($def['stamp_on']) && $value === '1') {
+				dolibarr_set_const($db, $def['stamp_on'], (string) dol_now(), 'chaine', 0, '', $conf->entity);
 			}
 			if (($def['right'] ?? '') !== 'manager') {
 				dol_syslog('inbox: '.$name.' changed by '.$user->login.' to '.$value, LOG_NOTICE);

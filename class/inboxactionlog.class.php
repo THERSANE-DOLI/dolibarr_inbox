@@ -30,7 +30,7 @@ class InboxActionLog
 	/** Actions of the journal */
 	const ACTIONS = array('move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign',
 		'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join',
-		'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft');
+		'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft', 'rescue');
 
 	/** @var int[] Lines written during this request (given back to the browser for the undo) */
 	public static $written = array();
@@ -43,6 +43,12 @@ class InboxActionLog
 	 *      meanwhile are in its name (no user), simulated in test mode. Set by InboxConsumerEvent around an action
 	 */
 	public static $consumer = null;
+
+	/**
+	 * @var bool Inbox itself acts (1.147.1): blocked senders and spams put in the junk, known senders taken out of it by
+	 *      the synchronisation. The lines are written without user (« Inbox (automatic) »), whoever runs the job
+	 */
+	public static $system = false;
 
 	/**
 	 * Write a line
@@ -78,8 +84,11 @@ class InboxActionLog
 		}
 		$name = trim($user->firstname.' '.$user->lastname);
 		$consumer = self::$consumer;
+		$system = self::$system && $consumer === null;
 		if ($consumer !== null) {
 			$name = (string) $consumer['label'];
+		} elseif ($system) {
+			$name = 'Inbox';
 		}
 		$s = function ($v, $len = 255) use ($db) {
 			$v = (string) $v;
@@ -90,7 +99,7 @@ class InboxActionLog
 		$from = self::readable($db, (int) $accountId, (string) $from);
 		$to = self::readable($db, $accountTo ? (int) $accountTo : (int) $accountId, (string) $to);
 		$sql = "INSERT INTO ".$db->prefix()."inbox_action_log (entity, fk_account, fk_user, user_name, consumer, action, nb, message_id, subject, folder_from, folder_to, fk_account_to,"
-			." detail, undone, simulated, date_action) VALUES (".((int) $conf->entity).", ".((int) $accountId).", ".($consumer !== null ? 0 : (int) $user->id).", ".$s($name !== '' ? $name : $user->login).","
+			." detail, undone, simulated, date_action) VALUES (".((int) $conf->entity).", ".((int) $accountId).", ".($consumer !== null || $system ? 0 : (int) $user->id).", ".$s($name !== '' ? $name : $user->login).","
 			." ".($consumer !== null ? $s($consumer['code'], 64) : 'NULL').","
 			." '".$db->escape(substr((string) $action, 0, 32))."', ".$n.", ".($n === 1 ? $s($first->message_id ?? '') : 'NULL').", ".$s($subject).", ".$s($from).", ".$s($to).","
 			." ".($accountTo ? (int) $accountTo : 'NULL').", ".$s($detail).", 0, ".($consumer !== null && !empty($consumer['simulated']) ? 1 : 0).", '".$db->idate(dol_now())."')";
@@ -99,8 +108,8 @@ class InboxActionLog
 			return 0;
 		}
 		$id = (int) $db->last_insert_id($db->prefix().'inbox_action_log');
-		// The undo of the page is for the actions of its user, never for those of a module (1.146.1)
-		if ($consumer === null) {
+		// The undo of the page is for the actions of its user, never for those of a module (1.146.1) nor of inbox itself
+		if ($consumer === null && !$system) {
 			self::$written[] = $id;
 		}
 
@@ -239,7 +248,8 @@ class InboxActionLog
 	 *
 	 * @param DoliDB              $db        Database handler
 	 * @param int                 $accountId Mailbox
-	 * @param array<string,mixed> $filters   user (id), action, from / to (timestamps), q (subject or Message-ID)
+	 * @param array<string,mixed> $filters   user (id), consumer (code), system (inbox itself), action, from / to (timestamps),
+	 *                                       q (subject or Message-ID)
 	 * @param int                 $limit     Lines
 	 * @param int                 $offset    First line
 	 * @return array{lines:array<int,array<string,mixed>>,more:bool}
@@ -254,6 +264,9 @@ class InboxActionLog
 		if (!empty($filters['consumer'])) {
 			// A module subscribed (1.146.0): its lines only
 			$where .= " AND l.consumer = '".$db->escape((string) $filters['consumer'])."'";
+		} elseif (!empty($filters['system'])) {
+			// Inbox itself (1.147.1)
+			$where .= " AND l.fk_user = 0 AND l.consumer IS NULL";
 		} elseif (!empty($filters['user'])) {
 			$where .= " AND l.fk_user = ".((int) $filters['user'])." AND l.consumer IS NULL";
 		}
@@ -281,6 +294,7 @@ class InboxActionLog
 				'from' => (string) $r->folder_from, 'to' => (string) $r->folder_to, 'account_to' => (int) $r->fk_account_to === (int) $accountId ? '' : (string) $r->account_to_label,
 				'incoming' => (int) $r->fk_account !== (int) $accountId, 'detail' => (string) $r->detail, 'undone' => (int) $r->undone,
 				'consumer' => (string) $r->consumer, 'simulated' => (int) $r->simulated,
+				'system' => (int) $r->fk_user === 0 && (string) $r->consumer === '',
 			);
 		}
 		$more = count($lines) > $limit;
@@ -293,7 +307,8 @@ class InboxActionLog
 	 *
 	 * @param DoliDB $db        Database handler
 	 * @param int    $accountId Mailbox
-	 * @return array<int,array{id:int,name:string,consumer:string}> A module subscribed (1.146.0): id 0, its code
+	 * @return array<int,array{id:int,name:string,consumer:string,system:bool}> A module subscribed (1.146.0): id 0, its code;
+	 *         inbox itself (1.147.1): id 0, system
 	 */
 	public static function authors(DoliDB $db, $accountId)
 	{
@@ -301,7 +316,8 @@ class InboxActionLog
 			." GROUP BY fk_user, consumer ORDER BY name LIMIT 500");
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
-			$out[] = array('id' => (int) $r->fk_user, 'name' => (string) $r->name, 'consumer' => (string) $r->consumer);
+			$out[] = array('id' => (int) $r->fk_user, 'name' => (string) $r->name, 'consumer' => (string) $r->consumer,
+				'system' => (int) $r->fk_user === 0 && (string) $r->consumer === '');
 		}
 
 		return $out;

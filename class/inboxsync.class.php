@@ -153,6 +153,7 @@ class InboxSync
 			return 0;
 		}
 		$this->blockedNew = array();
+		$this->rescueNew = array();
 		$this->consumerNew = array();
 		// What inbox does here is never written in the name of a module that runs an action (1.146.1)
 		$journal = class_exists('InboxActionLog', false) ? InboxActionLog::$consumer : null;
@@ -194,6 +195,15 @@ class InboxSync
 			$moved = (new InboxBlockedSender($this->db))->moveNew($user, (int) $account->id, $this->blockedNew);
 			$this->stats['blocked'] = $moved;
 		}
+		// Junk (1.147.0): a known sender, authenticated, back to the inbox (setting « Take the known senders out of the
+		// junk »); after the blocked senders, before the modules subscribed: they get it as a new mail of the inbox
+		if ($this->rescueNew) {
+			global $user;
+			require_once __DIR__.'/inboxknownsenders.class.php';
+			$known = new InboxKnownSenders($this->db);
+			$this->stats['rescued'] = $known->rescue($user, (int) $account->id, $this->rescueNew);
+			$this->consumerNew = array_merge($this->consumerNew, $known->lastRescued);
+		}
 		// Anti-spam engine of inbox (1.88.0): the new mails of the inbox judged, within the time left
 		// (marked at once, judged now or at a next pass)
 		require_once __DIR__.'/inboxspamcheck.class.php';
@@ -221,6 +231,9 @@ class InboxSync
 
 		return $res;
 	}
+
+	/** @var int[] Mails of the junk found probably legitimate in this pass (taken out of the junk, 1.147.0) */
+	protected $rescueNew = array();
 
 	/** @var int[] New mails of the inbox in this pass (blocked senders, 1.85.0) */
 	protected $blockedNew = array();
@@ -397,6 +410,8 @@ class InboxSync
 				require_once __DIR__.'/inboxknownsenders.class.php';
 				$known = new InboxKnownSenders($this->db);
 				$known->checkJunk($connector, $folderId, (string) $f->path, $deadline);
+				// Taken out of the junk at the end of the pass when the setting says so (1.147.0)
+				$this->rescueNew = array_merge($this->rescueNew, $known->lastLegit);
 			}
 			$removed = $mails->removeMany($folderId, $res['deleted']);
 			$this->stats['deleted'] += $removed;

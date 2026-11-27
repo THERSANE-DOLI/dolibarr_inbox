@@ -1,5 +1,14 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: journal of a mailbox: what inbox does by itself is written « Inbox (automatic) », not as a user :   1.147.1
+  - blocked senders and spams put in the junk, known senders taken out of it: the user whose page or job ran the
+    synchronisation was named; a choice « Inbox (automatic) » in the filter « Who ». Lines already written stay.
+
+- NEW: the emails of the junk from a known sender, authenticated, go back to the inbox (off by default) :   1.147.0
+  - Settings > Anti-spam > Settings « Take the known senders out of the junk »: at the synchronisation, marked
+    « Not junk », written in the journal; only the emails arrived since it was turned on, in the last 7 days.
+  - never a blocked sender, never an email marked as junk by someone ($Junk); needs the trusted receiving servers.
+
 - FIX: a mail without Message-ID moved by another mail program is no longer given twice to the modules subscribed :   1.146.2
   - its key in the queue is the print of its date, sender, subject and size, as for the links, not its row.
   - the key is given to the module ($event->key) to leave a mail already handled (doc page Modules subscribed, dev).
