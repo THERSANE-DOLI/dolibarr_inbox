@@ -10772,6 +10772,8 @@
 				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wnext" aria-label="' + th('InboxNext') + '">' + ic('chevron-right') + '</button>' : '')
 			// In a window of its own, then this preview closed (1.148.0): not for what inbox alone shows
 			+ (!w.source && !m.compose && list[w.index] && !PREVIEW_ONLY.includes(list[w.index].kind) && I.canOpenWindow() ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wout" title="' + th('InboxOpenInWindow') + '" aria-label="' + th('InboxOpenInWindow') + '">' + ic('external') + '</button>' : '')
+			// The whole source copied (1.150.0), enabled once it is loaded
+			+ (w.source ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wcopy" title="' + th('InboxCopySource') + '" aria-label="' + th('InboxCopySource') + '" disabled>' + ic('copy') + '</button>' : '')
 			+ (!w.source ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wdownload" title="' + th('InboxDownload') + '" aria-label="' + th('InboxDownload') + '">' + ic('download') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmin" title="' + th('InboxMinimize') + '" aria-label="' + th('InboxMinimize') + '">' + ic('minimize') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wmax" title="' + th('InboxMaximize') + '" aria-label="' + th('InboxMaximize') + '">' + ic('maximize') + '</button>'
@@ -10789,6 +10791,10 @@
 				// Focusable (1.149.1): a click in the text keeps the keys in the window, Ctrl+A selects the source only
 				body.innerHTML = '<pre class="ibx-viewer__text ibx-js-selectall" tabindex="0">' + esc(w.sourceText) + '</pre>';
 				$('.ibx-js-selectall', body).focus({ preventScroll: true });
+				const copy = $('.ibx-js-wcopy', w.dlg);
+				if (copy) {
+					copy.disabled = false;
+				}
 			} catch (err) {
 				body.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
 			}
@@ -11054,6 +11060,9 @@
 				openInWindow(w.mail, w.index, { viewer: w.viewer, force: !!w.forced }).then(ok => ok && closeWindow(w));
 			} else if (b.classList.contains('ibx-js-wdownload')) {
 				guardedDownload(w.mail, w.mail.attachments[w.index]);
+			} else if (b.classList.contains('ibx-js-wcopy') && typeof w.sourceText === 'string') {
+				// Not copyText(): its toast would show the whole source
+				navigator.clipboard.writeText(w.sourceText).then(() => toast(t('InboxSourceCopied')), () => toast(t('InboxCopyFailed'), { error: true }));
 			} else if (b.classList.contains('ibx-js-wprev') || b.classList.contains('ibx-js-wnext')) {
 				const n = w.mail.attachments.length;
 				w.index = (w.index + (b.classList.contains('ibx-js-wnext') ? 1 : n - 1)) % n;
