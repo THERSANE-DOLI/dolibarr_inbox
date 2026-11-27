@@ -506,11 +506,12 @@ class InboxMimeParser
 	 * @param string                $html      HTML of the mail
 	 * @param array<string, string> $inline    Content-ID => data URI of the pictures of the mail
 	 * @param bool                  $hasRemote Set when the mail loads remote pictures
+	 * @param ?array<string,string> $hosts     Set to the hosts of these pictures (host => host)
 	 * @return string Whole HTML document
 	 */
-	public static function safeHtml($html, array $inline, &$hasRemote)
+	public static function safeHtml($html, array $inline, &$hasRemote, &$hosts = null)
 	{
-		return InboxSafe::display($html, $inline, $hasRemote);
+		return InboxSafe::display($html, $inline, $hasRemote, $hosts);
 	}
 
 	/**

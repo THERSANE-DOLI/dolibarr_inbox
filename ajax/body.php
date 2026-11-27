@@ -125,6 +125,8 @@ if (GETPOSTINT('print') === 1 && $intro === '') {
 }
 
 $images = GETPOSTINT('images') === 1;
+$remote = false;
+$remoteHosts = array();
 if ($message->bodyHtml !== '') {
 	// Pictures of the mail (cid:) as data URIs, 5 MB at most
 	$inline = array();
@@ -136,8 +138,7 @@ if ($message->bodyHtml !== '') {
 		$mime = array('png' => 'image/png', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif')[InboxMimeParser::kind($a['content'])];
 		$inline[$a['cid']] = 'data:'.$mime.';base64,'.base64_encode($a['content']);
 	}
-	$remote = false;
-	$html = InboxMimeParser::safeHtml($message->bodyHtml, $inline, $remote);
+	$html = InboxMimeParser::safeHtml($message->bodyHtml, $inline, $remote, $remoteHosts);
 } else {
 	$html = InboxMimeParser::textDocument($message->bodyText);
 	// Addresses of the text body become links
@@ -152,6 +153,8 @@ if (GETPOSTINT('fold') === 1) {
 	$html = InboxMimeParser::foldQuotes($html);
 }
 
+// Without « Show »: the pictures of our own domains and of the hosts chosen by the user only (1.149.0), decided here
+$imgSrc = $images ? ' https: http:' : ($remote ? InboxReader::imageHostsCsp($reader->imageHostsAllowed($user, $remoteHosts)) : '');
 header('Content-Type: text/html; charset=utf-8');
-header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:".($images ? ' https: http:' : '')."; font-src data:; script-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'");
+header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:".$imgSrc."; font-src data:; script-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'self'");
 print $html;

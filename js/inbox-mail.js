@@ -9316,14 +9316,11 @@
 		if (I.mailExtrasHtml) {
 			banners += I.mailExtrasHtml(m, opts);
 		}
-		if (m.body.remote && !m.body.images) {
-			banners += '<div class="ibx-banner ibx-banner--info ibx-js-imagesbar">' + ic('remote-blocked') + '<div class="ibx-banner__text">' + th('InboxRemoteBlocked')
-				+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '')
-				// Sender not proven: a choice « Always » would be saved but never applied, so not offered
-				+ (!(m.auth && m.auth.fail) && m.body.always !== 'never' && m.body.always_ok === false ? '<div class="ibx-muted">' + th('InboxImagesAlwaysUnproven') + '</div>' : '') + '</div>'
+		if (imagesBlocked(m)) {
+			banners += '<div class="ibx-banner ibx-banner--info ibx-js-imagesbar">' + ic('remote-blocked') + '<div class="ibx-banner__text ibx-js-imagestext">' + imagesBarText(m) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-showimages">' + th('InboxShowImages') + '</button>'
 				// « Always » refused by the administrator (setting 1.78.0): the pictures of each mail on a click only
-				+ (m.auth && m.auth.fail || m.body.always === 'never' || m.body.always_ok === false ? '' : '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu" aria-label="' + th('InboxAlwaysShowImages') + '"><span class="ibx-banner__lbl">' + th('InboxAlwaysShowImages') + '</span> ' + ic('chevron-down') + '</button>') + '</div>';
+				+ (alwaysSenderOk(m) || alwaysHosts(m).length ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-allowimages" aria-haspopup="menu" aria-label="' + th('InboxAlwaysShowImages') + '"><span class="ibx-banner__lbl">' + th('InboxAlwaysShowImages') + '</span> ' + ic('chevron-down') + '</button>' : '') + '</div>';
 		}
 		const files = att.length;
 		const total = att.reduce((n, a) => n + a.size, 0);
@@ -9614,12 +9611,19 @@
 		});
 		const allow = $('.ibx-js-allowimages', pane);
 		if (allow) {
-			const domain = '@' + (m.from.email.split('@')[1] || '');
-			const items = [{ label: t('InboxAlwaysForSender', m.from.email), run: () => allowImages(m, 'sender') }];
-			if (m.body.always !== 'sender') {
-				items.push({ label: t('InboxAlwaysForDomain', domain), run: () => allowImages(m, 'domain') });
-			}
-			allow.addEventListener('click', () => menu(allow, items));
+			// Built at each opening: a host chosen meanwhile is no longer offered
+			allow.addEventListener('click', () => {
+				const items = [];
+				if (alwaysSenderOk(m)) {
+					items.push({ label: t('InboxAlwaysForSender', m.from.email), run: () => allowImages(m, 'sender') });
+					if (m.body.always !== 'sender') {
+						items.push({ label: t('InboxAlwaysForDomain', '@' + (m.from.email.split('@')[1] || '')), run: () => allowImages(m, 'domain') });
+					}
+				}
+				// Hosts of the pictures (1.149.0): whoever sends, the exact host only
+				alwaysHosts(m).forEach(h => items.push({ label: t('InboxAlwaysForHost', h.host), run: () => allowImagesHost(m, h) }));
+				menu(allow, items);
+			});
 		}
 		const toggle = $('.ibx-js-atttoggle', pane);
 		if (toggle) {
@@ -9681,6 +9685,62 @@
 					openInWindow(m, +tileEl.dataset.att);
 				}
 			});
+		}
+	}
+
+	/**
+	 * Remote pictures still blocked in the frame: none shown by « Show » or « Always » for the sender, and a host at
+	 * least neither ours nor chosen (1.149.0). A mail whose hosts could not be read keeps the banner.
+	 */
+	function imagesBlocked(m) {
+		const hosts = m.body.hosts || [];
+		return !!m.body.remote && !m.body.images && (!hosts.length || hosts.some(h => !h.allowed));
+	}
+
+	/** « Always » for the sender or its domain: an authenticated sender, not refused by the administrator */
+	function alwaysSenderOk(m) {
+		return !(m.auth && m.auth.fail) && m.body.always !== 'never' && m.body.always_ok !== false;
+	}
+
+	/** Hosts of the pictures that may be chosen: blocked ones, never for a forged sender nor with the setting « never » */
+	function alwaysHosts(m) {
+		if (m.auth && m.auth.fail || m.body.always === 'never') {
+			return [];
+		}
+		return (m.body.hosts || []).filter(h => !h.allowed && !h.tracker).slice(0, 6);
+	}
+
+	/** Text of the banner: what is blocked, the hosts already shown, why « Always » cannot be remembered */
+	function imagesBarText(m) {
+		const shown = (m.body.hosts || []).filter(h => h.allowed).map(h => h.host);
+		return (shown.length ? esc(t('InboxRemoteBlockedExcept', shown.slice(0, 3).join(', ') + (shown.length > 3 ? '…' : ''))) : th('InboxRemoteBlocked'))
+			+ (m.body.trackers ? ' ' + th('InboxTrackers', m.body.trackers) : '')
+			// Sender not proven: a choice « Always » for it would be saved but never applied, so not offered
+			+ (!(m.auth && m.auth.fail) && m.body.always !== 'never' && m.body.always_ok === false ? '<div class="ibx-muted">' + th(alwaysHosts(m).length ? 'InboxImagesAlwaysUnprovenHosts' : 'InboxImagesAlwaysUnproven') + '</div>' : '');
+	}
+
+	async function allowImagesHost(m, h) {
+		try {
+			await post('mail', 'images', { id: m.id, what: 'host', host: h.host });
+			h.allowed = 'user';
+			const root = mailRoot(m);
+			const frame = $('.ibx-js-frame', root);
+			if (frame) {
+				// Not « Show »: the server lists the hosts allowed in the CSP of the frame, the others stay blocked
+				frame.src = bodyUrl(m, false);
+			}
+			const bar = $('.ibx-js-imagesbar', root);
+			if (bar && !imagesBlocked(m)) {
+				bar.remove();
+			} else if (bar) {
+				$('.ibx-js-imagestext', bar).innerHTML = imagesBarText(m);
+				if (!alwaysSenderOk(m) && !alwaysHosts(m).length) {
+					$('.ibx-js-allowimages', bar).remove();
+				}
+			}
+			toast(t('InboxImagesHostAllowed', h.host));
+		} catch (err) {
+			toast(err.message, { error: true });
 		}
 	}
 

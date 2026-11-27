@@ -81,6 +81,8 @@ function inboxGeneralSettings()
 		// pictures », unsubscribe, alert on bank details (A6)
 		'INBOX_QUOTE_REMOTE_IMAGES' => array('right' => 'manager', 'default' => 'keep', 'check' => array('keep', 'reply', 'all')),
 		'INBOX_IMAGES_ALWAYS' => array('right' => 'manager', 'default' => 'domain', 'check' => array('domain', 'sender', 'never')),
+		// 1.149.0: the remote pictures of our own domains (domains of the mailboxes) shown without a click
+		'INBOX_IMAGES_OWN_DOMAINS' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		'INBOX_UNSUBSCRIBE' => array('right' => 'manager', 'default' => 'oneclick', 'check' => array('oneclick', 'mail', 'off')),
 		'INBOX_BANK_CHECK' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Anti-spam (1.85.0): blocked senders, « probably legitimate » in the junk

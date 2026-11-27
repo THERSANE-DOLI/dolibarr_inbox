@@ -143,6 +143,33 @@ switch ($action) {
 	case 'images':
 		// Remote pictures always shown (allow) or no more (forget) for the sender or its domain, for this user
 		$what = (string) inboxAjaxParam('what', 'aZ09');
+		$forget = (string) inboxAjaxParam('mode', 'aZ09') === 'forget';
+		$p = $db->prefix();
+		if ($what === 'host') {
+			// Host of the pictures (1.149.0), exact host whoever sends: one of the hosts of this mail, never typed
+			$host = strtolower((string) inboxAjaxParam('host', 'alphanohtml'));
+			$raw = $reader->raw($user);
+			if ($raw === null) {
+				inboxMailFail($reader);
+			}
+			$message = InboxMimeParser::parse($raw);
+			$remote = false;
+			$remoteHosts = array();
+			if ($message->bodyHtml !== '') {
+				InboxMimeParser::safeHtml($message->bodyHtml, array(), $remote, $remoteHosts);
+			}
+			if (!isset($remoteHosts[$host])) {
+				inboxAjaxError($langs->transnoentities('InboxErrorImagesHost'), 422);
+			}
+			if (!$forget && InboxReader::imagesAlwaysMode() === 'never') {
+				inboxAjaxError($langs->transnoentities('InboxErrorImagesAlwaysOff'), 403);
+			}
+			$db->query("DELETE FROM ".$p."inbox_image_allow WHERE fk_user = ".((int) $user->id)." AND address = '".$db->escape($host)."'");
+			if (!$forget) {
+				$db->query("INSERT INTO ".$p."inbox_image_allow (fk_user, address, date_creation) VALUES (".((int) $user->id).", '".$db->escape($host)."', '".$db->idate(dol_now())."')");
+			}
+			inboxAjaxReply(array('host' => $host));
+		}
 		$email = strtolower((string) $reader->row->from_email);
 		if (!isValidEmail($email)) {
 			inboxAjaxError($langs->transnoentities('InboxErrorEmail'), 422);
@@ -150,12 +177,11 @@ switch ($action) {
 		$address = $what === 'domain' ? substr($email, strpos($email, '@')) : $email;
 		// Setting of the administrator (1.78.0): « never », or « by sender only » for a domain; forgetting always allowed
 		$always = InboxReader::imagesAlwaysMode();
-		if ((string) inboxAjaxParam('mode', 'aZ09') !== 'forget' && ($always === 'never' || ($always === 'sender' && $what === 'domain'))) {
+		if (!$forget && ($always === 'never' || ($always === 'sender' && $what === 'domain'))) {
 			inboxAjaxError($langs->transnoentities('InboxErrorImagesAlwaysOff'), 403);
 		}
-		$p = $db->prefix();
 		$db->query("DELETE FROM ".$p."inbox_image_allow WHERE fk_user = ".((int) $user->id)." AND address IN ('".$db->escape($email)."', '".$db->escape(substr($email, strpos($email, '@')))."')");
-		if ((string) inboxAjaxParam('mode', 'aZ09') !== 'forget') {
+		if (!$forget) {
 			$db->query("INSERT INTO ".$p."inbox_image_allow (fk_user, address, date_creation) VALUES (".((int) $user->id).", '".$db->escape($address)."', '".$db->idate(dol_now())."')");
 		}
 		inboxAjaxReply(array('address' => $address));

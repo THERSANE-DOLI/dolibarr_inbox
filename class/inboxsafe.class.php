@@ -62,11 +62,12 @@ class InboxSafe
 	 * @param string                $html      HTML of the mail
 	 * @param array<string, string> $inline    Content-ID => data URI of the pictures of the mail
 	 * @param bool                  $hasRemote Set when the mail loads remote pictures
+	 * @param ?array<string,string> $hosts     Set to the hosts of these pictures (host => host), for the CSP of the frame
 	 * @return string Whole HTML document
 	 */
-	public static function display($html, array $inline, &$hasRemote)
+	public static function display($html, array $inline, &$hasRemote, &$hosts = null)
 	{
-		$prepared = self::prepare($html, $inline, $hasRemote);
+		$prepared = self::prepare($html, $inline, $hasRemote, $hosts);
 
 		return self::frame($prepared['body'], $prepared['styles']);
 	}
@@ -173,11 +174,13 @@ class InboxSafe
 	 * @param string                $html      HTML of the mail
 	 * @param array<string, string> $inline    Content-ID => data URI of the pictures of the mail
 	 * @param bool                  $hasRemote Set when the mail loads remote pictures
+	 * @param ?array<string,string> $hosts     Set to the hosts of these pictures (host => host)
 	 * @return array{body:string,styles:string}
 	 */
-	protected static function prepare($html, array $inline, &$hasRemote)
+	protected static function prepare($html, array $inline, &$hasRemote, &$hosts = null)
 	{
 		$hasRemote = false;
+		$hosts = array();
 		$doc = new DOMDocument();
 		$previous = libxml_use_internal_errors(true);
 		// The body is UTF-8 already (toUtf8): the charset of its <meta> (Outlook « iso-8859-1 ») would win over the
@@ -214,10 +217,14 @@ class InboxSafe
 				if (strpos($name, 'on') === 0 || in_array($name, array('srcset', 'formaction', 'action', 'ping', 'xmlns', 'target'), true)
 					|| preg_match('/^\s*(javascript|vbscript|data):/i', $value) && !in_array($name, array('src', 'alt', 'title'), true)) {
 					$node->removeAttribute($attr->name);
-				} elseif ($name === 'style' && preg_match('/url\s*\(\s*[\'"]?\s*https?:/i', $value)) {
+				} elseif ($name === 'style' && preg_match_all('/url\s*\(\s*[\'"]?\s*(https?:[^\'")\s]*)/i', $value, $urls)) {
 					$hasRemote = true;
+					foreach ($urls[1] as $url) {
+						self::addRemoteHost($hosts, $url);
+					}
 				} elseif ($name === 'background' && preg_match('/^https?:/i', $value)) {
 					$hasRemote = true;
+					self::addRemoteHost($hosts, $value);
 				}
 			}
 			$tag = strtolower($node->nodeName);
@@ -234,6 +241,7 @@ class InboxSafe
 					$node->setAttribute('src', $inline[trim(rawurldecode(substr($src, 4)), '<>')]);
 				} elseif (preg_match('/^https?:/i', $src)) {
 					$hasRemote = true;
+					self::addRemoteHost($hosts, $src);
 				} elseif (!preg_match('#^data:image/(png|jpeg|gif|webp);base64,#i', $src)) {
 					$node->removeAttribute('src');
 				}
@@ -246,6 +254,26 @@ class InboxSafe
 		}
 
 		return array('body' => $inner, 'styles' => implode("\n", $styles));
+	}
+
+	/**
+	 * Host of a remote picture, kept only when it can be written as is in a CSP: ASCII name with a dot (IDN in
+	 * punycode), optional port; any other (IP literal in brackets, unicode, credentials) stays blocked
+	 *
+	 * @param array<string,string> $hosts Hosts found so far
+	 * @param string               $url   Address of the picture
+	 * @return void
+	 */
+	protected static function addRemoteHost(array &$hosts, $url)
+	{
+		$parts = parse_url(trim((string) $url));
+		if (!is_array($parts) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+			return;
+		}
+		$host = strtolower(rtrim((string) $parts['host'], '.')).(isset($parts['port']) ? ':'.((int) $parts['port']) : '');
+		if (preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$/', $host) && count($hosts) < 50) {
+			$hosts[$host] = $host;
+		}
 	}
 
 	/**

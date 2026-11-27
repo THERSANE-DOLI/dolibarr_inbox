@@ -65,6 +65,7 @@ class InboxDocumentation
 			)),
 			'InboxDocGroupReception' => array('icon' => 'fa-shield-alt', 'pages' => array(
 				'anti_spam' => array('icon' => 'fa-ban', 'version' => '1.85.0', 'files' => array('en_US' => 'admin/anti-spam.md')),
+				'remote_pictures' => array('icon' => 'fa-image', 'version' => '1.149.0', 'files' => array('en_US' => 'admin/remote-pictures.md')),
 				'shared_domains' => array('icon' => 'fa-globe', 'version' => '1.76.0', 'files' => array('en_US' => 'admin/shared-domains.md')),
 				'data_sources' => array('icon' => 'fa-file-import', 'version' => '1.72.0', 'files' => array('en_US' => 'admin/data-sources.md')),
 				'module_subscriptions' => array('icon' => 'fa-plug', 'version' => '1.112.0', 'files' => array('en_US' => 'admin/module-subscriptions.md')),
