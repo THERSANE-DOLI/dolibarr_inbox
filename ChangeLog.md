@@ -65,6 +65,10 @@
   - the panel says what is signed: the requester and its data, never the subject, the text or the attachments.
   - Settings > Data sources, doc page Data sources (section Signed sources). Activate the module again.
 
+- FIX: answer to a mail whose References are separated by commas (Foxmail...): draft and sending no longer refused :   1.142.1
+  - the ids are read between their angle brackets, as the index does; the drafts already opened are repaired.
+  - a wrong id in References / In-Reply-To is left out of the mail instead of stopping it (GitHub issue #25).
+
 - NEW: view « Spams »: the junk of every mailbox in one list, to find quickly an email that is not a spam :   1.142.0
   - hidden by default (menu of the views); a grey count of the spams arrived since the last visit, no unread badge.
   - on each line why it is there (score of the anti-spam filter, blocked sender), « Probably legitimate » chip.
