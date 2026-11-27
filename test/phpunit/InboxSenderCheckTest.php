@@ -170,9 +170,18 @@ class InboxSenderCheckTest extends InboxImapTestCase
 		$this->assertStringContainsString('$NotJunk', $this->flagsOnServer('INBOX', $uids[0]));
 		$this->assertSame($this->folder($a, 'INBOX'), (int) $this->row($a, 'jr1')->fk_folder, 'the index follows');
 		$this->assertSame(0, (int) $this->row($a, 'jr1')->seen, 'still unread');
-		$log = $this->db->getRow("SELECT action, folder_from, folder_to FROM ".$p."inbox_action_log WHERE fk_account = ".((int) $a->id)." AND action = 'rescue'");
+		$log = $this->db->getRow("SELECT action, folder_from, folder_to, fk_user, consumer FROM ".$p."inbox_action_log WHERE fk_account = ".((int) $a->id)." AND action = 'rescue'");
 		$this->assertIsObject($log, 'written in the journal');
 		$this->assertStringContainsString('Junk', (string) $log->folder_from);
+		// Written as inbox itself, not as the user of the synchronisation (1.147.1)
+		$this->assertSame(0, (int) $log->fk_user);
+		$this->assertNull($log->consumer);
+		$journal = InboxActionLog::listForAccount($this->db, (int) $a->id, array('system' => 1));
+		$this->assertCount(1, $journal['lines']);
+		$this->assertTrue($journal['lines'][0]['system']);
+		$this->assertSame(array(), array_values(array_filter(InboxActionLog::$written, function ($id) use ($journal) {
+			return $id === $journal['lines'][0]['id'];
+		})), 'never undone by the page of the user');
 
 		foreach (array('jr2' => 'marked as junk by someone', 'jr3' => 'arrived before the switch', 'jr4' => 'not authenticated', 'jr5' => 'unknown sender', 'jr0' => 'checked before the switch') as $id => $why) {
 			$this->assertNotEmpty($this->onServer('INBOX.Junk', $id), $id.': '.$why);

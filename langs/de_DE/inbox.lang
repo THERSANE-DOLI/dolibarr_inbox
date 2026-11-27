@@ -3828,6 +3828,7 @@ InboxConsumerLastOk = Zuletzt verarbeitete E-Mail: %s
 InboxConsumerWaiting = %s E-Mail(s) in Warteschlange
 InboxConsumerFailed = %s E-Mail(s) nach 5 Versuchen aufgegeben
 InboxJournalModule = Modul
+InboxJournalAutomatic = Inbox (automatisch)
 InboxJournalSimulated = Test, nicht ausgeführt
 InboxJournal_consumer_read = Inhalt gelesen
 InboxJournal_consumer_seen = Gelesen oder ungelesen

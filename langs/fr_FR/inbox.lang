@@ -3828,6 +3828,7 @@ InboxConsumerLastOk = Dernier mail traité : %s
 InboxConsumerWaiting = %s mail(s) en attente
 InboxConsumerFailed = %s mail(s) abandonné(s) après 5 essais
 InboxJournalModule = module
+InboxJournalAutomatic = Inbox (automatique)
 InboxJournalSimulated = test, non fait
 InboxJournal_consumer_read = Contenu lu
 InboxJournal_consumer_seen = Lu ou non lu

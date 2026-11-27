@@ -1085,7 +1085,7 @@
 	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join', 'rescue', 'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft'];
 	async function tabJournal(box, account) {
 		// Author: a user (id), or a module subscribed (1.146.0, « c:code »)
-		const f = { user: 0, consumer: '', what: '', from: '', to: '', q: '' };
+		const f = { user: 0, consumer: '', system: 0, what: '', from: '', to: '', q: '' };
 		let offset = 0;
 		let lines = [];
 		box.innerHTML = '<p class="ibx-section__help">' + th('InboxJournalHelp') + '</p>'
@@ -1100,7 +1100,7 @@
 		const day = v => v ? Math.floor(new Date(v + 'T00:00:00').getTime() / 1000) : 0;
 		const paint = more => {
 			if (!lines.length) {
-				list.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div>' + th(f.user || f.consumer || f.what || f.from || f.to || f.q ? 'InboxJournalNoMatch' : 'InboxActionsJournalEmpty') + '</div></div>';
+				list.innerHTML = '<div class="ibx-empty">' + ic('info', 'ibx-empty__icon') + '<div>' + th(f.user || f.consumer || f.system || f.what || f.from || f.to || f.q ? 'InboxJournalNoMatch' : 'InboxActionsJournalEmpty') + '</div></div>';
 				return;
 			}
 			const where = l => {
@@ -1151,7 +1151,7 @@
 				return esc(l.from) + ' → ' + (l.account_to ? '<b>' + esc(l.account_to) + '</b> / ' : '') + esc(l.to);
 			};
 			list.innerHTML = '<table class="ibx-table ibx-journal"><thead><tr><th>' + th('InboxJournalDate') + '</th><th>' + th('InboxJournalWho') + '</th><th>' + th('InboxJournalAction') + '</th><th>' + th('InboxJournalMails') + '</th><th>' + th('InboxJournalWhere') + '</th></tr></thead><tbody>'
-				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString(I.locale())) + '</td><td>' + esc(l.user)
+				+ lines.map(l => '<tr' + (l.undone ? ' class="is-undone"' : '') + '><td class="ibx-nowrap">' + esc(new Date(l.date * 1000).toLocaleString(I.locale())) + '</td><td>' + (l.system ? th('InboxJournalAutomatic') : esc(l.user))
 					+ (l.consumer ? ' <span class="ibx-badge">' + th('InboxJournalModule') + '</span>' : '') + '</td>'
 					+ '<td>' + th('InboxJournal_' + l.action) + (l.simulated ? ' <span class="ibx-badge ibx-badge--warning">' + th('InboxJournalSimulated') + '</span>' : '')
 					+ (l.undone ? ' <span class="ibx-badge">' + th('InboxJournalUndone') + '</span>' : '') + (l.incoming ? ' <span class="ibx-badge">' + th('InboxJournalIncoming') + '</span>' : '') + '</td>'
@@ -1173,7 +1173,7 @@
 			}
 			let res;
 			try {
-				res = await api('action', 'journal', { id: account.id, user: f.user, consumer: f.consumer, what: f.what, from: day(f.from), to: f.to ? day(f.to) + 86400 : 0, q: f.q, offset }, { method: 'POST' });
+				res = await api('action', 'journal', { id: account.id, user: f.user, consumer: f.consumer, system: f.system, what: f.what, from: day(f.from), to: f.to ? day(f.to) + 86400 : 0, q: f.q, offset }, { method: 'POST' });
 			} catch (err) {
 				if (mine === seq) {
 					list.replaceChildren(errorBox(err, () => load(false)));
@@ -1186,8 +1186,8 @@
 			lines = append ? lines.concat(res.lines) : res.lines;
 			const who = $('#j-user', box);
 			if (who.options.length === 1) {
-				res.authors.forEach(a => who.insertAdjacentHTML('beforeend', '<option value="' + (a.consumer ? 'c:' + esc(a.consumer) : a.id) + '">' + esc(a.name)
-					+ (a.consumer ? ' (' + th('InboxJournalModule') + ')' : '') + '</option>'));
+				res.authors.forEach(a => who.insertAdjacentHTML('beforeend', a.system ? '<option value="s">' + th('InboxJournalAutomatic') + '</option>'
+					: '<option value="' + (a.consumer ? 'c:' + esc(a.consumer) : a.id) + '">' + esc(a.name) + (a.consumer ? ' (' + th('InboxJournalModule') + ')' : '') + '</option>'));
 			}
 			paint(res.more);
 		};
@@ -1203,7 +1203,8 @@
 			if (k === 'user') {
 				const v = e.target.value;
 				f.consumer = v.startsWith('c:') ? v.slice(2) : '';
-				f.user = f.consumer ? 0 : +v;
+				f.system = v === 's' ? 1 : 0;
+				f.user = f.consumer || f.system ? 0 : +v;
 			} else {
 				f[k] = e.target.value;
 			}

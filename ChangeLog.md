@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: journal of a mailbox: what inbox does by itself is written « Inbox (automatic) », not as a user :   1.147.1
+  - blocked senders and spams put in the junk, known senders taken out of it: the user whose page or job ran the
+    synchronisation was named; a choice « Inbox (automatic) » in the filter « Who ». Lines already written stay.
+
 - NEW: the emails of the junk from a known sender, authenticated, go back to the inbox (off by default) :   1.147.0
   - Settings > Anti-spam > Settings « Take the known senders out of the junk »: at the synchronisation, marked
     « Not junk », written in the journal; only the emails arrived since it was turned on, in the last 7 days.

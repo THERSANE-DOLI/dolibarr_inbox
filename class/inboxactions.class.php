@@ -90,10 +90,14 @@ class InboxActions
 			return array('ok' => false, 'count' => 0, 'undo' => array(), 'error' => 'Unknown action', 'ids' => array(), 'rest' => array());
 		}
 		$this->system = true;
+		// Written in the journal as inbox itself, not as the user whose page or job runs the synchronisation (1.147.1)
+		$journal = InboxActionLog::$system;
+		InboxActionLog::$system = true;
 		try {
 			return $this->run($user, $action, $mailIds);
 		} finally {
 			$this->system = false;
+			InboxActionLog::$system = $journal;
 		}
 	}
 
