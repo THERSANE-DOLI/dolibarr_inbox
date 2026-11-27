@@ -329,6 +329,8 @@ class InboxSync
 		$firstSyncLeft = false;
 		$done = array();
 		$failed = array();
+		$readOk = array();
+		$incomplete = array();
 		$reports = array();
 		foreach ($queue as $item) {
 			list($f, $backfill) = $item;
@@ -371,7 +373,8 @@ class InboxSync
 				}
 				continue;
 			}
-			$folders->countFailure($folderId, false);
+			// Counted from zero at the end of the pass, if no reading of it failed (1.145.0)
+			$readOk[$folderId] = (int) ($f->sync_fail_count ?? 0);
 			if ($res['reset']) {
 				$mails->clearFolder($folderId);
 			}
@@ -431,7 +434,19 @@ class InboxSync
 			$f->first_sync_done = $complete ? 1 : 0;
 			$f->sync_cursor = $res['cursor'];
 			if (!$complete) {
-				$firstSyncLeft = true;
+				$incomplete[$folderId] = true;
+			}
+		}
+		// First indexing left on a folder: the mailbox waits for it, unless another reading of it failed in this pass
+		// (1.145.0), then the count of its failures decides (sqlFirstSyncLeft() at the end)
+		if (array_diff_key($incomplete, $failed)) {
+			$firstSyncLeft = true;
+		}
+		// A folder read well in this pass, none of its readings failed: its failures counted from zero (1.145.0). Not
+		// at each good reading: changes read, then first indexing failed, the folder would never be set aside
+		foreach ($readOk as $folderId => $fails) {
+			if ($fails > 0 && !isset($failed[$folderId])) {
+				$folders->countFailure($folderId, false);
 			}
 		}
 		foreach ($reports as $r) {
@@ -451,7 +466,7 @@ class InboxSync
 			return 1;
 		}
 		// A folder that fails pass after pass no longer counts (1.145.0): it stays shown in error in the tab Synchro
-		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND ".InboxFolder::sqlFirstSyncLeft());
+		$left = $firstSyncLeft || (bool) $this->db->getRow("SELECT rowid FROM ".$p."inbox_folder WHERE fk_account = ".((int) $account->id)." AND ".InboxFolder::sqlFirstSyncLeft($this->db));
 		$this->saveState((int) $account->id, $left ? 'first_sync' : 'ok');
 
 		return 1;
@@ -542,7 +557,7 @@ class InboxSync
 	 */
 	public function progress($accountId)
 	{
-		$row = $this->db->getRow("SELECT SUM(indexed) AS i, SUM(total) AS t, COUNT(rowid) AS n, SUM(CASE WHEN ".InboxFolder::sqlFirstSyncLeft()." THEN 1 ELSE 0 END) AS left_n"
+		$row = $this->db->getRow("SELECT SUM(indexed) AS i, SUM(total) AS t, COUNT(rowid) AS n, SUM(CASE WHEN ".InboxFolder::sqlFirstSyncLeft($this->db)." THEN 1 ELSE 0 END) AS left_n"
 			." FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $accountId)." AND status = 1");
 
 		return array('indexed' => (int) ($row->i ?? 0), 'total' => (int) ($row->t ?? 0), 'folders' => (int) ($row->n ?? 0), 'first_sync_left' => (int) ($row->left_n ?? 0));

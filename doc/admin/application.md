@@ -27,6 +27,21 @@ as in the installed application. A plain click keeps everything in the page.
   the first time. A window blocked by the browser is said (allow the pop-up windows for the site); the attachment
   then opens in the preview, the writing in the page. On a phone: as a click.
 
+## Windows snapped to the edges (1.151.0)
+
+The windows of the page (preview of an attachment, source of an email, window of a module, writing) move by their
+title bar as before, and now snap to the edges of the screen, as in Windows or Ubuntu:
+
+- dragged against the **left** or **right** edge: the half of the screen, whole height (over the rail);
+- dragged against the **top** edge: the whole screen, the rail kept seen (same as the Maximize button and a double click
+  on the bar);
+- a translucent zone shows where the window goes before the release; brought back to the middle, nothing changes.
+
+A snapped or maximized window stays movable and resizable: dragged by its bar, it takes back its size of before under
+the pointer; resized by an edge, it keeps the size given. The Maximize button becomes « Restore the size ». The size
+kept for the next window of the same kind is the one of before the snapping. A writing maximized from the row at the
+bottom right goes back to it. On a phone and in a window of its own, nothing changes (whole screen).
+
 ## Several entities (multicompany)
 
 - The mailboxes belong to one entity: Inbox shows the mailboxes of the entity the user is on in Dolibarr, and every

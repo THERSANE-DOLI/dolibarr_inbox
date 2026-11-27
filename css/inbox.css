@@ -92,6 +92,8 @@
 	--ibx-focus: 0 0 0 0.125rem var(--ibx-bg), 0 0 0 0.25rem var(--ibx-accent);
 	--ibx-row-h: 1.875rem;
 	--ibx-rail-w: 3rem;
+	/* Grips of the windows: how far past the edge the size is taken (1.151.2) */
+	--ibx-grip-out: 0.375rem;
 	--ibx-dur: 180ms;
 }
 
@@ -617,8 +619,11 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 	position: fixed; inset: auto; z-index: 50; margin: 0; padding: 0; max-width: none; max-height: none; display: flex; flex-direction: column;
 	min-width: 17.5rem; min-height: 10rem; color: var(--ibx-text); background: var(--ibx-bg);
 	border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float);
-	overflow: hidden;
+	/* The grips go past the edges (1.151.2): clipped a little outside, the content keeps its rounded corners itself */
+	overflow: hidden; overflow: clip; overflow-clip-margin: var(--ibx-grip-out);
 }
+.ibx-window > .ibx-window__bar { border-radius: calc(var(--ibx-radius-lg) - 1px) calc(var(--ibx-radius-lg) - 1px) 0 0; }
+.ibx-window > .ibx-window__body, .ibx-window > .ibx-window__foot { border-radius: 0 0 calc(var(--ibx-radius-lg) - 1px) calc(var(--ibx-radius-lg) - 1px); }
 .ibx-window:not([open]) { display: none; }
 .ibx-window.is-front { z-index: 60; }
 .ibx-window__bar {
@@ -636,15 +641,29 @@ html.ibx-html--app, html.ibx-html--app body { overflow: hidden; }
 .ibx-window__body { flex: 1; overflow: auto; min-height: 0; background: var(--ibx-bg); }
 .ibx-window__foot { flex: none; display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); }
 .ibx-window--maximized { inset: var(--ibx-s3) var(--ibx-s3) var(--ibx-s3) calc(var(--ibx-rail-w) + var(--ibx-s3)) !important; width: auto !important; height: auto !important; resize: none; }
-/* Size from every edge and corner (1.48.0): invisible grips, the cursor tells the direction */
-.ibx-wgrip { position: absolute; z-index: 6; touch-action: none; }
-.ibx-wgrip--n, .ibx-wgrip--s { left: 0.75rem; right: 0.75rem; height: 0.375rem; cursor: ns-resize; }
-.ibx-wgrip--e, .ibx-wgrip--w { top: 0.75rem; bottom: 0.75rem; width: 0.375rem; cursor: ew-resize; }
-.ibx-wgrip--n { top: 0; } .ibx-wgrip--s { bottom: 0; } .ibx-wgrip--e { right: 0; } .ibx-wgrip--w { left: 0; }
-.ibx-wgrip--nw, .ibx-wgrip--ne, .ibx-wgrip--sw, .ibx-wgrip--se { width: 0.75rem; height: 0.75rem; }
-.ibx-wgrip--nw { top: 0; left: 0; cursor: nwse-resize; } .ibx-wgrip--se { bottom: 0; right: 0; cursor: nwse-resize; }
-.ibx-wgrip--ne { top: 0; right: 0; cursor: nesw-resize; } .ibx-wgrip--sw { bottom: 0; left: 0; cursor: nesw-resize; }
+/*
+ * Size from every edge and corner (1.48.0): invisible grips, the cursor tells the direction. They go
+ * --ibx-grip-out past the edge (1.151.2): the size is taken just outside the window, as in the desktop
+ */
+.ibx-wgrip, .ibx-compose__grip { position: absolute; z-index: 6; touch-action: none; --o: calc(-1 * var(--ibx-grip-out)); }
+.ibx-wgrip--n, .ibx-wgrip--s, .ibx-compose__grip--n, .ibx-compose__grip--s { left: 0.75rem; right: 0.75rem; height: calc(0.375rem + var(--ibx-grip-out)); cursor: ns-resize; }
+.ibx-wgrip--e, .ibx-wgrip--w, .ibx-compose__grip--e, .ibx-compose__grip--w { top: 0.75rem; bottom: 0.75rem; width: calc(0.375rem + var(--ibx-grip-out)); cursor: ew-resize; }
+.ibx-wgrip--n, .ibx-compose__grip--n { top: var(--o); } .ibx-wgrip--s, .ibx-compose__grip--s { bottom: var(--o); }
+.ibx-wgrip--e, .ibx-compose__grip--e { right: var(--o); } .ibx-wgrip--w, .ibx-compose__grip--w { left: var(--o); }
+.ibx-wgrip--nw, .ibx-wgrip--ne, .ibx-wgrip--sw, .ibx-wgrip--se, .ibx-compose__grip--nw, .ibx-compose__grip--ne, .ibx-compose__grip--sw, .ibx-compose__grip--se { width: calc(0.75rem + var(--ibx-grip-out)); height: calc(0.75rem + var(--ibx-grip-out)); }
+.ibx-wgrip--nw, .ibx-compose__grip--nw { top: var(--o); left: var(--o); cursor: nwse-resize; }
+.ibx-wgrip--se, .ibx-compose__grip--se { bottom: var(--o); right: var(--o); cursor: nwse-resize; }
+.ibx-wgrip--ne, .ibx-compose__grip--ne { top: var(--o); right: var(--o); cursor: nesw-resize; }
+.ibx-wgrip--sw, .ibx-compose__grip--sw { bottom: var(--o); left: var(--o); cursor: nesw-resize; }
 .ibx-window--maximized .ibx-wgrip { display: none; }
+/* Snapped to an edge (1.151.0): the zone shown while the window is dragged, the halves without rounded corners */
+.ibx-snap-preview {
+	position: fixed; z-index: 55; pointer-events: none; border: 2px solid var(--ibx-accent); border-radius: var(--ibx-radius);
+	background: color-mix(in srgb, var(--ibx-accent) 14%, transparent); transition: left var(--ibx-dur), top var(--ibx-dur), width var(--ibx-dur), height var(--ibx-dur);
+}
+.ibx-window[data-snap="left"], .ibx-window[data-snap="right"] { border-radius: 0; }
+.ibx-window.is-dragged { user-select: none; }
+.ibx-window.is-dragged iframe { pointer-events: none; }
 /* Window of a module opened modal by another one (1.48.0): what is under it is out of reach */
 .ibx-backdrop { position: fixed; inset: 0; z-index: 64; background: rgb(18 18 24 / 62%); }
 .ibx-window.ibx-window--modal { z-index: 66; }
@@ -1856,11 +1875,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 
 /* ===== Writing (lot W6 1.16.0): floating window, recipients as chips, editor, signature, quote ===== */
 .ibx-compose { right: var(--ibx-s4); bottom: 0; width: 35rem; height: min(36rem, calc(100vh - 4rem)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; resize: none; }
-/* Grips: the window is anchored at the bottom right, it grows from the top and the left */
-.ibx-compose__grip { position: absolute; z-index: 6; touch-action: none; }
-.ibx-compose__grip--n { top: 0; left: 0.75rem; right: 0; height: 0.375rem; cursor: ns-resize; }
-.ibx-compose__grip--w { top: 0.75rem; bottom: 0; left: 0; width: 0.375rem; cursor: ew-resize; }
-.ibx-compose__grip--nw { top: 0; left: 0; width: 0.75rem; height: 0.75rem; cursor: nwse-resize; }
+/* Grips on every edge and corner (1.151.1, with those of the windows): in the row at the bottom right it grows from the top and the left */
 .ibx-window--maximized .ibx-compose__grip { display: none; }
 /* A writing in a window of its own (1.148.0, index.php?window=compose): the whole window, no rail, nothing to resize */
 .ibx-html--popup .ibx-compose.ibx-window--maximized { inset: 0 !important; border: 0; border-radius: 0; box-shadow: none; }

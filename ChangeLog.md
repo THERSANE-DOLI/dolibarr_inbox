@@ -1,5 +1,20 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a folder whose first indexing fails while its changes are read could keep its mailbox in « first synchronisation » :   1.151.3
+  - its failures are counted from zero at the end of a pass only when no reading of it failed.
+  - files replaced before the module is activated again: no query on the missing column; « Rebuild the index » tries
+    every folder again.
+
+- FIX: the size of a window was taken only inside its edges :   1.151.2
+  - the grips go 6 px past every edge and corner, as in the desktop (CSS only).
+
+- FIX: a writing could be resized only by its top and left edges :   1.151.1
+  - every edge and corner now; by the bottom or the right it leaves the row at the bottom right.
+
+- NEW: windows of the page snapped to the edges of the screen :   1.151.0
+  - dragged by the bar against the left or right edge: half of the screen; against the top: whole screen.
+  - a snapped or maximized window stays movable and resizable; dragged again, it takes back its size of before.
+
 - NEW: button « Copy the source » in the window of the source of an email :   1.150.0
   - the whole source in one click, enabled once loaded; the toast does not repeat it.
 
