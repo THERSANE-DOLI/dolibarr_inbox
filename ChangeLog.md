@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: button « Copy the source » in the window of the source of an email :   1.150.0
+  - the whole source in one click, enabled once loaded; the toast does not repeat it.
+
 - FIX: Ctrl+A in the source of an email selected every email of the list (then Delete deleted them all) :   1.149.1
   - in a window of inbox or a dialog, the keys of the mail list (Ctrl+A, A, Delete, J, M, 1 to 9...) no longer act.
   - Ctrl+A in the source, a text or a CSV attachment selects its text only; a click in a window gives it the focus.
