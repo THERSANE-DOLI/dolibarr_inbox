@@ -9484,7 +9484,7 @@
 		return I.ctx('INBOX_AJAX_URL', '') + 'body.php?id=' + m.id + (images ? '&images=1' : '') + (m.fold ? '&fold=1' : '');
 	}
 
-	const KIND_ICON = { pdf: 'file-pdf', image: 'file-image', zip: 'file-zip', mail: 'mail', csv: 'file-xls' };
+	const KIND_ICON = { pdf: 'file-pdf', image: 'file-image', zip: 'file-zip', mail: 'mail', csv: 'file-xls', sheet: 'file-xls' };
 	function tile(a, i) {
 		const warn = (a.warnings || []).length;
 		return '<div class="ibx-attachment' + (warn ? ' is-warning' : '') + '" data-att="' + i + '" draggable="true">'
@@ -10249,6 +10249,9 @@
 		if (/\.csv$/.test(n) || t === 'text/csv') {
 			return 'csv';
 		}
+		if (/\.(xlsx?|xlsm|xlt[xm]?|ods|ots)$/.test(n)) {
+			return 'sheet';
+		}
 		if (/^text\//.test(t) || /\.(txt|log|md|json|xml)$/.test(n)) {
 			return 'text';
 		}
@@ -10505,7 +10508,7 @@
 	function viewerKind(m, o) {
 		const a = !o.source && m.attachments ? m.attachments[o.index] : null;
 		// The viewer of another module, or an office document (shown by such a viewer): the size of a PDF
-		return o.viewer || (a && (a.kind === 'pdf' || a.kind === 'image' || /\.(docx?|xlsx?|pptx?|od[tsp]|rtf)$/i.test(a.name || ''))) ? 'doc' : 'other';
+		return o.viewer || (a && (a.kind === 'pdf' || a.kind === 'image' || a.kind === 'sheet' || /\.(docx?|xlsx?|pptx?|od[tsp]|rtf)$/i.test(a.name || ''))) ? 'doc' : 'other';
 	}
 	/** Opening of a PDF by the viewer of the browser: the width of the page, no panel of thumbnails when it obeys */
 	const PDF_OPEN = '#view=FitH&zoom=page-width&pagemode=none&navpanes=0';
@@ -10884,11 +10887,265 @@
 			} catch (err) {
 				body.innerHTML = '<div class="ibx-empty">' + esc(err.message) + '</div>';
 			}
+		} else if (a.kind === 'sheet') {
+			try {
+				sheetView(body, top, await attApi(m, a.part, 'sheet', force));
+			} catch (err) {
+				// Protected by a password, or not a spreadsheet inbox can read: said, and the file stays one click away
+				noPreview(body, top, m, a, force, err.message);
+			}
 		} else {
-			body.innerHTML = top + '<div class="ibx-empty">' + ic(KIND_ICON[a.kind] || 'attachment', 'ibx-empty__icon') + '<div class="ibx-empty__title ibx-breakall">' + esc(a.name) + '</div><div>' + esc(size(a.size)) + ' · ' + th('InboxNoPreview') + '</div>'
-				+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-wdl2">' + ic('download') + ' ' + th('InboxDownload') + '</button></div>';
-			$('.ibx-js-wdl2', body).addEventListener('click', () => download(attUrl(m, a, 'download', force)));
+			noPreview(body, top, m, a, force, t('InboxNoPreview'));
 		}
+	}
+
+	/** A file inbox does not show: its name, its size, why, and the download */
+	function noPreview(body, top, m, a, force, why) {
+		body.innerHTML = top + '<div class="ibx-empty">' + ic(KIND_ICON[a.kind] || 'attachment', 'ibx-empty__icon') + '<div class="ibx-empty__title ibx-breakall">' + esc(a.name) + '</div><div>' + esc(size(a.size)) + ' · ' + esc(why) + '</div>'
+			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-js-wdl2">' + ic('download') + ' ' + th('InboxDownload') + '</button></div>';
+		$('.ibx-js-wdl2', body).addEventListener('click', () => download(attUrl(m, a, 'download', force)));
+	}
+
+	/** Letters of a column of a spreadsheet: 0 = A, 25 = Z, 26 = AA */
+	function sheetColumn(index) {
+		let name = '';
+		for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+			name = String.fromCharCode(65 + (n - 1) % 26) + name;
+		}
+		return name;
+	}
+	/** A colour of a look of a spreadsheet, as the server gives it: checked again before it goes into a style */
+	const SHEET_COLOR = /^#[0-9a-f]{6}$/;
+	/** Pixels taken by one character of the grid, to tell what fits in a column */
+	const SHEET_CHAR = 6.5;
+	/** Width of the numbers of the rows, in pixels */
+	const SHEET_HEAD = 44;
+	/** Spreadsheets shown since the page was loaded: each one has its own styles */
+	let sheetSeq = 0;
+
+	/**
+	 * A border of a look as CSS
+	 * @param {Array} b [width 1 to 3, colour, line]
+	 * @returns {string} '' when it is not a border
+	 */
+	function sheetEdge(b) {
+		return Array.isArray(b) && [1, 2, 3].includes(b[0]) && SHEET_COLOR.test(b[1]) ? b[0] + 'px ' + (['dashed', 'dotted', 'double'].includes(b[2]) ? b[2] : 'solid') + ' ' + b[1] : '';
+	}
+
+	/**
+	 * CSS of the look of a cell of a spreadsheet. Nothing of the file is written as it is: flags, colours
+	 * checked, sizes bounded
+	 * @param {object} s Look given by the server (InboxSheetReader::styleId())
+	 * @param {object} edges {right, bottom, top, left}: its borders as CSS (sheetEdge())
+	 * @returns {string}
+	 */
+	function sheetCss(s, edges) {
+		const css = [];
+		if (s.b) {
+			css.push('font-weight:700');
+		}
+		if (s.i) {
+			css.push('font-style:italic');
+		}
+		if (s.u || s.k) {
+			css.push('text-decoration:' + (s.u ? 'underline' : '') + (s.u && s.k ? ' ' : '') + (s.k ? 'line-through' : ''));
+		}
+		if (SHEET_COLOR.test(s.c)) {
+			css.push('color:' + s.c);
+		}
+		if (SHEET_COLOR.test(s.g)) {
+			// A background hides the lines of the grid, as in a spreadsheet
+			css.push('background-color:' + s.g, 'border-color:' + s.g);
+		}
+		if (s.a === 'l' || s.a === 'c' || s.a === 'r') {
+			css.push('text-align:' + { l: 'left', c: 'center', r: 'right' }[s.a]);
+		}
+		if (s.va === 't' || s.va === 'm') {
+			css.push('vertical-align:' + (s.va === 't' ? 'top' : 'middle'));
+		}
+		if (s.w) {
+			css.push('white-space:pre-wrap', 'overflow-wrap:anywhere');
+		}
+		const size = Number(s.z);
+		if (size >= 0.5 && size <= 4) {
+			css.push('font-size:' + size + 'em');
+		}
+		['right', 'bottom', 'top', 'left'].forEach(side => {
+			if (edges[side]) {
+				css.push('border-' + side + ':' + edges[side]);
+			}
+		});
+		return css.join(';');
+	}
+
+	/**
+	 * One sheet of a spreadsheet as a table: the look of its cells, the widths of its columns, its merged cells, and a
+	 * long text shown over the empty cells that follow it
+	 * @param {object} sheet {rows, widths, merges}
+	 * @param {Array} looks Looks of the cells of the file
+	 * @returns {{html: SafeHtml, widths: number[], classes: Map<string, string>}|null} null for an empty sheet
+	 */
+	function sheetGrid(sheet, looks) {
+		const rows = sheet.rows || [];
+		const given = sheet.widths || [];
+		const count = Math.min(200, rows.reduce((n, row) => Math.max(n, row.length), given.length));
+		if (!count) {
+			return null;
+		}
+		const at = (r, c) => (rows[r] || [])[c];
+		const textOf = x => String((x && typeof x === 'object' ? x.v : x) || '');
+		const lookOf = x => (x && typeof x === 'object' && looks[x.s]) || {};
+		// Room taken by a text in the look it has
+		const needOf = (text, s) => Math.ceil(text.split('\n').reduce((n, line) => Math.max(n, line.length), 0) * SHEET_CHAR * (Number(s.z) || 1) * (s.b ? 1.08 : 1) + 8);
+		const widths = Array.from({ length: count }, (x, i) => Math.max(12, Math.min(600, Math.round(Number(given[i]) || 64))));
+
+		// Merged cells: where each one starts, and the cells it covers. Two of them never share a cell
+		const key = (r, c) => r * 1024 + c;
+		const spans = new Map();
+		const covered = new Set();
+		(sheet.merges || []).forEach(m => {
+			const [r, c, h, w] = (Array.isArray(m) ? m : []).map(n => Math.floor(Number(n)));
+			if (!(r >= 0 && c >= 0 && h >= 1 && w >= 1 && h * w > 1 && r + h <= rows.length && c + w <= count)) {
+				return;
+			}
+			const cells = [];
+			for (let i = r; i < r + h; i++) {
+				for (let j = c; j < c + w; j++) {
+					cells.push(key(i, j));
+				}
+			}
+			if (cells.some(k => covered.has(k) || spans.has(k))) {
+				return;
+			}
+			spans.set(cells[0], [h, w]);
+			cells.slice(1).forEach(k => covered.add(k));
+		});
+
+		// A number is never cut: its column takes the room it needs
+		rows.forEach((row, r) => row.forEach((x, c) => {
+			if (c < count && x && typeof x === 'object' && x.t && !spans.has(key(r, c))) {
+				widths[c] = Math.min(600, Math.max(widths[c], needOf(textOf(x), lookOf(x))));
+			}
+		}));
+
+		const thicker = (own, other) => (sheetEdge(own) && (!sheetEdge(other) || own[0] >= other[0]) ? own : other);
+		const classes = new Map();
+		const classOf = css => {
+			if (css && !classes.has(css)) {
+				classes.set(css, 'ibx-sheet__k' + classes.size);
+			}
+			return css ? classes.get(css) : '';
+		};
+		const lines = rows.map((row, r) => {
+			const cells = [];
+			for (let c = 0; c < count; c++) {
+				if (covered.has(key(r, c))) {
+					continue;
+				}
+				const x = at(r, c);
+				const text = textOf(x);
+				const s = lookOf(x);
+				const number = !!(x && typeof x === 'object' && x.t);
+				let [h, w] = spans.get(key(r, c)) || [1, 1];
+				let room = 0;
+				for (let j = c; j < c + w; j++) {
+					room += widths[j];
+				}
+				const need = text ? needOf(text, s) : 0;
+				if (text && !number && !s.w && h === 1 && w === 1 && (!s.a || s.a === 'l')) {
+					// A long text goes over the empty cells that follow it, as a spreadsheet shows it
+					while (need > room && c + w < count && !textOf(at(r, c + w)) && !covered.has(key(r, c + w)) && !spans.has(key(r, c + w))) {
+						room += widths[c + w];
+						w++;
+					}
+				}
+				// One line between two cells: the border of this one or the one its neighbour draws on the same side, the
+				// thicker of the two
+				const cls = [number ? 'is-number' : '', classOf(sheetCss(s, {
+					right: sheetEdge(thicker(s.br || lookOf(at(r, c + w - 1)).br, lookOf(at(r, c + w)).bl)),
+					bottom: sheetEdge(thicker(s.bb || lookOf(at(r + h - 1, c)).bb, lookOf(at(r + h, c)).bt)),
+					top: r === 0 ? sheetEdge(s.bt) : '',
+					left: c === 0 ? sheetEdge(s.bl) : '',
+				}))].filter(Boolean).join(' ');
+				// A text cut by its column: whole in its tooltip
+				cells.push(I.html`<td${cls ? I.html` class="${cls}"` : ''}${w > 1 ? I.html` colspan="${w}"` : ''}${h > 1 ? I.html` rowspan="${h}"` : ''}${need > room && !s.w ? I.html` title="${text}"` : ''}>${text}</td>`);
+				c += w - 1;
+			}
+			return I.html`<tr><th scope="row">${r + 1}</th>${cells}</tr>`;
+		});
+		return {
+			html: I.html`<table class="ibx-sheet__table ibx-js-selectall" tabindex="0"><colgroup><col>${widths.map(() => I.raw('<col>'))}</colgroup>`
+				+ I.html`<thead><tr><th></th>${widths.map((x, i) => I.html`<th scope="col">${sheetColumn(i)}</th>`)}</tr></thead><tbody>${lines}</tbody></table>`,
+			widths,
+			classes,
+		};
+	}
+
+	/**
+	 * A spreadsheet in the preview (xls, xlsx, ods, 1.152.0): the first rows of each sheet, read by the server
+	 * (InboxSheetReader), with the look their author gave them; one tab per sheet, the letters of the columns
+	 * and the numbers of the rows stay in view
+	 * @param {Element} body Body of the window
+	 * @param {string} top Warnings of the antivirus, above
+	 * @param {object} res {sheets: [{name, rows, widths, merges, truncated}], styles, truncated, rows, cols}; a cell is its
+	 * text, or {v, t, s}: number or date, index of its look in styles
+	 */
+	function sheetView(body, top, res) {
+		const sheets = res.sheets || [];
+		const looks = Array.isArray(res.styles) ? res.styles : [];
+		const uid = ++sheetSeq;
+		body.innerHTML = top + I.html`<div class="ibx-sheet" data-ibx-sheet="${uid}">`
+			+ (sheets.length > 1 ? I.html`<div class="ibx-tabs" role="tablist" aria-label="${t('InboxSheetTabs')}">${sheets.map((s, i) => I.html`<button type="button" class="ibx-tab" role="tab" data-sheet="${i}">${s.name}</button>`)}</div>` : '')
+			+ I.html`<div class="ibx-sheet__grid"></div><p class="ibx-sheet__note ibx-muted" hidden>${t('InboxSheetTruncated', res.rows, res.cols)}</p></div>`;
+		const tabs = [...body.querySelectorAll('.ibx-sheet .ibx-tab')];
+		const show = index => {
+			const sheet = sheets[index];
+			const box = $('.ibx-sheet__grid', body);
+			const grid = sheetGrid(sheet, looks);
+			box.innerHTML = grid ? grid.html : I.html`<div class="ibx-empty">${t('InboxSheetEmpty')}</div>`;
+			if (grid) {
+				// The widths of the file and the looks of its cells are set here, never written in the HTML
+				const table = $('table', box);
+				table.style.width = (SHEET_HEAD + grid.widths.reduce((sum, w) => sum + w, 0)) + 'px';
+				[...table.querySelectorAll('col')].forEach((col, i) => {
+					col.style.width = (i ? grid.widths[i - 1] : SHEET_HEAD) + 'px';
+				});
+				const style = document.createElement('style');
+				style.textContent = [...grid.classes].map(([css, name]) => '.ibx-sheet[data-ibx-sheet="' + uid + '"] .' + name + '{' + css + '}').join('\n');
+				box.appendChild(style);
+				if (!style.sheet) {
+					// A site whose security policy refuses the styles added by a script: the same looks, cell by cell
+					const looksOf = new Map([...grid.classes].map(([css, name]) => [name, css]));
+					[...table.querySelectorAll('td[class]')].forEach(td => {
+						const name = [...td.classList].find(c => looksOf.has(c));
+						if (name) {
+							td.style.cssText = looksOf.get(name);
+						}
+					});
+				}
+			}
+			box.scrollTo(0, 0);
+			// Cut by the limits of the preview: this sheet, or the file (sheets left out) when no sheet says it
+			$('.ibx-sheet__note', body).hidden = !(sheet.truncated || (res.truncated && !sheets.some(s => s.truncated)));
+			tabs.forEach((b, i) => {
+				b.setAttribute('aria-selected', i === index ? 'true' : 'false');
+				b.tabIndex = i === index ? 0 : -1;
+			});
+		};
+		tabs.forEach((b, i) => {
+			b.addEventListener('click', () => show(i));
+			// Arrows between the tabs, as in a tab list
+			b.addEventListener('keydown', e => {
+				const to = e.key === 'ArrowRight' ? i + 1 : (e.key === 'ArrowLeft' ? i - 1 : -1);
+				if (to >= 0 && to < tabs.length) {
+					e.preventDefault();
+					e.stopPropagation();
+					show(to);
+					tabs[to].focus();
+				}
+			});
+		});
+		show(0);
 	}
 
 	/** CSV in a table, 500 lines (separator guessed: ; , or tab) */

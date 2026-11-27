@@ -29,6 +29,7 @@ require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxblockedsender.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxheaderparser.class.php';
+require_once __DIR__.'/inboxsheetreader.class.php';
 require_once __DIR__.'/inboxuserparam.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 require_once __DIR__.'/inboxreceipt.class.php';
@@ -696,7 +697,7 @@ class InboxReader
 	 * Kind used by the preview window
 	 *
 	 * @param array<string,mixed> $a Attachment
-	 * @return string pdf, image, mail, text, csv, zip, other
+	 * @return string pdf, image, mail, text, csv, zip, sheet, other
 	 */
 	public static function previewKind(array $a)
 	{
@@ -713,6 +714,10 @@ class InboxReader
 		}
 		if ($kind === 'zip' && preg_match('/\.zip$/', $name)) {
 			return 'zip';
+		}
+		// A spreadsheet (xls, xlsx, ods, 1.152.0): its first rows read by InboxSheetReader
+		if (InboxSheetReader::accepts($kind, $name)) {
+			return 'sheet';
 		}
 		if ($kind === 'other' && preg_match('/\.(csv)$/', $name) && mb_check_encoding(substr((string) $a['content'], 0, 4096), 'UTF-8')) {
 			return 'csv';

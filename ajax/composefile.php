@@ -22,7 +22,7 @@
  *          user before sending. Same answers and protections as the attachments of a mail (inbox_attserve.inc.php);
  *          only the author of the writing, in its session.
  *
- * compose = token of the writing, att = attachment, mode = check, inline, download, text, list
+ * compose = token of the writing, att = attachment, mode = check, inline, download, text, list, sheet
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

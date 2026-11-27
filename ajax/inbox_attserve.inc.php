@@ -19,7 +19,8 @@
  * \file    inbox/ajax/inbox_attserve.inc.php
  * \ingroup inbox
  * \brief   One file shown or given, the same way for an attachment of a mail and a file of a writing (lot A5, 1.82.0):
- *          verdict of the antivirus, beginning of a text, files of a .zip, preview of a PDF or a picture, download
+ *          verdict of the antivirus, beginning of a text, files of a .zip, first rows of a spreadsheet, preview of a PDF or
+ *          a picture, download
  */
 
 /**
@@ -40,7 +41,7 @@ function inboxAttVerdict(InboxAttachmentScan $scan, array $a)
 }
 
 /**
- * Answer for one file and exit: mode check (JSON verdict), text, list, inline (PDF and pictures only), download.
+ * Answer for one file and exit: mode check (JSON verdict), text, list, sheet, inline (PDF and pictures only), download.
  * An infected file is never given; a file not scanned only with force=1.
  *
  * @param InboxAttachmentScan $scan  Antivirus
@@ -90,6 +91,16 @@ function inboxAttServe(InboxAttachmentScan $scan, array $a, $mode, array $extra 
 			@unlink($tmp);
 		}
 		inboxAjaxReply(array('files' => $files));
+	}
+	if ($mode === 'sheet') {
+		// First rows of each sheet of a spreadsheet (1.152.0), numbers and dates written for the language of the user
+		dol_include_once('/inbox/class/inboxsheetreader.class.php');
+		$sheets = new InboxSheetReader(InboxSheetReader::optionsOf($langs));
+		$res = $sheets->read($a['content']);
+		if ($sheets->error !== '') {
+			inboxAjaxError($langs->transnoentities($sheets->error === 'protected' ? 'InboxSheetProtected' : 'InboxSheetUnreadable'), 422, array('state' => $sheets->error));
+		}
+		inboxAjaxReply($res + array('rows' => InboxSheetReader::MAX_ROWS, 'cols' => InboxSheetReader::MAX_COLS));
 	}
 
 	$types = array('pdf' => 'application/pdf', 'png' => 'image/png', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif');
