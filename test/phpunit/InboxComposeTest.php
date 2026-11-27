@@ -114,6 +114,34 @@ class InboxComposeTest extends InboxImapTestCase
 	}
 
 	/**
+	 * References separated by commas (Foxmail...) and ids saved damaged by an older version (1.142.1): read as the
+	 * index reads them, a wrong id left, the mail never refused (GitHub issue #25)
+	 *
+	 * @return void
+	 */
+	public function testReferencesWithCommas()
+	{
+		$header = "<aaa@exemple.invalid>, \r\n\t<bbb@exemple.invalid>, \r\n\t<ccc@exemple.invalid>";
+		$this->assertSame(array('aaa@exemple.invalid', 'bbb@exemple.invalid', 'ccc@exemple.invalid'), InboxMailBuilder::messageIds($header));
+		$this->assertSame(array('a@x.invalid', 'b@x.invalid'), InboxMailBuilder::messageIds('<a@x.invalid> (old phrase) <b@x.invalid> <a@x.invalid>'), 'phrases left, duplicates once');
+		$this->assertSame(array('a@x.invalid', 'b@x.invalid'), InboxMailBuilder::messageIds(array('a@x.invalid>,', 'b@x.invalid>,')), 'state of a draft opened before the fix');
+		$this->assertSame(array(), InboxMailBuilder::messageIds(''));
+
+		$b = new InboxMailBuilder();
+		$b->from = array('email' => 'devis@inbox-test.invalid', 'name' => 'Devis');
+		$b->to = array(array('email' => 'jean@client.invalid', 'name' => ''));
+		$b->subject = 'ZzCompose references';
+		$b->html = '<p>Bonjour</p>';
+		$b->inReplyTo = '<ccc@exemple.invalid>,';
+		$b->references = array('aaa@exemple.invalid>,', 'not an id', 'bbb@exemple.invalid>,', 'ccc@exemple.invalid');
+		$res = $b->build();
+		$this->assertNotNull($res, $b->error);
+		$this->assertMatchesRegularExpression('/^In-Reply-To: <ccc@exemple.invalid>\r?$/m', $res['wire']);
+		$this->assertMatchesRegularExpression('/^References: <aaa@exemple.invalid> <bbb@exemple.invalid>\s+<ccc@exemple.invalid>/m', $res['wire'], 'the words without @ are left');
+		$this->assertStringNotContainsString('>,', $res['wire']);
+	}
+
+	/**
 	 * @return void
 	 */
 	public function testBuilder()

@@ -430,10 +430,8 @@ class InboxComposer
 					$state['source'] = $found + array('mode' => $replyMode);
 				}
 			}
-			$state['source_refs'] = array_values(array_filter(array_map(function ($r) {
-				return trim($r, '<>');
-			}, preg_split('/\s+/', $h('References')))));
-			$state['in_reply_to'] = trim($h('In-Reply-To'), " <>");
+			$state['source_refs'] = InboxMailBuilder::messageIds($h('References'));
+			$state['in_reply_to'] = (string) (InboxMailBuilder::messageIds($h('In-Reply-To'))[0] ?? '');
 			foreach ($message->getFileAttachments() as $a) {
 				$this->keepFile($dir, $state, $a['name'], $a['content'], $a['mime']);
 			}
@@ -514,9 +512,7 @@ class InboxComposer
 			$state['source_refs'] = array();
 			foreach ($headers as $pair) {
 				if (strcasecmp($pair[0], 'References') === 0) {
-					$state['source_refs'] = array_values(array_filter(array_map(function ($r) {
-						return trim($r, '<>');
-					}, preg_split('/\s+/', (string) $pair[1]))));
+					$state['source_refs'] = InboxMailBuilder::messageIds((string) $pair[1]);
 				}
 			}
 			$own = array_map('strtolower', array_merge(array((string) $reader->account->email), array_column(array_filter($identities, function ($i) use ($sourceAccount) {
