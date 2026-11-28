@@ -1,16 +1,26 @@
 # Widgets of the Dolibarr panel
 
-On a computer, the column Dolibarr of a mail has three parts: the fixed top (sender, pieces, actions), a grid of
+On a computer, the column Dolibarr of a mail has three parts: the fixed top (sender, pieces), a grid of
 widgets, and the notes docked at the bottom (drag the bar between them to change the height of the notes). The
 widgets are small pieces of information about the other side of the mail: late invoices, open tickets, next event,
 mails exchanged, key figures (revenue, left to pay, last order...), lists (invoices, orders, proposals...), charts,
-and quick actions (open tickets and « New ticket », open proposals and « New proposal »). They follow the rights of
+and quick actions (open tickets and « New ticket », open proposals and « New proposal », invoices and « New
+invoice », orders and « New order », each button only with the right to create). They follow the rights of
 Dolibarr and the switches of the overview ([Overview of a mail](overview.md)): a widget the user may not read is
 never offered nor computed. A widget with nothing to show for a mail keeps its place (a dash, or « Nothing to show »)
 so that the layout does not move from a mail to the next one.
 
 By default the panel shows the least: a few widgets chosen by the usage of the mailbox (Settings > Mailboxes >
 Usage), or none. Each user builds what he needs.
+
+## Actions and blocks of the other modules
+
+Since 1.157.0 the buttons of the other modules (widget « Actions ») and the blocks they add to the panel of a mail
+(for example the meetings with the third party) are widgets too. They show by themselves at the end of the grid, as
+before, until the user moves them (they then keep their place) or removes them (they no longer come, the catalogue
+gives them back). A block is in the catalogue only for a mail where its module shows it, and it is left out of the
+panel for the mails where its module has nothing to say. Without the overview (switched off in the setup) they stay
+in the fixed top as before.
 
 ## Personalize
 

@@ -72,6 +72,11 @@ an `icon` (usage name) and a `url` inside Dolibarr. The panel reads that address
 
 Every text is escaped by the panel. Check the rights in the page: the hook runs for any mail the user opens.
 
+With the widgets of the panel (1.157.0), each block is a widget of the template `free` (id `panel:` and the `id` of
+the block): it comes by itself at the end of the grid, the user may move or remove it ([Widgets of the Dolibarr
+panel](widgets.md)). Keep the `id` of a block stable: it is the key of its place in the layouts of the users. The
+module actions (`inboxMailActions`) are the widget `mail_actions` in the same way.
+
 A block of the panel is for a short summary. For a rich content (figures, charts, lists), prefer a column of the
 strip (below): it is read only when the user opens it, never at each mail opened.
 

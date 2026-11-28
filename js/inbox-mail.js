@@ -6559,7 +6559,9 @@
 		if (data && data.hidden === true) {
 			box._data.panels = (box._data.panels || []).filter(x => x.id !== p.id);
 			const row = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"]', box);
-			if (row) {
+			if (row && I.panelWidgets && row.closest('.ibx-wg-cell')) {
+				I.panelWidgets.refresh();
+			} else if (row) {
 				row.remove();
 			}
 			return;
@@ -6568,6 +6570,10 @@
 		const el = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"] .ibx-mpanel__body', box);
 		if (el) {
 			el.innerHTML = panelBody(box._panels[p.id]);
+			// A widget as high as its new content
+			if (I.panelWidgets && el.closest('.ibx-wg-cell')) {
+				I.panelWidgets.fit();
+			}
 		}
 		if (data && data.pending && tries < 60) {
 			setTimeout(() => loadPanel(box, mail, p, tries + 1), Math.min(30000, Math.max(2000, +data.retry_ms || 3000)));
@@ -7207,7 +7213,27 @@
 			toast(err.message, { error: true });
 		}
 	}
+	/**
+	 * Buttons of the other modules (hook inboxMailActions): in a window of inbox (1.108.0) or a new tab; the markers
+	 * are filled on click, with the mail as it is then
+	 */
+	function modActionsHtml(d) {
+		return (d.actions || []).map((a, i) => a.window
+			? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
+			: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('');
+	}
+	/**
+	 * What the widgets of the panel take from it (1.157.0): the module actions and the blocks of the modules of the mail
+	 * shown, drawn with the markup and the handlers of the panel
+	 */
+	I.dolPanel = {
+		actions: box => (box && box._data ? box._data.actions || [] : []),
+		actionsHtml: box => modActionsHtml(box && box._data ? box._data : {}),
+		panels: box => (box && box._data ? box._data.panels || [] : []),
+		panelBody: (box, id) => panelBody(box && box._panelsMail === box.dataset.mail ? (box._panels || {})[id] : null),
+	};
 	function paintDolibar(box) {
+		const wgOn = !!(I.panelWidgets && I.ctx('INBOX_OVERVIEW', false));
 		const d = box._data;
 		// Phone (1.102.0): a bottom sheet opened by the chips of the head, so always built whole
 		const sheet = isSmallPhone();
@@ -7313,15 +7339,13 @@
 						action: '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-piece__act ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '" aria-label="' + esc(t('InboxLink') + ' ' + (c.ref || '')) + '">' + ic('link') + ' ' + th('InboxLink') + '</button>',
 					})).join('')
 					+ '</span></div>' : '')
-				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
-					// In a window of inbox (1.108.0) or a new tab; the markers are filled on click, with the mail as it is then
-					+ d.actions.map((a, i) => a.window
-						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
-						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
-				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
-					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
+				// With the widgets (1.157.0), the actions and the blocks of the modules are widgets of the grid
+				+ (!wgOn && (d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
+					+ modActionsHtml(d) + '</span></div>' : '')
+				+ (wgOn ? '' : (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
+					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join(''))
 				// Grid of the widgets between the fixed top and the notes docked at the bottom (column of a computer, 1.155.0)
-				+ (I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
+				+ (wgOn ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
 					+ (right && !sheet ? '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" title="' + th('InboxWgDockResize') + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '') : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)

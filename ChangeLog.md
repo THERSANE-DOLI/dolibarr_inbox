@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: module actions and blocks of the modules as widgets of the Dolibarr panel, quick action widgets :   1.157.0
+  - the actions and each block of a module show by themselves at the end of the grid until the user moves or removes
+    them; a block placed is left out for a mail where its module declares nothing.
+  - new widgets « Invoices and new invoice », « Orders and new order », each button behind its right.
+
 - NEW: widgets of the Dolibarr panel on a small screen, with a layout of their own :   1.156.0
   - one column in the band of a tablet and the sheet of a phone, the minis as chips; the large layout until one is saved.
   - edit as a list: grip (drag or arrows) and cross; the catalogue as a sheet, a tap adds.

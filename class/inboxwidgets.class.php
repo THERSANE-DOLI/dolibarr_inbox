@@ -80,8 +80,27 @@ class InboxWidgets
 		'chart_mails' => array('template' => 'chart', 'title' => 'InboxWgChartMails', 'section' => 'mails'),
 		'action_tickets' => array('template' => 'action', 'title' => 'InboxWgActionTickets', 'section' => 'tickets'),
 		'action_proposals' => array('template' => 'action', 'title' => 'InboxWgActionProposals', 'section' => 'proposals'),
+		'action_invoices' => array('template' => 'action', 'title' => 'InboxWgActionInvoices', 'section' => 'invoices'),
+		'action_orders' => array('template' => 'action', 'title' => 'InboxWgActionOrders', 'section' => 'orders'),
+		// The buttons of the other modules (hook inboxMailActions), drawn by the panel from its own data
+		'mail_actions' => array('template' => 'action', 'title' => 'InboxModuleActions', 'section' => null, 'local' => true),
 		'notes' => array('template' => 'thread', 'title' => 'InboxNotesAndReplies', 'section' => null),
 	);
+
+	/**
+	 * Quick actions: the section listed and the piece created for the thirdparty (right: module, permission)
+	 */
+	const ACTIONS = array(
+		'action_tickets' => array('section' => 'tickets', 'right' => array('ticket', 'write'), 'label' => 'InboxWgCreateTicket', 'url' => '/ticket/card.php?action=create&socid='),
+		'action_proposals' => array('section' => 'proposals', 'right' => array('propal', 'creer'), 'label' => 'InboxWgCreateProposal', 'url' => '/comm/propal/card.php?action=create&socid='),
+		'action_invoices' => array('section' => 'invoices', 'right' => array('facture', 'creer'), 'label' => 'InboxWgCreateInvoice', 'url' => '/compta/facture/card.php?action=create&socid='),
+		'action_orders' => array('section' => 'orders', 'right' => array('commande', 'creer'), 'label' => 'InboxWgCreateOrder', 'url' => '/commande/card.php?action=create&socid='),
+	);
+	/**
+	 * A block of another module (hook inboxMailPanels) placed as a widget: « panel: » and the id of the block. The
+	 * blocks and the module actions show at the end of the grid as long as the user did not take them away (« off »)
+	 */
+	const PANEL_ID = '/^panel:[a-z0-9_-]{1,40}$/';
 
 	/** Widgets read in one call at most */
 	const BATCH_MAX = 30;
@@ -131,6 +150,17 @@ class InboxWidgets
 	}
 
 	/**
+	 * A widget a layout may hold: one of the registry, or a block of a module
+	 *
+	 * @param string $id Widget
+	 * @return bool
+	 */
+	public static function known($id)
+	{
+		return isset(self::WIDGETS[$id]) || preg_match(self::PANEL_ID, $id);
+	}
+
+	/**
 	 * Catalogue of the widgets the user may place: those whose section he may read in a thirdparty that is both a
 	 * customer and a supplier (the panel of each mail then shows only what applies), with their size and a preview
 	 *
@@ -153,7 +183,7 @@ class InboxWidgets
 				continue;
 			}
 			$out[] = array('id' => $id, 'template' => $w['template'], 'title' => $langs->transnoentities($w['title']), 'size' => self::size($id),
-				'preview' => $this->preview($id));
+				'preview' => $this->preview($id), 'local' => !empty($w['local']));
 		}
 
 		return $out;
@@ -179,7 +209,7 @@ class InboxWidgets
 		$out = array();
 		foreach (array_slice(array_values(array_unique(array_map('strval', $ids))), 0, self::BATCH_MAX) as $id) {
 			$w = self::WIDGETS[$id] ?? null;
-			if (!$w || $w['template'] === 'thread' || ($w['section'] !== null && !in_array($w['section'], $offered, true))) {
+			if (!$w || $w['template'] === 'thread' || !empty($w['local']) || ($w['section'] !== null && !in_array($w['section'], $offered, true))) {
 				$out[$id] = null;
 				continue;
 			}
@@ -320,14 +350,14 @@ class InboxWidgets
 	{
 		global $langs;
 
-		$s = (int) $ctx['socId'];
-		$sec = $this->sectionOf($user, $ctx, $id === 'action_tickets' ? 'tickets' : 'proposals');
-		$actions = array();
-		if ($id === 'action_tickets' && $user->hasRight('ticket', 'write')) {
-			$actions[] = array('label' => $langs->transnoentities('InboxWgCreateTicket'), 'icon' => 'plus', 'url' => DOL_URL_ROOT.'/ticket/card.php?action=create&socid='.$s);
+		$def = self::ACTIONS[$id] ?? null;
+		if (!$def) {
+			return null;
 		}
-		if ($id === 'action_proposals' && $user->hasRight('propal', 'creer')) {
-			$actions[] = array('label' => $langs->transnoentities('InboxWgCreateProposal'), 'icon' => 'plus', 'url' => DOL_URL_ROOT.'/comm/propal/card.php?action=create&socid='.$s);
+		$sec = $this->sectionOf($user, $ctx, $def['section']);
+		$actions = array();
+		if ($user->hasRight($def['right'][0], $def['right'][1])) {
+			$actions[] = array('label' => $langs->transnoentities($def['label']), 'icon' => 'plus', 'url' => DOL_URL_ROOT.$def['url'].((int) $ctx['socId']));
 		}
 		if (!$sec && !$actions) {
 			return null;
@@ -416,7 +446,7 @@ class InboxWidgets
 	 * Preset of the usage of a mailbox (automatic and none: the one of the sales)
 	 *
 	 * @param int $accountId Mailbox
-	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,at:int}
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,at:int}
 	 */
 	public function preset($accountId)
 	{
@@ -428,14 +458,14 @@ class InboxWidgets
 			$items[] = array('id' => $x[0], 'x' => $x[1], 'y' => $x[2], 'w' => $size['w'], 'h' => $size['h']);
 		}
 
-		return array('items' => $items, 'dock' => 0, 'at' => 0);
+		return array('items' => $items, 'dock' => 0, 'off' => array(), 'at' => 0);
 	}
 
 	/**
 	 * A layout checked: known widgets, each once, inside the grid and the bounds of its template
 	 *
 	 * @param mixed $layout Layout sent
-	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,at:int}|null
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,at:int}|null
 	 */
 	protected function clean($layout)
 	{
@@ -446,7 +476,7 @@ class InboxWidgets
 		$seen = array();
 		foreach ($layout['items'] as $it) {
 			$id = is_array($it) ? (string) ($it['id'] ?? '') : '';
-			if (!isset(self::WIDGETS[$id]) || isset($seen[$id])) {
+			if (!self::known($id) || isset($seen[$id])) {
 				return null;
 			}
 			$seen[$id] = 1;
@@ -459,8 +489,16 @@ class InboxWidgets
 		}
 		// Height of the notes docked at the bottom, in pixels (0: the default)
 		$dock = max(0, min(2000, (int) ($layout['dock'] ?? 0)));
+		// Module actions and blocks taken away by the user: they no longer show by themselves at the end
+		$off = array();
+		foreach (is_array($layout['off'] ?? null) ? array_slice($layout['off'], 0, self::LAYOUT_MAX) : array() as $id) {
+			$id = (string) $id;
+			if (($id === 'mail_actions' || preg_match(self::PANEL_ID, $id)) && !isset($seen[$id]) && !in_array($id, $off, true)) {
+				$off[] = $id;
+			}
+		}
 
-		return array('items' => $items, 'dock' => $dock, 'at' => (int) dol_now());
+		return array('items' => $items, 'dock' => $dock, 'off' => $off, 'at' => (int) dol_now());
 	}
 
 	/**
@@ -534,8 +572,12 @@ class InboxWidgets
 				}
 				return array('title' => $title, 'chart' => array('label' => $title, 'value' => '', 'hint' => '', 'bars' => $bars), 'small' => $id === 'chart_mails');
 			case 'action':
+				if ($id === 'mail_actions') {
+					return array('title' => $title, 'sum' => '', 'rows' => array(),
+						'actions' => array(array('label' => $langs->transnoentities('InboxWgModuleActionSample'), 'icon' => 'magic', 'url' => '')));
+				}
 				return array('title' => $title, 'sum' => '', 'rows' => array($row('A-0001', '1 200'), $row('A-0002', '860')),
-					'actions' => array(array('label' => $langs->transnoentities($id === 'action_tickets' ? 'InboxWgCreateTicket' : 'InboxWgCreateProposal'), 'icon' => 'plus', 'url' => '')));
+					'actions' => array(array('label' => $langs->transnoentities(self::ACTIONS[$id]['label']), 'icon' => 'plus', 'url' => '')));
 			case 'list':
 				return array('title' => $title, 'sum' => '', 'rows' => array($row('A-0001', '1 200', '', 'danger'), $row('A-0002', '860'), $row('A-0003', '2 400')));
 			case 'thread':

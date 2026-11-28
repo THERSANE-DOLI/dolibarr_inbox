@@ -160,4 +160,49 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 		$this->assertNull($w->layouts($reader, (int) $box->id)['desktop']['model']);
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_userparam WHERE fk_account = ".((int) $box->id));
 	}
+
+	/**
+	 * Quick actions (create button by the right) and the module widgets: the module actions offered but drawn by the
+	 * panel, the blocks of the modules and the widgets taken away accepted in a layout
+	 *
+	 * @return void
+	 */
+	public function testActionsAndModuleWidgets()
+	{
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$creator = $this->withRights('wgcreate', array(array('facture', 'lire'), array('facture', 'creer')));
+		$reader = $this->withRights('wgread', array(array('facture', 'lire')));
+		$acc = new InboxAccess($this->db);
+		$acc->grant($this->admin, $box->id, $creator->id, 0, 'read');
+		$acc->grant($this->admin, $box->id, $reader->id, 0, 'read');
+		InboxAccess::clearCache();
+		$soc = $this->soc('inboxtest_wgact', 'compta@wgact.inbox-test.invalid');
+		$this->invoice($soc, true);
+		$mail = $this->mail($box->id, 'compta@wgact.inbox-test.invalid');
+		$w = new InboxWidgets($this->db);
+		$ov = new InboxOverview($this->db);
+
+		$cat = array_column($w->catalogue($creator), null, 'id');
+		$this->assertArrayHasKey('action_invoices', $cat);
+		$this->assertTrue($cat['mail_actions']['local'], 'the module actions are drawn by the panel');
+		$this->assertFalse($cat['action_invoices']['local']);
+
+		$data = $w->data($creator, $ov->context($creator, (int) $mail->rowid), array('action_invoices', 'mail_actions'));
+		$this->assertNotEmpty($data['action_invoices']['rows']);
+		$this->assertCount(1, $data['action_invoices']['actions']);
+		$this->assertStringContainsString('socid='.((int) $soc), $data['action_invoices']['actions'][0]['url']);
+		$this->assertNull($data['mail_actions'], 'never computed by the server');
+		$dataRead = $w->data($reader, $ov->context($reader, (int) $mail->rowid), array('action_invoices'));
+		$this->assertSame(array(), $dataRead['action_invoices']['actions'], 'no button without the right to create');
+
+		$layout = array('items' => array(array('id' => 'panel:my_block', 'x' => 0, 'y' => 0), array('id' => 'mail_actions', 'x' => 0, 'y' => 4)),
+			'off' => array('panel:other-block', 'invoices_late', 'panel:my_block', 'panel:bad id', 'panel:other-block'));
+		$this->assertSame(1, $w->saveUser($reader, (int) $box->id, 'desktop', $layout));
+		$mine = $w->layouts($reader, (int) $box->id)['desktop']['user'];
+		$this->assertSame('panel:my_block', $mine['items'][0]['id']);
+		$this->assertSame(4, $mine['items'][0]['h'], 'a block of a module takes the size of the free template');
+		$this->assertSame(array('panel:other-block'), $mine['off'], 'only module widgets not placed, each once');
+		$this->assertSame(-2, $w->saveUser($reader, (int) $box->id, 'desktop', array('items' => array(array('id' => 'panel:Bad')))), 'id of a block checked');
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_userparam WHERE fk_account = ".((int) $box->id));
+	}
 }

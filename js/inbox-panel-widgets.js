@@ -24,6 +24,10 @@
  * panel) loads GridStack (behind I.grid), puts a veil over the rest of the application and opens the catalogue on the
  * left of the panel: previews dragged into the grid to add, widgets dragged back to the catalogue to remove, each
  * change saved at once. The data of the widgets of a mail are read in one call, kept for the mail.
+ *
+ * The module actions and the blocks of the other modules (1.157.0) are widgets too, drawn from the data of the panel
+ * (I.dolPanel): they show by themselves at the end of the grid as long as the user did not take them away (« off » of
+ * the layout), and a block placed is left out for a mail where its module declares nothing.
  */
 (function () {
 	'use strict';
@@ -39,7 +43,12 @@
 	const version = () => (SMALL.matches ? 'mobile' : 'desktop');
 	const COLUMNS = 4;
 	const GAP = 4;
-	const AUTO = ['list', 'action'];
+	const AUTO = ['list', 'action', 'free'];
+	/** Size of a block of a module: the template free (InboxWidgets::TEMPLATES) */
+	const FREE = { w: 4, h: 4, min_rem: 3.5, min_h: 2, max_w: 4, max_h: 20, resize: 'both' };
+	const PANEL = 'panel:';
+	/** Module actions and blocks: they come by themselves, the user may take them away */
+	const isLocal = id => id === 'mail_actions' || String(id).indexOf(PANEL) === 0;
 	const list = v => (Array.isArray(v) ? v : []);
 
 	/** layouts per mailbox, data per mail, the panel shown, the edit mode */
@@ -91,7 +100,7 @@
 	}
 	async function dataOf(mail, ids) {
 		const have = P.data.get(mail) || {};
-		const missing = ids.filter(id => !(id in have));
+		const missing = ids.filter(id => !(id in have) && !isLocal(id));
 		if (missing.length) {
 			Object.assign(have, await I.widgets.data(mail, missing));
 			P.data.set(mail, have);
@@ -101,9 +110,53 @@
 		}
 		return have;
 	}
+	/** Catalogue of the user, and the blocks the modules declare for the mail shown */
 	async function catalogue() {
 		const cat = await I.widgets.catalogue();
-		return cat.filter(w => w.template !== 'thread');
+		const blocks = I.dolPanel ? I.dolPanel.panels(P.box).map(p => ({ id: PANEL + p.id, template: 'free', title: p.title, icon: p.icon, size: FREE, local: true, block: p.id })) : [];
+		return cat.filter(w => w.template !== 'thread').concat(blocks);
+	}
+	/**
+	 * Widgets to draw for a layout: the placed ones the user may read, then the module actions and blocks of this mail
+	 * not placed nor taken away
+	 * @returns {Array<{it:object, w:object}>}
+	 */
+	function arrange(layout, cat) {
+		const items = list(layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+		const placed = new Set(items.map(it => it.id));
+		const off = list(layout.off);
+		const out = items.map(it => ({ it, w: cat.find(c => c.id === it.id) })).filter(x => x.w);
+		// Not placed yet: as high as their content (from one row in the static grid, the least of the template in the edit grid)
+		cat.filter(w => w.local && !placed.has(w.id) && !off.includes(w.id)).forEach(w => out.push({ it: { id: w.id, x: 0, y: 9999, w: w.size.w, h: w.size.min_h || 2 }, w, auto: true }));
+		return out;
+	}
+	/** Something to show for this mail (no module action: the widget of the actions stays away) */
+	function present(w) {
+		return w.id !== 'mail_actions' || (I.dolPanel && I.dolPanel.actions(P.box).length > 0);
+	}
+	/**
+	 * One widget: from its data, or from the panel for the module actions and blocks
+	 * @param {object} w Definition (catalogue)
+	 * @param {object|null|undefined} data Data (undefined: not read yet, the preview)
+	 * @returns {string}
+	 */
+	function widgetHtml(w, data) {
+		if (w.block) {
+			return String(html`<div class="ibx-wg ibx-wg--free ibx-mpanel" data-panel="${w.block}"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div>`)
+				+ '<div class="ibx-mpanel__body ibx-wg__free">' + I.dolPanel.panelBody(P.box, w.block) + '</div></div>';
+		}
+		if (w.id === 'mail_actions' && present(w)) {
+			return String(html`<div class="ibx-wg ibx-wg--action ibx-wg--modactions"><div class="ibx-wg__head"><span class="ibx-wg__title">${w.title}</span></div>`)
+				+ '<div class="ibx-wg__actions">' + I.dolPanel.actionsHtml(P.box) + '</div></div>';
+		}
+		return String(I.widgets.render(w.template, data === undefined ? w.preview : data, w.preview));
+	}
+	/** Preview in the catalogue: sample values; a block of a module, its title and what it is */
+	function previewHtml(w) {
+		if (w.block) {
+			return String(html`<div class="ibx-wg ibx-wg--free"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div><p class="ibx-wg__note">${t('InboxWgModuleBlockHint')}</p></div>`);
+		}
+		return String(I.widgets.render(w.template, w.preview));
 	}
 
 	// ---------- Static grid (outside the edit mode) ----------
@@ -143,40 +196,47 @@
 			return paintFlow(zone, mail, l);
 		}
 		const eff = effective(l);
-		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+		const cat = await catalogue().catch(() => []);
+		if (P.zone !== zone || P.mail !== mail) {
+			return;
+		}
+		// A placed widget the user may no longer read is left out (rights changed), its place kept in the layout
+		const shown = arrange(eff.layout, cat).filter(x => present(x.w));
 		const body = zone.closest('.ibx-dolibar__body');
 		if (body) {
-			body.classList.toggle('has-widgets', items.length > 0);
+			body.classList.toggle('has-widgets', shown.length > 0);
 			if (eff.layout.dock > 0) {
 				body.style.setProperty('--ibx-dock-h', eff.layout.dock + 'px');
 			} else {
 				body.style.removeProperty('--ibx-dock-h');
 			}
 		}
-		zone.hidden = !items.length && !banner(l, eff);
-		if (!items.length) {
+		zone.hidden = !shown.length && !banner(l, eff);
+		if (!shown.length) {
 			zone.innerHTML = banner(l, eff);
 			return;
 		}
-		const cat = await catalogue().catch(() => []);
-		const tpl = id => (cat.find(w => w.id === id) || {}).template || '';
-		const hint = id => (cat.find(w => w.id === id) || {}).preview;
-		const size = id => (cat.find(w => w.id === id) || {}).size || {};
-		// A placed widget the user may no longer read is left out (rights changed), its place kept in the layout
-		const shown = items.filter(it => tpl(it.id));
-		const data = await dataOf(mail, shown.map(it => it.id)).catch(() => ({}));
+		const data = await dataOf(mail, shown.map(x => x.it.id)).catch(() => ({}));
 		if (P.zone !== zone || P.mail !== mail) {
 			return;
 		}
 		const unit = rowUnit();
 		zone.innerHTML = banner(l, eff) + '<div class="ibx-wggrid" style="--ibx-wg-unit:' + unit + 'px">'
-			+ shown.map(it => '<div class="ibx-wg-cell" data-wid="' + it.id + '" data-template="' + tpl(it.id) + '" data-maxh="' + (size(it.id).max_h || it.h) + '"'
-				+ ' style="grid-column:' + (it.x + 1) + ' / span ' + it.w + ';grid-row:span ' + it.h + '">'
-				+ String(I.widgets.render(tpl(it.id), data[it.id] === undefined ? null : data[it.id], hint(it.id))) + '</div>').join('')
+			+ shown.map(({ it, w, auto }) => '<div class="ibx-wg-cell" data-wid="' + I.esc(it.id) + '" data-template="' + w.template + '" data-maxh="' + (w.size.max_h || it.h) + '"'
+				+ ' style="grid-column:' + (it.x + 1) + ' / span ' + it.w + ';grid-row:span ' + (auto ? 1 : it.h) + '">'
+				+ widgetHtml(w, data[it.id] === undefined ? null : data[it.id]) + '</div>').join('')
 			+ '</div>';
 		I.mount(zone);
-		// Lists and actions as high as their content, up to their maximum (« auto » height)
-		$$('.ibx-wg-cell', zone).forEach(cell => {
+		fit(zone);
+	}
+	/** Lists, actions and blocks as high as their content, up to their maximum (« auto » height) */
+	function fit(zone) {
+		zone = zone || P.zone;
+		if (!zone || P.edit) {
+			return;
+		}
+		const unit = rowUnit();
+		$$('.ibx-wggrid > .ibx-wg-cell', zone).forEach(cell => {
 			if (!AUTO.includes(cell.dataset.template)) {
 				return;
 			}
@@ -199,32 +259,36 @@
 			}
 		});
 	}
+	/** Drawn again (a block of a module gone for this mail) */
+	function refresh() {
+		if (!P.edit && P.zone && P.zone.isConnected && P.account) {
+			layoutsOf(P.account).then(l => paintStatic(P.zone, P.mail, l)).catch(() => {});
+		}
+	}
 	/**
 	 * Small screen: the widgets one under the other in the order of the layout, the minis side by side as chips,
 	 * the lists as high as their content; the menu of the widgets at the end (the head of the band is a button)
 	 */
 	async function paintFlow(zone, mail, l) {
 		const eff = effective(l);
-		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
 		zone.hidden = false;
 		const cat = await catalogue().catch(() => []);
-		const def = id => cat.find(w => w.id === id);
-		const shown = items.filter(it => def(it.id));
-		const data = shown.length ? await dataOf(mail, shown.map(it => it.id)).catch(() => ({})) : {};
+		const shown = arrange(eff.layout, cat).filter(x => present(x.w));
+		const data = shown.length ? await dataOf(mail, shown.map(x => x.it.id)).catch(() => ({})) : {};
 		if (P.zone !== zone || P.mail !== mail) {
 			return;
 		}
 		const unit = rowUnit();
 		zone.innerHTML = banner(l, eff) + '<div class="ibx-wglist">'
-			+ shown.map(it => flowCell(def(it.id), data[it.id] === undefined ? null : data[it.id], unit, false)).join('')
+			+ shown.map(({ it, w }) => flowCell(w, data[it.id] === undefined ? null : data[it.id], unit, false)).join('')
 			+ '</div>' + String(html`<div class="ibx-wgflowfoot"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-wgmenu" aria-haspopup="menu" title="${t('InboxWgMenu')}" aria-label="${t('InboxWgMenu')}">${raw(ic('more'))}</button></div>`);
 		I.mount(zone);
 	}
 	/** One widget in the column of a small screen (edit: with its grip and its cross) */
 	function flowCell(w, data, unit, edit) {
 		const fixed = ['chart', 'figure'].includes(w.template) ? ' style="height:' + (w.size.h * unit + (w.size.h - 1) * GAP) + 'px"' : '';
-		return '<div class="ibx-wg-cell ibx-wg-cell--flow ibx-wgflow--' + w.template + '" data-wid="' + w.id + '"' + fixed + '>'
-			+ String(I.widgets.render(w.template, data, w.preview))
+		return '<div class="ibx-wg-cell ibx-wg-cell--flow ibx-wgflow--' + w.template + '" data-wid="' + I.esc(w.id) + '"' + fixed + '>'
+			+ widgetHtml(w, data)
 			+ (edit ? String(html`<div class="ibx-wgflowtools"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wgmove" title="${t('InboxWgMove')}" aria-label="${t('InboxWgMove')} ${w.title}">${raw(ic('grip'))}</button>
 				<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wgflowremove" data-wid="${w.id}" title="${t('InboxWgRemove')}" aria-label="${t('InboxWgRemove')} ${w.title}">${raw(ic('close'))}</button></div>`) : '')
 			+ '</div>';
@@ -274,7 +338,7 @@
 	 */
 	async function saveLayout(action, layout) {
 		try {
-			const res = await post('widget', action, { account: P.account, version: version(), layout: layout ? { items: layout.items, dock: layout.dock || 0 } : null });
+			const res = await post('widget', action, { account: P.account, version: version(), layout: layout ? { items: layout.items, dock: layout.dock || 0, off: layout.off || [] } : null });
 			P.layouts.set(P.account, Promise.resolve(res));
 			if (!P.edit && P.zone) {
 				await paintStatic(P.zone, P.mail, res);
@@ -316,7 +380,7 @@
 				}
 				const l = await layoutsOf(P.account);
 				const eff = effective(l);
-				await saveLayout('save', { items: eff.layout.items, dock: Math.round(h) });
+				await saveLayout('save', { items: eff.layout.items, dock: Math.round(h), off: eff.layout.off });
 			};
 			sp.addEventListener('pointermove', move);
 			sp.addEventListener('pointerup', up);
@@ -331,7 +395,7 @@
 			const h = Math.max(144, notes.getBoundingClientRect().height + (e.key === 'ArrowUp' ? 24 : -24));
 			body.style.setProperty('--ibx-dock-h', h + 'px');
 			const eff = effective(await layoutsOf(P.account));
-			await saveLayout('save', { items: eff.layout.items, dock: Math.round(h) });
+			await saveLayout('save', { items: eff.layout.items, dock: Math.round(h), off: eff.layout.off });
 		});
 	}
 
@@ -441,6 +505,11 @@
 		if (body) {
 			body.classList.add('has-widgets');
 		}
+		// Heights reached in the static grid: the module widgets not placed yet keep them in the edit grid
+		const spans = {};
+		$$('.ibx-wggrid > .ibx-wg-cell', zone).forEach(c => {
+			spans[c.dataset.wid] = +((c.style.gridRow.match(/span (\d+)/) || [])[1] || 0);
+		});
 		zone.hidden = false;
 		zone.innerHTML = '<div class="grid-stack ibx-wgedit-grid"></div>';
 		if (!$('.ibx-wgbackdrop')) {
@@ -459,6 +528,9 @@
 					return;
 				}
 				const n = nodes[0];
+				if (n) {
+					takeAway(String(n.id), true);
+				}
 				queueSave();
 				paintCatalogue();
 				if (n) {
@@ -466,6 +538,7 @@
 					const was = { x: n.x, y: n.y, w: n.w, h: n.h };
 					I.toast(t('InboxWgRemoved', w ? w.title : n.id), { action: t('InboxUndo'), onAction: () => {
 						if (P.edit && w) {
+							takeAway(w.id, false);
 							addEdit(g, w, was, cellPx);
 							queueSave();
 							paintCatalogue();
@@ -479,12 +552,8 @@
 		P.edit.cellPx = cellPx;
 		P.edit.silent = true;
 		const eff = effective(l);
-		list(eff.layout.items).forEach(it => {
-			const w = cat.find(c => c.id === it.id);
-			if (w) {
-				addEdit(g, w, it, cellPx);
-			}
-		});
+		keepAside(eff.layout, cat);
+		arrange(eff.layout, cat).forEach(({ it, w, auto }) => addEdit(g, w, auto ? Object.assign({}, it, { h: Math.max(w.size.min_h || 2, Math.min(w.size.max_h || 20, spans[it.id] || w.size.h)) }) : it, cellPx));
 		P.edit.silent = false;
 		P.edit.dock = eff.layout.dock || 0;
 		paintCatalogue();
@@ -500,9 +569,9 @@
 		el.dataset.wid = w.id;
 		const content = $('.grid-stack-item-content', el);
 		const data = (P.data.get(P.mail) || {})[w.id];
-		content.innerHTML = '<div class="ibx-wg-cell">' + String(I.widgets.render(w.template, data === undefined ? w.preview : data, w.preview)) + '</div>'
+		content.innerHTML = '<div class="ibx-wg-cell">' + (w.local && !present(w) ? previewHtml(w) : widgetHtml(w, data)) + '</div>'
 			+ String(html`<div class="ibx-wgframe"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wgremove" data-wid="${w.id}" title="${t('InboxWgRemove')}" aria-label="${t('InboxWgRemove')} ${w.title}">${raw(ic('close'))}</button></div>`);
-		if (data === undefined) {
+		if (data === undefined && !w.local) {
 			dataOf(P.mail, [w.id]).then(d => {
 				const cell = $('.ibx-wg-cell', content);
 				if (cell && P.edit) {
@@ -525,6 +594,7 @@
 		if (!w || placedIds().includes(id)) {
 			return;
 		}
+		takeAway(id, false);
 		if (P.edit.flow) {
 			addFlow(w);
 			return;
@@ -609,15 +679,41 @@
 		}
 		return P.edit.flow ? $$('.ibx-wglist .ibx-wg-cell', P.zone).map(c => c.dataset.wid) : I.grid.items(P.edit.grid).map(i => i.id);
 	}
-	/** Layout being edited: the grid, or the list of a small screen (one column, in its order) */
+	/**
+	 * Layout being edited: the grid, or the list of a small screen (one column, in its order); and the placed widgets
+	 * that cannot be drawn here (a block of a module absent for this mail, a right withdrawn), kept at the end
+	 */
 	function editedItems() {
+		let items;
 		if (P.edit.flow) {
-			return placedIds().map((id, i) => {
+			items = placedIds().map((id, i) => {
 				const w = P.edit.cat.find(c => c.id === id);
 				return { id, x: 0, y: i, w: w ? w.size.w : 4, h: w ? w.size.h : 2 };
 			});
+		} else {
+			items = I.grid.items(P.edit.grid);
 		}
-		return I.grid.items(P.edit.grid);
+		const bottom = items.reduce((m, it) => Math.max(m, it.y + it.h), 0);
+		return items.concat(list(P.edit.kept).filter(k => !items.some(it => it.id === k.id)).map((k, i) => Object.assign({}, k, { y: bottom + i })));
+	}
+	/** The edited layout, to save */
+	function edited() {
+		return { items: editedItems(), dock: P.edit.dock || 0, off: list(P.edit.off) };
+	}
+	/** Placed widgets not drawn while editing, and the module widgets taken away */
+	function keepAside(layout, cat) {
+		P.edit.kept = list(layout.items).filter(it => !cat.some(c => c.id === it.id));
+		P.edit.off = list(layout.off).slice();
+	}
+	/** A module action or block taken away (it no longer comes by itself), or put back */
+	function takeAway(id, away) {
+		if (!P.edit || !isLocal(id)) {
+			return;
+		}
+		P.edit.off = list(P.edit.off).filter(x => x !== id);
+		if (away) {
+			P.edit.off.push(id);
+		}
 	}
 	let saveTimer = 0;
 	function queueSave() {
@@ -627,7 +723,7 @@
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
 			if (P.edit && (P.edit.grid || P.edit.flow)) {
-				saveLayout('save', { items: editedItems(), dock: P.edit.dock || 0 });
+				saveLayout('save', edited());
 			}
 		}, 400);
 	}
@@ -656,14 +752,11 @@
 			document.body.appendChild(veil);
 		}
 		const eff = effective(l);
-		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).filter(it => cat.find(w => w.id === it.id));
+		keepAside(eff.layout, cat);
 		const data = P.data.get(P.mail) || {};
 		const unit = rowUnit();
 		zone.hidden = false;
-		zone.innerHTML = '<div class="ibx-wglist is-edit">' + items.map(it => {
-			const w = cat.find(c => c.id === it.id);
-			return flowCell(w, data[w.id] === undefined ? w.preview : data[w.id], unit, true);
-		}).join('') + '</div>';
+		zone.innerHTML = '<div class="ibx-wglist is-edit">' + arrange(eff.layout, cat).map(({ w }) => flowCell(w, data[w.id], unit, true)).join('') + '</div>';
 		openCatalogue(holder, l, cat);
 		// The Dolibarr part is itself a sheet at the bottom on a phone: the catalogue goes on top, both half high
 		$('.ibx-wgcat').classList.add('is-sheet');
@@ -678,9 +771,9 @@
 			return;
 		}
 		const data = (P.data.get(P.mail) || {})[w.id];
-		listEl.insertAdjacentHTML('beforeend', flowCell(w, data === undefined ? w.preview : data, rowUnit(), true));
+		listEl.insertAdjacentHTML('beforeend', flowCell(w, data, rowUnit(), true));
 		const cell = listEl.lastElementChild;
-		if (data === undefined) {
+		if (data === undefined && !w.local) {
 			dataOf(P.mail, [w.id]).then(d => {
 				// The content only: the widget keeps its place, its focus and its handlers
 				const wg = $(':scope > .ibx-wg', cell);
@@ -695,12 +788,12 @@
 	}
 	async function endEditFlow() {
 		clearTimeout(saveTimer);
-		const items = editedItems();
+		const layout = Object.assign(edited(), { dock: 0 });
 		P.edit = null;
 		document.body.classList.remove('is-wgediting');
 		$$('.is-wgedit').forEach(x => x.classList.remove('is-wgedit'));
 		$$('.ibx-wgbackdrop, .ibx-wgcat').forEach(x => x.remove());
-		const res = await saveLayout('save', { items, dock: 0 });
+		const res = await saveLayout('save', layout);
 		if (!res && P.zone) {
 			await paintStatic(P.zone, P.mail, await layoutsOf(P.account));
 		}
@@ -758,8 +851,7 @@
 		}
 		clearTimeout(saveTimer);
 		const g = P.edit.grid;
-		const items = g ? I.grid.items(g) : null;
-		const dock = P.edit.dock || 0;
+		const layout = g ? edited() : null;
 		if (g) {
 			I.grid.destroy(g);
 		}
@@ -767,7 +859,7 @@
 		document.body.classList.remove('is-wgediting');
 		$$('.is-wgedit').forEach(x => x.classList.remove('is-wgedit'));
 		$$('.ibx-wgbackdrop, .ibx-wgcat').forEach(x => x.remove());
-		const res = items ? await saveLayout('save', { items, dock }) : null;
+		const res = layout ? await saveLayout('save', layout) : null;
 		if (!res && P.zone) {
 			await paintStatic(P.zone, P.mail, await layoutsOf(P.account));
 		}
@@ -836,7 +928,7 @@
 		}
 		const placed = new Set(placedIds());
 		const q = (box._q || '').toLowerCase();
-		const groups = ['mini', 'line', 'figure', 'list', 'chart', 'action'];
+		const groups = ['mini', 'line', 'figure', 'list', 'chart', 'action', 'free'];
 		const unit = rowUnit();
 		const body = groups.map(tpl => {
 			const ws = P.edit.cat.filter(w => w.template === tpl && (w.title + ' ' + t('InboxWgTemplate_' + tpl)).toLowerCase().includes(q));
@@ -849,7 +941,7 @@
 					return '<div class="ibx-wgprev' + (tpl === 'mini' ? ' is-mini' : '') + (on ? ' is-placed' : '') + '" data-wid="' + w.id + '"'
 						+ (on ? ' aria-disabled="true"' : ' role="button" tabindex="0" aria-label="' + I.esc(w.title) + '"')
 						+ ' style="--ibx-wgprev-h:' + (w.size.h * unit + (w.size.h - 1) * GAP) + 'px">'
-						+ '<div class="ibx-wgprev__box"><div class="ibx-wg-cell">' + String(I.widgets.render(w.template, w.preview)) + '</div></div>'
+						+ '<div class="ibx-wgprev__box"><div class="ibx-wg-cell">' + previewHtml(w) + '</div></div>'
 						+ String(html`<span class="ibx-wgprev__name">${w.title}${on ? ' · ' + t('InboxWgPlaced') : ''}</span>`) + '</div>';
 				}).join('') + '</div>';
 		}).join('');
@@ -874,7 +966,7 @@
 		if (!P.edit || (!P.edit.grid && !P.edit.flow)) {
 			return;
 		}
-		const res = await saveLayout('savemodel', { items: editedItems(), dock: P.edit.dock || 0 });
+		const res = await saveLayout('savemodel', edited());
 		if (res) {
 			I.toast(t('InboxWgModelSaved'));
 		}
@@ -898,10 +990,12 @@
 			const parent = cell.parentElement;
 			const w = P.edit.cat.find(c => c.id === cell.dataset.wid);
 			cell.remove();
+			takeAway(cell.dataset.wid, true);
 			queueSave();
 			paintCatalogue();
 			I.toast(t('InboxWgRemoved', w ? w.title : ''), { action: t('InboxUndo'), onAction: () => {
 				if (P.edit && P.edit.flow && parent.isConnected) {
+					takeAway(cell.dataset.wid, false);
 					parent.insertBefore(cell, next && next.parentElement === parent ? next : null);
 					queueSave();
 					paintCatalogue();
@@ -970,5 +1064,5 @@
 		}
 	});
 
-	I.panelWidgets = { mount, edit: () => startEdit(false), done: endEdit };
+	I.panelWidgets = { mount, edit: () => startEdit(false), done: endEdit, fit: () => fit(), refresh };
 })();

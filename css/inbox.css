@@ -3467,6 +3467,14 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-wg__actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: auto; }
 .ibx-wg__actions .ibx-btn { flex: 1 1 auto; justify-content: center; text-decoration: none; }
 .ibx-wg__actions .ibx-btn[aria-disabled="true"] { opacity: .7; cursor: default; }
+/* Module actions (1.157.0): only their buttons, side by side */
+.ibx-wg--modactions .ibx-wg__actions { margin-top: 0; }
+/* Free: a block of another module (hook inboxMailPanels), its summary drawn by the panel */
+.ibx-wg__title .ibx-icon { width: 0.875rem; height: 0.875rem; vertical-align: -0.125rem; }
+.ibx-wg__free { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; min-height: 0; overflow: auto; }
+.ibx-wg--free > .ibx-wg__note { margin: 0; white-space: normal; }
+/* While personalizing: the content of a widget is not clicked (a click picks the widget up) */
+.ibx-wgedit-grid .grid-stack-item-content > .ibx-wg-cell, .ibx-wglist.is-edit > .ibx-wg-cell > .ibx-wg { pointer-events: none; }
 /* Steps by the size obtained */
 @container (max-width: 6.5rem) {
 	.ibx-wg--mini .ibx-wg__label, .ibx-wg--line .ibx-wg__note { display: none; }
@@ -3516,7 +3524,7 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-wgcat { position: fixed; top: var(--ibx-s3); bottom: var(--ibx-s3); z-index: 66; display: flex; flex-direction: column; width: 19rem; max-width: calc(100vw - 2rem);
 	background: var(--ibx-bg-pane); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); font-size: var(--ibx-fs-sm); }
 .ibx-wgcat__head { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
-.ibx-wgcat__search { margin: var(--ibx-s2) var(--ibx-s3) 0; }
+.ibx-wgcat__search { box-sizing: border-box; width: calc(100% - 2 * var(--ibx-s3)); flex: none; margin: var(--ibx-s2) var(--ibx-s3) 0; }
 .ibx-wgcat__hint { margin: var(--ibx-s1) var(--ibx-s3) 0; color: var(--ibx-text-muted); font-size: var(--ibx-fs-xs); }
 .ibx-wgcat__list { flex: 1; min-height: 0; overflow: auto; padding: var(--ibx-s2) var(--ibx-s3); display: flex; flex-direction: column; gap: var(--ibx-s2); }
 .ibx-wgcat__group { margin-top: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }

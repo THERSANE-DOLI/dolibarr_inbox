@@ -40,7 +40,11 @@ section, and its data is computed only for the mails of a mailbox he can read.
   `list_interventions`, `list_card`.
 - Chart: `chart_revenue`, `chart_mails`.
 - Action: `action_tickets` (button « New ticket » with the right to create tickets), `action_proposals` (« New
-  proposal » with the right to create proposals).
+  proposal » with the right to create proposals), `action_invoices` (« New invoice »), `action_orders` (« New
+  order »), defined by `InboxWidgets::ACTIONS`; `mail_actions`: the buttons of the hook `inboxMailActions`
+  (`local`: drawn by the panel from its own data, never computed by `ajax/widget.php`).
+- Free: `panel:<id>`, a block of the hook `inboxMailPanels` (not in the catalogue of the server: the panel adds the
+  blocks of the mail shown).
 - Thread: `notes`.
 
 ## Data
@@ -66,9 +70,13 @@ Formats (every text escaped when drawn, links kept inside Dolibarr):
 ## Layouts (1.155.0)
 
 Stored in `llx_inbox_userparam`: `widgets_desktop` / `widgets_mobile` for a user and a mailbox, `widgets_model_desktop`
-/ `widgets_model_mobile` with `fk_user` = 0 for the model of a mailbox. Value: `{items: [{id, x, y, w, h}], dock, at}`
-(`dock`: height of the notes in pixels, 0 the default; `at`: date of the saving). Checked by `InboxWidgets::clean()`:
-known widgets, each once, 40 at most, sizes and places kept inside the grid and the bounds of the template.
+/ `widgets_model_mobile` with `fk_user` = 0 for the model of a mailbox. Value: `{items: [{id, x, y, w, h}], dock, off,
+at}` (`dock`: height of the notes in pixels, 0 the default; `off`: the module widgets, `mail_actions` and `panel:*`,
+the user took away; `at`: date of the saving). Checked by `InboxWidgets::clean()`: known widgets (or `panel:` and an
+id), each once, 40 at most, sizes and places kept inside the grid and the bounds of the template.
+
+The module widgets not placed and not in `off` are drawn at the end of the grid (1.157.0); a placed one with nothing
+for the mail shown (no action, no block) is left out of the panel and kept in the layout when it is edited.
 
 `ajax/widget.php`: `action=layout&account=<mailbox>` gives `manager`, `preset` and, per version, `user` and `model`
 (null when none); `save`, `reset` (the user's), `savemodel`, `removemodel` (a manager of the mailbox, written in its
