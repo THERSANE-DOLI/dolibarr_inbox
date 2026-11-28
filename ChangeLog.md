@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: objects of the modules as pieces, linked to the mails, found by « Link », created from a mail :   1.164.0
+  - hook inboxElementTypes: element, rights, access, table and fields searched, page and trigger of creation,
+    trigger of deletion; every declaration checked, never a type nor a trigger of the core.
+  - capability « element_types »; two keys of the widgets renamed.
+
 - NEW: something left to do on an event of a module, as a button under the event in the agenda panel :   1.163.0
   - field « todo » of the hook inboxAgendaEvents: its page opens in a window of inbox, the panel read again after.
   - capability « agenda_todo » announced to the hooks of the agenda and of a mail.

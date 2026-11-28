@@ -84,6 +84,9 @@ class InboxElements
 	/** @var DoliDB */
 	protected $db;
 
+	/** @var array<string,array<string,mixed>>|null Types of the core and of the modules, read once per request */
+	protected static $registry = null;
+
 	/**
 	 * @param DoliDB $db Database handler
 	 */
@@ -93,12 +96,159 @@ class InboxElements
 	}
 
 	/**
+	 * Types of pieces: the ones of the core, then the objects the modules declare (hook inboxElementTypes, 1.164.0)
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function types()
+	{
+		if (self::$registry === null) {
+			self::$registry = self::TYPES;
+			global $db, $hookmanager;
+			if (is_object($db)) {
+				if (!is_object($hookmanager)) {
+					include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+					$hookmanager = new HookManager($db);
+				}
+				$hookmanager->initHooks(array('inbox'));
+				$parameters = array();
+				$object = null;
+				$action = '';
+				if ($hookmanager->executeHooks('inboxElementTypes', $parameters, $object, $action) >= 0 && is_array($hookmanager->resArray['types'] ?? null)) {
+					foreach (self::normalizeTypes($hookmanager->resArray['types']) as $t => $def) {
+						if (!isset(self::$registry[$t])) {
+							self::$registry[$t] = $def;
+						}
+					}
+				}
+			}
+		}
+
+		return self::$registry;
+	}
+
+	/**
+	 * The registry read again (tests, a module enabled in the request)
+	 *
+	 * @param array<string,array<string,mixed>>|null $types Types to use, null to read the hook again
+	 * @return void
+	 */
+	public static function reset($types = null)
+	{
+		self::$registry = $types;
+	}
+
+	/**
+	 * Types of pieces declared by modules, checked: names and fields of the database by strict patterns, rights as
+	 * lists of words, addresses of this site; the type is « source_name », never one of the core
+	 *
+	 * @param array<int|string,mixed> $declared Declared
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function normalizeTypes(array $declared)
+	{
+		$word = '/^[a-z0-9_]{1,40}$/';
+		$rights = function ($list) {
+			$out = array();
+			foreach (is_array($list) ? $list : array() as $r) {
+				if (!is_array($r) || count($r) < 2 || count($r) > 3) {
+					return null;
+				}
+				$r = array_map('strval', array_values($r));
+				foreach ($r as $w) {
+					if (!preg_match('/^[a-z0-9_]{1,40}$/', $w)) {
+						return null;
+					}
+				}
+				$out[] = $r;
+			}
+			return $out;
+		};
+		$out = array();
+		foreach ($declared as $d) {
+			if (!is_array($d)) {
+				continue;
+			}
+			$source = (string) ($d['source'] ?? '');
+			$name = (string) ($d['name'] ?? '');
+			if (!preg_match('/^[a-z0-9_]{1,30}$/', $source) || !preg_match('/^[a-z0-9_]{1,30}$/', $name)) {
+				continue;
+			}
+			$type = $source.'_'.$name;
+			$read = $rights($d['rights'] ?? null);
+			$write = $rights($d['write'] ?? array());
+			$access = is_array($d['access'] ?? null) ? array_values(array_map('strval', array_slice($d['access'], 0, 5))) : array();
+			$search = is_array($d['search'] ?? null) ? array_values(array_map('strval', $d['search'])) : array();
+			$table = (string) ($d['table'] ?? '');
+			$soc = (string) ($d['soc'] ?? '');
+			$key = (string) ($d['key'] ?? 'rowid');
+			$element = (string) ($d['element'] ?? '');
+			if (isset(self::TYPES[$type]) || !$read || $write === null || !$access || !preg_match('/^[a-z0-9_]{1,40}$/', $access[0])
+				|| count(array_filter($access, function ($a) {
+					return !preg_match('/^[a-zA-Z0-9_&|@]{0,80}$/', $a);
+				})) || !preg_match('/^[a-z0-9_]{1,64}$/', $table) || !preg_match($word, $key) || ($soc !== '' && !preg_match($word, $soc))
+				|| !$search || count(array_filter($search, function ($f) use ($word) {
+					return !preg_match($word, $f);
+				})) || !preg_match('/^[a-z0-9_]{1,40}(@[a-z0-9_]{1,40})?$/', $element) || !preg_match($word, (string) ($d['module'] ?? ''))
+				|| empty($d['label'])) {
+				continue;
+			}
+			$def = array('module' => (string) $d['module'], 'rights' => $read, 'write' => $write, 'access' => $access, 'table' => $table, 'key' => $key,
+				'search' => $search, 'soc' => $soc, 'entity' => preg_match($word, (string) ($d['entity'] ?? '')) ? (string) $d['entity'] : $name,
+				'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($d['icon'] ?? '')) ? (string) $d['icon'] : 'document',
+				'label' => dol_trunc(trim(dol_string_nohtmltag((string) $d['label'])), 60, 'right', 'UTF-8', 1), 'element' => $element, 'source' => $source);
+			// Page of creation and triggers: the piece created there linked to its mail, its links forgotten when deleted
+			$create = is_array($d['create'] ?? null) ? $d['create'] : array();
+			$url = (string) ($create['url'] ?? '');
+			$trigger = (string) ($create['trigger'] ?? '');
+			require_once __DIR__.'/inboxcreate.class.php';
+			if (preg_match('/^[A-Z0-9_]{1,60}$/', $trigger) && InboxCreate::localUrl($url)) {
+				$def['create'] = array('url' => $url, 'trigger' => $trigger);
+			}
+			if (preg_match('/^[A-Z0-9_]{1,60}$/', (string) ($d['delete'] ?? ''))) {
+				$def['delete'] = (string) $d['delete'];
+			}
+			$out[$type] = $def;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A piece loaded, of the core or of a module (its element for Dolibarr)
+	 *
+	 * @param int    $id   Record
+	 * @param string $type Type
+	 * @return object|null
+	 */
+	public static function fetch($id, $type)
+	{
+		$element = self::types()[$type]['element'] ?? $type;
+		$o = fetchObjectByElement((int) $id, $element, '', 1, 50);
+
+		return is_object($o) && !empty($o->id) ? $o : null;
+	}
+
+	/**
+	 * Rights to change a piece of this type (core or module), any of them
+	 *
+	 * @param string $type Type
+	 * @return array<int,array<int,string>>|null
+	 */
+	public static function writeRights($type)
+	{
+		return self::WRITE[$type] ?? (self::types()[$type]['write'] ?? null);
+	}
+
+	/**
 	 * @param string $type Type
 	 * @return bool A known type whose module is enabled
 	 */
 	public static function enabled($type)
 	{
-		return isset(self::TYPES[$type]) && isModEnabled(self::TYPES[$type]['module']);
+		$types = self::types();
+
+		return isset($types[$type]) && isModEnabled($types[$type]['module']);
 	}
 
 	/**
@@ -113,7 +263,7 @@ class InboxElements
 		if (!self::enabled($type)) {
 			return false;
 		}
-		foreach (self::TYPES[$type]['rights'] as $r) {
+		foreach (self::types()[$type]['rights'] as $r) {
 			if (count($r) === 3 ? $user->hasRight($r[0], $r[1], $r[2]) : $user->hasRight($r[0], $r[1])) {
 				return true;
 			}
@@ -131,10 +281,11 @@ class InboxElements
 	 */
 	public static function canWriteType(User $user, $type)
 	{
-		if (!self::enabled($type) || !isset(self::WRITE[$type])) {
+		$write = self::writeRights($type);
+		if (!self::enabled($type) || !$write) {
 			return false;
 		}
-		foreach (self::WRITE[$type] as $r) {
+		foreach ($write as $r) {
 			if (count($r) === 3 ? $user->hasRight($r[0], $r[1], $r[2]) : $user->hasRight($r[0], $r[1])) {
 				return true;
 			}
@@ -156,7 +307,7 @@ class InboxElements
 		if ((int) $id <= 0 || !self::canReadType($user, $type)) {
 			return false;
 		}
-		$a = self::TYPES[$type]['access'];
+		$a = self::types()[$type]['access'];
 
 		return checkUserAccessToObject($user, array($a[0]), (int) $id, $a[1], $a[2] ?? '', $a[3] ?? '', $a[4] ?? 'rowid');
 	}
@@ -217,13 +368,14 @@ class InboxElements
 	{
 		global $langs;
 
-		$icon = self::TYPES[$type]['icon'] ?? 'link';
-		$kind = isset(self::TYPES[$type]) ? $langs->transnoentities(self::TYPES[$type]['label']) : $type;
+		$types = self::types();
+		$icon = $types[$type]['icon'] ?? 'link';
+		$kind = isset($types[$type]) ? $langs->transnoentities($types[$type]['label']) : $type;
 		if (!self::canRead($user, $type, $id)) {
 			return array('type' => $type, 'id' => (int) $id, 'readable' => false, 'icon' => $icon, 'kind' => $kind);
 		}
-		$o = fetchObjectByElement((int) $id, $type, '', 1, 50);
-		if (!is_object($o) || empty($o->id)) {
+		$o = self::fetch((int) $id, $type);
+		if (!$o) {
 			return null;
 		}
 		// Tooltip of Dolibarr, built by the application: the parameters of the ajax tooltip of getNomUrl (data-params, read
@@ -352,7 +504,7 @@ class InboxElements
 		$contains = dol_strlen($q) >= self::CONTAINS_FROM;
 		$found = array();
 		$order = 0;
-		foreach (self::TYPES as $type => $t) {
+		foreach (self::types() as $type => $t) {
 			$order++;
 			if ($types === null ? in_array($type, self::SEARCH_ON_DEMAND, true) : !in_array($type, $types, true)) {
 				continue;
@@ -372,10 +524,13 @@ class InboxElements
 				}
 				$where[] = "(".implode(' OR ', $or).")";
 				$exact = "CASE WHEN t.".$main." = '".$exactValue."' THEN 1 ELSE 0 END";
-			} else {
+			} elseif ($t['soc'] !== '') {
 				$where[] = "t.".$t['soc']." = ".((int) $socId);
+			} else {
+				// A type without thirdparty: nothing to show without words
+				continue;
 			}
-			$near = $socId > 0 ? "CASE WHEN t.".$t['soc']." = ".((int) $socId)." THEN 1 ELSE 0 END" : "0";
+			$near = $socId > 0 && $t['soc'] !== '' ? "CASE WHEN t.".$t['soc']." = ".((int) $socId)." THEN 1 ELSE 0 END" : "0";
 			$starts = $q !== '' ? "CASE WHEN t.".$main." LIKE '".$like."%' THEN 1 ELSE 0 END" : "0";
 			$rows = $this->db->getRows("SELECT t.".$key." as rowid, ".$exact." as exact, ".$near." as near, ".$starts." as starts FROM ".$p.$t['table']." as t"
 				." WHERE ".implode(' AND ', $where)." ORDER BY exact DESC, near DESC, starts DESC, t.".$key." DESC LIMIT 8");
@@ -410,10 +565,10 @@ class InboxElements
 	 */
 	public function socOf($type, $id)
 	{
-		if (!isset(self::TYPES[$type])) {
+		$t = self::types()[$type] ?? null;
+		if (!$t || $t['soc'] === '') {
 			return 0;
 		}
-		$t = self::TYPES[$type];
 		$row = $this->db->getRow("SELECT ".$t['soc']." as soc FROM ".$this->db->prefix().$t['table']." WHERE ".($t['key'] ?? 'rowid')." = ".((int) $id));
 
 		return is_object($row) ? (int) $row->soc : 0;

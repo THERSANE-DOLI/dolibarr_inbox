@@ -187,7 +187,7 @@ class InboxAttachmentFile
 	{
 		require_once __DIR__.'/inboxelements.class.php';
 		$type = (string) $type;
-		if (!isset(InboxElements::TYPES[$type]) || (int) $id <= 0 || !InboxElements::canWriteType($fuser, $type) || !InboxElements::canRead($fuser, $type, (int) $id)) {
+		if (!isset(InboxElements::types()[$type]) || (int) $id <= 0 || !InboxElements::canWriteType($fuser, $type) || !InboxElements::canRead($fuser, $type, (int) $id)) {
 			return null;
 		}
 		global $langs;

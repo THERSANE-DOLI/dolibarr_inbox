@@ -1555,7 +1555,7 @@ class InboxComposer
 			return $pc['type'].':'.$pc['id'];
 		}, (array) ($state['linked'] ?? array()));
 		$entry = array('type' => (string) $type, 'id' => (int) $id, 'ref' => (string) $o->ref, 'kind' => (string) (new InboxElements($this->db))->describe($user, (string) $type, (int) $id)['kind'],
-			'icon' => (string) (InboxElements::TYPES[$type]['icon'] ?? 'document'));
+			'icon' => (string) (InboxElements::types()[$type]['icon'] ?? 'document'));
 		if (!in_array($key, $known, true)) {
 			$state['linked'][] = $entry;
 		}

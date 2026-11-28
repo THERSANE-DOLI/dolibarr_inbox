@@ -67,6 +67,7 @@ never by the version of inbox (branches and backports make a version number wron
 |---|---|---|
 | `agenda_create` | 1.160.0 | « Create > Event » opens the page of creation of the agenda provider (`inboxAgendaProvider`) and links the event saved there to the mail ([agenda.md](agenda.md)) |
 | `create_buttons` | 1.161.0 | the hook `inboxCreateButtons` (below) adds and removes buttons of « Create from this mail » |
+| `element_types` | 1.164.0 | the hook `inboxElementTypes` declares an object of your module as a type of piece (below) |
 | `agenda_todo` | 1.163.0 | an event of `inboxAgendaEvents` may carry `todo` (a button under the event in the agenda panel, [agenda.md](agenda.md)) |
 | `widgets` | 1.162.0 | the hook `inboxWidgets` declares widgets of the Dolibarr panel ([widgets.md](widgets.md)): declare a widget instead of a block of `inboxMailPanels` |
 
@@ -74,6 +75,43 @@ never by the version of inbox (branches and backports make a version number wron
 $caps = $parameters['capabilities'] ?? array();
 if (!in_array('agenda_create', $caps, true)) {
 	$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true, 'url' => $url);
+}
+```
+
+## Objects of a module as pieces
+
+Hook `inboxElementTypes`, context `inbox` (1.164.0): an object of your module becomes a type of piece. It is linked
+to mails, shown in the pieces of the Dolibarr panel, found by « Link », may receive the files of a mail, and may be
+created from a mail (a button of « Create », with `inboxCreateButtons`). Answer `$this->results['types']`, a list of:
+
+- `source` and `name` (`[a-z0-9_]`): the type is `source_name` (never one of the core);
+- `element`: the element of Dolibarr loaded by `fetchObjectByElement()` (`myobject@mymodule`), `module`: the module
+  tested by `isModEnabled()`;
+- `label` (already translated), `icon` (usage name);
+- `rights`: rights to read, any of them, each `array(module, permission[, sub])`; `write`: rights to change (create one,
+  add a file), may be empty;
+- `access`: the parameters of `checkUserAccessToObject()` for one record (features, tableandshare, feature2, dbt_keyfield,
+  dbt_select), checked for every piece shown;
+- `table`, `key` (default `rowid`), `search` (fields searched by « Link », the first one first), `soc` (field of the
+  thirdparty, empty when none), `entity` (key of `getEntity()`);
+- `create` (optional): `url` (an address of this site, markers as for the buttons) and `trigger` (the trigger of the
+  creation, `MYOBJECT_CREATE`, never one of the core): the object created from a mail is linked to it;
+- `delete` (optional): the trigger of the deletion, the links of the object to the mails are forgotten.
+
+Inbox reads the hook once per request and checks every name and field by strict patterns: a declaration not valid
+is left out as a whole.
+
+```php
+public function inboxElementTypes($parameters, &$object, &$action, $hookmanager)
+{
+	$this->results['types'][] = array('source' => 'mymodule', 'name' => 'myobject', 'element' => 'myobject@mymodule',
+		'module' => 'mymodule', 'label' => 'My object', 'icon' => 'briefcase',
+		'rights' => array(array('mymodule', 'myobject', 'read')), 'write' => array(array('mymodule', 'myobject', 'write')),
+		'access' => array('mymodule', 'mymodule_myobject&societe', 'myobject'), 'table' => 'mymodule_myobject',
+		'search' => array('ref', 'label'), 'soc' => 'fk_soc', 'entity' => 'myobject',
+		'create' => array('url' => dol_buildpath('/mymodule/myobject_card.php', 1).'?action=create&socid={socid}', 'trigger' => 'MYOBJECT_CREATE'),
+		'delete' => 'MYOBJECT_DELETE');
+	return 0;
 }
 ```
 

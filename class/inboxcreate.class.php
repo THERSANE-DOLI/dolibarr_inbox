@@ -51,7 +51,7 @@ class InboxCreate
 	 * Capabilities announced to the hooks of a mail ($parameters['capabilities'], 1.160.0), a word only once it is
 	 * delivered: agenda_create = « Create > Event » opens the page of creation of the agenda provider
 	 */
-	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets', 'agenda_todo');
+	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets', 'agenda_todo', 'element_types');
 
 	/** Groups of the dialog « Create from this mail » (1.161.0), in their order; a module never makes one */
 	const GROUPS = array('contacts', 'sales', 'purchases', 'followup', 'other');
@@ -127,6 +127,29 @@ class InboxCreate
 	}
 
 	/**
+	 * Types that can be created from a mail: those of the core, then the objects of the modules that give a page of
+	 * creation and its trigger (hook inboxElementTypes, 1.164.0)
+	 *
+	 * @return array<string,array{url:string,trigger:string,label:string,module?:bool}>
+	 */
+	public static function types()
+	{
+		$out = self::TYPES;
+		$core = array_column(self::TYPES, 'trigger');
+		foreach (InboxElements::types() as $t => $def) {
+			// Never the trigger of a type of the core: its pieces stay linked as pieces of the core
+			if (!isset($out[$t]) && !empty($def['create']) && !in_array($def['create']['trigger'], $core, true)) {
+				$out[$t] = array('url' => $def['create']['url'], 'trigger' => $def['create']['trigger'], 'label' => $def['label'], 'module' => true);
+			}
+		}
+
+		return $out;
+	}
+
+	/** @var bool The page of the last intent is the one of a module: its markers filled by the browser */
+	public $moduleUrl = false;
+
+	/**
 	 * Buttons of « Create from this mail » for a mailbox (1.161.0): those of the core the user may create, then the
 	 * ones the modules add and remove (hook inboxCreateButtons, for this mailbox), the buttons the admin kept back
 	 *
@@ -190,7 +213,7 @@ class InboxCreate
 			$id = is_array($b) ? (string) ($b['id'] ?? '') : '';
 			$type = is_array($b) ? (string) ($b['type'] ?? '') : '';
 			$url = is_array($b) ? (string) ($b['url'] ?? '') : '';
-			if (!preg_match('/^[a-z0-9_]{1,40}$/', $source) || !preg_match('/^[a-z0-9_-]{1,40}$/', $id) || !isset(self::TYPES[$type])
+			if (!preg_match('/^[a-z0-9_]{1,40}$/', $source) || !preg_match('/^[a-z0-9_-]{1,40}$/', $id) || !isset(self::types()[$type])
 				|| empty($b['label']) || !self::localUrl($url) || !InboxElements::canWriteType($user, $type) || !self::allowed($user, $b['rights'] ?? array())) {
 				continue;
 			}
@@ -325,7 +348,8 @@ class InboxCreate
 	 */
 	public function intent(User $user, InboxReader $reader, $type, $attach, array $known, $button = null)
 	{
-		if (!isset(self::TYPES[$type]) || !InboxElements::canWriteType($user, $type)) {
+		$types = self::types();
+		if (!isset($types[$type]) || !InboxElements::canWriteType($user, $type)) {
 			$this->error = 'InboxErrorCannotCreate';
 			return '';
 		}
@@ -363,6 +387,12 @@ class InboxCreate
 				$url = (string) $p['urls']['create'];
 				$this->provider = array('label' => (string) $p['label']);
 			}
+		}
+		$this->moduleUrl = $url !== '';
+		if ($url === '' && !empty($types[$type]['module'])) {
+			// An object of a module (1.164.0): its page of creation, its markers filled by the browser
+			$url = $types[$type]['url'];
+			$this->moduleUrl = true;
 		}
 		if ($url === '') {
 			$url = $this->createUrl($type, $row, $known);
@@ -569,9 +599,10 @@ class InboxCreate
 	public function onCreate(User $user, $code, $object)
 	{
 		$type = '';
-		foreach (self::TYPES as $t => $def) {
+		foreach (self::types() as $t => $def) {
 			if ($def['trigger'] === $code) {
 				$type = $t;
+				break;
 			}
 		}
 		if ($type === '' || empty($object->id)) {
@@ -624,8 +655,8 @@ class InboxCreate
 			$this->error = 'InboxErrorCannotAttach';
 			return '';
 		}
-		$object = fetchObjectByElement((int) $id, $type);
-		if (!is_object($object) || empty($object->id)) {
+		$object = InboxElements::fetch((int) $id, $type);
+		if (!$object) {
 			$this->error = 'InboxErrorPieceNotReadable';
 			return '';
 		}

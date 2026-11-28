@@ -365,7 +365,7 @@ switch ($action) {
 			'create' => array_map(function ($b) {
 				return array('id' => $b['id'], 'type' => $b['type'], 'label' => $b['label'], 'icon' => $b['icon'], 'group' => $b['group'], 'window' => $b['window']);
 			}, (new InboxCreate($db))->buttons($user, (int) $row->fk_account, $hookParams)), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
-			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
+			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::types()), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
 			}))));
 		// no break
@@ -397,7 +397,7 @@ switch ($action) {
 			inboxDolibarrFail($creator->error);
 		}
 		// The page of a module (agenda, button): in a window of inbox or a tab, its markers filled by the browser
-		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null, 'module' => $button !== null || $creator->provider !== null));
+		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null, 'module' => $button !== null || $creator->provider !== null || $creator->moduleUrl));
 		// no break
 
 	case 'attach':
@@ -449,7 +449,7 @@ switch ($action) {
 
 	case 'search':
 		// types: only these (« Extend to »: the events, asked apart so the pieces come first); none = the usual ones
-		$types = array_values(array_intersect(explode(',', (string) inboxAjaxParam('types', 'aZ09comma')), array_keys(InboxElements::TYPES)));
+		$types = array_values(array_intersect(explode(',', (string) inboxAjaxParam('types', 'aZ09comma')), array_keys(InboxElements::types())));
 		inboxAjaxReply(array('results' => $elements->search($user, (string) inboxAjaxParam('q', 'alphanohtml'), (int) inboxAjaxParam('soc', 'int'), 20, $types ?: null)));
 		// no break
 

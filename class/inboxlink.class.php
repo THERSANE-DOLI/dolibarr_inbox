@@ -173,7 +173,7 @@ class InboxLink
 		$p = $this->db->prefix();
 		$or = array("(element_type = '".$this->db->escape((string) $type)."' AND fk_element = ".((int) $elementId).")");
 		if ($type === 'societe') {
-			foreach (InboxElements::TYPES as $t => $def) {
+			foreach (InboxElements::types() as $t => $def) {
 				// Only the modules enabled: the table of a disabled one may not exist
 				if ($t !== 'societe' && $def['soc'] === 'fk_soc' && InboxElements::enabled($t)) {
 					$or[] = "(element_type = '".$t."' AND fk_element IN (SELECT ".($def['key'] ?? 'rowid')." FROM ".$p.$def['table']." WHERE fk_soc = ".((int) $elementId)."))";

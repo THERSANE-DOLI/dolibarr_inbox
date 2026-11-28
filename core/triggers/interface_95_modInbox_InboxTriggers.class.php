@@ -93,6 +93,16 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 			$linker = new InboxLink($this->db);
 			$linker->forgetElement($removed[$action], (int) $object->id);
 		}
+		// An object of a module declared as a type of piece (1.164.0): its trigger of deletion, the same
+		if (!isset($removed[$action]) && substr($action, -7) === '_DELETE' && !empty($object->id)) {
+			dol_include_once('/inbox/class/inboxelements.class.php');
+			foreach (InboxElements::types() as $t => $def) {
+				if (($def['delete'] ?? '') === $action) {
+					dol_include_once('/inbox/class/inboxlink.class.php');
+					(new InboxLink($this->db))->forgetElement($t, (int) $object->id);
+				}
+			}
+		}
 		if (!in_array($action, array('CONTACT_CREATE', 'CONTACT_MODIFY', 'CONTACT_DELETE', 'COMPANY_CREATE', 'COMPANY_MODIFY', 'COMPANY_DELETE'), true)) {
 			return 0;
 		}

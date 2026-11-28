@@ -66,7 +66,7 @@ class InboxWidgets
 		'invoices_late' => array('template' => 'mini', 'title' => 'InboxWgInvoicesLate', 'section' => 'invoices', 'icon' => 'warning'),
 		'tickets_open' => array('template' => 'mini', 'title' => 'InboxWgTicketsOpen', 'section' => 'tickets', 'icon' => 'tasks'),
 		'event_next' => array('template' => 'mini', 'title' => 'InboxWgEventNext', 'section' => 'agenda', 'icon' => 'today'),
-		'mails_count' => array('template' => 'mini', 'title' => 'InboxWgMailsCount', 'section' => 'mails', 'icon' => 'mail'),
+		'mails_count' => array('template' => 'mini', 'title' => 'InboxWgExchangedCount', 'section' => 'mails', 'icon' => 'mail'),
 		'customer_since' => array('template' => 'line', 'title' => 'InboxWgCustomerSince', 'section' => 'identity', 'icon' => 'company'),
 		'figure_revenue' => array('template' => 'figure', 'title' => 'InboxWgFigureRevenue', 'section' => 'revenue', 'kpi' => 10),
 		'figure_due' => array('template' => 'figure', 'title' => 'InboxWgFigureDue', 'section' => 'invoices', 'kpi' => 20),
@@ -462,7 +462,7 @@ class InboxWidgets
 					'url' => DOL_URL_ROOT.'/comm/action/list.php?socid='.$s);
 			case 'mails_count':
 				$m = $this->overview->mailCounts($user, $ctx);
-				return $m ? array('icon' => $w['icon'], 'value' => (string) ($m['nIn'] + $m['nOut']), 'label' => $langs->transnoentities('InboxWgMailsShort'), 'title' => $title, 'level' => '',
+				return $m ? array('icon' => $w['icon'], 'value' => (string) ($m['nIn'] + $m['nOut']), 'label' => $langs->transnoentities('InboxWgExchangedShort'), 'title' => $title, 'level' => '',
 					'note' => $langs->transnoentities('InboxOvSumMails', $m['nIn'], $m['nOut'])) : null;
 		}
 
@@ -737,7 +737,7 @@ class InboxWidgets
 		switch ($w['template']) {
 			case 'mini':
 				$samples = array('invoices_late' => array('2', 'danger', 'InboxWgLateShort'), 'tickets_open' => array('3', 'warning', 'InboxWgTicketsShort'),
-					'event_next' => array('02/12', 'info', 'InboxWgEventShort'), 'mails_count' => array('69', '', 'InboxWgMailsShort'));
+					'event_next' => array('02/12', 'info', 'InboxWgEventShort'), 'mails_count' => array('69', '', 'InboxWgExchangedShort'));
 				$x = $samples[$id] ?? array('1', '', '');
 				return array('icon' => $w['icon'], 'value' => $x[0], 'level' => $x[1], 'label' => $x[2] !== '' ? $langs->transnoentities($x[2]) : '', 'title' => $title);
 			case 'line':
