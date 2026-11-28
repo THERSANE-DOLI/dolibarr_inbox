@@ -34,5 +34,17 @@ The lists and the actions are as high as their content, up to their maximum.
   and sees « The model of the mailbox changed · Adopt ». There is no way to force a layout on everybody.
 - **Back to the model of the mailbox** (menu « ⋯ ») removes the layout of the user: the model, else the preset of the
   usage.
-- Kept on the server, so the same on every computer of the user. The version for a small screen (phone, tablet in
-  portrait) comes with a next version.
+- Kept on the server, so the same on every computer of the user.
+
+## Small screen
+
+Under 64 rem (a phone, a tablet in portrait, a narrow window) the Dolibarr part is a band on top of the mail or a
+sheet: the widgets are one under the other, the minis side by side as chips, the lists as high as their content. The
+small screen has a layout of its own, chosen by the width of the screen and never by the device: as long as none is
+saved (the user's or the model of the mailbox), it takes the one of the large screen in one column. Personalizing on
+a small screen saves the small layout only.
+
+Menu « ⋯ » (in the head of the sheet on a phone, at the end of the widgets on a tablet) > « Personalize the widgets »:
+the widgets become a list with a grip (drag it, or the arrows of the keyboard, to change the order) and a cross, and
+the catalogue opens as a sheet (on top of the screen on a phone, the Dolibarr sheet below it): a tap on a widget adds
+it at the end.

@@ -7222,6 +7222,7 @@
 		let html = '';
 		html += sheet ? '<div class="ibx-dolibar__head ibx-dolsheet__head ibx-js-dolsheethead"><span class="ibx-dolsheet__grip" aria-hidden="true"></span>' + ic('dolibarr')
 			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '')
+			+ (I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--ghost ibx-js-wgmenu" aria-haspopup="menu" title="' + th('InboxWgMenu') + '" aria-label="' + th('InboxWgMenu') + '">' + ic('more') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-dolsheetclose" aria-label="' + th('InboxDolibarrSheetClose') + '">' + ic('close') + '</button></div>'
 			: (right ? '<div class="ibx-dolibar__head ibx-dolibar__head--col">' + ic('dolibarr') + '<b>' + th('InboxDolibarr') + '</b>'
 				+ (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '')
@@ -7320,8 +7321,8 @@
 				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
 				// Grid of the widgets between the fixed top and the notes docked at the bottom (column of a computer, 1.155.0)
-				+ (right && !sheet && I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
-					+ '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" title="' + th('InboxWgDockResize') + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '')
+				+ (I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
+					+ (right && !sheet ? '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" title="' + th('InboxWgDockResize') + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '') : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)
 				+ '</div>'
@@ -7338,7 +7339,8 @@
 		placeSocCard(box);
 		hydrateUserPhotos(box);
 		I.mount(box);
-		if (right && !sheet && I.panelWidgets && !folded) {
+		// Widgets (1.155.0, small screen 1.156.0): the column of a computer, the band of a tablet, the sheet of a phone
+		if (I.panelWidgets && !folded) {
 			const m = S.mail && String(S.mail.id) === String(box.dataset.mail) ? S.mail : null;
 			I.panelWidgets.mount(box, { mail: +box.dataset.mail || 0, account: m ? +m.account || 0 : 0 });
 		}

@@ -4320,3 +4320,5 @@ InboxLogWidgetsModel = Model of the widgets of the panel saved
 InboxLogWidgetsModelRemoved = Model of the widgets of the panel removed
 InboxDocTitle_panel_widgets = Widgets of the Dolibarr panel
 InboxDocDesc_panel_widgets = Lay out the widgets of the panel per mailbox, the model of the mailbox, back to the model
+InboxWgMove = Move (drag, or arrows)
+InboxWgCatalogueHelpSmall = Tap a widget to add it at the end of the panel. Previews with sample values, nothing is computed.

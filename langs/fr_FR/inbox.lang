@@ -4320,3 +4320,5 @@ InboxLogWidgetsModel = Modèle des widgets du panneau enregistré
 InboxLogWidgetsModelRemoved = Modèle des widgets du panneau supprimé
 InboxDocTitle_panel_widgets = Widgets du panneau Dolibarr
 InboxDocDesc_panel_widgets = Disposer les widgets du panneau par boîte, le modèle de la boîte, revenir au modèle
+InboxWgMove = Déplacer (glisser, ou flèches)
+InboxWgCatalogueHelpSmall = Touchez un widget pour l'ajouter à la fin du panneau. Aperçus avec des valeurs d'exemple, rien n'est calculé.

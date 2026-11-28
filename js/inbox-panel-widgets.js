@@ -33,7 +33,10 @@
 	}
 	const I = Dolibarr.tools.inbox;
 	const { html, raw, ic, t, api, post, $, $$ } = I;
-	const VERSION = 'desktop';
+	/** Small screen: the width where inbox shows the Dolibarr part on top of the mail or in a sheet (64 rem) */
+	const SMALL = window.matchMedia('(max-width: 63.9375rem)');
+	/** Version of the layout by the width of the screen, never by the device */
+	const version = () => (SMALL.matches ? 'mobile' : 'desktop');
 	const COLUMNS = 4;
 	const GAP = 4;
 	const AUTO = ['list', 'action'];
@@ -66,14 +69,23 @@
 		}
 		return P.layouts.get(account);
 	}
-	/** The layout used: the user's, else the model of the mailbox, else the preset; and where it comes from */
+	/**
+	 * The layout used: the user's, else the model of the mailbox, else the preset; and where it comes from. On a small
+	 * screen, as long as no small layout is saved (the user's or the model), the one of the large screen in one column
+	 */
 	function effective(l) {
-		const v = l[VERSION] || {};
+		const v = l[version()] || {};
 		if (v.user) {
 			return { layout: v.user, from: 'user' };
 		}
 		if (v.model) {
 			return { layout: v.model, from: 'model' };
+		}
+		if (version() === 'mobile') {
+			const d = l.desktop || {};
+			if (d.user || d.model) {
+				return { layout: d.user || d.model, from: 'desktop' };
+			}
 		}
 		return { layout: l.preset || { items: [] }, from: 'preset' };
 	}
@@ -109,11 +121,6 @@
 		P.zone = zone;
 		P.mail = ctx.mail;
 		P.account = ctx.account;
-		const menuBtn = $('.ibx-js-wgmenu', box);
-		if (menuBtn && !menuBtn._wg) {
-			menuBtn._wg = true;
-			menuBtn.addEventListener('click', () => openMenu(menuBtn));
-		}
 		bindSplitter(box);
 		let l;
 		try {
@@ -132,6 +139,9 @@
 		await paintStatic(zone, ctx.mail, l);
 	}
 	async function paintStatic(zone, mail, l) {
+		if (version() === 'mobile') {
+			return paintFlow(zone, mail, l);
+		}
 		const eff = effective(l);
 		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
 		const body = zone.closest('.ibx-dolibar__body');
@@ -189,9 +199,39 @@
 			}
 		});
 	}
+	/**
+	 * Small screen: the widgets one under the other in the order of the layout, the minis side by side as chips,
+	 * the lists as high as their content; the menu of the widgets at the end (the head of the band is a button)
+	 */
+	async function paintFlow(zone, mail, l) {
+		const eff = effective(l);
+		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+		zone.hidden = false;
+		const cat = await catalogue().catch(() => []);
+		const def = id => cat.find(w => w.id === id);
+		const shown = items.filter(it => def(it.id));
+		const data = shown.length ? await dataOf(mail, shown.map(it => it.id)).catch(() => ({})) : {};
+		if (P.zone !== zone || P.mail !== mail) {
+			return;
+		}
+		const unit = rowUnit();
+		zone.innerHTML = banner(l, eff) + '<div class="ibx-wglist">'
+			+ shown.map(it => flowCell(def(it.id), data[it.id] === undefined ? null : data[it.id], unit, false)).join('')
+			+ '</div>' + String(html`<div class="ibx-wgflowfoot"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-wgmenu" aria-haspopup="menu" title="${t('InboxWgMenu')}" aria-label="${t('InboxWgMenu')}">${raw(ic('more'))}</button></div>`);
+		I.mount(zone);
+	}
+	/** One widget in the column of a small screen (edit: with its grip and its cross) */
+	function flowCell(w, data, unit, edit) {
+		const fixed = ['chart', 'figure'].includes(w.template) ? ' style="height:' + (w.size.h * unit + (w.size.h - 1) * GAP) + 'px"' : '';
+		return '<div class="ibx-wg-cell ibx-wg-cell--flow ibx-wgflow--' + w.template + '" data-wid="' + w.id + '"' + fixed + '>'
+			+ String(I.widgets.render(w.template, data, w.preview))
+			+ (edit ? String(html`<div class="ibx-wgflowtools"><button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wgmove" title="${t('InboxWgMove')}" aria-label="${t('InboxWgMove')} ${w.title}">${raw(ic('grip'))}</button>
+				<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-wgflowremove" data-wid="${w.id}" title="${t('InboxWgRemove')}" aria-label="${t('InboxWgRemove')} ${w.title}">${raw(ic('close'))}</button></div>`) : '')
+			+ '</div>';
+	}
 	/** A line on top when the model of the mailbox changed after the user made his own layout */
 	function banner(l, eff) {
-		const v = l[VERSION] || {};
+		const v = l[version()] || {};
 		if (eff.from !== 'user' || !v.model || !(v.model.at > v.user.at)) {
 			return '';
 		}
@@ -217,13 +257,13 @@
 			return;
 		}
 		const items = [{ label: t('InboxWgPersonalize'), icon: 'edit', run: () => startEdit(false) }];
-		if ((l[VERSION] || {}).user) {
+		if ((l[version()] || {}).user) {
 			items.push({ label: t('InboxWgRevert'), icon: 'undo', run: () => revert() });
 		}
 		I.menu(anchor, items);
 	}
 	async function revert() {
-		const before = ((await layoutsOf(P.account))[VERSION] || {}).user;
+		const before = ((await layoutsOf(P.account))[version()] || {}).user;
 		await saveLayout('reset', null);
 		I.toast(t('InboxWgReverted'), before ? { action: t('InboxUndo'), onAction: () => saveLayout('save', before) } : {});
 	}
@@ -234,7 +274,7 @@
 	 */
 	async function saveLayout(action, layout) {
 		try {
-			const res = await post('widget', action, { account: P.account, version: VERSION, layout: layout ? { items: layout.items, dock: layout.dock || 0 } : null });
+			const res = await post('widget', action, { account: P.account, version: version(), layout: layout ? { items: layout.items, dock: layout.dock || 0 } : null });
 			P.layouts.set(P.account, Promise.resolve(res));
 			if (!P.edit && P.zone) {
 				await paintStatic(P.zone, P.mail, res);
@@ -378,6 +418,9 @@
 		if (!zone) {
 			return;
 		}
+		if (version() === 'mobile') {
+			return startEditFlow(again);
+		}
 		let GridStackLib;
 		let l;
 		let cat;
@@ -475,11 +518,15 @@
 	 * @param {{x:number,y:number}|null} at Cell
 	 */
 	function addFromCatalogue(id, at) {
-		if (!P.edit || !P.edit.grid) {
+		if (!P.edit || (!P.edit.grid && !P.edit.flow)) {
 			return;
 		}
 		const w = P.edit.cat.find(c => c.id === id);
-		if (!w || I.grid.items(P.edit.grid).some(i => i.id === id)) {
+		if (!w || placedIds().includes(id)) {
+			return;
+		}
+		if (P.edit.flow) {
+			addFlow(w);
 			return;
 		}
 		const it = { w: w.size.w, h: w.size.h };
@@ -555,6 +602,23 @@
 		document.addEventListener('pointerup', end);
 		document.addEventListener('keydown', esc, true);
 	}
+	/** Widgets placed in the layout being edited */
+	function placedIds() {
+		if (!P.edit) {
+			return [];
+		}
+		return P.edit.flow ? $$('.ibx-wglist .ibx-wg-cell', P.zone).map(c => c.dataset.wid) : I.grid.items(P.edit.grid).map(i => i.id);
+	}
+	/** Layout being edited: the grid, or the list of a small screen (one column, in its order) */
+	function editedItems() {
+		if (P.edit.flow) {
+			return placedIds().map((id, i) => {
+				const w = P.edit.cat.find(c => c.id === id);
+				return { id, x: 0, y: i, w: w ? w.size.w : 4, h: w ? w.size.h : 2 };
+			});
+		}
+		return I.grid.items(P.edit.grid);
+	}
 	let saveTimer = 0;
 	function queueSave() {
 		if (!P.edit || P.edit.silent) {
@@ -562,14 +626,135 @@
 		}
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(() => {
-			if (P.edit && P.edit.grid) {
-				saveLayout('save', { items: I.grid.items(P.edit.grid), dock: P.edit.dock || 0 });
+			if (P.edit && (P.edit.grid || P.edit.flow)) {
+				saveLayout('save', { items: editedItems(), dock: P.edit.dock || 0 });
 			}
 		}, 400);
+	}
+
+	// ---------- Edit mode of a small screen: a list to order, the catalogue as a sheet ----------
+	async function startEditFlow(again) {
+		let l;
+		let cat;
+		try {
+			[l, cat] = await Promise.all([layoutsOf(P.account), catalogue()]);
+		} catch (err) {
+			I.toast(err.message || t('InboxOvLoadError'), { error: true });
+			return;
+		}
+		if (!P.edit || !again) {
+			P.edit = { account: P.account, flow: true, cat };
+		}
+		P.edit.cat = cat;
+		const zone = P.zone;
+		const holder = zone.closest('.ibx-dolibar') || zone.closest('.ibx-pane') || P.box;
+		document.body.classList.add('is-wgediting');
+		holder.classList.add('is-wgedit');
+		if (!$('.ibx-wgbackdrop')) {
+			const veil = document.createElement('div');
+			veil.className = 'ibx-wgbackdrop';
+			document.body.appendChild(veil);
+		}
+		const eff = effective(l);
+		const items = list(eff.layout.items).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).filter(it => cat.find(w => w.id === it.id));
+		const data = P.data.get(P.mail) || {};
+		const unit = rowUnit();
+		zone.hidden = false;
+		zone.innerHTML = '<div class="ibx-wglist is-edit">' + items.map(it => {
+			const w = cat.find(c => c.id === it.id);
+			return flowCell(w, data[w.id] === undefined ? w.preview : data[w.id], unit, true);
+		}).join('') + '</div>';
+		openCatalogue(holder, l, cat);
+		// The Dolibarr part is itself a sheet at the bottom on a phone: the catalogue goes on top, both half high
+		$('.ibx-wgcat').classList.add('is-sheet');
+		$('.ibx-wgcat').classList.toggle('is-top', holder.classList.contains('is-sheet'));
+		paintCatalogue();
+		// A layout taken from the large screen becomes the one of the small screen once changed
+		P.edit.dock = 0;
+	}
+	function addFlow(w) {
+		const listEl = $('.ibx-wglist', P.zone);
+		if (!listEl) {
+			return;
+		}
+		const data = (P.data.get(P.mail) || {})[w.id];
+		listEl.insertAdjacentHTML('beforeend', flowCell(w, data === undefined ? w.preview : data, rowUnit(), true));
+		const cell = listEl.lastElementChild;
+		if (data === undefined) {
+			dataOf(P.mail, [w.id]).then(d => {
+				// The content only: the widget keeps its place, its focus and its handlers
+				const wg = $(':scope > .ibx-wg', cell);
+				if (P.edit && cell.isConnected && wg) {
+					wg.outerHTML = String(I.widgets.render(w.template, d[w.id] === undefined ? null : d[w.id], w.preview));
+				}
+			}).catch(() => {});
+		}
+		cell.scrollIntoView({ block: 'nearest' });
+		queueSave();
+		paintCatalogue();
+	}
+	async function endEditFlow() {
+		clearTimeout(saveTimer);
+		const items = editedItems();
+		P.edit = null;
+		document.body.classList.remove('is-wgediting');
+		$$('.is-wgedit').forEach(x => x.classList.remove('is-wgedit'));
+		$$('.ibx-wgbackdrop, .ibx-wgcat').forEach(x => x.remove());
+		const res = await saveLayout('save', { items, dock: 0 });
+		if (!res && P.zone) {
+			await paintStatic(P.zone, P.mail, await layoutsOf(P.account));
+		}
+	}
+	/** Order of the list: the grip dragged (pointer), or the arrows up and down on it */
+	function moveFlow(cell, delta) {
+		const sib = delta < 0 ? cell.previousElementSibling : cell.nextElementSibling;
+		if (!sib) {
+			return;
+		}
+		if (delta < 0) {
+			sib.before(cell);
+		} else {
+			sib.after(cell);
+		}
+		const grip = $('.ibx-js-wgmove', cell);
+		if (grip) {
+			grip.focus();
+		}
+		queueSave();
+	}
+	function dragFlow(cell, e) {
+		const listEl = cell.parentElement;
+		cell.classList.add('is-dragging');
+		const move = ev => {
+			const over = document.elementFromPoint(ev.clientX, ev.clientY);
+			const target = over && over.closest ? over.closest('.ibx-wglist.is-edit > .ibx-wg-cell') : null;
+			if (!target || target === cell || target.parentElement !== listEl) {
+				return;
+			}
+			const r = target.getBoundingClientRect();
+			const after = target.classList.contains('ibx-wgflow--mini') ? ev.clientX > r.left + r.width / 2 : ev.clientY > r.top + r.height / 2;
+			if (after) {
+				target.after(cell);
+			} else {
+				target.before(cell);
+			}
+		};
+		const up = () => {
+			document.removeEventListener('pointermove', move);
+			document.removeEventListener('pointerup', up);
+			cell.classList.remove('is-dragging');
+			queueSave();
+		};
+		document.addEventListener('pointermove', move);
+		document.addEventListener('pointerup', up);
+		void e;
 	}
 	async function endEdit() {
 		if (!P.edit) {
 			return;
+		}
+		if (P.edit.flow) {
+			return endEditFlow();
 		}
 		clearTimeout(saveTimer);
 		const g = P.edit.grid;
@@ -606,7 +791,11 @@
 				const prev = e.target.closest('.ibx-wgprev:not(.is-placed)');
 				if (prev && e.button === 0) {
 					e.preventDefault();
-					dragPreview(prev, e);
+					if (P.edit && P.edit.flow) {
+						addFromCatalogue(prev.dataset.wid, null);
+					} else {
+						dragPreview(prev, e);
+					}
 				}
 			});
 			box.addEventListener('keydown', e => {
@@ -630,10 +819,14 @@
 				}
 			});
 		}
-		const r = side.getBoundingClientRect();
-		box.style.right = Math.round(window.innerWidth - r.left + 8) + 'px';
+		if (version() === 'mobile') {
+			box.style.right = '';
+		} else {
+			const r = side.getBoundingClientRect();
+			box.style.right = Math.round(window.innerWidth - r.left + 8) + 'px';
+		}
 		box._manager = !!l.manager;
-		box._own = !!(l[VERSION] || {}).user;
+		box._own = !!(l[version()] || {}).user;
 		void cat;
 	}
 	function paintCatalogue(keepFocus) {
@@ -641,7 +834,7 @@
 		if (!box || !P.edit) {
 			return;
 		}
-		const placed = new Set(I.grid.items(P.edit.grid).map(i => i.id));
+		const placed = new Set(placedIds());
 		const q = (box._q || '').toLowerCase();
 		const groups = ['mini', 'line', 'figure', 'list', 'chart', 'action'];
 		const unit = rowUnit();
@@ -665,7 +858,7 @@
 		box.innerHTML = String(html`<div class="ibx-wgcat__head"><b>${t('InboxWgCatalogue')}</b><span class="ibx-spacer"></span>
 				<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-wgdone" aria-label="${t('InboxWgDone')}" title="${t('InboxWgDone')}">${raw(ic('close'))}</button></div>
 			<input type="search" class="ibx-field ibx-wgcat__search ibx-js-wgsearch" placeholder="${t('InboxWgCatalogueSearch')}" aria-label="${t('InboxWgCatalogueSearch')}" value="${box._q || ''}">
-			<p class="ibx-wgcat__hint">${t('InboxWgCatalogueHelp')}</p>`)
+			<p class="ibx-wgcat__hint">${t(P.edit && P.edit.flow ? 'InboxWgCatalogueHelpSmall' : 'InboxWgCatalogueHelp')}</p>`)
 			+ '<div class="ibx-wgcat__list">' + body + '</div>'
 			+ String(html`<div class="ibx-wgcat__foot">
 				${box._own ? html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-wgrevert">${t('InboxWgRevert')}</button>` : ''}
@@ -678,10 +871,10 @@
 		}
 	}
 	async function saveModel() {
-		if (!P.edit || !P.edit.grid) {
+		if (!P.edit || (!P.edit.grid && !P.edit.flow)) {
 			return;
 		}
-		const res = await saveLayout('savemodel', { items: I.grid.items(P.edit.grid), dock: P.edit.dock || 0 });
+		const res = await saveLayout('savemodel', { items: editedItems(), dock: P.edit.dock || 0 });
 		if (res) {
 			I.toast(t('InboxWgModelSaved'));
 		}
@@ -693,6 +886,29 @@
 		if (!el) {
 			return;
 		}
+		const menuBtn = el.closest('.ibx-js-wgmenu');
+		if (menuBtn && P.zone && (menuBtn.closest('.ibx-dolibar') || menuBtn.closest('.ibx-pane'))) {
+			openMenu(menuBtn);
+			return;
+		}
+		const flowRm = el.closest('.ibx-js-wgflowremove');
+		if (flowRm && P.edit && P.edit.flow) {
+			const cell = flowRm.closest('.ibx-wg-cell');
+			const next = cell.nextElementSibling;
+			const parent = cell.parentElement;
+			const w = P.edit.cat.find(c => c.id === cell.dataset.wid);
+			cell.remove();
+			queueSave();
+			paintCatalogue();
+			I.toast(t('InboxWgRemoved', w ? w.title : ''), { action: t('InboxUndo'), onAction: () => {
+				if (P.edit && P.edit.flow && parent.isConnected) {
+					parent.insertBefore(cell, next && next.parentElement === parent ? next : null);
+					queueSave();
+					paintCatalogue();
+				}
+			} });
+			return;
+		}
 		const rm = el.closest('.ibx-js-wgremove');
 		if (rm && P.edit && P.edit.grid) {
 			const item = rm.closest('.grid-stack-item');
@@ -702,20 +918,42 @@
 			return;
 		}
 		if (el.closest('.ibx-js-wgadopt')) {
-			const before = ((await layoutsOf(P.account))[VERSION] || {}).user;
+			const before = ((await layoutsOf(P.account))[version()] || {}).user;
 			await saveLayout('reset', null);
 			I.toast(t('InboxWgAdopted'), before ? { action: t('InboxUndo'), onAction: () => saveLayout('save', before) } : {});
 			return;
 		}
 		if (el.closest('.ibx-js-wgseen')) {
 			const l = await layoutsOf(P.account);
-			const m = (l[VERSION] || {}).model;
+			const m = (l[version()] || {}).model;
 			try {
 				localStorage.setItem('inbox.wg.seen.' + P.account, String(m ? m.at : 0));
 			} catch (err) {
 				// no storage
 			}
 			paintStatic(P.zone, P.mail, l);
+		}
+	});
+	document.addEventListener('pointerdown', e => {
+		const grip = e.target.closest ? e.target.closest('.ibx-js-wgmove') : null;
+		if (grip && P.edit && P.edit.flow && e.button === 0) {
+			e.preventDefault();
+			dragFlow(grip.closest('.ibx-wg-cell'), e);
+		}
+	});
+	document.addEventListener('keydown', e => {
+		const grip = e.target.closest ? e.target.closest('.ibx-js-wgmove') : null;
+		if (grip && P.edit && P.edit.flow && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+			e.preventDefault();
+			moveFlow(grip.closest('.ibx-wg-cell'), e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 1);
+		}
+	});
+	// Crossing 64 rem: the other version of the layout
+	SMALL.addEventListener('change', () => {
+		if (P.edit) {
+			endEdit();
+		} else if (P.zone && P.zone.isConnected && P.account) {
+			layoutsOf(P.account).then(l => paintStatic(P.zone, P.mail, l)).catch(() => {});
 		}
 	});
 	document.addEventListener('keydown', e => {

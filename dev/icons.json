@@ -8,6 +8,7 @@
 		"agenda-space": ["calendar-month", "outline"],
 		"today": ["calendar-event", "outline"],
 		"overview": ["report-analytics", "outline"],
+		"grip": ["grip-vertical", "outline"],
 		"tasks": ["checklist", "outline"],
 		"theme": ["contrast", "outline"],
 		"catalogue": ["palette", "outline"],

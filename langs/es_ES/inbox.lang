@@ -4320,3 +4320,5 @@ InboxLogWidgetsModel = Modelo de los widgets del panel guardado
 InboxLogWidgetsModelRemoved = Modelo de los widgets del panel eliminado
 InboxDocTitle_panel_widgets = Widgets del panel Dolibarr
 InboxDocDesc_panel_widgets = Disponer los widgets del panel por buzón, el modelo del buzón, volver al modelo
+InboxWgMove = Mover (arrastrar o flechas)
+InboxWgCatalogueHelpSmall = Toque un widget para añadirlo al final del panel. Vistas previas con valores de ejemplo, no se calcula nada.

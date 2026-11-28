@@ -4320,3 +4320,5 @@ InboxLogWidgetsModel = Vorlage der Widgets des Bereichs gespeichert
 InboxLogWidgetsModelRemoved = Vorlage der Widgets des Bereichs gelöscht
 InboxDocTitle_panel_widgets = Widgets des Dolibarr-Bereichs
 InboxDocDesc_panel_widgets = Widgets des Bereichs pro Postfach anordnen, die Vorlage des Postfachs, zurück zur Vorlage
+InboxWgMove = Verschieben (ziehen oder Pfeiltasten)
+InboxWgCatalogueHelpSmall = Tippen Sie auf ein Widget, um es am Ende des Bereichs hinzuzufügen. Vorschauen mit Beispielwerten, nichts wird berechnet.

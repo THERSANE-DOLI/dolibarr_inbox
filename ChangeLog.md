@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: widgets of the Dolibarr panel on a small screen, with a layout of their own :   1.156.0
+  - one column in the band of a tablet and the sheet of a phone, the minis as chips; the large layout until one is saved.
+  - edit as a list: grip (drag or arrows) and cross; the catalogue as a sheet, a tap adds.
+
 - NEW: widgets in the Dolibarr panel, laid out by each user per mailbox, model of the mailbox :   1.155.0
   - grid between the fixed top and the notes docked at the bottom; « Personalize the widgets »: catalogue beside the
     panel, drag or click to add, drag back to remove, each change saved at once.
