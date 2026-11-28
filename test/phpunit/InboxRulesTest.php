@@ -221,7 +221,8 @@ class InboxRulesTest extends InboxImapTestCase
 	{
 		$a = $this->ready();
 		$p = $this->db->prefix();
-		// The test mails are in ZzActA: it plays the inbox here, received now
+		// The test mails are in ZzActA: it plays the inbox here, the only one (the real inbox holds what other runs left), received now
+		$this->db->query("UPDATE ".$p."inbox_folder SET role = NULL WHERE fk_account = ".((int) $a->id)." AND role = 'inbox'");
 		$this->db->query("UPDATE ".$p."inbox_folder SET role = 'inbox' WHERE fk_account = ".((int) $a->id)." AND path = 'INBOX.ZzActA'");
 		$this->db->query("UPDATE ".$p."inbox_mail SET date_received = '".$this->db->idate(dol_now() - 3600)."' WHERE fk_account = ".((int) $a->id));
 		$r = new InboxRules($this->db);

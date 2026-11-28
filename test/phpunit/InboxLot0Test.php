@@ -146,23 +146,54 @@ class InboxLot0Test extends InboxTestCase
 	{
 		$this->needDovecot();
 		$this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
-		$inbox = new Inbox($this->db);
-		$raw = $inbox->fetchRaw(self::BOX, '<seed-2@inbox-test.invalid>', $this->admin, 'phpunit', true);
-		$this->assertIsString($raw);
-		$this->assertFalse($inbox->fromCache);
-		$row = $this->db->getRow("SELECT uid FROM ".$this->db->prefix()."inbox_message WHERE mailbox = '".self::BOX."' AND message_id = 'seed-2@inbox-test.invalid'");
-		// The UID of the mail on the server, whatever the test box holds (seed.py run again appends the mail again)
-		$this->assertGreaterThan(0, (int) $row->uid, 'UID of the mail kept');
-		$this->assertMatchesRegularExpression('/^Message-ID:\s*<seed-2@inbox-test\.invalid>/mi', $raw, 'the mail asked');
-		$this->assertSame($raw, $inbox->fetchRaw(self::BOX, 'seed-2@inbox-test.invalid', $this->admin, 'phpunit', true));
-		$this->assertTrue($inbox->fromCache);
-		$this->assertNull($inbox->fetchRaw(self::BOX, 'nope-x@inbox-test.invalid', $this->admin, 'phpunit', true));
-		$this->assertSame(Inbox::RESULT_NOT_FOUND, $inbox->result);
-		$this->assertIsString($inbox->fetchRaw('other@inbox-test.invalid', 'seed-1@inbox-test.invalid', $this->admin, 'phpunit', true), 'hook inboxResolveAccount');
-		$this->assertNull($inbox->fetchRaw('nobody@inbox-test.invalid', 'seed-1@inbox-test.invalid', $this->admin, 'phpunit', true));
-		$this->assertSame(Inbox::RESULT_INVALID, $inbox->result);
-		$this->assertNull($inbox->fetchRaw(self::BOX, 'seed-1@inbox-test.invalid', new User($this->db), 'phpunit', false));
-		$this->assertSame(Inbox::RESULT_FORBIDDEN, $inbox->result);
+		// A mail of this test, never read before: the test box holds what other runs left (or took away)
+		$mid = 'lot0-'.bin2hex(random_bytes(6)).'@inbox-test.invalid';
+		$q = preg_quote($mid, '/');
+		$imap = $this->rawClient();
+		$imap->getConnection()->appendMessage('INBOX', "Message-ID: <".$mid.">\r\nFrom: Marie <marie@client.invalid>\r\nTo: ".self::BOX
+			."\r\nSubject: Consultation\r\nDate: ".date('r')."\r\n\r\nMerci.\r\n");
+		try {
+			$inbox = new Inbox($this->db);
+			$raw = $inbox->fetchRaw(self::BOX, '<'.$mid.'>', $this->admin, 'phpunit', true);
+			$this->assertIsString($raw);
+			$this->assertFalse($inbox->fromCache);
+			$row = $this->db->getRow("SELECT uid FROM ".$this->db->prefix()."inbox_message WHERE mailbox = '".self::BOX."' AND message_id = '".$this->db->escape($mid)."'");
+			$this->assertGreaterThan(0, (int) $row->uid, 'UID of the mail kept');
+			$this->assertMatchesRegularExpression('/^Message-ID:\s*<'.$q.'>/mi', $raw, 'the mail asked');
+			$this->assertSame($raw, $inbox->fetchRaw(self::BOX, $mid, $this->admin, 'phpunit', true));
+			$this->assertTrue($inbox->fromCache);
+			$this->assertNull($inbox->fetchRaw(self::BOX, 'nope-x@inbox-test.invalid', $this->admin, 'phpunit', true));
+			$this->assertSame(Inbox::RESULT_NOT_FOUND, $inbox->result);
+			$this->assertIsString($inbox->fetchRaw('other@inbox-test.invalid', $mid, $this->admin, 'phpunit', true), 'hook inboxResolveAccount');
+			$this->assertNull($inbox->fetchRaw('nobody@inbox-test.invalid', $mid, $this->admin, 'phpunit', true));
+			$this->assertSame(Inbox::RESULT_INVALID, $inbox->result);
+			$this->assertNull($inbox->fetchRaw(self::BOX, $mid, new User($this->db), 'phpunit', false));
+			$this->assertSame(Inbox::RESULT_FORBIDDEN, $inbox->result);
+		} finally {
+			$p = $imap->getConnection();
+			$p->selectFolder('INBOX');
+			foreach ((array) $p->search(array('HEADER', 'Message-ID', '"'.$mid.'"'), true) as $u) {
+				$p->requestAndResponse('UID STORE', array((string) $u, '+FLAGS.SILENT', '(\\Deleted)'));
+			}
+			$p->expunge();
+			$imap->disconnect();
+		}
+	}
+
+	/**
+	 * Client of the test mailbox beside inbox (to put a mail there and take it away)
+	 *
+	 * @return \Webklex\PHPIMAP\Client
+	 */
+	private function rawClient()
+	{
+		require_once DOL_DOCUMENT_ROOT.'/includes/webklex/php-imap/vendor/autoload.php';
+		$cm = new \Webklex\PHPIMAP\ClientManager();
+		$c = $cm->make(array('host' => self::IMAP_HOST, 'port' => self::IMAP_PORT, 'encryption' => false, 'validate_cert' => false, 'protocol' => 'imap',
+			'username' => self::BOX, 'password' => self::BOX_PASSWORD, 'authentication' => 'login'));
+		$c->connect();
+
+		return $c;
 	}
 
 	/**

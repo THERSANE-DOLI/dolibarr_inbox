@@ -189,6 +189,10 @@ class InboxReadingTest extends InboxTestCase
 		global $langs;
 
 		$this->needDovecot();
+		// A mail of this test, its words found nowhere else: the test box holds what other runs left there
+		$tok = 'srch'.bin2hex(random_bytes(4));
+		$this->append("Message-ID: <reading-search@inbox-test.invalid>\r\nFrom: Jean Dupont <j.".$tok."@acme.invalid>\r\nTo: ".self::BOX
+			."\r\nSubject: Demande de prix raccords ".$tok." DN25\r\nDate: ".date('r')."\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nBonjour.\r\n", 'reading-search@inbox-test.invalid');
 		$a = $this->readyBox();
 		$inbox = $this->db->getRow("SELECT rowid, total FROM ".$this->db->prefix()."inbox_folder WHERE fk_account = ".((int) $a->id)." AND role = 'inbox'");
 		$engine = new InboxSearchSql($this->db);
@@ -205,10 +209,10 @@ class InboxReadingTest extends InboxTestCase
 		$count = (int) $this->db->getRow("SELECT COUNT(rowid) AS n FROM ".$this->db->prefix()."inbox_mail WHERE fk_folder = ".((int) $inbox->rowid))->n;
 		$this->assertCount($count, $seen, 'every mail of the folder, page by page');
 
-		$this->assertSame(1, $engine->search(array((int) $a->id), 0, InboxSearchQuery::parse('subject:"raccords inox"', $langs), '', 50)['total'], 'search in the whole mailbox');
-		$res = $engine->search(array((int) $a->id), 0, InboxSearchQuery::parse("from:dupont subject:DN25", $langs), '', 50);
+		$this->assertSame(1, $engine->search(array((int) $a->id), 0, InboxSearchQuery::parse('subject:"raccords '.$tok.'"', $langs), '', 50)['total'], 'search in the whole mailbox');
+		$res = $engine->search(array((int) $a->id), 0, InboxSearchQuery::parse('from:'.$tok.' subject:DN25', $langs), '', 50);
 		$this->assertSame(1, $res['total']);
-		$this->assertSame('j.dupont@acme.invalid', $res['rows'][0]['from_email']);
+		$this->assertSame('j.'.$tok.'@acme.invalid', $res['rows'][0]['from_email']);
 		foreach (array("%", "_", "' OR 1=1 -- ", '\\', '"') as $evil) {
 			$this->assertSame(0, $engine->search(array((int) $a->id), 0, InboxSearchQuery::parse($evil.'zz', $langs), '', 50)['total'], 'harmless: '.$evil);
 		}
