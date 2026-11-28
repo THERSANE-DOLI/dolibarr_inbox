@@ -223,6 +223,14 @@ class InboxElements
 			if ($type === 'project' || $type === 'ticket') {
 				$title = trim((string) ($o->title ?? ($o->subject ?? '')));
 				$label = trim($title.($label !== '' ? ' · '.$label : ''));
+			} elseif ($type === 'action') {
+				// An event has no reference (its ref is its id): its subject, then its date
+				$ref = dol_trunc(trim((string) ($o->label ?? '')), 80, 'right', 'UTF-8', 1);
+				if ($ref === '') {
+					$ref = $kind.' '.((int) $o->id);
+				}
+				$title = empty($o->datep) ? '' : dol_print_date($o->datep, empty($o->fulldayevent) ? 'dayhour' : 'day', 'tzuserrel');
+				$label = trim($title.($label !== '' ? ' · '.$label : ''));
 			}
 		}
 		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'socid' => $socId, 'title' => $title, 'status' => '', 'url' => $url, 'tip_params' => $tipParams, 'tip_html' => $tipHtml, 'icon' => $icon, 'kind' => $kind);

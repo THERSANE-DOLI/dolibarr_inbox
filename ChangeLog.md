@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: an event linked to a mail shows its subject and its date, no longer its id :   1.157.1
+  - in the pieces of the panel and in the search of « Link ».
+
 - NEW: module actions and blocks of the modules as widgets of the Dolibarr panel, quick action widgets :   1.157.0
   - the actions and each block of a module show by themselves at the end of the grid until the user moves or removes
     them; a block placed is left out for a mail where its module declares nothing.
