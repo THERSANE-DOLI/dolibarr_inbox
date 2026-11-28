@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxthreadmark.class.php
  * \ingroup inbox
- * \brief   Conversations ignored or watched (lot W4 1.11.0, B8, keys K and W of Thunderbird)
+ * \brief   Conversations ignored or watched (1.11.0, B8, keys K and W of Thunderbird)
  */
 
 require_once __DIR__.'/inboxaccess.class.php';

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxautoconfig.class.php
  * \ingroup inbox
- * \brief   Servers of a new mailbox found from its address (lot H1)
+ * \brief   Servers of a new mailbox found from its address
  */
 
 require_once __DIR__.'/inboxservertester.class.php';

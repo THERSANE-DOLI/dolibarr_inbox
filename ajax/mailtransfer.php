@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/mailtransfer.php
  * \ingroup inbox
- * \brief   Mails imported into a folder by batches (.eml, mbox), folder exported (.mbox, .zip), lot W4 1.12.0
+ * \brief   Mails imported into a folder by batches (.eml, mbox), folder exported (.mbox, .zip), 1.12.0
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

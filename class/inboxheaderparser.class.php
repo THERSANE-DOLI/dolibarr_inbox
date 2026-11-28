@@ -40,7 +40,7 @@ class InboxHeaderParser
 	const MAX_HEADER = 65536;
 
 	/**
-	 * Common format of one mail (see analyse-lot-w2 §2.2)
+	 * Common format of one mail
 	 *
 	 * @param string              $header        Raw header (RFC 822), as fetched
 	 * @param array<mixed>|null   $bodystructure BODYSTRUCTURE tokens, null if not fetched

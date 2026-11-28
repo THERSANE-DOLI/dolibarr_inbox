@@ -297,7 +297,7 @@
 	}
 
 	/**
-	 * Send a file (multipart POST, the token added): attachments of a writing (lot W6)
+	 * Send a file (multipart POST, the token added): attachments of a writing
 	 * @param {string} endpoint File of ajax/ without .php
 	 * @param {string} action   Action
 	 * @param {object} fields   Values
@@ -636,7 +636,7 @@
 			return '';
 		}
 	})();
-	// Leader tab (the only one that will poll the server from lot W2): Web Locks, else every tab is its own leader
+	// Leader tab (the only one that polls the server): Web Locks, else every tab is its own leader
 	let isLeader = false;
 	if (popup) {
 		// not a candidate
@@ -738,7 +738,7 @@
 		},
 	};
 
-	// ---------- Title of the tab: « (12) Mail - Inbox » with the unread counter (lot W8 1.21.0) ----------
+	// ---------- Title of the tab: « (12) Mail - Inbox » with the unread counter (1.21.0) ----------
 	const title = { base: '', unread: 0 };
 	function paintTitle() {
 		document.title = (title.unread > 0 ? '(' + (title.unread > 99 ? '99+' : title.unread) + ') ' : '') + title.base;
@@ -831,7 +831,7 @@
 		});
 	}
 
-	// Mail space: js/inbox-mail.js (lot W3), registered first so that it is the default space
+	// Mail space: js/inbox-mail.js, registered first so that it is the default space
 
 	// ---------- Windows of their own (1.148.0): Ctrl+click on an attachment, on « New mail », « Reply »... ----------
 	/** Size of a window of each kind the first time: an A4 page read in its width, a writing */

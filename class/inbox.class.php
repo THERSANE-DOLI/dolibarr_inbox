@@ -322,7 +322,7 @@ class Inbox
 			return;
 		}
 		dolChmod($dir.'/'.$file);
-		// Column uid of the lot 0 cache: the UID part of the opaque identifier of the IMAP connector, 0 for others
+		// Column uid of the cache of the readings by Message-ID: the UID part of the opaque identifier of the IMAP connector, 0 for others
 		$uid = isset($found['uid']) ? (int) $found['uid'] : (preg_match('/^\d+:(\d+)$/', (string) (isset($found['remote_id']) ? $found['remote_id'] : ''), $m) ? (int) $m[1] : 0);
 		$header = InboxMimeParser::parse(substr($found['raw'], 0, (int) (strpos($found['raw'], "\r\n\r\n") ?: 65536))."\r\n\r\n");
 		$sql = "INSERT INTO ".$this->db->prefix()."inbox_message (entity, mailbox, folder, uid, message_id, sha1, date_mail, from_email, subject, filepath, size, date_fetch, fk_user_fetch)"
@@ -339,7 +339,7 @@ class Inbox
 	}
 
 	/**
-	 * Raw mail kept in the cache (reading in the application, lot W3: no journal, the rights per mailbox apply)
+	 * Raw mail kept in the cache (reading in the application, No journal, the rights per mailbox apply)
 	 *
 	 * @param string $mailbox   Email address of the mailbox
 	 * @param string $messageId Message-ID
@@ -531,7 +531,7 @@ class Inbox
 		// Mails gone from the server for long (1.114.0): their references forgotten with their links and notes
 		require_once __DIR__.'/inboxmailref.class.php';
 		$forgotten = (new InboxMailRef($this->db))->shed();
-		// Writings left open (lot W6): their temporary folder
+		// Writings left open: their temporary folder
 		require_once __DIR__.'/inboxcomposer.class.php';
 		InboxComposer::purge();
 		// Trash and junk of the mailboxes emptied after their delay (1.41.0): removed for good on the server

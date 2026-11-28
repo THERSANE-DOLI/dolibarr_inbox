@@ -15,7 +15,7 @@
  */
 
 /**
- * New customer from a mail (lot A1, 1.79.0): a side panel on the left, over the folders and the list, the mail left
+ * New customer from a mail (1.79.0): a side panel on the left, over the folders and the list, the mail left
  * readable on the right. Each value shows its source (its line of the mail lit on hover) and the other values found;
  * « Create » makes the thirdparty and its contact, « Full page… » opens the page of Dolibarr, filled.
  *

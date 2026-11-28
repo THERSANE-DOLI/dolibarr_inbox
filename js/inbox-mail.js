@@ -15,7 +15,7 @@
  */
 
 /**
- * inbox application, space « Mail » (lot W3, analyse-lot-w3.md, interface §3 to §7):
+ * inbox application, space « Mail »:
  * - pane 1: mailboxes and folders from the index, unread counters, mailbox in error;
  * - pane 2: list of a folder as a table or as cards, sort, quick filters, search on the index, pages loaded while
  *   scrolling, refresh every 20 s without losing the selection;
@@ -50,18 +50,18 @@
 		pickOpen: false,
 		q: '',
 		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false, legit: false },
-		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
+		// Search panel (1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
 		chips: [],
 		soc: null,
 		tag: '',
 		period: '',
 		sx: { open: false, active: -1, opts: [], sug: null, sugSeq: 0, text: '', timer: 0 },
 		deep: null,
-		// Meilisearch (lot W7 1.20.0): state given by the last list, crops of the text per row
+		// Meilisearch (1.20.0): state given by the last list, crops of the text per row
 		ft: null,
 		crops: {},
 		// Names of the people assigned seen in the lists (user => name), their photo of Dolibarr (user => address,
-		// '' when none), and the user (lot W4 1.9.0)
+		// '' when none), and the user (1.9.0)
 		people: {},
 		photos: {},
 		me: +(I.ctx('INBOX_USER_ID', 0) || 0),
@@ -1128,7 +1128,7 @@
 	}
 
 	/**
-	 * Out of office of the mailboxes read (lot W8 1.23.0): said to every reader (they know the senders got an automatic
+	 * Out of office of the mailboxes read (1.23.0): said to every reader (they know the senders got an automatic
 	 * answer); Turn off and Change for the managers
 	 */
 	function awayNotes() {
@@ -1631,7 +1631,7 @@
 			}
 			S.listLocked = 0;
 			S.pills = res.query;
-			// Meilisearch (lot W7 1.20.0): mailboxes fully indexed, error, order, crops of the text
+			// Meilisearch (1.20.0): mailboxes fully indexed, error, order, crops of the text
 			S.ft = res.fulltext || null;
 			S.crops = Object.assign({}, res.crops || {});
 			learnPeople(res.people);
@@ -2760,7 +2760,7 @@
 		sxRenderPanel();
 	}
 
-	// ---------- Search panel and deep search (lot W7 1.19.0) ----------
+	// ---------- Search panel and deep search (1.19.0) ----------
 	// The field opens into a panel: scope, suggestions, filters (shown as pills in the field), the deep search in the
 	// text of the mails (asked, one mailbox after the other on its mail server), recent searches
 
@@ -4186,6 +4186,25 @@
 	 */
 	const OT = { src: new Map(), cache: new Map(), el: null, for: null, show: 0, hide: 0, styled: false };
 	/** Key of the tooltip of a piece ('' when Dolibarr gives none), its source kept aside */
+	/**
+	 * A bubble of the application on hover or keyboard focus (1.158.2), the same as for the pieces: put the key
+	 * returned in data-objtip. The HTML is built by the caller with I.html (escaped), the same content gives the same key
+	 * @param {string} html Content
+	 * @param {string} [title] Title
+	 * @returns {string} Key
+	 */
+	const tipKeys = new Map();
+	/** The bubble closed (a drag begins on what it explains) */
+	I.tipHide = () => objTipHide();
+	I.tip = (html, title) => {
+		const text = String(html);
+		if (!tipKeys.has(text)) {
+			const key = 'tip:' + (tipKeys.size + 1);
+			tipKeys.set(text, key);
+			OT.src.set(key, { params: null, html: text, title: title || '' });
+		}
+		return tipKeys.get(text);
+	};
 	function objTipKey(d) {
 		if (!d.tip_params && !d.tip_html) {
 			return '';
@@ -4244,7 +4263,7 @@
 			}
 		};
 		walk(doc.body);
-		// Then the one door (lot S3): DOMPurify and the Sanitizer API, the classes of Dolibarr kept
+		// Then the one door: DOMPurify and the Sanitizer API, the classes of Dolibarr kept
 		return I.safeHtml(doc.body.innerHTML, 'tooltip');
 	}
 	function objTipLoad(key) {
@@ -4444,13 +4463,14 @@
 			}
 		};
 		root.addEventListener('click', e => {
-			const a = e.target.closest('.ibx-addr--user');
+			const a = e.target.closest('.ibx-addr--user, .ibx-js-pieceperson');
 			if (a && root.contains(a)) {
+				objTipHide();
 				toggle(a, false);
 			}
 		});
 		root.addEventListener('keydown', e => {
-			const a = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.ibx-addr--user');
+			const a = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.ibx-addr--user, .ibx-js-pieceperson');
 			if (a && e.target === a) {
 				e.preventDefault();
 				toggle(a, true);
@@ -4514,10 +4534,10 @@
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
 
-	// ---------- Actions on mails (lot W4: write on the server, checked, undo 8 s) ----------
+	// ---------- Actions on mails (write on the server, checked, undo 8 s) ----------
 	/** Actions after which the mail leaves the folder */
 	const LEAVING = new Set(['move', 'archive', 'delete', 'junk', 'notjunk']);
-	/** Actions of the level « manage » (read / unread and starred: « read », lot W4 §10 point 2) */
+	/** Actions of the level « manage » (read / unread and starred: « read ») */
 	const MANAGING = new Set(['tag', 'move', 'archive', 'delete', 'junk', 'notjunk']);
 	/** Mails per call (a larger selection goes by batches, decision W4 point 3) */
 	const BATCH = 200;
@@ -5550,7 +5570,7 @@
 		return items;
 	}
 
-	// ---------- Assignment (lot W4 1.9.0, webmail §5.4 quinquies): who handles a mail ----------
+	// ---------- Assignment (1.9.0, webmail §5.4 quinquies): who handles a mail ----------
 	function learnPeople(map) {
 		Object.keys(map || {}).forEach(k => {
 			const p = map[k];
@@ -5798,7 +5818,7 @@
 		q.focus();
 	}
 
-	// ---------- Threads ignored or watched, newsletters (lot W4 1.11.0, B4, B8) ----------
+	// ---------- Threads ignored or watched, newsletters (1.11.0, B4, B8) ----------
 	/**
 	 * A spam (1.142.0): « Probably legitimate » (known sender, authenticated: a doubt, never green) and why it is in the
 	 * junk when inbox knows it (score of the anti-spam engine, blocked sender)
@@ -5922,7 +5942,7 @@
 		toast(t('InboxUnsubscribed', m.from.name || m.from.email), canHandle(m) ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
 	}
 
-	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
+	// ---------- Bandeau Dolibarr of the reading (1.13.0, analyse-interface §6 bloc 3) ----------
 	/**
 	 * Column Dolibarr of a computer (1.110.0): a pane of the mail space beside the reading, full height, at the place
 	 * of the agenda panel (same splitter, same drawer when narrow). The bandeau of the mail open is moved into it; on a
@@ -6034,7 +6054,11 @@
 			return false;
 		}
 		const app = sideApp();
-		const docked = app.dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el) : (app.dataset.dolside === 'open' ? dolSide() : null);
+		// The column docked on the right: the agenda, else the column Dolibarr or the one of the overview and of the modules
+		// (1.153.0), whichever is shown (the hidden one measures 0 and would make the space narrow, then wide again)
+		const extra = $('.ibx-js-sidepane', S.el);
+		const docked = app.dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el)
+			: (app.dataset.dolside === 'open' ? (extra && !extra.hidden ? extra : dolSide()) : null);
 		const width = pane.clientWidth + (docked ? docked.getBoundingClientRect().width + 5 : 0);
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 		return width / rem < 60;
@@ -6042,10 +6066,26 @@
 	function agendaOn() {
 		return !!(I.agenda && I.agenda.enabled());
 	}
+	/**
+	 * Columns of the strip beside Dolibarr and the agenda (1.153.0): the overview of inbox, then the ones of the
+	 * modules (hook inboxSidePanes), drawn by js/inbox-overview.js in the column .ibx-js-sidepane
+	 * @returns {Array<{id:string,title:string,icon:string,url:string,needs_mail:boolean}>}
+	 */
+	function sidePanes() {
+		if (!S.panes) {
+			const own = I.ctx('INBOX_OVERVIEW', false) ? [{ id: 'overview', title: t('InboxOverview'), icon: 'overview', url: '', needs_mail: true }] : [];
+			const mods = I.ctxJson('INBOX_SIDEPANES_JSON', []);
+			S.panes = own.concat((Array.isArray(mods) ? mods : []).filter(x => x && /^mod:[a-z0-9_-]{1,40}$/.test(String(x.id))));
+		}
+		return S.panes;
+	}
+	function sidePane(id) {
+		return sidePanes().find(x => x.id === id) || null;
+	}
 	/** Choice kept for a mail open: the last column chosen (the agenda pinned before 1.109.0 stays the agenda) */
 	function sideChoice() {
 		const c = params.side_panel;
-		if (['dolibarr', 'agenda', 'none'].includes(c)) {
+		if (['dolibarr', 'agenda', 'none'].includes(c) || sidePane(c)) {
 			return c;
 		}
 		return params.agenda_mode === 'pinned' ? 'agenda' : 'dolibarr';
@@ -6066,7 +6106,9 @@
 		} else {
 			c = params.agenda_mode === 'closed' ? '' : 'agenda';
 		}
-		if ((c === 'agenda' && !agendaOn()) || (c === 'dolibarr' && !S.openId) || c === 'none') {
+		const pane = sidePane(c);
+		if ((c === 'agenda' && !agendaOn()) || (c === 'dolibarr' && !S.openId) || c === 'none' || (pane && pane.needs_mail && !S.openId)
+			|| (!pane && !['dolibarr', 'agenda'].includes(c))) {
 			return '';
 		}
 		return c;
@@ -6086,8 +6128,15 @@
 		}
 		layoutDolside();
 		paintStrip();
+		// The overview or a column of a module (1.153.0): drawn for the mail open, read only while it is shown
+		if (I.sidePane && I.sidePane.sync) {
+			I.sidePane.sync(sidePane(cur) ? cur : '', S.openId || 0);
+		}
 	}
-	/** The column Dolibarr shown or not, docked or as a drawer; the splitter of the right column for the one docked */
+	/**
+	 * The column Dolibarr, or the one of the overview and of the modules (1.153.0), shown or not, docked or as a drawer;
+	 * the splitter of the right column for the one docked. Both sit in the same place of the grid (data-dolside).
+	 */
 	function layoutDolside() {
 		const app = sideApp();
 		const side = dolSide();
@@ -6096,7 +6145,12 @@
 		}
 		const on = !isPhone() && app.dataset.side === 'dolibarr';
 		side.hidden = !on;
-		if (on) {
+		const extra = $('.ibx-js-sidepane', S.el);
+		const paneOn = !isPhone() && !!sidePane(app.dataset.side || '');
+		if (extra) {
+			extra.hidden = !paneOn;
+		}
+		if (on || paneOn) {
 			app.dataset.dolside = app.dataset.narrow === '1' ? 'over' : 'open';
 		} else {
 			app.removeAttribute('data-dolside');
@@ -6112,7 +6166,9 @@
 	 * @param {string} reason
 	 */
 	function toggleSide(what, reason) {
-		if (!S.el || isPhone() || (what === 'dolibarr' && !S.openId) || (what === 'agenda' && !agendaOn())) {
+		const pane = sidePane(what);
+		if (!S.el || isPhone() || (what === 'dolibarr' && !S.openId) || (what === 'agenda' && !agendaOn()) || (pane && pane.needs_mail && !S.openId)
+			|| (!pane && !['dolibarr', 'agenda'].includes(what))) {
 			return;
 		}
 		const next = sideCurrent() === what ? '' : what;
@@ -6125,7 +6181,7 @@
 		}
 		applySide(reason || 'button');
 		if (next) {
-			const col = next === 'dolibarr' ? dolSide() : $('.ibx-pane--agenda', S.el);
+			const col = next === 'dolibarr' ? dolSide() : (sidePane(next) ? $('.ibx-js-sidepane', S.el) : $('.ibx-pane--agenda', S.el));
 			if (col && sideApp().dataset.narrow === '1') {
 				col.setAttribute('tabindex', '-1');
 				col.focus({ preventScroll: true });
@@ -6141,6 +6197,7 @@
 	function stripHtml() {
 		return '<nav class="ibx-sidestrip ibx-js-sidestrip" aria-label="' + th('InboxSideStrip') + '">'
 			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sidedol" aria-pressed="false">' + ic('dolibarr') + '</button>'
+			+ sidePanes().map(x => '<button type="button" class="ibx-sidestrip__btn ibx-js-sidepanebtn" data-pane="' + esc(x.id) + '" aria-pressed="false">' + ic(x.icon) + '</button>').join('')
 			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sideagenda" aria-pressed="false" hidden>' + ic('today') + '<span class="ibx-sidestrip__day ibx-js-sideday" aria-hidden="true"></span>'
 			+ '<span class="ibx-latemark" aria-hidden="true" hidden>' + ic('warning') + '</span></button>'
 			+ '</nav>';
@@ -6161,6 +6218,22 @@
 		} else {
 			dol.setAttribute('aria-disabled', 'true');
 		}
+		$$('.ibx-js-sidepanebtn', strip).forEach(b => {
+			const pane = sidePane(b.dataset.pane);
+			if (!pane) {
+				return;
+			}
+			const off = pane.needs_mail && !S.openId;
+			const name = off && pane.id === 'overview' ? t('InboxOverviewNoMail') : pane.title;
+			b.title = name;
+			b.setAttribute('aria-label', name);
+			b.setAttribute('aria-pressed', cur === pane.id ? 'true' : 'false');
+			if (off) {
+				b.setAttribute('aria-disabled', 'true');
+			} else {
+				b.removeAttribute('aria-disabled');
+			}
+		});
 		const ag = $('.ibx-js-sideagenda', strip);
 		ag.hidden = !agendaOn();
 		// Events late to do (1.152.0): a warning on the icon, said in its name too (never the colour alone)
@@ -6179,12 +6252,13 @@
 		}
 		$('.ibx-js-sidedol', strip).addEventListener('click', () => toggleSide('dolibarr'));
 		$('.ibx-js-sideagenda', strip).addEventListener('click', () => toggleSide('agenda'));
+		$$('.ibx-js-sidepanebtn', strip).forEach(b => b.addEventListener('click', () => toggleSide(b.dataset.pane)));
 		// A drawer closes by a click beside it (menus, dialogs and windows opened from it are not « beside »)
 		document.addEventListener('pointerdown', e => {
 			if (!S.el || sideApp().dataset.narrow !== '1' || !S.sideDrawer || !e.target.closest) {
 				return;
 			}
-			if (e.target.closest('.ibx-dolibar, .ibx-pane--dolside, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
+			if (e.target.closest('.ibx-dolibar, .ibx-pane--dolside, .ibx-pane--sidepane, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
 				return;
 			}
 			closeSide('outside');
@@ -6209,7 +6283,7 @@
 		}
 		applySide('init');
 	}
-	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide, paint: paintStrip };
+	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide, paint: paintStrip, panes: sidePanes };
 
 	// ---------- Phone (1.102.0): the Dolibarr part as chips under the head, details in a bottom sheet ----------
 	/** Slot of the chips in the head of a mail or of a conversation (filled by the panel once loaded) */
@@ -6261,10 +6335,22 @@
 		if (x.notes || x.canWrite) {
 			html += chip('notes', 'note', '', { badge: x.notes || '+', aria: x.notes ? t('InboxNotesCount', x.notes) : t('InboxNotes') });
 		}
+		// Overview (1.153.0): its own sheet on a phone, its column on a narrow computer
+		if (sidePane('overview') && S.openId) {
+			html += chip('overview', 'overview', '', { aria: t('InboxOverview') });
+		}
 		slot.innerHTML = html;
 		slot.hidden = false;
 		slot.classList.toggle('is-line', drawer);
 		$$('.ibx-dolchip', slot).forEach(b => b.addEventListener('click', () => {
+			if (b.dataset.sec === 'overview') {
+				if (!drawer && I.sidePane && I.sidePane.sheet) {
+					I.sidePane.sheet('overview', S.openId, b);
+				} else if (sideCurrent() !== 'overview') {
+					toggleSide('overview');
+				}
+				return;
+			}
 			if (!drawer) {
 				openDolSheet(box, b.dataset.sec, b);
 				return;
@@ -6493,7 +6579,9 @@
 		if (data && data.hidden === true) {
 			box._data.panels = (box._data.panels || []).filter(x => x.id !== p.id);
 			const row = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"]', box);
-			if (row) {
+			if (row && I.panelWidgets && row.closest('.ibx-wg-cell')) {
+				I.panelWidgets.refresh();
+			} else if (row) {
 				row.remove();
 			}
 			return;
@@ -6502,6 +6590,10 @@
 		const el = $('.ibx-mpanel[data-panel="' + CSS.escape(p.id) + '"] .ibx-mpanel__body', box);
 		if (el) {
 			el.innerHTML = panelBody(box._panels[p.id]);
+			// A widget as high as its new content
+			if (I.panelWidgets && el.closest('.ibx-wg-cell')) {
+				I.panelWidgets.fit();
+			}
 		}
 		if (data && data.pending && tries < 60) {
 			setTimeout(() => loadPanel(box, mail, p, tries + 1), Math.min(30000, Math.max(2000, +data.retry_ms || 3000)));
@@ -6658,6 +6750,37 @@
 	 * @param {object} [more] {theirs: text of the second line, action: html of a button}
 	 * @returns {string} html
 	 */
+	/**
+	 * Colleagues of a piece (1.158.0): the owner and the users invited to an event, the user assigned to a ticket.
+	 * Three faces at most; on hover a bubble (name, role, answer), on a click the card of the colleague
+	 * @param {object} d Piece (describe)
+	 * @returns {string}
+	 */
+	function piecePeopleHtml(d) {
+		const people = Array.isArray(d.people) ? d.people : [];
+		if (!people.length) {
+			return '';
+		}
+		const role = p => t({ owner: 'InboxPiecePersonOwner', attendee: 'InboxPiecePersonAttendee', assigned: 'InboxPiecePersonAssigned' }[p.role] || 'InboxPiecePersonAttendee');
+		const answer = p => (p.role === 'assigned' ? '' : t({ accepted: 'InboxPiecePersonAccepted', tentative: 'InboxPiecePersonTentative', declined: 'InboxPiecePersonDeclined' }[p.answer] || 'InboxPiecePersonPending'));
+		const line = p => [role(p), p.role === 'owner' && !p.answer ? '' : answer(p)].filter(Boolean).join(' · ');
+		const shown = people.slice(0, 3);
+		const rest = people.slice(3);
+		const faces = shown.map(p => {
+			const key = String(p.email || ('u:' + p.id)).toLowerCase();
+			peopleCache.set(key, p);
+			const tip = 'person:' + d.type + ':' + d.id + ':' + p.id + ':' + (p.answer || '');
+			OT.src.set(tip, { html: String(I.html`<div class="ibx-persontip"><b>${p.name}</b>${p.job ? I.html`<div>${p.job}</div>` : ''}<div class="ibx-muted">${line(p)}</div></div>`), title: p.name });
+			return String(I.html`<button type="button" class="ibx-piecepeople__one ibx-js-pieceperson${p.answer === 'declined' ? ' is-declined' : ''}" data-user="${key}" data-objtip="${tip}" aria-haspopup="dialog" aria-label="${p.name} · ${line(p)}">${I.raw(userAvatar(p))}</button>`);
+		}).join('');
+		let more = '';
+		if (rest.length) {
+			const tip = 'people:' + d.type + ':' + d.id + ':' + rest.map(p => p.id + (p.answer || '')).join(',');
+			OT.src.set(tip, { html: String(I.html`<div class="ibx-persontip">${rest.map(p => I.html`<div><b>${p.name}</b> <span class="ibx-muted">${line(p)}</span></div>`)}</div>`), title: '' });
+			more = String(I.html`<span class="ibx-piecepeople__more" tabindex="0" data-objtip="${tip}" aria-label="${t('InboxPiecePeopleMore', rest.length)}">+${rest.length}</span>`);
+		}
+		return '<span class="ibx-piecepeople">' + faces + more + '</span>';
+	}
 	function pieceHtml(d, unlink, warn, socId, more) {
 		more = more || {};
 		const attrs = d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '';
@@ -6665,8 +6788,9 @@
 			return '<span class="ibx-piece"' + attrs + '><span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span></span>';
 		}
 		const sub = [pieceSub(d, socId || 0), more.theirs || ''].filter(Boolean).join(' · ');
-		const foot = sub || more.action
-			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + (more.action || '') + '</span>'
+		const people = piecePeopleHtml(d);
+		const foot = sub || more.action || people
+			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + people + (more.action || '') + '</span>'
 			: '';
 		// Tooltip of Dolibarr in a card of the application (objTip) when getNomUrl gives one; else a plain title
 		const tip = objTipKey(d);
@@ -7141,7 +7265,29 @@
 			toast(err.message, { error: true });
 		}
 	}
+	/**
+	 * Buttons of the other modules (hook inboxMailActions): in a window of inbox (1.108.0) or a new tab; the markers
+	 * are filled on click, with the mail as it is then
+	 */
+	function modActionsHtml(d) {
+		return (d.actions || []).map((a, i) => a.window
+			? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
+			: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('');
+	}
+	/**
+	 * What the widgets of the panel take from it (1.157.0): the module actions and the blocks of the modules of the mail
+	 * shown, drawn with the markup and the handlers of the panel
+	 */
+	I.dolPanel = {
+		actions: box => (box && box._data ? box._data.actions || [] : []),
+		actionsHtml: box => modActionsHtml(box && box._data ? box._data : {}),
+		panels: box => (box && box._data ? box._data.panels || [] : []),
+		panelBody: (box, id) => panelBody(box && box._panelsMail === box.dataset.mail ? (box._panels || {})[id] : null),
+		// The summary of a block from its data (widget « free » of a module, 1.162.0): badges, lines, action, links
+		render: d => panelBody(d),
+	};
 	function paintDolibar(box) {
+		const wgOn = !!(I.panelWidgets && I.ctx('INBOX_OVERVIEW', false));
 		const d = box._data;
 		// Phone (1.102.0): a bottom sheet opened by the chips of the head, so always built whole
 		const sheet = isSmallPhone();
@@ -7156,9 +7302,12 @@
 		let html = '';
 		html += sheet ? '<div class="ibx-dolibar__head ibx-dolsheet__head ibx-js-dolsheethead"><span class="ibx-dolsheet__grip" aria-hidden="true"></span>' + ic('dolibarr')
 			+ '<b>' + th('InboxDolibarr') + '</b>' + (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '')
+			+ (I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--ghost ibx-js-wgmenu" aria-haspopup="menu" title="' + th('InboxWgMenu') + '" aria-label="' + th('InboxWgMenu') + '">' + ic('more') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-dolsheetclose" aria-label="' + th('InboxDolibarrSheetClose') + '">' + ic('close') + '</button></div>'
 			: (right ? '<div class="ibx-dolibar__head ibx-dolibar__head--col">' + ic('dolibarr') + '<b>' + th('InboxDolibarr') + '</b>'
 				+ (summary ? ' <span class="ibx-muted ibx-ellipsis">' + esc(summary) + '</span>' : '')
+				// Widgets of the panel (1.155.0, js/inbox-panel-widgets.js): personalize them, back to the model
+				+ (I.panelWidgets && I.ctx('INBOX_OVERVIEW', false) ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-btn--ghost ibx-js-wgmenu" aria-haspopup="menu" title="' + th('InboxWgMenu') + '" aria-label="' + th('InboxWgMenu') + '">' + ic('more') + '</button>' : '')
 				+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-js-sideclose" title="' + th('InboxSideClose') + '" aria-label="' + th('InboxSideClose') + '">' + ic('close') + '</button></div>'
 			: '<button type="button" class="ibx-dolibar__head ibx-js-doltoggle" aria-expanded="' + !folded + '" title="' + th(folded ? 'InboxDolibarrUnfold' : 'InboxDolibarrFold') + '">'
 			+ ic(folded ? 'chevron-right' : 'chevron-down') + ic('dolibarr')
@@ -7171,7 +7320,7 @@
 				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0) + '<span class="ibx-muted ibx-soccard__by">' + th('InboxSocHiddenHelp') + '</span>')
 					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
 			}
-			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
+			// Shared domains (1.76.0): a disposable address said; the thirdparties sharing the domain offered
 			if (d.sender.domain_category === 'disposable') {
 				sender.push('<span class="ibx-badge ibx-domwarn" title="' + th('InboxDomainsDisposableHelp') + '">' + ic('warning') + th('InboxDomainsDisposable') + '</span>');
 			}
@@ -7192,7 +7341,7 @@
 			// A piece linked though cited for another thirdparty keeps its warning
 			const pieces = d.links.map(l => {
 				const c = citedOf(l);
-				// Linked by its conversation (lot A3, 1.73.0): said under the piece
+				// Linked by its conversation (1.73.0): said under the piece
 				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId, l.origin === 'thread' ? { theirs: t('InboxLinkedByThread') } : {});
 			}).concat(d.extra.map(x => pieceHtml(x, 0, '', socId)));
 			const convo = d.conversation || { others: 0, detached: false };
@@ -7217,7 +7366,7 @@
 					+ '</span></div>' : '')
 				// A mail written by us (1.92.2): the thirdparty is the one of its recipient
 				+ '<div class="ibx-dolibar__row" data-sec="sender"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
-				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
+				// New customer from this mail (1.79.0): its button says the sender is unknown, the text only without it
 				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
 					+ '<span class="ibx-dolibar__tools">'
 					+ (canLead ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-newcustomer" aria-haspopup="dialog">' + ic('user-plus') + ' ' + th('InboxLeadOpen') + '</button>' : '')
@@ -7244,13 +7393,14 @@
 						action: '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-piece__act ibx-js-linkcited" data-type="' + esc(c.type) + '" data-id="' + c.id + '" aria-label="' + esc(t('InboxLink') + ' ' + (c.ref || '')) + '">' + ic('link') + ' ' + th('InboxLink') + '</button>',
 					})).join('')
 					+ '</span></div>' : '')
-				+ ((d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
-					// In a window of inbox (1.108.0) or a new tab; the markers are filled on click, with the mail as it is then
-					+ d.actions.map((a, i) => a.window
-						? '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" aria-haspopup="dialog">' + ic(a.icon) + ' ' + esc(a.label) + '</button>'
-						: '<a class="ibx-btn ibx-btn--sm ibx-js-modaction" data-i="' + i + '" href="' + esc(insideUrl(a.url) ? I.moduleUrl(a.url, null) : '#') + '" target="_blank" rel="noopener">' + ic(a.icon) + ' ' + esc(a.label) + '</a>').join('') + '</span></div>' : '')
-				+ (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
-					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join('')
+				// With the widgets (1.157.0), the actions and the blocks of the modules are widgets of the grid
+				+ (!wgOn && (d.actions || []).length ? '<div class="ibx-dolibar__row"><span class="ibx-dolibar__label">' + th('InboxModuleActions') + '</span><span class="ibx-dolibar__items">'
+					+ modActionsHtml(d) + '</span></div>' : '')
+				+ (wgOn ? '' : (d.panels || []).map(p => '<div class="ibx-dolibar__row ibx-mpanel" data-panel="' + esc(p.id) + '"><span class="ibx-dolibar__label">' + ic(p.icon) + ' ' + esc(p.title) + '</span>'
+					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join(''))
+				// Grid of the widgets between the fixed top and the notes docked at the bottom (column of a computer, 1.155.0)
+				+ (wgOn ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
+					+ (right && !sheet ? '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" data-objtip="' + esc(I.tip(I.html`<div>${t('InboxWgDockResize')}</div>`)) + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '') : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)
 				+ '</div>'
@@ -7267,6 +7417,11 @@
 		placeSocCard(box);
 		hydrateUserPhotos(box);
 		I.mount(box);
+		// Widgets (1.155.0, small screen 1.156.0): the column of a computer, the band of a tablet, the sheet of a phone
+		if (I.panelWidgets && !folded) {
+			const m = S.mail && String(S.mail.id) === String(box.dataset.mail) ? S.mail : null;
+			I.panelWidgets.mount(box, { mail: +box.dataset.mail || 0, account: m ? +m.account || 0 : 0 });
+		}
 		box.classList.toggle('is-folded', folded);
 		const reading = readingOf(box);
 		if (reading) {
@@ -7304,7 +7459,7 @@
 		}
 	}
 	/**
-	 * Fil of the mail (lot E2, 1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
+	 * Fil of the mail (1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
 	 * date. Only what is sure: an answer is tied to the mail by its headers or its conversation, never by its subject;
 	 * the forwards are not there.
 	 */
@@ -7542,7 +7697,7 @@
 			return;
 		}
 		if (e.target.closest('.ibx-js-threaddetach')) {
-			// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go, undo
+			// « Detach this mail from its conversation » (1.73.0): its links of the conversation go, undo
 			let res;
 			try {
 				res = await post('dolibarr', 'detach', { id: mailId });
@@ -7599,7 +7754,7 @@
 		}
 		const rqBtn = e.target.closest('.ibx-js-createrequest');
 		if (rqBtn) {
-			createPiece(box, rqBtn.dataset.type, false, null);
+			createPiece(box, { id: rqBtn.dataset.type, type: rqBtn.dataset.type, window: false }, false, null);
 			return;
 		}
 		const x = e.target.closest('.ibx-js-unlink');
@@ -7720,14 +7875,20 @@
 	 * « Create ▾ »: the page of creation of Dolibarr opens in a new tab, filled from the mail; the piece saved there is
 	 * linked to the mail (and gets the mail in its documents when the box is ticked)
 	 */
+	/** Groups of the dialog « Create from this mail » (1.161.0), in their order (InboxCreate::GROUPS) */
+	const CREATE_GROUPS = ['contacts', 'sales', 'purchases', 'followup', 'other'];
 	function createDialog(box) {
 		const d = box._data;
+		const buttons = d.create || [];
+		const groups = CREATE_GROUPS.map(g => ({ g, list: buttons.filter(c => (CREATE_GROUPS.includes(c.group) ? c.group : 'other') === g) })).filter(x => x.list.length);
 		const dlg = dialog({
 			title: t('InboxCreateTitle'),
 			noCancel: false,
-			// A disposable address (lot A7, 1.76.0): said before a thirdparty is made from it
+			// A disposable address (1.76.0): said before a thirdparty is made from it
 			body: (d.sender.domain_category === 'disposable' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxDomainsDisposableCreate', d.sender.domain) + '</div></div>' : '')
-				+ '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
+				// Titled groups (1.161.0): the buttons of the core first, then those of the modules in the same group
+				+ groups.map(x => String(I.html`<h3 class="ibx-creategroup">${t('InboxCreateGroup_' + x.g)}</h3>`)
+					+ '<div class="ibx-creategrid">' + x.list.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '" data-button="' + esc(c.id || c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>').join('')
 				+ '<label class="ibx-inline ibx-createattach"><input type="checkbox" class="ibx-js-createattach"> ' + th('InboxCreateAttachMail') + '</label>'
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],
@@ -7737,26 +7898,47 @@
 			if (!b) {
 				return;
 			}
+			const btn = buttons.find(c => (c.id || c.type) === b.dataset.button) || { id: b.dataset.type, type: b.dataset.type, label: b.textContent, window: false };
 			const attach = $('.ibx-js-createattach', dlg).checked;
 			// A thirdparty already known for this sender (readable or not): asked before a second one is made
-			if (b.dataset.type === 'societe' && d.sender && d.sender.soc) {
+			if (btn.type === 'societe' && d.sender && d.sender.soc) {
 				const ok = await I.confirmDialog({ title: t('InboxCreateSocExistsTitle'), text: t(d.sender.soc.readable ? 'InboxCreateSocExists' : 'InboxCreateSocExistsHidden'), confirm: t('InboxCreateSocAnyway') });
 				if (!ok) {
 					return;
 				}
 			}
-			createPiece(box, b.dataset.type, attach, dlg);
+			createPiece(box, btn, attach, dlg);
 		});
 	}
-	/** The page of creation of a type, in a new tab; the piece saved there is linked to the mail */
-	async function createPiece(box, type, attach, dlg) {
+	/** An agenda module declares its page of creation of an event (hook inboxAgendaProvider) */
+	function agendaCreatePage() {
+		const conf = I.ctxJson('INBOX_AGENDA_JSON', {}) || {};
+		return !!(conf.provider && conf.provider.urls && conf.provider.urls.create);
+	}
+	/** A button of a module (1.161.0) or of the core: its id for the server */
+	function createParams(box, btn, attach) {
 		const d = box._data;
+		return { id: +box.dataset.mail, type: btn.type, button: btn.id && btn.id !== btn.type ? btn.id : '', attach: attach ? 1 : 0,
+			soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 };
+	}
+	/** Address of a page of a module, its markers filled from the mail open */
+	async function createFill(url) {
+		const mail = I.mailContext ? I.mailContext() : null;
+		return String(url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx ? I.moduleUrlCtx(url, mail, {}) : I.moduleUrl(url, mail, {});
+	}
+	/**
+	 * The page of creation of a button, in a new tab; an event goes to the page of the agenda module when there is one,
+	 * a button of a module where it says (window or tab). The piece saved there is linked to the mail
+	 */
+	async function createPiece(box, btn, attach, dlg) {
+		if (btn.window || (btn.id === 'action' && agendaCreatePage())) {
+			return createInWindow(box, btn, attach, dlg);
+		}
 		// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
 		const tab = window.open('about:blank', '_blank');
 		let res;
 		try {
-			res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type, attach: attach ? 1 : 0,
-				soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+			res = await post('dolibarr', 'intent', createParams(box, btn, attach));
 		} catch (err) {
 			if (tab) {
 				tab.close();
@@ -7764,11 +7946,18 @@
 			toast(err.message, { error: true });
 			return;
 		}
+		const url = res.module ? await createFill(res.url) : res.url;
+		if (!insideUrl(url)) {
+			if (tab) {
+				tab.close();
+			}
+			return;
+		}
 		if (tab) {
 			tab.opener = null;
-			tab.location.href = res.url;
+			tab.location.href = url;
 		} else {
-			window.open(res.url, '_blank', 'noopener');
+			window.open(url, '_blank', 'noopener');
 		}
 		if (dlg) {
 			dlg.close();
@@ -7776,6 +7965,31 @@
 		toast(t('InboxCreateOpened'));
 		// Back in inbox: the piece created is shown linked
 		window.addEventListener('focus', () => loadDolibar(box), { once: true });
+	}
+	/** The page of a module in a window of inbox: its markers filled from the mail, the token of the intent kept */
+	async function createInWindow(box, btn, attach, dlg) {
+		let res;
+		try {
+			res = await post('dolibarr', 'intent', createParams(box, btn, attach));
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const url = await createFill(res.url);
+		if (!insideUrl(url)) {
+			return;
+		}
+		if (dlg) {
+			dlg.close();
+		}
+		if (res.window) {
+			// Back from the window (saved or closed): the piece created is shown linked
+			openModuleWindow({ mailId: +box.dataset.mail, box, url, title: btn.label || t('InboxCreateEvent'), panel: 'create:' + (btn.id || btn.type), onClose: () => box.isConnected && loadDolibar(box) });
+		} else {
+			// No module page any more (gone since the page was loaded): the page of Dolibarr, in a tab
+			window.open(url, '_blank', 'noopener');
+			window.addEventListener('focus', () => loadDolibar(box), { once: true });
+		}
 	}
 	/** Toast of a link given to the other mails of the conversation too */
 	function threadLinkedToast(res) {
@@ -7817,7 +8031,7 @@
 				return true;
 			} }],
 		});
-		// The link follows the conversation (lot A3, 1.73.0): ticked by default, the other mails of the conversation
+		// The link follows the conversation (1.73.0): ticked by default, the other mails of the conversation
 		const conv = d.conversation;
 		if (!opts.attach && !opts.annotate && conv && conv.others && !conv.detached) {
 			$('.ibx-js-piecelist', dlg).insertAdjacentHTML('afterend', '<label class="ibx-inline ibx-linkthread"><input type="checkbox" class="ibx-js-linkthread" checked> ' + th('InboxLinkThreadToo', conv.others) + '</label>');
@@ -8460,7 +8674,7 @@
 		});
 	}
 
-	// ---------- Import and export of mails (lot W4 1.12.0, B14): local folders of Thunderbird before the switch ----------
+	// ---------- Import and export of mails (1.12.0, B14): local folders of Thunderbird before the switch ----------
 	function pickImport(account, f) {
 		const input = document.createElement('input');
 		input.type = 'file';
@@ -8882,7 +9096,7 @@
 	// ---------- Registry of actions (one definition: buttons, menu, keyboard; hook inbox:mail:actions) ----------
 	function actions(m) {
 		const list = [];
-		// Lot W6: writing. A draft is edited; the other mails are answered or forwarded from any mailbox where the
+		// Writing. A draft is edited; the other mails are answered or forwarded from any mailbox where the
 		// user may send (the identity of the mailbox that got the mail chosen first, by the server)
 		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
 		if (m.folder_role === 'drafts') {
@@ -8898,18 +9112,18 @@
 				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'replylist', mail: m.id }, e) });
 			}
 			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'forward_attach', mail: m.id }, e) });
-			// B19 (lot W6 1.18.0): the very mail sent again to someone else; a mail written again as a new one
+			// B19 (1.18.0): the very mail sent again to someone else; a mail written again as a new one
 			list.push({ id: 'redirect', icon: 'redirect', label: t('InboxRedirect'), disabled: !!noSend, reason: noSend, run: () => redirectDialog(m) });
 		}
 		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'editnew', mail: m.id }, e) });
-		// Rule made from this mail (lot W8 1.23.0): its sender and subject in the editor of the rules of the mailbox
+		// Rule made from this mail (1.23.0): its sender and subject in the editor of the rules of the mailbox
 		if (m.level === 'manage' && m.from && m.from.email && I.rules) {
 			// The editor over the mail (the mail stays read); the rules of the mailbox in the panel on the right
 			list.push({ id: 'rule', icon: 'folder-bolt', label: t('InboxRuleFromMail'), run: () => I.rules.fromMail(m) });
 			list.push({ id: 'rules', icon: 'folders', label: t('InboxRulesPanelOpen'), run: () => I.rules.openPanel(m.account) });
 		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
-		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
+		// Actions of Starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
 		const shown = sel => $$(sel, S.el).find(b => b.offsetParent !== null);
 		const anchor = () => shown('.ibx-js-panebar .ibx-js-more') || $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
@@ -8961,7 +9175,7 @@
 	// The menus of inbox for the other spaces too (Settings: menu of a rule)
 	I.menu = (anchor, items, at) => menu(anchor, items, at);
 	/**
-	 * The files of a writing in the viewer of inbox (lot A5, 1.82.0), to check them before sending
+	 * The files of a writing in the viewer of inbox (1.82.0), to check them before sending
 	 * @param {string} token Writing
 	 * @param {string} subject Subject of the writing
 	 * @param {Array<{id:string,name:string,size:number,mime:string}>} files Attachments
@@ -9305,7 +9519,7 @@
 			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
 		}
-		// Bank details (lot A6, 1.75.0): red when not authenticated or imitated, orange otherwise, never green
+		// Bank details (1.75.0): red when not authenticated or imitated, orange otherwise, never green
 		if (m.bank && !opts.inline) {
 			const b = bankBanner(m);
 			banners = b + banners;
@@ -9348,7 +9562,7 @@
 				// The address copied only when inbox cannot write the mail itself
 				+ (byMail && why ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyUnsubscribeAddress') + '</button>' : '') + '</div>';
 		}
-		// Invitation and read receipt (lot W8 1.22.0, js/inbox-invite.js)
+		// Invitation and read receipt (1.22.0, js/inbox-invite.js)
 		if (I.mailExtrasHtml) {
 			banners += I.mailExtrasHtml(m, opts);
 		}
@@ -9390,7 +9604,7 @@
 	}
 
 	/**
-	 * Bank details in the mail (lot A6, 1.75.0): a lesson, not a verdict. What to do first (call with the numbers of
+	 * Bank details in the mail (1.75.0): a lesson, not a verdict. What to do first (call with the numbers of
 	 * Dolibarr, never the ones of the mail), what inbox saw (each signal a doubt, not a proof), why even a green mail
 	 * may come from a mailbox whose password was stolen, and the check written as a note of the mail
 	 */
@@ -10266,7 +10480,7 @@
 	}
 
 	function attUrl(m, a, mode, force) {
-		// A file of a writing (lot A5, 1.82.0): the very file that leaves with the mail, same answers and protections
+		// A file of a writing (1.82.0): the very file that leaves with the mail, same answers and protections
 		if (m.compose) {
 			return I.ctx('INBOX_AJAX_URL', '') + 'composefile.php?compose=' + encodeURIComponent(m.compose) + '&att=' + encodeURIComponent(a.part) + '&mode=' + mode + (force ? '&force=1' : '');
 		}
@@ -11314,7 +11528,7 @@
 		menu(el || S.el, items, at || rectPoint(el));
 	}
 
-	// ---------- Folders managed from inbox (lot W4 1.10.0, B10, B11) ----------
+	// ---------- Folders managed from inbox (1.10.0, B10, B11) ----------
 	function isInboxPath(f) {
 		return String(f.label || f.name || '').toUpperCase() === 'INBOX' && !f.parent;
 	}
@@ -12281,7 +12495,7 @@
 			box.setAttribute('role', 'status');
 			head.appendChild(box);
 		}
-		// « is writing an answer » first (lot W6): two people should not answer the same mail
+		// « is writing an answer » first: two people should not answer the same mail
 		const writers = users.filter(u => u.writing);
 		const readers = users.filter(u => !u.writing);
 		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => userAvatar(u, 'ibx-avatar--xs')).join('') + '</span> '
@@ -12291,7 +12505,7 @@
 		hydrateUserPhotos(box);
 	}
 
-	// ---------- Keyboard (interface §11, read only keys of lot W3) ----------
+	// ---------- Keyboard (read only keys) ----------
 	/** Shared mailbox: the state (and so the presence) asked now, at most once per 2 s */
 	let presenceTimer = 0;
 	function presenceSoon() {
@@ -12564,6 +12778,22 @@
 			app.style.removeProperty('--ibx-w3');
 		}
 	}
+	/**
+	 * Widest a column may grow: the reading column keeps its minimum (as css/inbox.css, 22.5 rem under 80 rem, else
+	 * 26.25 rem), the column stops there instead of pushing the others out of the window
+	 * @param {number} base Width of the column now
+	 * @param {number} cap  Bound of the column (part of the window)
+	 * @returns {number}
+	 */
+	function splitMax(base, cap) {
+		const read = $('.ibx-pane--read', S.el);
+		if (!read || !read.offsetWidth) {
+			return cap;
+		}
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		const minRead = (window.matchMedia('(max-width: 79.9375rem)').matches ? 22.5 : 26.25) * rem;
+		return Math.min(cap, base + Math.max(0, read.getBoundingClientRect().width - minRead));
+	}
 	function bindSplitters() {
 		$$('.ibx-splitter', S.el).forEach(sp => {
 			const which = 'w' + sp.dataset.split;
@@ -12580,8 +12810,9 @@
 				const target = which === 'w3' && dolSide() && !dolSide().hidden ? dolSide() : pane;
 				const base = target.getBoundingClientRect().width;
 				const app = $('.ibx-mailapp', S.el);
+				const max = splitMax(base, window.innerWidth * (which === 'w3' ? 0.4 : 0.6));
 				const move = ev => {
-					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(window.innerWidth * (which === 'w3' ? 0.4 : 0.6), base + dir * (ev.clientX - start))) + 'px');
+					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(max, base + dir * (ev.clientX - start))) + 'px');
 				};
 				const up = () => {
 					sp.classList.remove('is-dragging');
@@ -12617,8 +12848,10 @@
 				}
 				e.preventDefault();
 				const app = $('.ibx-mailapp', S.el);
-				const cur = pane.getBoundingClientRect().width;
-				app.style.setProperty('--ibx-' + which, Math.max(min, cur + dir * (e.key === 'ArrowRight' ? 24 : -24)) + 'px');
+				const target = which === 'w3' && dolSide() && !dolSide().hidden ? dolSide() : pane;
+				const cur = target.getBoundingClientRect().width;
+				const max = splitMax(cur, window.innerWidth * (which === 'w3' ? 0.4 : 0.6));
+				app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(max, cur + dir * (e.key === 'ArrowRight' ? 24 : -24))) + 'px');
 			});
 		});
 	}
@@ -12641,7 +12874,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-refresh" title="' + th('InboxRefreshMails') + '" aria-label="' + th('InboxRefreshMails') + '">' + ic('refresh') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
-			// Search field opening into a panel (lot W7 1.19.0)
+			// Search field opening into a panel (1.19.0)
 			+ '<div class="ibx-toolbar"><div class="ibx-sx-holder"><div class="ibx-sx-backdrop ibx-js-sxbackdrop" hidden></div><div class="ibx-sx ibx-js-sx"><div class="ibx-sx__row ibx-js-sxrow">' + ic('search')
 			+ '<span class="ibx-sx__pills ibx-js-sxpills"></span>'
 			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'
@@ -12675,6 +12908,8 @@
 			+ '<aside class="ibx-pane ibx-pane--agenda ibx-js-agenda" aria-label="' + th('InboxAgendaPanel') + '" hidden></aside>'
 			// Column Dolibarr (1.110.0): the bandeau of the mail open, moved here on a computer
 			+ '<aside class="ibx-pane ibx-pane--dolside ibx-js-dolside" aria-label="' + th('InboxDolibarr') + '" hidden></aside>'
+			// Column of the overview and of the modules (1.153.0, js/inbox-overview.js), in the same place of the grid
+			+ '<aside class="ibx-pane ibx-pane--sidepane ibx-js-sidepane" aria-label="' + th('InboxOverview') + '" hidden></aside>'
 			// Strip on the right (1.109.0): Dolibarr and the agenda, one column at a time
 			+ stripHtml()
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')

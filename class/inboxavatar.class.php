@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxavatar.class.php
  * \ingroup inbox
- * \brief   Pictures of the correspondents (lot W3, 1.5.0)
+ * \brief   Pictures of the correspondents (1.5.0)
  */
 
 /**

@@ -1,5 +1,108 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: on a phone, the chips of Dolibarr under the head of a mail stay on one line :   1.164.5
+  - only the name of the thirdparty shrinks; chips 44 px high under the finger.
+
+- FIX: Escape while a widget is held in the layout cancels that gesture only, nothing is saved :   1.164.4
+  - the widget taken from the catalogue goes away, the one moved or taken out goes back to its place.
+
+- FIX: the bar above the notes explains itself in the bubble of the application, no longer in a bare title :   1.164.3
+  - the bubble closes when the drag begins.
+
+- FIX: the room of the notes shows after a short stay on the bar, no more flash when the pointer passes by :   1.164.2
+  - right away from the keyboard and as soon as the drag begins.
+
+- FIX: no widget by default in the Dolibarr panel, without a layout of the user nor a model of the mailbox :   1.164.1
+  - the module actions and blocks still come by themselves; the rest from the catalogue or the model.
+
+- NEW: objects of the modules as pieces, linked to the mails, found by « Link », created from a mail :   1.164.0
+  - hook inboxElementTypes: element, rights, access, table and fields searched, page and trigger of creation,
+    trigger of deletion; every declaration checked, never a type nor a trigger of the core.
+  - capability « element_types »; two keys of the widgets renamed.
+
+- NEW: something left to do on an event of a module, as a button under the event in the agenda panel :   1.163.0
+  - field « todo » of the hook inboxAgendaEvents: its page opens in a window of inbox, the panel read again after.
+  - capability « agenda_todo » announced to the hooks of the agenda and of a mail.
+
+- FIX: a widget dragged from the catalogue takes its real place in the grid while dragged, the others making room :   1.162.1
+  - centred under the pointer, it stays where it is shown when released; out of the grid or Escape, it goes away.
+
+- NEW: widgets of the modules in the Dolibarr panel, drawn with the templates of inbox :   1.162.0
+  - hook inboxWidgets: template, data read at the address of the module for each mail, preview, shown by itself or not.
+  - « replaces »: a block of a module that became a widget keeps its place in the layouts; capability « widgets ».
+
+- NEW: buttons of « Create from this mail » open to the modules, in titled groups, mailbox by mailbox :   1.161.0
+  - hook inboxCreateButtons: a module adds buttons (several for a type of piece) and removes any, for each mailbox;
+    the piece created is linked to the mail as with the buttons of the core.
+  - Settings > the mailbox > Reception: the buttons with the module that removed them; the admin keeps one back.
+
+- NEW: « Create > Event » of a mail opens the page of the agenda module, the event linked to the mail :   1.160.0
+  - in a window of inbox, filled from the mail; the page of Dolibarr when no agenda module declares one.
+  - capabilities announced to the hooks of a mail (agenda_create): a module drops its duplicate action by itself.
+  - the help of « Create » no longer says « in a new tab » only.
+
+- FIX: the bar above the notes always follows the pointer, the room kept for the notes shows dashed :   1.159.1
+  - it sets the maximum height of the notes; above the notes now, the room they will take shows dashed (hover,
+    focus, drag), the notes still as high as their content.
+  - one grip while dragging, the one of the edge that moves; grabbed from the bar, the pointer jumps onto it (pointer
+    lock) and its moves go on at the edge of the screen; that edge can be grabbed too.
+
+- NEW: grid of 12 columns for the widgets of the Dolibarr panel, instead of 4 :   1.159.0
+  - 2, 3, 4 or 6 widgets of the same width on a line; finer places and widths (half a chart...).
+  - the layouts saved with 4 columns are read in 12.
+
+- FIX: the notes docked under the widgets are as high as their content, up to the height set by the bar :   1.158.7
+  - without notes only the head and the field to write remain, the widgets take the room; the bar sets a maximum.
+
+- FIX: the content of a widget no longer moves when its tools show on hover while personalizing :   1.158.6
+  - a scroll bar of the grid library took its width from the widget.
+  - on a widget two rows high (mini, line), the cross goes to the top left, clear of the resize grip.
+
+- FIX: no horizontal scroll bar in the widgets of the panel while a widget is resized :   1.158.5
+  - the grid always fits the width of the panel, only the height scrolls.
+
+- FIX: the column on the right (Dolibarr, agenda) stops growing when the mail reaches its least width :   1.158.4
+  - it no longer slides under the strip; the splitter stops there, with the mouse and with the keyboard.
+
+- FIX: the cells of the grid drawn very finely behind the widgets while personalizing :   1.158.3
+  - a line per column and per row, to see where a widget will land.
+
+- FIX: the widgets explain themselves in the bubble of the application, no longer in a bare title :   1.158.2
+  - a mini: its name, its figure, its note and where a click goes; the change of a figure: what it is compared to.
+
+- FIX: a widget placed beside another one no longer jumps up into an empty place of the panel :   1.158.1
+  - the grid shown keeps the order of the layout (no more dense packing), as laid out while personalizing.
+
+- NEW: colleagues of an event or a ticket linked to a mail, as small faces on the piece :   1.158.0
+  - the organizer and the users invited to an event (an invitation declined in grey), the user assigned to a ticket.
+  - on hover a bubble with the name, the role and the answer; on a click the card of the colleague.
+
+- FIX: an event linked to a mail shows its subject and its date, no longer its id :   1.157.1
+  - in the pieces of the panel and in the search of « Link ».
+
+- NEW: module actions and blocks of the modules as widgets of the Dolibarr panel, quick action widgets :   1.157.0
+  - the actions and each block of a module show by themselves at the end of the grid until the user moves or removes
+    them; a block placed is left out for a mail where its module declares nothing.
+  - new widgets « Invoices and new invoice », « Orders and new order », each button behind its right.
+
+- NEW: widgets of the Dolibarr panel on a small screen, with a layout of their own :   1.156.0
+  - one column in the band of a tablet and the sheet of a phone, the minis as chips; the large layout until one is saved.
+  - edit as a list: grip (drag or arrows) and cross; the catalogue as a sheet, a tap adds.
+
+- NEW: widgets in the Dolibarr panel, laid out by each user per mailbox, model of the mailbox :   1.155.0
+  - grid between the fixed top and the notes docked at the bottom; « Personalize the widgets »: catalogue beside the
+    panel, drag or click to add, drag back to remove, each change saved at once.
+  - model of the mailbox saved by its managers, « Back to the model »; GridStack.js loaded only while personalizing.
+
+- NEW: registry of the widgets of the Dolibarr panel, with their templates, sizes and previews :   1.154.0
+  - mini, line, figure, list, chart, action: drawn from the data of the overview, by the rights of each section.
+  - ajax/widget.php gives the catalogue of the user and the data of the widgets of a mail; section Widgets in ux.php.
+
+- NEW: overview of the other side of a mail in its own column of the strip, and columns of the modules :   1.153.0
+  - revenue, invoices, orders, proposals, tickets, mails exchanged...: the head when the column opens, each section
+    only when unfolded, in the order of the usage of the mailbox; one switch per piece of information in the setup.
+  - taken from the module InboxInsight of Max (Air MKG); hook inboxSidePanes for the columns of the modules.
+
 - NEW: a warning on the icon of the agenda when events are late to do :   1.152.0
   - on the icon of the strip and of the rail, in red as « Late » in the panel; its name says how many.
   - counted with the state of the mail space every 5 minutes while the panel is closed; hook inboxAgendaEvents mode

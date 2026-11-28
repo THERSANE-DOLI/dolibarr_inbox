@@ -5,7 +5,7 @@
         "licence": "GPL-3.0-or-later",
         "copied": "2026-11-10",
         "count": 162,
-        "sha256": "d3311ebe22e6cb66f1731145160a22d9383695b659ae9f624a03f2fa5ff28256"
+        "sha256": "8c3d0d31c61603e28884bff143112a71aa0775281f29396089c1f9afe2ff88bb"
     },
     "disposable": {
         "file": "disposable.txt",
@@ -13,6 +13,6 @@
         "licence": "CC0-1.0",
         "copied": "2026-11-10",
         "count": 10181,
-        "sha256": "e0ac2c1e69080fca7885318c2e3420fe84ad3cd07caaf5dde6fe908a72cfe5b7"
+        "sha256": "c71e3847b989c1f039c5b6993582c6985ba19480201c5d85c1895e9af88ed666"
     }
 }

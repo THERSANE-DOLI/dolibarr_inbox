@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxlead.class.php
  * \ingroup inbox
- * \brief   New customer from a mail (lot A1, 1.79.0): what the mail says of its sender, the thirdparties that may be
+ * \brief   New customer from a mail (1.79.0): what the mail says of its sender, the thirdparties that may be
  *          the same, the form of the panel (what Dolibarr asks on its page of creation) and the quick creation
  */
 
@@ -345,7 +345,7 @@ class InboxLead
 	 */
 	public static function cleanValue($field, $value)
 	{
-		// The one door (lot S1): no tag, tags coded in entities included (audit INBX-072), no double quote; no < > left
+		// The one door: no tag, tags coded in entities included (audit INBX-072), no double quote; no < > left
 		$v = InboxSafe::line(self::plainLines(strip_tags((string) $value)), 0);
 		$v = str_replace(array("\u{2039}", "\u{203A}"), '', $v);
 		$v = trim(preg_replace('/\s+/u', ' ', $v), " \t,;:|*_-");
@@ -1143,7 +1143,7 @@ class InboxLead
 	}
 
 	/**
-	 * Value of the panel for an extrafield, as its type wants it (lot S2): a text field gets a plain line, an HTML
+	 * Value of the panel for an extrafield, as its type wants it: a text field gets a plain line, an HTML
 	 * field the text escaped, a list one of its keys only; the types the panel cannot fill (lists of the database,
 	 * links, dates...) get nothing
 	 *

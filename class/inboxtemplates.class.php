@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxtemplates.class.php
  * \ingroup inbox
- * \brief   Mail templates in the writing (lot W6 1.18.0, analyse-webmail.md §5.5 bis)
+ * \brief   Mail templates in the writing (1.18.0, analyse-webmail.md §5.5 bis)
  *
  * The templates are the ones of Dolibarr (llx_c_email_templates): the type inbox_send, offered in the mailboxes it is
  * attached to (llx_inbox_template_account, none = every mailbox), and the types of the pieces linked to the mail

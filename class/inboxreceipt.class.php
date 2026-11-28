@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxreceipt.class.php
  * \ingroup inbox
- * \brief   Read receipts asked by a mail (lot W8 1.22.0): never sent without a click (RFC 8098)
+ * \brief   Read receipts asked by a mail (1.22.0): never sent without a click (RFC 8098)
  */
 
 require_once __DIR__.'/inboxsystemmail.class.php';

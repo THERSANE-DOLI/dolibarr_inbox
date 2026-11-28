@@ -1,0 +1,4 @@
+GridStack.js 14.1.1 (MIT), dist/gridstack-all.js and dist/gridstack.min.css of the npm package, copied unchanged
+Used behind Dolibarr.tools.inbox.grid (js/inbox-panel-widgets.js) only: never called directly by the rest of inbox
+sha256 gridstack-all.js 83667b6e2baea97c4cd01f365c5858231192eb1a0ba45ee82af6f11d096aac9f
+sha256 gridstack.min.css 74efc82159c5e8d28cb2cebd9f912be9d728bb07fa83896a6b62f4a843207126

@@ -13,5 +13,5 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- 1.73.0: the link follows the conversation (lot A3); a mail detached from its conversation keeps out of it
+-- 1.73.0: the link follows the conversation; a mail detached from its conversation keeps out of it
 ALTER TABLE llx_inbox_mailref ADD COLUMN thread_detached smallint DEFAULT 0 NOT NULL;

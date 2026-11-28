@@ -18,7 +18,7 @@
 /**
  * \file    inbox/mails.php
  * \ingroup inbox
- * \brief   Tab « Mails » of the cards of Dolibarr (lot W5 1.13.0): mails linked to the piece and, for a thirdparty or a
+ * \brief   Tab « Mails » of the cards of Dolibarr (1.13.0): mails linked to the piece and, for a thirdparty or a
  *          contact, mails from and to its addresses, in the mailboxes the user can read
  */
 

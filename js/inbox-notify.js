@@ -15,7 +15,7 @@
  */
 
 /**
- * Notification centre of inbox, the bell of the rail (lot W4 1.9.0, webmail §5.4 sexies).
+ * Notification centre of inbox, the bell of the rail (1.9.0, webmail §5.4 sexies).
  * - The count comes with the call of state of the Mail space (every 20 s, hook inbox:notif:state); in another space,
  *   or when that call is paused, the bell asks it every 60 s (never after 30 min without activity).
  * - Fast or instant refresh (1.125.0): a notification made or removed for this user comes as an event « notif »
@@ -31,7 +31,7 @@
 	const IDLE_MS = 30 * 60 * 1000;
 	const N = { unread: 0, last: -1, at: 0, panel: null, items: [], more: false, loading: false, mails: -1, mailFolders: null };
 
-	// ---------- Unread counter: tab, installed application, top bar of Dolibarr (lot W8 1.21.0) ----------
+	// ---------- Unread counter: tab, installed application, top bar of Dolibarr (1.21.0) ----------
 	const icons = new Map();
 	let iconBase = null;
 
@@ -126,7 +126,7 @@
 		}
 	});
 
-	// ---------- Notifications of the browser (lot W8 1.21.0) ----------
+	// ---------- Notifications of the browser (1.21.0) ----------
 	/**
 	 * Turned on by the user (Settings > Notifications, the permission asked then). Only the leader tab asks the server
 	 * and tells: one notification even with five tabs. The sender and the subject only, never the text of the mail.

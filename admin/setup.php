@@ -163,7 +163,7 @@ if ($devProbes) {
 	print '</div>';
 }
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
-// The webmail settings live in the application, not here (analyse-lot-w1 §5)
+// The webmail settings live in the application, not here
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupAppHelp').'</span> <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxOpenSettings').'</a><br><br>';
 // Companion module for the attachments, suggested only while it is missing: link to the page of its last
 // GitHub release (stable URL, the zip there keeps the name module_docstudio-x.y.z.zip asked by Dolibarr)
@@ -221,6 +221,35 @@ foreach (array_unique(array_merge(array_keys($consumerDecl), array_keys($consume
 print '<span id="consumers"></span>';
 print $formSetup->generateOutput();
 print '<span class="opacitymedium">'.$langs->trans('InboxConsumersSetupWhere').'</span><br><br>';
+
+// Overview of a mail (1.153.0): the column itself, then one switch per piece of information (on until switched off:
+// the constant INBOX_OVERVIEW_HIDE_<key> hides it, and it is not computed any more, for every user)
+require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
+require_once '../class/inboxoverview.class.php';
+$formOverview = new FormSetup($db);
+$item = $formOverview->newItem('INBOX_OVERVIEW_TITLE')->setAsTitle();
+$item->nameText = $langs->trans('InboxOvSetupTitle');
+$item = $formOverview->newItem('INBOX_OVERVIEW_OFF');
+$item->nameText = $langs->trans('InboxOvSetupOff');
+$item->helpText = $langs->trans('InboxOvSetupOffHelp');
+$item->fieldOverride = ajax_constantonoff('INBOX_OVERVIEW_OFF', array(), null, 1);
+foreach (InboxOverview::settings() as $group => $keys) {
+	$item = $formOverview->newItem('INBOX_OVERVIEW_GROUP_'.$group)->setAsTitle();
+	$item->nameText = $langs->trans('InboxOvSetGroup'.$group);
+	foreach ($keys as $key) {
+		$item = $formOverview->newItem('INBOX_OVERVIEW_HIDE_'.$key);
+		$item->nameText = $langs->trans('InboxOvSet'.$key);
+		$help = 'InboxOvSet'.$key.'Help';
+		if ($langs->trans($help) !== $help) {
+			$item->helpText = $langs->trans($help);
+		}
+		$item->fieldOverride = ajax_constantonoff('INBOX_OVERVIEW_HIDE_'.$key, array(), null, 1);
+	}
+}
+print '<span id="overview"></span>';
+print '<span class="opacitymedium">'.$langs->trans('InboxOvSetupHelp').'</span><br>';
+print $formOverview->generateOutput();
+print '<br>';
 
 // Cache: what it holds, emptied on demand
 if ($action == 'clearcache') {

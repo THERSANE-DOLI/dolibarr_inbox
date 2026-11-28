@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxthreadlink.class.php
  * \ingroup inbox
- * \brief   The link follows the conversation (lot A3, 1.73.0): linking a mail links its conversation, the mails that
+ * \brief   The link follows the conversation (1.73.0): linking a mail links its conversation, the mails that
  *          come in a linked conversation are linked, a mail detached from its conversation is left out
  */
 

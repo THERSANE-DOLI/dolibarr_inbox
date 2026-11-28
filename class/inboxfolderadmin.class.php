@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxfolderadmin.class.php
  * \ingroup inbox
- * \brief   Folders managed from inbox (lot W4 1.10.0, B10, B11): create, rename, move, remove, mark read, empty
+ * \brief   Folders managed from inbox (1.10.0, B10, B11): create, rename, move, remove, mark read, empty
  */
 
 require_once __DIR__.'/inboxaccess.class.php';

@@ -27,7 +27,7 @@ require_once __DIR__.'/inboxaccountlog.class.php';
 /**
  * Levels of a user on a mailbox: read < send < manage (cumulative).
  *
- * Rules (analyse-lot-w1 §2.3):
+ * Rules:
  * - effective level = highest of the direct access and of the accesses of the groups of the user (a group gives
  *   its level to all its members, no exception per user);
  * - owner of a personal mailbox: manage, without a line;

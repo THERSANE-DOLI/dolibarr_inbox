@@ -1,4 +1,4 @@
-# Public mail services and access providers: never a thirdparty by its domain (inbox, lot A7).
+# Public mail services and access providers: never a thirdparty by its domain (inbox).
 # Kept by hand, one domain per line, lower case; '#' starts a comment. Licence: same as inbox (GPLv3).
 126.com
 163.com

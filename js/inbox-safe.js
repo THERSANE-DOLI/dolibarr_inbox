@@ -15,7 +15,7 @@
  */
 
 /**
- * The one door of the HTML of a mail in the page (lot S1, analysis analyse-assainissement-xss.md):
+ * The one door of the HTML of a mail in the page (analysis analyse-assainissement-xss.md):
  * Dolibarr.tools.inbox.safeHtml(html).
  *
  * The reading frame (sandboxed iframe, CSP without script) protects the reading. Everything else runs in the page

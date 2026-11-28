@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/rules.php
  * \ingroup inbox
- * \brief   Rules and out of office of a mailbox (lot W8 1.23.0): managers of the mailbox only, except « away_off »
+ * \brief   Rules and out of office of a mailbox (1.23.0): managers of the mailbox only, except « away_off »
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

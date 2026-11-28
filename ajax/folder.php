@@ -125,7 +125,7 @@ switch ($action) {
 		$newMarks = new InboxNewMarks($db);
 		$list = array();
 		$accounts = $access->getAccounts($user);
-		// Meilisearch (lot W7 1.20.0): state of the mailboxes indexed (indexing, ready)
+		// Meilisearch (1.20.0): state of the mailboxes indexed (indexing, ready)
 		dol_include_once('/inbox/class/inboxfulltext.class.php');
 		$ftOn = InboxFulltext::enabled();
 		$ftStates = array();
@@ -135,7 +135,7 @@ switch ($action) {
 				return (int) $a->id;
 			}, $accounts));
 		}
-		// Out of office (lot W8 1.23.0) not over yet: banner of the application, for every reader of the mailbox
+		// Out of office (1.23.0) not over yet: banner of the application, for every reader of the mailbox
 		$aways = array();
 		if ($accounts) {
 			$rows = $db->getRows("SELECT rowid, away_from, away_to FROM ".$db->prefix()."inbox_account WHERE rowid IN (".implode(',', array_map('intval', array_keys($accounts))).")"

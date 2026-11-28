@@ -61,6 +61,8 @@ class InboxDocumentation
 				'conversations' => array('icon' => 'fa-comments', 'version' => '1.139.0', 'files' => array('en_US' => 'admin/conversations.md')),
 				'views' => array('icon' => 'fa-layer-group', 'version' => '1.141.0', 'files' => array('en_US' => 'admin/views.md')),
 				'agenda_panel' => array('icon' => 'fa-calendar-alt', 'version' => '1.107.0', 'files' => array('en_US' => 'admin/agenda-panel.md')),
+				'overview' => array('icon' => 'fa-chart-bar', 'version' => '1.153.0', 'files' => array('en_US' => 'admin/overview.md')),
+				'panel_widgets' => array('icon' => 'fa-th-large', 'version' => '1.155.0', 'files' => array('en_US' => 'admin/panel-widgets.md')),
 				'new_customer' => array('icon' => 'fa-user-plus', 'version' => '1.79.0', 'files' => array('en_US' => 'admin/new-customer.md')),
 			)),
 			'InboxDocGroupReception' => array('icon' => 'fa-shield-alt', 'pages' => array(
@@ -76,6 +78,7 @@ class InboxDocumentation
 				'dev_overview' => array('icon' => 'fa-book', 'version' => '1.0.0', 'files' => array('en_US' => 'dev/README.md')),
 				'dev_extend' => array('icon' => 'fa-puzzle-piece', 'version' => '', 'files' => array('en_US' => 'dev/extend-application.md')),
 				'dev_agenda' => array('icon' => 'fa-calendar-alt', 'version' => '1.107.0', 'files' => array('en_US' => 'dev/agenda.md')),
+				'dev_widgets' => array('icon' => 'fa-th-large', 'version' => '1.154.0', 'files' => array('en_US' => 'dev/widgets.md')),
 				'dev_new_customer' => array('icon' => 'fa-user-plus', 'version' => '1.79.0', 'files' => array('en_US' => 'dev/new-customer.md')),
 				'dev_consumers' => array('icon' => 'fa-plug', 'version' => '1.112.0', 'files' => array('en_US' => 'dev/consumers.md')),
 				'dev_combo' => array('icon' => 'fa-list', 'version' => '1.80.0', 'files' => array('en_US' => 'dev/combo.md')),

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxnote.class.php
  * \ingroup inbox
- * \brief   Internal notes on a mail (lot W5 1.13.0), public for the other modules
+ * \brief   Internal notes on a mail (1.13.0), public for the other modules
  */
 
 require_once __DIR__.'/inboxmailref.class.php';

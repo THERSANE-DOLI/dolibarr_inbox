@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/dolibarr.php
  * \ingroup inbox
- * \brief   Bandeau Dolibarr of the reading (lot W5 1.13.0): sender known, pieces linked, internal notes, search of pieces
+ * \brief   Bandeau Dolibarr of the reading (1.13.0): sender known, pieces linked, internal notes, search of pieces
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -26,6 +26,7 @@ dol_include_once('/inbox/class/inboxreader.class.php');
 dol_include_once('/inbox/class/inboxlink.class.php');
 dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
+dol_include_once('/inbox/class/inboxcounterpart.class.php');
 dol_include_once('/inbox/class/inboxdatasource.class.php');
 dol_include_once('/inbox/class/inboxthreadlink.class.php');
 dol_include_once('/inbox/class/inboxactivity.class.php');
@@ -130,48 +131,7 @@ function inboxDolibarrCounterpart($row)
 {
 	global $db;
 
-	$requester = strtolower(trim((string) ($row->requester_email ?? '')));
-	if ($requester !== '') {
-		return array('email' => $requester, 'side' => 'sender');
-	}
-	$p = $db->prefix();
-	$own = array();
-	$rows = $db->getRows("SELECT email FROM ".$p."inbox_account WHERE rowid = ".((int) $row->fk_account)
-		." UNION SELECT email FROM ".$p."inbox_identity WHERE fk_account = ".((int) $row->fk_account)." LIMIT 500");
-	foreach (is_array($rows) ? $rows : array() as $r) {
-		if ((string) $r->email !== '') {
-			$own[] = strtolower(trim((string) $r->email));
-		}
-	}
-	$domains = (new InboxCited($db))->ownDomains();
-	$isOurs = function ($email) use ($own, $domains) {
-		$at = strrpos($email, '@');
-		return in_array($email, $own, true) || ($at !== false && in_array(substr($email, $at + 1), $domains, true));
-	};
-	$from = strtolower(trim((string) $row->from_email));
-	if ($from !== '' && !$isOurs($from)) {
-		return array('email' => $from, 'side' => 'sender');
-	}
-	if ($from === '') {
-		return array('email' => '', 'side' => 'sender');
-	}
-	$m = array();
-	preg_match_all('/[^\s<>,;"\']+@[^\s<>,;"\']+/', (string) $row->to_text.', '.(string) $row->cc_text, $m);
-	$others = array_values(array_filter(array_unique(array_map('strtolower', $m[0])), function ($e) use ($isOurs) {
-		return !$isOurs($e);
-	}));
-	if (!$others) {
-		return array('email' => '', 'side' => 'internal');
-	}
-	$matcher = new InboxContactMatcher($db);
-	foreach (array_slice($others, 0, 5) as $email) {
-		$found = $matcher->match($email);
-		if ($found['fk_soc'] || $found['fk_socpeople']) {
-			return array('email' => $email, 'side' => 'recipient');
-		}
-	}
-
-	return array('email' => $others[0], 'side' => 'recipient');
+	return InboxCounterpart::of($db, $row);
 }
 
 switch ($action) {
@@ -264,21 +224,13 @@ switch ($action) {
 		$counterpart = $requester ? array('email' => strtolower((string) $requester['email']), 'side' => 'sender') : inboxDolibarrCounterpart($row);
 		$email = $counterpart['email'];
 		$sender['side'] = $counterpart['side'];
-		$socId = (int) $row->fk_soc;
-		$contactId = (int) $row->fk_socpeople;
+		// Thirdparty and contact of the mail (InboxCounterpart, shared with the overview 1.153.0)
+		$found = InboxCounterpart::thirdparty($db, $row, $email);
+		$socId = $found['soc'];
+		$contactId = $found['contact'];
+		$sender['by'] = $found['by'];
 		$matcher = null;
-		if (!$socId && $email !== '') {
-			$matcher = new InboxContactMatcher($db);
-			$m = $matcher->match($email);
-			$socId = $m['fk_soc'];
-			$contactId = $contactId ?: $m['fk_socpeople'];
-			if (!$socId) {
-				$socId = $matcher->matchDomain($email);
-				$sender['by'] = $socId ? 'domain' : '';
-			}
-		}
-		$sender['by'] = $sender['by'] ?: ($socId || $contactId ? 'address' : '');
-		// Shared domains (lot A7, 1.76.0): the category of the domain (a disposable address is said), the
+		// Shared domains (1.76.0): the category of the domain (a disposable address is said), the
 		// thirdparties that share it offered to choose (never linked without the user), and who may correct the list
 		$matcher = $matcher ?? new InboxContactMatcher($db);
 		$byDomain = $email !== '' ? $matcher->domainCandidates($email) : array('socs' => array(), 'category' => '', 'domain' => '');
@@ -343,7 +295,9 @@ switch ($action) {
 		$hookParams = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'message_id' => (string) $row->message_id, 'from' => $requester ? $email : strtolower((string) $row->from_email),
 			'subject' => (string) $row->subject, 'mailref' => (int) ($byRow[(int) $row->rowid] ?? 0),
 			// Recognized on the mail (1.108.0): the thirdparty and the contact of the sender the user may read, else 0
-			'socid' => !empty($sender['soc']['readable']) ? (int) $socId : 0, 'contactid' => !empty($sender['contact']['readable']) ? (int) $contactId : 0);
+			'socid' => !empty($sender['soc']['readable']) ? (int) $socId : 0, 'contactid' => !empty($sender['contact']['readable']) ? (int) $contactId : 0,
+			// What this inbox knows how to do (1.160.0): a module drops what became a duplicate, never by the version of inbox
+			'capabilities' => InboxCreate::CAPABILITIES);
 		$extraLinks = array();
 		$alerts = array();
 		$hookObject = null;
@@ -397,17 +351,21 @@ switch ($action) {
 			// The piece the source offers to create, when the user may
 			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
 		}
-		// Fil of the mail (lot E2, 1.77.0): the answers sent from the mailbox in its conversation, beside the notes
+		// Fil of the mail (1.77.0): the answers sent from the mailbox in its conversation, beside the notes
 		$activity = array_map(function ($a) use ($user) {
 			$a['mine'] = $a['author'] > 0 && $a['author'] === (int) $user->id;
 			unset($a['message_id']);
 			return $a;
 		}, (new InboxActivity($db))->sentIn($row));
 		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
-			// New customer from a mail (lot A1, 1.79.0): contacts left to create from their page
+			// New customer from a mail (1.79.0): contacts left to create from their page
 			'lead_pending' => (new InboxLead($db))->pendingFor($user, (int) $row->rowid),
-			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
-			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
+			// Buttons of « Create » for the mailbox of the mail (1.161.0): the core, then the modules (their pages read
+			// again on the server at the click, never sent)
+			'create' => array_map(function ($b) {
+				return array('id' => $b['id'], 'type' => $b['type'], 'label' => $b['label'], 'icon' => $b['icon'], 'group' => $b['group'], 'window' => $b['window']);
+			}, (new InboxCreate($db))->buttons($user, (int) $row->fk_account, $hookParams)), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
+			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::types()), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
 			}))));
 		// no break
@@ -416,12 +374,30 @@ switch ($action) {
 		// « Create ▾ »: the page of creation of Dolibarr, filled from the mail; the piece will be linked to it
 		$reader = inboxDolibarrMail();
 		$creator = new InboxCreate($db);
-		$url = $creator->intent($user, $reader, (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('attach', 'int') === 1,
-			array('soc' => (int) inboxAjaxParam('soc', 'int'), 'contact' => (int) inboxAjaxParam('contact', 'int')));
+		$type = (string) inboxAjaxParam('type', 'aZ09');
+		$known = array('soc' => (int) inboxAjaxParam('soc', 'int'), 'contact' => (int) inboxAjaxParam('contact', 'int'));
+		// A button of a module (1.161.0): found again among the buttons of this mailbox, its page from the hook
+		$buttonId = (string) inboxAjaxParam('button', 'alphanohtml');
+		$button = null;
+		if (strpos($buttonId, ':') !== false) {
+			$params = array('mail' => (int) $reader->row->rowid, 'account' => (int) $reader->row->fk_account, 'message_id' => (string) $reader->row->message_id,
+				'subject' => (string) $reader->row->subject, 'socid' => $known['soc'], 'contactid' => $known['contact'], 'capabilities' => InboxCreate::CAPABILITIES);
+			foreach ($creator->buttons($user, (int) $reader->row->fk_account, $params) as $b) {
+				if ($b['id'] === $buttonId) {
+					$button = $b;
+				}
+			}
+			if (!$button) {
+				inboxDolibarrFail('InboxErrorCannotCreate');
+			}
+			$type = $button['type'];
+		}
+		$url = $creator->intent($user, $reader, $type, (int) inboxAjaxParam('attach', 'int') === 1, $known, $button);
 		if ($url === '') {
 			inboxDolibarrFail($creator->error);
 		}
-		inboxAjaxReply(array('url' => $url));
+		// The page of a module (agenda, button): in a window of inbox or a tab, its markers filled by the browser
+		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null, 'module' => $button !== null || $creator->provider !== null || $creator->moduleUrl));
 		// no break
 
 	case 'attach':
@@ -473,7 +449,7 @@ switch ($action) {
 
 	case 'search':
 		// types: only these (« Extend to »: the events, asked apart so the pieces come first); none = the usual ones
-		$types = array_values(array_intersect(explode(',', (string) inboxAjaxParam('types', 'aZ09comma')), array_keys(InboxElements::TYPES)));
+		$types = array_values(array_intersect(explode(',', (string) inboxAjaxParam('types', 'aZ09comma')), array_keys(InboxElements::types())));
 		inboxAjaxReply(array('results' => $elements->search($user, (string) inboxAjaxParam('q', 'alphanohtml'), (int) inboxAjaxParam('soc', 'int'), 20, $types ?: null)));
 		// no break
 
@@ -490,7 +466,7 @@ switch ($action) {
 		if ($id < 0) {
 			inboxDolibarrFail($linker->error);
 		}
-		// « Link also the other mails of the conversation » (lot A3, 1.73.0), ticked by default
+		// « Link also the other mails of the conversation » (1.73.0), ticked by default
 		$others = 0;
 		if ((int) inboxAjaxParam('thread', 'int') === 1) {
 			$others = max(0, (new InboxThreadLink($db))->linkThread($user, $reader->row, $type, $element));
@@ -507,7 +483,7 @@ switch ($action) {
 		// no break
 
 	case 'detach':
-		// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go
+		// « Detach this mail from its conversation » (1.73.0): its links of the conversation go
 		$reader = inboxDolibarrMail();
 		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
 		// mailbox (as INBX-006), never by a reader (audit INBX-068)

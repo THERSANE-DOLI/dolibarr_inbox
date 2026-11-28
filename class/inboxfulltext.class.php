@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxfulltext.class.php
  * \ingroup inbox
- * \brief   Full text search with Meilisearch (lot W7 1.20.0): option of the admin, mailboxes chosen, one index each
+ * \brief   Full text search with Meilisearch (1.20.0): option of the admin, mailboxes chosen, one index each
  */
 
 require_once __DIR__.'/inboxmeili.class.php';

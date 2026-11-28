@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Lot W3 (1.5.0): key of the conversation of each mail (computed by the synchronisation, the mails already indexed
+-- Key of the conversation of each mail (computed by the synchronisation, the mails already indexed
 -- by small batches)
 ALTER TABLE llx_inbox_mail ADD COLUMN thread_key varchar(32) DEFAULT NULL;
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_thread (fk_account, thread_key);

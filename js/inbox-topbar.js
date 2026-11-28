@@ -15,7 +15,7 @@
  */
 
 /**
- * Unread counter of inbox in the top bar of the other pages of Dolibarr (lot W8 1.21.0).
+ * Unread counter of inbox in the top bar of the other pages of Dolibarr (1.21.0).
  * - The badge goes onto the icon of the entry Inbox of the top menu (the menu entries have no hook on the server);
  *   the envelope printed by the hook stays only when that entry is not in the page (menu hidden, other menu manager).
  * - The number comes with the page; the tabs of inbox open in the browser write the new one in the local storage,

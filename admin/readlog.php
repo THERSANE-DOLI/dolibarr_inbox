@@ -18,7 +18,7 @@
 /**
  * \file    inbox/admin/readlog.php
  * \ingroup inbox
- * \brief   Journal of the readings of mails by their Message-ID (lot 0, readings asked by other modules): admin only
+ * \brief   Journal of the readings of mails by their Message-ID (readings asked by other modules): admin only
  */
 
 // Load Dolibarr environment

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/source.php
  * \ingroup inbox
- * \brief   Settings > Data sources (lot A2 level 1, 1.72.0): list, add, change, remove, test on pasted headers;
+ * \brief   Settings > Data sources (1.72.0): list, add, change, remove, test on pasted headers;
  *          admins of Dolibarr only (a source decides who the requester of a mail is)
  */
 

@@ -15,7 +15,7 @@
  */
 
 /**
- * Editors of the writing (lot W6 1.16.0, webmail §5.5 ter): the rest of inbox knows only this interface, so that
+ * Editors of the writing (1.16.0, webmail §5.5 ter): the rest of inbox knows only this interface, so that
  * another editor is one adapter away.
  * - Registry: Dolibarr.tools.inbox.editors.register(name, factory); another module registers its own on the event
  *   inbox:editor:register. inbox registers « tiptap » (frozen bundle js/vendor/tiptap, loaded at the first writing) and
@@ -39,7 +39,7 @@
 	const SIGNATURE_CLASS = 'inbox-signature-edited';
 
 	/**
-	 * HTML made safe before it enters the editor (lot S3): the editor runs in the page itself, with the rights of the
+	 * HTML made safe before it enters the editor: the editor runs in the page itself, with the rights of the
 	 * user; a quote, a draft, a template, a paste, a proposal of the AI pass here (js/inbox-safe.js). Without it: the
 	 * text only (fails closed).
 	 */
@@ -568,7 +568,7 @@
 		};
 
 		/**
-		 * Variable of a template (lot W6 1.18.0): a chip, its value inside (empty: the key shown by the style, nothing
+		 * Variable of a template (1.18.0): a chip, its value inside (empty: the key shown by the style, nothing
 		 * written), read back from span[data-inbox-var]; the mail sent holds its text only (cleaned by the server)
 		 */
 		const varNode = T.Node.create({

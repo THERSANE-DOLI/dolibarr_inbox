@@ -3,7 +3,7 @@
  * Styles of the inbox application. The page does not load the theme of Dolibarr (principle P20): every class starts
  * with ibx-, every value comes from a --ibx- variable, sizes are in rem (they follow the text size of the
  * application, P28), borders and shadows stay in px. A new style only exists with its section in the catalogue
- * (ux.php). Generated from the mockup (analyses/maquette/inbox.css) at the start of lot W1, maintained here since.
+ * (ux.php). Generated from the first mockup, maintained here since.
  */
 /* ===== 1. Tokens ===== */
 :root {
@@ -962,7 +962,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 }
 
 
-/* ===== 18. Mail space of the application (lot W3) ===== */
+/* ===== 18. Mail space of the application ===== */
 /* The rail is outside the space here (shell .ibx-app): 3 panes and their 2 splitters */
 .ibx-mailapp { height: 100%; min-height: 0; display: grid; grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); overflow: hidden; overflow: clip; }
 .ibx-mailapp[data-folders="collapsed"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr); }
@@ -999,7 +999,7 @@ textarea.ibx-field { min-height: 6rem; padding: var(--ibx-s2); resize: vertical;
 @container (max-width: 26rem) { .ibx-searchinfo__word { display: none; } }
 .ibx-sx__clear[hidden] { display: none; }
 
-/* Search field opening into a panel (lot W7 1.19.0): the field becomes the top of a card, the panel unrolls under it
+/* Search field opening into a panel (1.19.0): the field becomes the top of a card, the panel unrolls under it
    and may be wider than the list */
 .ibx-sx-holder { position: relative; flex: 1; min-width: 0; min-height: 1.875rem; }
 /* Light veil behind the open panel: the panel stands out, a click on it closes the panel */
@@ -1633,6 +1633,15 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-pane--dolside .ibx-piece__foot { grid-area: foot; display: flex; align-items: center; gap: 0.375rem; min-width: 0; padding-left: calc(1em + 0.375rem); }
 .ibx-pane--dolside .ibx-piece__sub { flex: 1; font-size: var(--ibx-fs-sm); }
 .ibx-pane--dolside .ibx-piece__act { margin: -0.125rem -0.25rem -0.125rem auto; }
+/* Colleagues of a piece (1.158.0): faces side by side, a little over each other, at the end of the line of the date */
+.ibx-piecepeople { order: 4; flex: none; display: inline-flex; align-items: center; margin-left: auto; padding-left: 0.375rem; }
+.ibx-piecepeople__one { display: inline-flex; padding: 0; margin-left: -0.25rem; background: none; border: 0; border-radius: 50%; cursor: pointer; }
+.ibx-piecepeople__one:first-child { margin-left: 0; }
+.ibx-piecepeople__one > .ibx-avatar { width: 1.25rem; height: 1.25rem; font-size: 0.5625rem; box-shadow: 0 0 0 2px var(--ibx-bg); }
+.ibx-piecepeople__one:hover > .ibx-avatar, .ibx-piecepeople__one:focus-visible > .ibx-avatar { box-shadow: 0 0 0 2px var(--ibx-accent); }
+.ibx-piecepeople__one.is-declined > .ibx-avatar { opacity: .45; filter: grayscale(1); }
+.ibx-piecepeople__more { margin-left: 0.25rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); cursor: default; }
+.ibx-persontip, .ibx-wgtip { display: grid; gap: 0.125rem; }
 /* ===== Tab « Usage » of a mailbox (1.67.0) ===== */
 .ibx-usage { display: grid; gap: var(--ibx-s2); max-width: 44rem; }
 .ibx-usage__opt { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 0.25rem var(--ibx-s3); align-items: start; padding: var(--ibx-s3);
@@ -1855,6 +1864,14 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 /* ===== Create from the mail, files to a piece (1.14.0) ===== */
 .ibx-dolibar__tools { display: inline-flex; flex-wrap: wrap; gap: var(--ibx-s1); }
 .ibx-creategrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: var(--ibx-s2); }
+/* Titled groups of « Create from this mail » (1.161.0) */
+.ibx-creategroup { margin: var(--ibx-s3) 0 var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }
+.ibx-creategroup:first-of-type { margin-top: 0; }
+/* Buttons of « Create » in the settings of a mailbox (1.161.0) */
+.ibx-createlist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ibx-s1); }
+.ibx-createlist__item { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-createlist__label { flex: 1; min-width: 0; font-weight: 600; }
+.ibx-createlist__source { font-size: var(--ibx-fs-xs); }
 .ibx-createbtn { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.75rem; padding: var(--ibx-s2) var(--ibx-s3); background: var(--ibx-bg); color: var(--ibx-text);
 	border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-lg); font: inherit; text-align: left; cursor: pointer; }
 .ibx-createbtn:hover { border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
@@ -1873,14 +1890,14 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 .ibx-tree__legit { display: inline-flex; align-items: center; gap: 0.125rem; margin-left: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; color: var(--ibx-warning, #b26a00); }
 .ibx-tree__legit .ibx-icon { width: 0.875rem; height: 0.875rem; }
 
-/* ===== Writing (lot W6 1.16.0): floating window, recipients as chips, editor, signature, quote ===== */
+/* ===== Writing (1.16.0): floating window, recipients as chips, editor, signature, quote ===== */
 .ibx-compose { right: var(--ibx-s4); bottom: 0; width: 35rem; height: min(36rem, calc(100vh - 4rem)); border-bottom-left-radius: 0; border-bottom-right-radius: 0; resize: none; }
 /* Grips on every edge and corner (1.151.1, with those of the windows): in the row at the bottom right it grows from the top and the left */
 .ibx-window--maximized .ibx-compose__grip { display: none; }
 /* A writing in a window of its own (1.148.0, index.php?window=compose): the whole window, no rail, nothing to resize */
 .ibx-html--popup .ibx-compose.ibx-window--maximized { inset: 0 !important; border: 0; border-radius: 0; box-shadow: none; }
 .ibx-html--popup .ibx-compose__wbtn { display: none !important; }
-/* Fields of the writing (lot W6): one per line, the name of the field inside while empty (John, 2026-11-07).
+/* Fields of the writing: one per line, the name of the field inside while empty (John, 2026-11-07).
    A row: lead (the ✕ of Cc / Bcc) · label (long and short words) · value · extra (buttons Cc / Bcc) */
 .ibx-cfield { position: relative; display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2rem; padding: 0 var(--ibx-s3) 0 var(--ibx-s1); border-bottom: 1px solid var(--ibx-border); cursor: text; }
 .ibx-cfield:focus-within { border-bottom-color: var(--ibx-accent); }
@@ -2144,7 +2161,7 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 }
 .ibx-text-danger { color: var(--ibx-danger); font-weight: 600; }
 
-/* Templates (lot W6 1.18.0): a variable is a chip, its value inside; orange and its key shown when it has no value */
+/* Templates (1.18.0): a variable is a chip, its value inside; orange and its key shown when it has no value */
 .ibx-var { display: inline-block; padding: 0 0.3em; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-accent) 35%, transparent); cursor: pointer; }
 .ibx-var.is-empty { background: var(--ibx-warning-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ibx-warning) 60%, transparent); color: var(--ibx-warning-text, #8a5a00); }
 .ibx-var.is-empty::before { content: attr(data-inbox-var); font-family: ui-monospace, monospace; font-size: 0.85em; }
@@ -2225,7 +2242,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-apreview__btn { align-self: flex-start; padding: 0.15rem 0.6rem; border-radius: var(--ibx-radius-sm); background: var(--ibx-accent); color: var(--ibx-on-accent); font-weight: 600; }
 .ibx-formrow__actions { margin-top: .5rem; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
 
-/* Invitation of the mail read (lot W8 1.22.0) */
+/* Invitation of the mail read (1.22.0) */
 /* DMARC aggregate reports (1.111.0, js/inbox-dmarc.js) */
 .ibx-dmarc { display: grid; gap: var(--ibx-s3); }
 .ibx-dmarc .ibx-banner { margin: 0; }
@@ -2299,7 +2316,7 @@ html.ibx-theme-fading *, html.ibx-theme-fading *::before, html.ibx-theme-fading 
 .ibx-usercard__acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--ibx-s1); padding-top: var(--ibx-s2); border-top: 1px solid var(--ibx-border); }
 .ibx-usercard__acts > .ibx-btn { flex: 1 1 auto; justify-content: center; }
 
-/* ===== Rules and out of office of a mailbox (lot W8 1.23.0, maquette regles.html) ===== */
+/* ===== Rules and out of office of a mailbox (1.23.0, maquette regles.html) ===== */
 .ibx-linkbtn { padding: 0; font: inherit; color: var(--ibx-accent); background: none; border: 0; cursor: pointer; text-decoration: underline; }
 .ibx-rules-head { display: flex; align-items: center; gap: var(--ibx-s2); margin: var(--ibx-s3) 0; }
 .ibx-rules-head .ibx-section__title { margin: 0; }
@@ -2804,7 +2821,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	.ibx-srcrow > .ibx-icon { display: none; }
 }
 
-/* Bank details in a mail (lot A6, 1.75.0): a lesson, never a green light */
+/* Bank details in a mail (1.75.0): a lesson, never a green light */
 .ibx-bank .ibx-banner__text > p, .ibx-bank__body > p { margin: var(--ibx-s1) 0; }
 .ibx-bank__head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--ibx-s1) var(--ibx-s3); justify-content: space-between; }
 .ibx-bank__fold { flex: none; margin-left: auto; }
@@ -2829,7 +2846,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-bank__steps li + li { margin-top: var(--ibx-s1); }
 .ibx-bank__foot { display: flex; justify-content: flex-end; margin-top: var(--ibx-s2); }
 
-/* Shared domains (lot A7, 1.76.0) */
+/* Shared domains (1.76.0) */
 /* Access: what each level gives (1.91.0) */
 .ibx-levels { margin-bottom: var(--ibx-s3); }
 .ibx-levels > summary { cursor: pointer; font-weight: 600; }
@@ -2862,7 +2879,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 	.ibx-domtable .ibx-num { text-align: left; }
 }
 
-/* Fil of the mail (lot E2, 1.77.0): an answer sent, between the notes */
+/* Fil of the mail (1.77.0): an answer sent, between the notes */
 /* No width asked by its content: the line is cut with « … » in a narrow column instead of widening the notes */
 .ibx-activity { min-width: 0; max-width: 100%; margin: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
 .ibx-activity__sum { display: flex; align-items: center; gap: var(--ibx-s2); width: 100%; min-height: 2.25rem; padding: var(--ibx-s1) var(--ibx-s2); font: inherit; color: inherit; text-align: left;
@@ -2887,7 +2904,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 @media (pointer: coarse) { .ibx-activity__sum { min-height: 2.75rem; } .ibx-activity .ibx-js-activitysee { min-height: 2.75rem; } }
 .ibx-compose__conflict { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ibx-s2); }
 
-/* New customer from a mail (lot A1, 1.79.0): side panel on the left, over the folders and the list */
+/* New customer from a mail (1.79.0): side panel on the left, over the folders and the list */
 .ibx-mailapp[data-lead="open"] { position: relative; }
 .ibx-lead { position: absolute; top: 0; bottom: 0; left: 0; z-index: 30; display: flex; flex-direction: column; min-width: 0; background: var(--ibx-bg-pane); border-right: 1px solid var(--ibx-border); box-shadow: var(--ibx-shadow-float); }
 .ibx-lead__head { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
@@ -2923,7 +2940,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-lead__nature--customer:has(input:checked) { background: #55955d; color: #fff; }
 .ibx-lead__nature--supplier:has(input:checked) { background: #499caf; color: #fff; }
 .ibx-lead__nature:has(input:focus-visible) { box-shadow: var(--ibx-focus); }
-/* Name of a file of a writing: opens it in the viewer (lot A5, 1.82.0) */
+/* Name of a file of a writing: opens it in the viewer (1.82.0) */
 .ibx-compose__attname { display: inline-flex; min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .ibx-compose__attname > span { text-decoration: underline dotted; text-underline-offset: 2px; }
 .ibx-compose__attname.is-static { cursor: default; }
@@ -2938,7 +2955,7 @@ textarea.ibx-field { min-height: 8rem; resize: vertical; padding: var(--ibx-s2);
 .ibx-compose.is-dragging iframe { pointer-events: none; }
 .ibx-compose__attname.is-static > span { text-decoration: none; }
 .ibx-compose__attname:hover { color: var(--ibx-accent); }
-/* Insert a piece of Dolibarr (lot A5, 1.83.0) */
+/* Insert a piece of Dolibarr (1.83.0) */
 .ibx-pieceins { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: min(40rem, 80vw); }
 .ibx-pieceins__item { display: grid; grid-template-columns: auto minmax(8rem, auto) minmax(0, 1fr) auto auto; gap: var(--ibx-s3); }
 .ibx-pieceins__soc { min-width: 0; }
@@ -3033,7 +3050,10 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 
 /* Phone (1.102.0): the Dolibarr part as chips under the head of the mail, its details in a bottom sheet. The body of
    the mail comes back in the first screen; the sheet opens on the section of the chip touched. */
-.ibx-dolchips { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); margin-top: var(--ibx-s2); }
+.ibx-dolchips { display: flex; flex-wrap: nowrap; gap: var(--ibx-s1); margin-top: var(--ibx-s2); min-width: 0; }
+/* One line always: the chips of icons keep their size, only the name of the sender shrinks (its full name in the sheet) */
+.ibx-dolchips > .ibx-dolchip { flex: none; }
+.ibx-dolchips > .ibx-dolchip.is-wide { flex: 0 1 auto; min-width: 0; }
 .ibx-dolchips[hidden] { display: none; }
 .ibx-dolchip { display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.25rem; max-width: 100%; padding: 0 0.75rem; font: inherit; font-size: var(--ibx-fs-sm); font-weight: 600; color: var(--ibx-text); background: var(--ibx-bg-sunken, var(--ibx-bg-hover)); border: 1px solid var(--ibx-border); border-radius: 999px; cursor: pointer; }
 .ibx-dolchip .ibx-icon { width: 1rem; height: 1rem; flex: none; color: var(--ibx-text-muted); }
@@ -3046,6 +3066,10 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-dolchip.is-muted { color: var(--ibx-text-muted); font-weight: 500; }
 .ibx-dolchip:active { background: var(--ibx-accent-soft); }
 .ibx-dolchip:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+@media (max-width: 39.9375rem) {
+	/* Under the finger: 44 px */
+	.ibx-dolchips:not(.is-line) .ibx-dolchip { min-height: 2.75rem; min-width: 2.75rem; justify-content: center; }
+}
 .ibx-sheetback { display: none; }
 /* Attachments (UX fix series): the paper clip and the head of the sheet are for a phone only */
 .ibx-attbar__clip, .ibx-attsheet__head { display: none; }
@@ -3144,7 +3168,7 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 	.ibx-bubble--phone .ibx-tbtn--label { width: auto; padding: 0 0.875rem 0 0.75rem; gap: 0.375rem; border-radius: 999px; font: inherit; font-size: var(--ibx-fs-sm); font-weight: 600; white-space: nowrap; }
 }
 
-/* New mailbox (lot H1): servers found from the address, folded until needed */
+/* New mailbox: servers found from the address, folded until needed */
 .ibx-autoconf:empty { display: none; }
 .ibx-autoconf .ibx-notice { margin: 0; }
 .ibx-autoconf .ibx-notice__text > p { margin: 0 0 var(--ibx-s1); }
@@ -3214,8 +3238,8 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 
 /* ---------- Agenda panel (1.107.0, js/inbox-agenda.js) ---------- */
 .ibx-mailapp { position: relative; }
-.ibx-mailapp[data-agenda="open"], .ibx-mailapp[data-dolside="open"] { grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
-.ibx-mailapp[data-folders="collapsed"][data-agenda="open"], .ibx-mailapp[data-folders="collapsed"][data-dolside="open"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
+.ibx-mailapp[data-agenda="open"], .ibx-mailapp[data-dolside="open"] { grid-template-columns: var(--ibx-w1, 16.25rem) 0.3125rem var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem minmax(15rem, var(--ibx-w3, 18.75rem)); }
+.ibx-mailapp[data-folders="collapsed"][data-agenda="open"], .ibx-mailapp[data-folders="collapsed"][data-dolside="open"] { grid-template-columns: var(--ibx-w2, 26.25rem) 0.3125rem minmax(26.25rem, 1fr) 0.3125rem minmax(15rem, var(--ibx-w3, 18.75rem)); }
 .ibx-pane--agenda { background: var(--ibx-bg-pane); }
 /* No room for the reading: over it, on the right */
 .ibx-mailapp[data-agenda="over"] .ibx-pane--agenda { position: absolute; top: 0; right: 0; bottom: 0; width: min(var(--ibx-w3, 18.75rem), 100%); z-index: 30; border-left: 1px solid var(--ibx-border); box-shadow: var(--ibx-shadow-float); }
@@ -3240,6 +3264,9 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-agenda__label { min-width: 0; padding: 0; border: 0; background: none; color: var(--ibx-text); font: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .ibx-agenda__label:hover, .ibx-agenda__label:focus-visible { text-decoration: underline; }
 .ibx-agenda__mail { grid-column: 4; }
+/* Something left to do on an event (1.163.0), under its label */
+.ibx-agenda__todo { grid-column: 3 / -1; padding-top: 0.25rem; }
+.ibx-agenda__todo .ibx-btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-agenda__sub { grid-column: 3 / 5; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-agenda__sub .ibx-icon { width: 0.75rem; height: 0.75rem; vertical-align: -0.0625rem; margin-right: 0.125rem; }
 .ibx-agenda__item.is-done .ibx-agenda__label { text-decoration: line-through; color: var(--ibx-text-muted); }
@@ -3257,7 +3284,7 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-agenda__foot .ibx-icon { width: 0.875rem; height: 0.875rem; margin-left: var(--ibx-s1); }
 .ibx-rail__item.ibx-rail__agenda[aria-expanded="true"] { color: var(--ibx-accent); background: var(--ibx-accent-soft); }
 @media (max-width: 79.9375rem) {
-	.ibx-mailapp[data-agenda="open"], .ibx-mailapp[data-folders="collapsed"][data-agenda="open"], .ibx-mailapp[data-dolside="open"], .ibx-mailapp[data-folders="collapsed"][data-dolside="open"] { grid-template-columns: var(--ibx-w2, 23.75rem) 0.3125rem minmax(22.5rem, 1fr) 0.3125rem var(--ibx-w3, 18.75rem); }
+	.ibx-mailapp[data-agenda="open"], .ibx-mailapp[data-folders="collapsed"][data-agenda="open"], .ibx-mailapp[data-dolside="open"], .ibx-mailapp[data-folders="collapsed"][data-dolside="open"] { grid-template-columns: var(--ibx-w2, 23.75rem) 0.3125rem minmax(22.5rem, 1fr) 0.3125rem minmax(15rem, var(--ibx-w3, 18.75rem)); }
 }
 /* Phone: a sheet over the screen */
 @media (max-width: 63.9375rem) {
@@ -3287,3 +3314,322 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-notiftest { margin-top: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s3); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); background: var(--ibx-bg-sunken); }
 .ibx-notiftest__lead { margin: var(--ibx-s2) 0 var(--ibx-s1); font-size: var(--ibx-fs-sm); }
 .ibx-notiftest__checks { margin: 0; padding-inline-start: 1.25rem; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); }
+
+/* ---------- Overview of a mail and columns of the modules (1.153.0, js/inbox-overview.js) ----------
+   Taken from the module InboxInsight of Max (Air MKG). The column sits where the column Dolibarr sits (data-dolside),
+   docked or as a drawer; on a phone the overview opens in a sheet. */
+.ibx-pane--sidepane { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--ibx-bg-pane); border-left: 1px solid var(--ibx-border); }
+.ibx-pane--sidepane[hidden] { display: none; }
+.ibx-mailapp[data-dolside="over"] > .ibx-pane.ibx-pane--sidepane { position: absolute; top: 0; right: var(--ibx-strip-w); bottom: 0; z-index: 30; width: min(var(--ibx-w3, 18.75rem), 100%); box-shadow: var(--ibx-shadow-float); }
+@media (prefers-reduced-motion: no-preference) {
+	.ibx-mailapp[data-dolside="over"] > .ibx-pane--sidepane { animation: ibx-drawer-in .16s ease-out; }
+}
+.ibx-ov-head { flex: none; display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
+.ibx-ov-head .ibx-pane__title { flex: none; white-space: nowrap; }
+.ibx-ov-head__soc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); }
+.ibx-ov-head__soc a { color: inherit; text-decoration: none; }
+.ibx-ov-head__soc a:hover, .ibx-ov-head__soc a:focus-visible { color: var(--ibx-accent); text-decoration: underline; }
+.ibx-ov-pane__body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--ibx-s2) var(--ibx-s3) var(--ibx-s4); }
+.ibx-ov-empty { margin: var(--ibx-s2) 0; color: var(--ibx-text-muted); font-size: var(--ibx-fs-sm); }
+.ibx-ov-sec.is-empty .ibx-ov-sec__title { color: var(--ibx-text-faint); }
+.ibx-ov-sheetback { position: fixed; inset: 0; z-index: 70; background: color-mix(in srgb, #000 35%, transparent); }
+.ibx-ov-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 71; display: flex; flex-direction: column; max-height: 88vh; max-height: 88dvh; background: var(--ibx-bg-pane); border-radius: var(--ibx-radius-lg) var(--ibx-radius-lg) 0 0; box-shadow: var(--ibx-shadow-float); padding-bottom: env(safe-area-inset-bottom); }
+.ibx-ov-sheet__head { flex: none; display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
+.ibx-ov-sheet__body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--ibx-s2) var(--ibx-s3) var(--ibx-s4); }
+.ibx-ov { display: flex; flex-direction: column; gap: var(--ibx-s2); min-width: 0; font-size: var(--ibx-fs-sm); color: var(--ibx-text); }
+.ibx-ov__chips { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); min-width: 0; }
+.ibx-ov-chip { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; }
+.ibx-ov-chip .ibx-icon { flex: none; width: 0.875em; height: 0.875em; }
+
+.ibx-ov-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(6.25rem, 100%), 1fr)); gap: var(--ibx-s1); margin: 0; }
+.ibx-ov-kpi { display: flex; flex-direction: column; min-width: 0; padding: var(--ibx-s2); background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-ov-kpi__label { margin: 0; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-ov-kpi__value { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.375rem; margin: 0; font-size: var(--ibx-fs-lg, 1.0625rem); font-weight: 700; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.ibx-ov-kpi__value > .ibx-icon { align-self: center; width: 0.875em; height: 0.875em; }
+.ibx-ov-kpi__note { margin: 0; font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); overflow-wrap: anywhere; }
+.ibx-ov-kpi--danger { border-color: var(--ibx-danger); }
+.ibx-ov-kpi--danger .ibx-ov-kpi__value, .ibx-ov-kpi--danger .ibx-ov-kpi__note { color: var(--ibx-danger); }
+.ibx-ov-kpi--warning .ibx-ov-kpi__value, .ibx-ov-kpi--warning .ibx-ov-kpi__note { color: var(--ibx-warning); }
+.ibx-ov-kpi--ok .ibx-ov-kpi__value > .ibx-icon { color: var(--ibx-success); }
+.ibx-ov-delta { font-size: var(--ibx-fs-sm); font-weight: 600; white-space: nowrap; }
+.ibx-ov-delta--ok { color: var(--ibx-success); }
+.ibx-ov-delta--warning { color: var(--ibx-warning); }
+
+.ibx-ov__body { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(15rem, 100%), 1fr)); gap: var(--ibx-s1); align-items: start; }
+.ibx-ov-sec { min-width: 0; background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-ov-sec__head { display: flex; align-items: stretch; margin: 0; font-size: inherit; font-weight: 400; }
+.ibx-ov-sec__toggle { flex: 1; display: flex; align-items: flex-start; gap: var(--ibx-s1); min-width: 0; padding: 0.4375rem var(--ibx-s2); border: 0; border-radius: var(--ibx-radius); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ibx-ov-sec__toggle:hover { background: var(--ibx-bg-hover, var(--ibx-bg-sunken)); }
+.ibx-ov-sec__toggle:focus-visible, .ibx-ov-sec__link:focus-visible, .ibx-ov-mail__go:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: -2px; }
+.ibx-ov-sec__toggle > .ibx-icon { flex: none; width: 0.875rem; height: 0.875rem; margin-top: 0.0625rem; color: var(--ibx-text-faint); transition: transform var(--ibx-dur, .18s) ease-out; }
+.ibx-ov-sec.is-open > .ibx-ov-sec__head .ibx-ov-sec__toggle > .ibx-icon { transform: rotate(90deg); }
+.ibx-ov-sec__text { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.ibx-ov-sec__title { font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }
+.ibx-ov-sec__note { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ibx-text-faint); overflow-wrap: anywhere; }
+.ibx-ov-sec__sum { font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ibx-ov-sec__sum .ibx-icon { width: 0.875em; height: 0.875em; margin-right: 0.25rem; vertical-align: -0.0625em; }
+.ibx-ov-sec__sum--danger { color: var(--ibx-danger); }
+.ibx-ov-sec__sum--warning { color: var(--ibx-warning); }
+.ibx-ov-sec.is-open .ibx-ov-sec__sum { display: none; }
+.ibx-ov-sec__link { flex: none; display: flex; align-items: flex-start; padding: 0.4375rem var(--ibx-s2); border-radius: var(--ibx-radius); color: var(--ibx-text-faint); }
+.ibx-ov-sec__link:hover { color: var(--ibx-accent); }
+.ibx-ov-sec__link .ibx-icon { width: 0.875rem; height: 0.875rem; margin-top: 0.0625rem; }
+.ibx-ov-sec__body { padding: 0 var(--ibx-s2) var(--ibx-s2); }
+.ibx-ov-sec__body[hidden] { display: none; }
+
+.ibx-ov-rows { display: flex; flex-direction: column; margin: 0; }
+.ibx-ov-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--ibx-s2); align-items: baseline; padding: 0.1875rem 0; }
+.ibx-ov-row + .ibx-ov-row { border-top: 1px solid var(--ibx-border); }
+.ibx-ov-row__label { margin: 0; color: var(--ibx-text-muted); overflow-wrap: anywhere; }
+.ibx-ov-row__val { margin: 0; max-width: 10rem; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ibx-ov-row a { color: inherit; text-decoration: none; border-radius: var(--ibx-radius-sm); }
+.ibx-ov-row a:hover, .ibx-ov-row a:focus-visible { color: var(--ibx-accent); text-decoration: underline; }
+.ibx-ov-row__val .ibx-icon { width: 0.875em; height: 0.875em; margin-right: 0.25rem; vertical-align: -0.0625em; }
+.ibx-ov-row__note { grid-column: 1 / -1; margin: 0; font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); overflow-wrap: anywhere; }
+.ibx-ov-row--danger .ibx-ov-row__val { color: var(--ibx-danger); }
+.ibx-ov-row--warning .ibx-ov-row__val { color: var(--ibx-warning); }
+.ibx-ov-row--ok .ibx-ov-row__val { font-weight: 400; color: var(--ibx-text-muted); }
+.ibx-ov-row--ok .ibx-ov-row__val .ibx-icon { color: var(--ibx-success); }
+.ibx-ov-row--item .ibx-ov-row__label { color: var(--ibx-text); }
+.ibx-ov-row--item .ibx-ov-row__val { font-weight: 400; color: var(--ibx-text-muted); white-space: nowrap; }
+.ibx-ov-row--wide .ibx-ov-row__label { grid-column: 1 / -1; }
+
+.ibx-ov-hero { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--ibx-s2); margin-bottom: var(--ibx-s2); }
+.ibx-ov-hero__value { font-size: var(--ibx-fs-xl, 1.25rem); font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.ibx-ov-hero__label { flex-basis: 100%; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+
+.ibx-ov-chart { margin: 0 0 var(--ibx-s2); }
+.ibx-ov-chart__cap { display: flex; align-items: baseline; justify-content: space-between; gap: var(--ibx-s2); margin-bottom: var(--ibx-s1); color: var(--ibx-text-muted); }
+.ibx-ov-chart__cap b { color: var(--ibx-text); font-variant-numeric: tabular-nums; }
+.ibx-ov-bars { display: flex; align-items: stretch; gap: 2px; }
+.ibx-ov-bar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 0.125rem; min-width: 0; border-radius: var(--ibx-radius-sm); cursor: default; }
+.ibx-ov-bar:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 1px; }
+.ibx-ov-bar__val { font-size: var(--ibx-fs-xs); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ibx-text-muted); }
+.ibx-ov-bar__track { display: flex; align-items: flex-end; justify-content: center; width: 100%; height: 3.5rem; border-bottom: 1px solid var(--ibx-border-strong); }
+.ibx-ov-bar__fill { width: 100%; max-width: 1.5rem; min-height: 0; background: var(--ibx-accent); border-radius: 4px 4px 0 0; transition: filter var(--ibx-dur, .18s) ease-out; }
+.ibx-ov-bar__x { font-size: var(--ibx-fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ibx-text-muted); }
+.ibx-ov-bar.is-active .ibx-ov-bar__val, .ibx-ov-bar.is-active .ibx-ov-bar__x { color: var(--ibx-text); }
+.ibx-ov-bar.is-active .ibx-ov-bar__fill { filter: brightness(1.15); }
+.ibx-ov-bar.is-current .ibx-ov-bar__fill { background: repeating-linear-gradient(135deg, var(--ibx-accent) 0 3px, var(--ibx-accent-soft) 3px 6px); box-shadow: inset 0 0 0 1px var(--ibx-accent); }
+.ibx-ov-readout { min-height: 1.25em; margin: var(--ibx-s1) 0 0; font-size: var(--ibx-fs-xs); color: var(--ibx-text-faint); }
+.ibx-ov-readout.is-on { color: var(--ibx-text); }
+
+.ibx-ov-chart--spark .ibx-ov-bars { position: relative; padding-bottom: 1rem; }
+.ibx-ov-chart--spark .ibx-ov-bar__track { height: 1.75rem; }
+.ibx-ov-chart--spark .ibx-ov-bar__fill { max-width: none; border-radius: 2px 2px 0 0; background: var(--ibx-border-strong); }
+.ibx-ov-chart--spark .ibx-ov-bar.is-current .ibx-ov-bar__fill { background: var(--ibx-accent); box-shadow: none; }
+.ibx-ov-chart--spark .ibx-ov-bar.is-active .ibx-ov-bar__fill { background: var(--ibx-accent); filter: none; }
+.ibx-ov-chart--spark .ibx-ov-bar__x { position: absolute; bottom: 0; }
+.ibx-ov-chart--spark .ibx-ov-bar:first-child .ibx-ov-bar__x { left: 0; }
+.ibx-ov-chart--spark .ibx-ov-bar:last-child .ibx-ov-bar__x { right: 0; }
+.ibx-ov-chart--spark .ibx-ov-readout { min-height: 0; margin: 0; font-size: inherit; color: var(--ibx-text-muted); }
+.ibx-ov-chart--spark .ibx-ov-readout.is-on { color: var(--ibx-text); }
+.ibx-ov-chart--spark .ibx-ov-readout.is-on + b { display: none; }
+.ibx-ov-chart--spark { margin-bottom: var(--ibx-s1); }
+
+.ibx-ov-sub { margin: var(--ibx-s2) 0 0.125rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+.ibx-ov-mails { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--ibx-s1)); padding: 0; list-style: none; }
+.ibx-ov-mail__line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--ibx-s1); width: 100%; box-sizing: border-box; padding: 0.1875rem var(--ibx-s1); border: 0; border-radius: var(--ibx-radius-sm); background: none; color: inherit; font: inherit; text-align: left; }
+.ibx-ov-mail__go { cursor: pointer; }
+.ibx-ov-mail__go:hover { background: var(--ibx-bg-hover, var(--ibx-bg-sunken)); }
+.ibx-ov-mail__go:hover .ibx-ov-mail__subject { color: var(--ibx-accent); }
+.ibx-ov-mail__dir { display: flex; color: var(--ibx-text-faint); }
+.ibx-ov-mail__dir .ibx-icon { width: 0.875rem; height: 0.875rem; }
+.ibx-ov-mail__subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-ov-mail__date { font-size: var(--ibx-fs-xs); font-variant-numeric: tabular-nums; color: var(--ibx-text-faint); white-space: nowrap; }
+.ibx-ov-mail.is-current .ibx-ov-mail__subject { font-weight: 600; }
+.ibx-ov-mail.is-current .ibx-ov-mail__dir { color: var(--ibx-accent); }
+
+.ibx-ov-note { margin: 0; padding: var(--ibx-s1) var(--ibx-s2); border-left: 2px solid var(--ibx-accent); background: var(--ibx-bg-sunken); border-radius: 0 var(--ibx-radius-sm) var(--ibx-radius-sm) 0; overflow-wrap: anywhere; }
+.ibx-ov-note b { display: block; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+
+@media (pointer: coarse) {
+	.ibx-ov-sec__toggle, .ibx-ov-sec__link { min-height: 2.75rem; align-items: center; }
+	.ibx-ov-sec__link { min-width: 2.75rem; justify-content: center; }
+	.ibx-ov-mail__line { min-height: 2.25rem; }
+}
+@media (forced-colors: active) {
+	.ibx-ov-bar__fill, .ibx-ov-chart--spark .ibx-ov-bar__fill { background: CanvasText; forced-color-adjust: none; }
+	.ibx-ov-bar.is-current .ibx-ov-bar__fill { background: Highlight; }
+}
+@media (prefers-reduced-motion: reduce) {
+}
+
+/* ---------- Widgets of the Dolibarr panel (1.154.0, js/inbox-widgets.js) ----------
+   One frame for every template; the content adapts to the size the grid gives (container queries on .ibx-wg-cell,
+   the box that holds a widget: a cell of the grid, a preview of the catalogue). */
+.ibx-wg-cell { container-type: size; min-width: 0; min-height: 0; }
+.ibx-wg { box-sizing: border-box; height: 100%; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.375rem 0.5rem;
+	font-size: var(--ibx-fs-sm); color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-wg a { color: inherit; text-decoration: none; }
+.ibx-wg a:hover, .ibx-wg a:focus-visible { color: var(--ibx-accent); text-decoration: underline; }
+.ibx-wg__head { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.ibx-wg__title { font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-wg__sum { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-wg__sum .ibx-icon { width: 0.875em; height: 0.875em; margin-right: 0.25rem; vertical-align: -0.0625em; }
+.ibx-wg__sum--danger { color: var(--ibx-danger); }
+.ibx-wg__sum--warning { color: var(--ibx-warning); }
+.ibx-wg .ibx-ov-rows { overflow: auto; min-height: 0; }
+.ibx-wg--empty { align-items: center; justify-content: center; color: var(--ibx-text-faint); font-size: var(--ibx-fs-xs); text-align: center; }
+/* Mini: an icon, a number, a short label */
+.ibx-wg--mini { flex-direction: row; align-items: center; justify-content: center; padding: 0 0.375rem; }
+.ibx-wg__mini, .ibx-wg--mini > .ibx-icon { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; white-space: nowrap; }
+.ibx-wg--mini .ibx-icon { flex: none; width: 1rem; height: 1rem; }
+.ibx-wg__value { font-variant-numeric: tabular-nums; }
+.ibx-wg__label { color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; }
+.ibx-wg--danger { color: var(--ibx-danger); border-color: color-mix(in srgb, var(--ibx-danger) 45%, var(--ibx-border)); }
+.ibx-wg--warning { color: var(--ibx-warning); }
+.ibx-wg--info .ibx-icon { color: var(--ibx-accent); }
+.ibx-wg--ok .ibx-icon { color: var(--ibx-success); }
+/* Line: one piece of information */
+.ibx-wg--line { flex-direction: row; align-items: center; gap: 0.375rem; white-space: nowrap; }
+.ibx-wg--line .ibx-icon { flex: none; width: 1rem; height: 1rem; color: var(--ibx-text-muted); }
+.ibx-wg__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ibx-wg__note { color: var(--ibx-text-faint); font-size: var(--ibx-fs-xs); overflow: hidden; text-overflow: ellipsis; }
+/* Figure: the key figure of the overview, without its own frame */
+.ibx-wg--figure { padding: 0; }
+.ibx-wg--figure .ibx-ov-kpis { display: block; height: 100%; }
+.ibx-wg--figure .ibx-ov-kpi { height: 100%; box-sizing: border-box; border: 0; }
+/* Action: the list then its buttons at the bottom */
+.ibx-wg__actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: auto; }
+.ibx-wg__actions .ibx-btn { flex: 1 1 auto; justify-content: center; text-decoration: none; }
+.ibx-wg__actions .ibx-btn[aria-disabled="true"] { opacity: .7; cursor: default; }
+/* Module actions (1.157.0): only their buttons, side by side */
+.ibx-wg--modactions .ibx-wg__actions { margin-top: 0; }
+/* Free: a block of another module (hook inboxMailPanels), its summary drawn by the panel */
+.ibx-wg__title .ibx-icon { width: 0.875rem; height: 0.875rem; vertical-align: -0.125rem; }
+.ibx-wg__free { display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; min-height: 0; overflow: auto; }
+.ibx-wg--free > .ibx-wg__note { margin: 0; white-space: normal; }
+/* While personalizing: the content of a widget is not clicked (a click picks the widget up) */
+.ibx-wgedit-grid .grid-stack-item-content > .ibx-wg-cell, .ibx-wglist.is-edit > .ibx-wg-cell > .ibx-wg { pointer-events: none; }
+/* Steps by the size obtained */
+@container (max-width: 6.5rem) {
+	.ibx-wg--mini .ibx-wg__label, .ibx-wg--line .ibx-wg__note { display: none; }
+	.ibx-wg--figure .ibx-ov-delta { display: none; }
+}
+@container (max-height: 3.25rem) {
+	.ibx-wg--figure .ibx-ov-kpi__label, .ibx-wg--figure .ibx-ov-kpi__note { display: none; }
+	.ibx-wg--figure .ibx-ov-kpi { justify-content: center; }
+}
+@container (max-height: 5rem) {
+	.ibx-wg--list .ibx-ov-rows, .ibx-wg--action .ibx-ov-rows { display: none; }
+	.ibx-wg--chart .ibx-ov-bar__val { display: none; }
+}
+@container (max-width: 12rem) {
+	.ibx-wg--line .ibx-wg__note { display: none; }
+}
+
+/* ---------- Widgets in the Dolibarr panel (1.155.0, js/inbox-panel-widgets.js) ----------
+   Column of a computer: the fixed top (sender, pieces...), the grid of the widgets, a splitter, the notes docked at the
+   bottom. Outside the edit mode the grid is a CSS grid; GridStack only while personalizing. */
+.ibx-wgzone[hidden] { display: none; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets { display: flex; flex-direction: column; overflow: hidden; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-dolibar__row { flex: none; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-wgzone { flex: 1 1 0; min-height: 4rem; overflow: hidden auto; overscroll-behavior: contain; }
+/* Notes docked at the bottom (1.158.7): as high as their content, up to the height set by the splitter (a maximum),
+   down to the head, an empty line and the composer; the widgets take what is left */
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-dolibar__notes { flex: none; height: auto; max-height: var(--ibx-dock-h, 16rem); min-height: 0; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-dolibar__notes .ibx-notes { flex: 0 1 auto; min-height: 1.5rem; }
+.ibx-wgsplit { display: none; flex: none; height: 0.4375rem; cursor: row-resize; align-items: center; justify-content: center; border-top: 1px solid var(--ibx-border); }
+.ibx-wgsplit::after { content: ""; width: 2rem; height: 3px; border-radius: 2px; background: var(--ibx-border-strong); }
+.ibx-wgsplit:hover::after, .ibx-wgsplit:focus-visible::after { background: var(--ibx-accent); }
+.ibx-wgsplit:focus-visible { outline: none; }
+.has-widgets > .ibx-wgsplit { display: flex; }
+/* Room kept for the notes (1.159.1): dashed above the notes up to their maximum, on hover, focus or drag of the
+   splitter; its top edge is where the notes will stop growing */
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets { position: relative; }
+.ibx-dockghost { position: absolute; left: 0; right: 0; z-index: 3; display: flex; align-items: flex-start; justify-content: center; pointer-events: none;
+	border: 1px dashed var(--ibx-accent); border-bottom: 0; border-radius: var(--ibx-radius) var(--ibx-radius) 0 0;
+	background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ibx-accent) 7%, transparent) 0 6px, transparent 6px 12px); }
+/* What lies under the room slightly blurred: the room reads as a zone of its own */
+.ibx-dockghost { -webkit-backdrop-filter: blur(2.5px); backdrop-filter: blur(2.5px); }
+.ibx-dockghost[hidden] { display: none; }
+.ibx-dockghost::before { content: ""; position: absolute; top: -2px; left: 50%; width: 2rem; height: 3px; margin-left: -1rem; border-radius: 2px; background: var(--ibx-accent); }
+.ibx-dockghost__grip { position: absolute; top: -0.375rem; left: 0; right: 0; height: 0.75rem; cursor: row-resize; pointer-events: auto; touch-action: none; }
+.ibx-wgsplit.is-ghosted::after { visibility: hidden; }
+/* The pointer drawn on the grip of the room while the real one is locked (drag from the bar) */
+.ibx-dockcursor { position: fixed; z-index: 200; width: 1.25rem; height: 1.25rem; margin: -0.625rem 0 0 -0.625rem; pointer-events: none; background: var(--ibx-text);
+	-webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v16M6 6l4-4 4 4M6 14l4 4 4-4"/></svg>') center / contain no-repeat;
+	mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v16M6 6l4-4 4 4M6 14l4 4 4-4"/></svg>') center / contain no-repeat;
+	filter: drop-shadow(0 0 1px var(--ibx-bg)) drop-shadow(0 0 1px var(--ibx-bg)); }
+.ibx-dockghost__label { margin-top: 0.375rem; padding: 0.125rem 0.5rem; border-radius: var(--ibx-radius); background: var(--ibx-bg); color: var(--ibx-accent); font-size: var(--ibx-fs-xs); white-space: nowrap; }
+.is-dockdrag, .is-dockdrag * { cursor: row-resize !important; user-select: none; }
+.ibx-wggrid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: var(--ibx-wg-unit, 15px); grid-auto-flow: row; gap: 4px; }
+.ibx-wgbanner { display: flex; align-items: center; gap: var(--ibx-s2); margin-bottom: var(--ibx-s2); padding: 0.375rem 0.5rem; border-radius: var(--ibx-radius); background: var(--ibx-accent-soft); font-size: var(--ibx-fs-sm); }
+.ibx-wgbanner > span { flex: 1; }
+.ibx-wgbanner .ibx-icon { flex: none; color: var(--ibx-accent); }
+/* Edit mode: a veil over the application, the panel above it and framed, the catalogue on its left */
+.ibx-wgbackdrop { position: fixed; inset: 0; z-index: 64; background: color-mix(in srgb, #000 38%, transparent); }
+.ibx-pane.is-wgedit { position: relative; z-index: 65; outline: 2px dashed var(--ibx-accent); outline-offset: -2px; }
+.is-wgediting .ibx-pane--dolside.is-wgedit .ibx-js-wgmenu { visibility: hidden; }
+.ibx-wgedit-grid { min-height: 6rem; }
+/* The cells drawn very finely behind the widgets while personalizing (1.158.3): a line per column and per row,
+   in the middle of the gutters (GridStack keeps half a gap around each widget) */
+.ibx-wgedit-grid { --ibx-wggrid-line: color-mix(in srgb, var(--ibx-accent) 14%, transparent);
+	background-image: linear-gradient(to right, var(--ibx-wggrid-line) 1px, transparent 1px), linear-gradient(to bottom, var(--ibx-wggrid-line) 1px, transparent 1px);
+	background-size: calc(100% / 12) var(--ibx-wg-unit, 15px); box-shadow: inset -1px -1px 0 var(--ibx-wggrid-line); }
+/* Stronger than the rule of GridStack (overflow-y: auto): a scroll bar would take its width from the widget on hover */
+.ibx-wgedit-grid.grid-stack > .grid-stack-item > .grid-stack-item-content { overflow: visible; cursor: grab; }
+.ibx-wgedit-grid .grid-stack-item-content > .ibx-wg-cell { position: absolute; inset: 0; }
+.ibx-wgedit-grid .ibx-wg { background: color-mix(in srgb, var(--ibx-bg) 85%, var(--ibx-accent-soft)); border-style: dashed; border-color: var(--ibx-accent); }
+.ibx-wgframe { position: absolute; top: 2px; right: 2px; z-index: 2; display: none; }
+.ibx-wgedit-grid .grid-stack-item:hover .ibx-wgframe, .ibx-wgedit-grid .grid-stack-item:focus-within .ibx-wgframe { display: block; }
+.ibx-wgframe .ibx-btn { background: var(--ibx-bg); }
+/* Above the resize grip of GridStack; on a widget two rows high (mini, line) the grip at the bottom right would cover
+   the cross: the cross goes to the top left there */
+.ibx-wgedit-grid .ibx-wgframe { z-index: 102; }
+.ibx-wgedit-grid .grid-stack-item[gs-h="2"] .ibx-wgframe { right: auto; left: 2px; }
+.ibx-wgedit-grid .grid-stack-item[gs-h="2"] .ibx-wgframe .ibx-btn { width: 1.25rem; height: 1.25rem; min-height: 0; padding: 0; }
+.ibx-wgedit-grid .grid-stack-placeholder > .placeholder-content { border: 2px dashed var(--ibx-accent) !important; background: var(--ibx-accent-soft) !important; border-radius: var(--ibx-radius); }
+.ibx-wgcat { position: fixed; top: var(--ibx-s3); bottom: var(--ibx-s3); z-index: 66; display: flex; flex-direction: column; width: 19rem; max-width: calc(100vw - 2rem);
+	background: var(--ibx-bg-pane); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); font-size: var(--ibx-fs-sm); }
+.ibx-wgcat__head { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
+.ibx-wgcat__search { box-sizing: border-box; width: calc(100% - 2 * var(--ibx-s3)); flex: none; margin: var(--ibx-s2) var(--ibx-s3) 0; }
+.ibx-wgcat__hint { margin: var(--ibx-s1) var(--ibx-s3) 0; color: var(--ibx-text-muted); font-size: var(--ibx-fs-xs); }
+.ibx-wgcat__list { flex: 1; min-height: 0; overflow: auto; padding: var(--ibx-s2) var(--ibx-s3); display: flex; flex-direction: column; gap: var(--ibx-s2); }
+.ibx-wgcat__group { margin-top: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }
+.ibx-wgcat__items { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); }
+.ibx-wgcat__foot { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); }
+.ibx-wgcat.grid-stack-trash, .ibx-wgcat.ui-droppable-over { outline: 3px dashed var(--ibx-danger); outline-offset: -3px; }
+.ibx-wgprev { position: relative; flex: 1 1 100%; cursor: grab; touch-action: none; border-radius: var(--ibx-radius); }
+.ibx-wgprev.is-mini { flex: 0 0 auto; }
+.ibx-wgprev:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-wgprev__box { height: var(--ibx-wgprev-h); pointer-events: none; }
+.ibx-wgprev.is-mini .ibx-wgprev__box { width: 4.25rem; }
+.ibx-wgprev__box > .ibx-wg-cell { height: 100%; }
+.ibx-wgprev__name { display: block; margin-top: 0.125rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+.ibx-wgprev.is-placed { opacity: .45; cursor: default; }
+.ibx-wgghost { position: fixed; z-index: 100; width: 10rem; pointer-events: none; opacity: .92; border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-wgghost > .ibx-wg-cell { height: 100%; }
+/* A widget of the catalogue proposed at its real place while dragged (1.162.1) */
+.ibx-wgedit-grid .grid-stack-item.is-dropping .grid-stack-item-content { opacity: .7; }
+.ibx-wgedit-grid .grid-stack-item.is-dropping .ibx-wg { border-width: 2px; box-shadow: var(--ibx-shadow-float); }
+.ibx-wg--none { color: var(--ibx-text-faint); }
+/* Small screen (1.156.0): the widgets in one column, the minis side by side as chips; edit as a list to order, the
+   catalogue as a sheet at the bottom */
+.ibx-wglist { display: flex; flex-wrap: wrap; gap: 4px; }
+.ibx-wg-cell--flow { container-type: inline-size; position: relative; flex: 1 1 100%; min-width: 0; }
+.ibx-wg-cell--flow > .ibx-wg { height: auto; min-height: 2rem; }
+.ibx-wg-cell--flow.ibx-wgflow--figure { flex: 1 1 calc(50% - 2px); }
+.ibx-wg-cell--flow.ibx-wgflow--figure > .ibx-wg, .ibx-wg-cell--flow.ibx-wgflow--chart > .ibx-wg { height: 100%; }
+.ibx-wg-cell--flow.ibx-wgflow--mini { flex: 0 0 auto; container-type: normal; }
+.ibx-wg-cell--flow.ibx-wgflow--mini > .ibx-wg { min-width: 4.25rem; height: 2rem; padding: 0 0.5rem; }
+.ibx-wgflowfoot { display: flex; justify-content: flex-end; margin-top: 2px; }
+.is-sheet .ibx-wgflowfoot, .ibx-pane--dolside .ibx-wgflowfoot { display: none; }
+.ibx-dolibar.is-wgedit { z-index: 65; outline: 2px dashed var(--ibx-accent); outline-offset: -2px; }
+.ibx-dolibar.is-wgedit:not(.is-sheet) { position: relative; }
+.ibx-wglist.is-edit > .ibx-wg-cell > .ibx-wg { border-style: dashed; border-color: var(--ibx-accent); }
+.ibx-wglist.is-edit > .ibx-wg-cell { padding-right: 3.75rem; }
+.ibx-wglist.is-edit > .ibx-wg-cell.ibx-wgflow--mini { padding-right: 3.5rem; }
+.ibx-wglist.is-edit > .ibx-wg-cell.is-dragging { opacity: .5; }
+.ibx-wgflowtools { position: absolute; top: 50%; right: 0; display: flex; gap: 2px; translate: 0 -50%; }
+.ibx-wgflowtools .ibx-js-wgmove { cursor: grab; touch-action: none; }
+.ibx-wgcat.is-sheet { top: auto; left: 0; right: 0 !important; bottom: 0; width: auto; max-width: none; max-height: 50vh; max-height: 50dvh;
+	border-radius: var(--ibx-radius-lg) var(--ibx-radius-lg) 0 0; padding-bottom: env(safe-area-inset-bottom); }
+.ibx-wgcat.is-sheet .ibx-wgprev { cursor: pointer; }
+@media (pointer: coarse) {
+	.ibx-wgflowtools .ibx-btn { min-width: 2.25rem; min-height: 2.25rem; }
+	.ibx-wglist.is-edit > .ibx-wg-cell { padding-right: 4.75rem; }
+}
+.ibx-wgcat.is-sheet.is-top { top: 0; bottom: auto; max-height: 42vh; max-height: 42dvh; border-radius: 0 0 var(--ibx-radius-lg) var(--ibx-radius-lg); padding-bottom: 0; padding-top: env(safe-area-inset-top); }
+.ibx-dolibar.is-sheet.is-wgedit { max-height: 56vh; max-height: 56dvh; }

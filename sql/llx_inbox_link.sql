@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- A mail linked to a piece of Dolibarr (lot W5 1.13.0): thirdparty, contact, proposal, order... Tied to the mailref,
+-- A mail linked to a piece of Dolibarr (1.13.0): thirdparty, contact, proposal, order... Tied to the mailref,
 -- so the link survives every move. Own table (not element_element): author, date and origin (the bridge of another
 -- module uses it to never copy a link twice).
 CREATE TABLE llx_inbox_link(

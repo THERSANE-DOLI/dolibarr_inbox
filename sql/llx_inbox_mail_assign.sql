@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Who handles a mail (lot W4, webmail §5.4 quinquies): tied to the mailref, so an assignment survives every move,
+-- Who handles a mail (webmail §5.4 quinquies): tied to the mailref, so an assignment survives every move,
 -- even to another mailbox. Several people per mail. Nothing is written on the mail server.
 CREATE TABLE llx_inbox_mail_assign(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

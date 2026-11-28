@@ -203,7 +203,7 @@ function inboxListQuery()
 	$query = InboxSearchQuery::parse((string) inboxAjaxParam('q', 'alphanohtml'), $langs);
 	// Pills of the field typed by the user, without the ones chosen in the search panel
 	$inboxTypedQuery = $query;
-	// Criteria chosen in the search panel (lot W7 1.19.0): operators in English, merged with the typed ones
+	// Criteria chosen in the search panel (1.19.0): operators in English, merged with the typed ones
 	$more = InboxSearchQuery::parse((string) inboxAjaxParam('qx', 'alphanohtml'));
 	foreach (array('from', 'to', 'subject', 'tag') as $k) {
 		$query[$k] = array_merge($query[$k], $more[$k]);
@@ -231,7 +231,7 @@ function inboxListQuery()
 		$query['tag'][] = $tag;
 	}
 	$query['soc'] = (int) inboxAjaxParam('soc', 'int');
-	// « My mails » (lot W4 1.9.0): the mails where the user is assigned; out of a folder, the archived ones only if asked
+	// « My mails » (1.9.0): the mails where the user is assigned; out of a folder, the archived ones only if asked
 	if ((int) inboxAjaxParam('mine', 'int') === 1) {
 		$query['mine'] = (int) $user->id;
 		$query['mine_archived'] = (int) inboxAjaxParam('archived', 'int') === 1;
@@ -261,7 +261,7 @@ function inboxListTextIds(array &$query, $scope, $scopeId, array $readable)
 }
 
 /**
- * Meilisearch (lot W7 1.20.0): the words searched in the indexes of the mailboxes of the scope that are indexed; the
+ * Meilisearch (1.20.0): the words searched in the indexes of the mailboxes of the scope that are indexed; the
  * mails found join the list (rows read again through the index: rights and filters), most relevant first when the
  * list is in its default order
  *
@@ -344,7 +344,7 @@ const INBOX_LIST_VIEWS = array(
 
 switch ($action) {
 	case 'ids':
-		// « Select the 3 245 mails of the folder » (lot W4 point 3): their rows, the browser sends the action by batches
+		// « Select the 3 245 mails of the folder »: their rows, the browser sends the action by batches
 		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
 		$query = inboxListQuery();
 		if (!empty($folder->live)) {
@@ -493,7 +493,7 @@ switch ($action) {
 		// no break
 
 	case 'content':
-		// Deep search (lot W7 1.19.0): the text of the mails of ONE mailbox searched by its mail server, within
+		// Deep search (1.19.0): the text of the mails of ONE mailbox searched by its mail server, within
 		// 20 s; the browser calls the mailboxes one after the other, then reads the list again with text=1
 		$accountId = (int) inboxAjaxParam('account', 'int');
 		$scope = (string) inboxAjaxParam('scope', 'aZ09');
@@ -539,7 +539,7 @@ switch ($action) {
 		// no break
 
 	case 'suggest':
-		// Suggestions of the search panel (lot W7 1.19.0): known senders and third parties of the readable mailboxes
+		// Suggestions of the search panel (1.19.0): known senders and third parties of the readable mailboxes
 		// kind (1.22.0): from = after de:, to = after à: (the recipients of the mails, then the people of Dolibarr)
 		$text = trim((string) inboxAjaxParam('q', 'alphanohtml'));
 		$kind = (string) inboxAjaxParam('kind', 'aZ09');
@@ -622,7 +622,7 @@ switch ($action) {
 		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
 		dol_include_once('/inbox/class/inboxuserparam.class.php');
 		$mailId = (int) inboxAjaxParam('mail', 'int');
-		// Lot W6: the mail answered in a writing open in front counts more than the mail read
+		// The mail answered in a writing open in front counts more than the mail read
 		$writing = (int) inboxAjaxParam('writing', 'int');
 		$params = new InboxUserParam($db);
 		$mine = '';
@@ -770,7 +770,7 @@ switch ($action) {
 		// no break
 
 	case 'refresh':
-		// Folder open in the application: synchronised now (lot W2 §8.3), unless done less than 15 s ago (several users on the same folder: one pass) or a pass
+		// Folder open in the application: synchronised now, unless done less than 15 s ago (several users on the same folder: one pass) or a pass
 		// runs on the mailbox. Also the « Try again » of a mailbox in error (retry=1: even during the wait).
 		$folder = inboxListFolder((int) inboxAjaxParam('folder', 'int'), $readable);
 		$row = $db->getRow("SELECT date_sync FROM ".$db->prefix()."inbox_folder WHERE rowid = ".((int) $folder->rowid));

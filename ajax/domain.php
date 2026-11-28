@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/domain.php
  * \ingroup inbox
- * \brief   Settings > Public and shared domains (lot A7, 1.76.0): list, add, change, disable, restore; right « Manage the mailboxes ».
+ * \brief   Settings > Public and shared domains (1.76.0): list, add, change, disable, restore; right « Manage the mailboxes ».
  *          « request »: any user asks the managers from a mail (bell)
  */
 

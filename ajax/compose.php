@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/compose.php
  * \ingroup inbox
- * \brief   Writing of a mail, lot W6 1.16.0: open, recipients, attachments, draft, send, close
+ * \brief   Writing of a mail, 1.16.0: open, recipients, attachments, draft, send, close
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -159,7 +159,7 @@ switch ($action) {
 	case 'send':
 		// at: date of a sending scheduled; record: pieces (« type:id ») to record the sending on
 		$record = inboxAjaxParam('record', 'none');
-		// force: « Send anyway » after an answer of a colleague was said (lot E2, 1.77.0)
+		// force: « Send anyway » after an answer of a colleague was said (1.77.0)
 		$res = $composer->send($user, $token, inboxComposeTyped(), array('at' => (int) inboxAjaxParam('at', 'int'), 'record' => is_array($record) ? array_map('strval', $record) : array(),
 			'force' => (int) inboxAjaxParam('force', 'int') === 1, 'catchup' => (string) inboxAjaxParam('catchup', 'aZ09')));
 		if ($res === null) {
@@ -254,7 +254,7 @@ switch ($action) {
 		inboxAjaxReply(array('pieces' => $res));
 		break;
 	case 'piecesearch':
-		// Insert a piece (lot A5, 1.83.0): the pieces of the thirdparties of the recipients, or of all
+		// Insert a piece (1.83.0): the pieces of the thirdparties of the recipients, or of all
 		$emails = inboxAjaxParam('emails', 'none');
 		$res = $composer->pieceSearch($user, $token, (string) inboxAjaxParam('term', 'alphanohtml'), (int) inboxAjaxParam('all', 'int') === 1, is_array($emails) ? array_map('strval', $emails) : array());
 		if ($res === null) {

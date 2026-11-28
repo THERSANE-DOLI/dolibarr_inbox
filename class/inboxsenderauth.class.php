@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxsenderauth.class.php
  * \ingroup inbox
- * \brief   Authentication of the sender of a mail, read in the headers added by the receiving server of the company (lot W5 1.15.0)
+ * \brief   Authentication of the sender of a mail, read in the headers added by the receiving server of the company (1.15.0)
  */
 
 /**

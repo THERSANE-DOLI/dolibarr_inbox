@@ -14,7 +14,7 @@
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 
--- Mail templates of inbox (type inbox_send of llx_c_email_templates, lot W6 1.18.0) offered in some mailboxes only:
+-- Mail templates of inbox (type inbox_send of llx_c_email_templates, 1.18.0) offered in some mailboxes only:
 -- a template without any row here is offered in every mailbox
 CREATE TABLE llx_inbox_template_account(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

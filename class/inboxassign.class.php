@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxassign.class.php
  * \ingroup inbox
- * \brief   Who handles a mail (lot W4 1.9.0, webmail §5.4 quinquies): assignments tied to the mailref
+ * \brief   Who handles a mail (1.9.0, webmail §5.4 quinquies): assignments tied to the mailref
  */
 
 require_once __DIR__.'/inboxaccess.class.php';
@@ -28,7 +28,7 @@ require_once __DIR__.'/inboxmailref.class.php';
 require_once __DIR__.'/inboxnotification.class.php';
 
 /**
- * Anyone who can read a mailbox may assign himself or another person who can read it (lot W4 §10 point 2). An
+ * Anyone who can read a mailbox may assign himself or another person who can read it. An
  * assignment is tied to the mailref: it follows the mail in every move, and shows on every copy of the mail, for the
  * people who can read the mailbox of the copy. A person who cannot read the mailbox any more is never shown there.
  * Nothing is written on the mail server.

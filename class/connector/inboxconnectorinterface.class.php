@@ -118,7 +118,7 @@ interface InboxConnectorInterface
 	public function folderStatus($folder);
 
 	/**
-	 * Changes of a folder since a cursor (lot W2), read only. The new mails first, then the older ones not indexed yet
+	 * Changes of a folder since a cursor, read only. The new mails first, then the older ones not indexed yet
 	 * (first indexing, from the most recent to the oldest), within the limits of \$options.
 	 *
 	 * @param string              $folder  Folder path
@@ -141,7 +141,7 @@ interface InboxConnectorInterface
 	public function fetchRaw($folder, $remoteId);
 
 	/**
-	 * Find a mail by its complete Message-ID (lot 0), read only
+	 * Find a mail by its complete Message-ID, read only
 	 *
 	 * @param string        $messageId Message-ID without angle brackets, already checked by Inbox::normalizeMessageId()
 	 * @param string[]|null $folders   Folders to search, null = all, in the most likely order
@@ -155,7 +155,7 @@ interface InboxConnectorInterface
 	public function notFound();
 
 	/**
-	 * Mails of a folder whose text contains every word, searched by the mail server (lot W7 1.19.0, capability
+	 * Mails of a folder whose text contains every word, searched by the mail server (1.19.0, capability
 	 * CAP_SERVER_SEARCH), read only. Case is ignored by the server, accents are not.
 	 *
 	 * @param string              $folder  Folder path
@@ -166,7 +166,7 @@ interface InboxConnectorInterface
 	public function searchText($folder, array $words, array $options = array());
 
 	/**
-	 * Start of several mails (headers and the first bytes of the body), read only, to index their text (lot W7 1.20.0)
+	 * Start of several mails (headers and the first bytes of the body), read only, to index their text (1.20.0)
 	 *
 	 * @param string   $folder    Folder path
 	 * @param string[] $remoteIds Remote identifiers
@@ -176,7 +176,7 @@ interface InboxConnectorInterface
 	public function fetchStarts($folder, array $remoteIds, $max = 131072);
 
 	/**
-	 * Set or remove flags (lot W4)
+	 * Set or remove flags
 	 *
 	 * @param string   $folder    Folder path
 	 * @param string[] $remoteIds Identifiers
@@ -187,7 +187,7 @@ interface InboxConnectorInterface
 	public function setFlags($folder, array $remoteIds, array $add, array $remove);
 
 	/**
-	 * Set or remove tags (IMAP keywords, Outlook categories, Gmail labels) (lot W4)
+	 * Set or remove tags (IMAP keywords, Outlook categories, Gmail labels)
 	 *
 	 * @param string   $folder    Folder path
 	 * @param string[] $remoteIds Identifiers
@@ -198,7 +198,7 @@ interface InboxConnectorInterface
 	public function setTags($folder, array $remoteIds, array $add, array $remove);
 
 	/**
-	 * Move mails inside the mailbox, checked after (lot W4)
+	 * Move mails inside the mailbox, checked after
 	 *
 	 * @param string   $folder    Folder path
 	 * @param string[] $remoteIds Identifiers
@@ -208,7 +208,7 @@ interface InboxConnectorInterface
 	public function move($folder, array $remoteIds, $target);
 
 	/**
-	 * Put a mail in a folder from its source (move between mailboxes, lot W4)
+	 * Put a mail in a folder from its source (move between mailboxes)
 	 *
 	 * @param string   $folder Folder path
 	 * @param string   $raw    RFC 822 source
@@ -219,7 +219,7 @@ interface InboxConnectorInterface
 	public function importRaw($folder, $raw, array $flags = array(), $date = null);
 
 	/**
-	 * Remove mails for good, only these ones (lot W4)
+	 * Remove mails for good, only these ones
 	 *
 	 * @param string   $folder    Folder path
 	 * @param string[] $remoteIds Identifiers
@@ -228,7 +228,7 @@ interface InboxConnectorInterface
 	public function deleteMails($folder, array $remoteIds);
 
 	/**
-	 * Create a folder; an existing one is not an error (lot W4)
+	 * Create a folder; an existing one is not an error
 	 *
 	 * @param string $path Full path
 	 * @return bool
@@ -269,7 +269,7 @@ interface InboxConnectorInterface
 	public function emptyFolder($folder);
 
 	/**
-	 * Send a mail (lot W6). The copy in the sent folder is put by the caller (importRaw), with the Bcc header that the
+	 * Send a mail. The copy in the sent folder is put by the caller (importRaw), with the Bcc header that the
 	 * mail sent has not.
 	 *
 	 * @param string                                   $raw      RFC 822 source, without Bcc header
@@ -279,7 +279,7 @@ interface InboxConnectorInterface
 	public function send($raw, array $envelope = array());
 
 	/**
-	 * Save a draft (lot W6)
+	 * Save a draft
 	 *
 	 * @param string      $raw      RFC 822 source
 	 * @param string|null $replaces Identifier of the previous version of the draft, removed after the save

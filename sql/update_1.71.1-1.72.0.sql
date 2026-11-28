@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- 1.72.0: requester of a mail sent by a site (data sources, lot A2 level 1)
+-- 1.72.0: requester of a mail sent by a site (data sources)
 ALTER TABLE llx_inbox_mail ADD COLUMN requester_email varchar(255) DEFAULT NULL;
 ALTER TABLE llx_inbox_mail ADD COLUMN requester_name varchar(255) DEFAULT NULL;
 ALTER TABLE llx_inbox_mail ADD COLUMN fk_source integer DEFAULT NULL;

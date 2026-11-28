@@ -1,7 +1,7 @@
 # Inbox application
 
 `index.php` opens the application (right « Use the webmail »): Settings > Mailboxes (right « Manage the mailboxes »),
-General, My account. The reading of the mails comes with the next lots.
+General, My account.
 
 Cache: the raw mails read in the mailboxes are kept in `documents/inbox/raw/` (30 days by default, purged every night).
 This directory can be emptied at any time: a missing mail is read again on the mail server when needed. It holds a
@@ -52,3 +52,11 @@ bottom right goes back to it. On a phone and in a window of its own, nothing cha
   entity are shown; to go back, choose the previous entity in Dolibarr and reload.
 - The tabs of two entities never share their coordination (channel, leader tab, what the browser keeps).
 - The personal settings of a user (display, sorting...) are common to all the entities.
+
+## Buttons of « Create from this mail » (1.161.0)
+
+The dialog « Create » of the Dolibarr panel shows its buttons in titled groups: Contacts, Sales, Purchases, Follow-up,
+Others. Other modules may add their own buttons (another way to create a proposal, for example) and take away buttons,
+mailbox by mailbox. Settings > the mailbox > Reception > « Buttons of Create » lists the buttons of the mailbox: shown,
+or removed with the name of the module that removed it. The administrator of inbox may keep a removed button in a
+mailbox (« Keep this button »), or let the removal apply again; each change is written in the journal of the mailbox.

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/connector/inboxmanagesieve.class.php
  * \ingroup inbox
- * \brief   Session ManageSieve (RFC 5804) already opened and authenticated (lot W8 1.23.0)
+ * \brief   Session ManageSieve (RFC 5804) already opened and authenticated (1.23.0)
  */
 
 /**

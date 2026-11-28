@@ -30,6 +30,20 @@ Markers: `{id}` (the event), `{socid}`, `{contactids}`, `{projectid}` (recognize
 `propal:12,facture:34`), `{start}` (empty for now). Your page may close its window with
 `parent.postMessage({source: 'inbox-panel', action: 'close'}, location.origin)`.
 
+**« Create > Event » of a mail goes to your page** (1.160.0). When `urls.create` is declared, the menu « Create » of
+the Dolibarr panel opens it (in a window of inbox, its markers filled) instead of the page of Dolibarr, and the event
+saved there is **linked to the mail**, with the `.eml` in its documents when the user asked for it. Inbox adds the
+parameter `inboxintent` (a token of the creation) to your address. For the link to be made:
+
+- keep `inboxintent` in the address of the page that saves: a form posted to the same address, or a call (ajax) made
+  from that page (its Referer carries the token);
+- create the event with `ActionComm::create()` and its triggers (`ACTION_CREATE`): inbox links the event there.
+
+Inbox announces it to the hooks of a mail with the capability `agenda_create` (see « Capabilities » in
+[extend-application.md](extend-application.md)): an action of yours that also creates an event (« Plan a meeting »)
+is then a duplicate, leave it out when the word is there and keep it otherwise. To fill the subject and the attendees
+from the mail, put `inboxctx={ctx}` in `urls.create` (below).
+
 **The mail open: marker `{ctx}`** (1.127.0). Put `inboxctx={ctx}` in the query of your address: when the user
 clicks, inbox draws a token of one use (5 minutes, kept in his session with the number of the mail only) and your page
 reads the mail in PHP. The values are read again at that moment, with the rights of the user: a mailbox he no longer
@@ -87,8 +101,15 @@ mailbox.
 and the native `events` and `late`): add yours in `$this->results['events']` and `['late']`; return 1 to replace the
 native ones. Fields: `id`, `source` (your module), `label`, `start`, `end` (timestamps), `allday`, `percent` (-1
 without progress), `location`, `color` (`#rrggbb`), `thirdparty` (`id`, `name`), `url` (of this site), `messageId`,
-`answer` (1 accepted, 2 maybe). Anything else is dropped; inbox never ticks an event of a module (its clicks go to
-your JS hooks).
+`answer` (1 accepted, 2 maybe), `todo` (1.163.0, see below). Anything else is dropped; inbox never ticks an event of
+a module (its clicks go to your JS hooks).
+
+**Something left to do on an event** (1.163.0, capability `agenda_todo`): give `todo` => `array('label' => ..., 'url'
+=> ...)` (an address of this site, markers `{id}` of the event and those of the mail open, `{ctx}` too). The agenda
+panel shows a button under the event (« Write the report »...) that opens your page in a window of inbox, and reads
+the panel again when the window closes. To have it among the late events (and in the warning of the icon of the
+agenda), put the event in `late` in mode `list` and count it in `late_count` in mode `count`. The hook receives
+`$parameters['capabilities']` in the modes `list` and `count`.
 
 Mode `count` (1.152.0, `user`, `from`, and `late`, the number of native late events): the icon of the agenda shows a
 warning when events are late to do, asked every few minutes while the panel is closed. Give the number of your late

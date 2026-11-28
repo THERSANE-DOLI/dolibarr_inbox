@@ -18,13 +18,14 @@
 /**
  * \file    inbox/class/inboxcreate.class.php
  * \ingroup inbox
- * \brief   Pieces created from a mail and files of a mail put in the documents of a piece (lot W5 1.14.0)
+ * \brief   Pieces created from a mail and files of a mail put in the documents of a piece (1.14.0)
  */
 
 require_once __DIR__.'/inboxelements.class.php';
 require_once __DIR__.'/inboxlink.class.php';
 require_once __DIR__.'/inboxactionlog.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
+require_once __DIR__.'/inboxaccount.class.php';
 require_once __DIR__.'/inboxmailref.class.php';
 require_once __DIR__.'/inboxmimeparser.class.php';
 require_once __DIR__.'/inboxsafe.class.php';
@@ -45,6 +46,22 @@ class InboxCreate
 
 	/** Parameter of the address of the page of creation that carries the token of its intent */
 	const INTENT_PARAM = 'inboxintent';
+
+	/**
+	 * Capabilities announced to the hooks of a mail ($parameters['capabilities'], 1.160.0), a word only once it is
+	 * delivered: agenda_create = « Create > Event » opens the page of creation of the agenda provider
+	 */
+	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets', 'agenda_todo', 'element_types');
+
+	/** Groups of the dialog « Create from this mail » (1.161.0), in their order; a module never makes one */
+	const GROUPS = array('contacts', 'sales', 'purchases', 'followup', 'other');
+
+	/** Group of each type of the core */
+	const TYPE_GROUPS = array('societe' => 'contacts', 'contact' => 'contacts', 'propal' => 'sales', 'commande' => 'sales',
+		'supplier_proposal' => 'purchases', 'order_supplier' => 'purchases', 'action' => 'followup', 'ticket' => 'followup', 'project' => 'followup');
+
+	/** Name of the setting of a mailbox (llx_inbox_userparam, fk_user = 0) holding the buttons the admin kept */
+	const KEEP_PARAM = 'create_keep';
 
 	/**
 	 * Pieces that can be created from a mail: page of creation, trigger of the creation, label of the menu
@@ -72,6 +89,14 @@ class InboxCreate
 
 	/** @var string */
 	public $error = '';
+
+	/**
+	 * Page of a module the last intent opens (1.160.0): an event goes to the page of creation of the agenda provider
+	 * (hook inboxAgendaProvider) when it declares one, in a window of inbox; null for a page of Dolibarr
+	 *
+	 * @var array{label:string}|null
+	 */
+	public $provider = null;
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -102,6 +127,216 @@ class InboxCreate
 	}
 
 	/**
+	 * Types that can be created from a mail: those of the core, then the objects of the modules that give a page of
+	 * creation and its trigger (hook inboxElementTypes, 1.164.0)
+	 *
+	 * @return array<string,array{url:string,trigger:string,label:string,module?:bool}>
+	 */
+	public static function types()
+	{
+		$out = self::TYPES;
+		$core = array_column(self::TYPES, 'trigger');
+		foreach (InboxElements::types() as $t => $def) {
+			// Never the trigger of a type of the core: its pieces stay linked as pieces of the core
+			if (!isset($out[$t]) && !empty($def['create']) && !in_array($def['create']['trigger'], $core, true)) {
+				$out[$t] = array('url' => $def['create']['url'], 'trigger' => $def['create']['trigger'], 'label' => $def['label'], 'module' => true);
+			}
+		}
+
+		return $out;
+	}
+
+	/** @var bool The page of the last intent is the one of a module: its markers filled by the browser */
+	public $moduleUrl = false;
+
+	/**
+	 * Buttons of « Create from this mail » for a mailbox (1.161.0): those of the core the user may create, then the
+	 * ones the modules add and remove (hook inboxCreateButtons, for this mailbox), the buttons the admin kept back
+	 *
+	 * @param User                $user      User
+	 * @param int                 $accountId Mailbox
+	 * @param array<string,mixed> $params    Parameters of the hooks of the mail (mail 0: the mailbox alone)
+	 * @param bool                $all       With the buttons removed (list of the setup), else the ones shown only
+	 * @return list<array<string,mixed>>
+	 */
+	public function buttons(User $user, $accountId, array $params, $all = false)
+	{
+		global $hookmanager;
+
+		$core = array();
+		foreach (self::creatable($user) as $c) {
+			$core[] = array_merge($c, array('id' => $c['type'], 'group' => self::TYPE_GROUPS[$c['type']] ?? 'other', 'source' => '', 'url' => '', 'window' => false));
+		}
+		$add = array();
+		$remove = array();
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($this->db);
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$account = new InboxAccount($this->db);
+		$mailbox = $account->fetch((int) $accountId) > 0
+			? array('id' => (int) $account->id, 'email' => (string) $account->email, 'label' => (string) $account->label, 'usage' => (string) ($account->usage_profile ?: 'auto'))
+			: array('id' => (int) $accountId, 'email' => '', 'label' => '', 'usage' => 'auto');
+		$parameters = array_merge($params, array('user' => $user, 'mailbox' => $mailbox, 'capabilities' => self::CAPABILITIES,
+			'buttons' => array_map(function ($b) {
+				return array('id' => $b['id'], 'type' => $b['type'], 'label' => $b['label'], 'group' => $b['group'], 'source' => $b['source']);
+			}, $core)));
+		$object = null;
+		$action = '';
+		if ($hookmanager->executeHooks('inboxCreateButtons', $parameters, $object, $action) >= 0) {
+			$add = is_array($hookmanager->resArray['add'] ?? null) ? $hookmanager->resArray['add'] : array();
+			$remove = is_array($hookmanager->resArray['remove'] ?? null) ? $hookmanager->resArray['remove'] : array();
+		}
+
+		return self::assemble($user, $core, $add, $remove, $this->kept((int) $accountId), $all);
+	}
+
+	/**
+	 * The buttons of a mailbox from those of the core, the ones added and removed by the modules (all of them merged:
+	 * the removals apply to the whole list, whatever the order of the modules), the ones the admin kept
+	 *
+	 * @param User                           $user   User
+	 * @param list<array<string,mixed>>      $core   Buttons of the core
+	 * @param array<int|string,mixed>        $add    Added: source, id, type, label, icon, url, window, rights, group
+	 * @param array<int|string,mixed>        $remove Removed: id (string) or {id, source}
+	 * @param string[]                       $keep   Kept by the admin of inbox (removals ignored)
+	 * @param bool                           $all    With the removed buttons
+	 * @return list<array<string,mixed>>
+	 */
+	public static function assemble(User $user, array $core, array $add, array $remove, array $keep, $all)
+	{
+		$list = $core;
+		$seen = array_flip(array_column($core, 'id'));
+		foreach ($add as $b) {
+			$source = is_array($b) ? (string) ($b['source'] ?? '') : '';
+			$id = is_array($b) ? (string) ($b['id'] ?? '') : '';
+			$type = is_array($b) ? (string) ($b['type'] ?? '') : '';
+			$url = is_array($b) ? (string) ($b['url'] ?? '') : '';
+			if (!preg_match('/^[a-z0-9_]{1,40}$/', $source) || !preg_match('/^[a-z0-9_-]{1,40}$/', $id) || !isset(self::types()[$type])
+				|| empty($b['label']) || !self::localUrl($url) || !InboxElements::canWriteType($user, $type) || !self::allowed($user, $b['rights'] ?? array())) {
+				continue;
+			}
+			$key = $source.':'.$id;
+			if (isset($seen[$key])) {
+				continue;
+			}
+			$seen[$key] = 1;
+			$group = in_array($b['group'] ?? '', self::GROUPS, true) ? (string) $b['group'] : 'other';
+			$icon = preg_match('/^[a-z0-9-]{1,40}$/', (string) ($b['icon'] ?? '')) ? (string) $b['icon'] : (InboxElements::TYPES[$type]['icon'] ?? 'plus');
+			$list[] = array('id' => $key, 'type' => $type, 'label' => dol_trunc((string) $b['label'], 60, 'right', 'UTF-8', 1), 'icon' => $icon, 'group' => $group,
+				'source' => $source, 'url' => $url, 'window' => !empty($b['window']));
+		}
+		$removedBy = array();
+		foreach ($remove as $r) {
+			$id = is_array($r) ? (string) ($r['id'] ?? '') : (string) $r;
+			$source = is_array($r) && preg_match('/^[a-z0-9_]{1,40}$/', (string) ($r['source'] ?? '')) ? (string) $r['source'] : '';
+			if ($id !== '' && !isset($removedBy[$id])) {
+				$removedBy[$id] = $source;
+			}
+		}
+		$out = array();
+		foreach ($list as $b) {
+			$removed = isset($removedBy[$b['id']]);
+			$kept = $removed && in_array($b['id'], $keep, true);
+			$b['removed_by'] = $removed ? $removedBy[$b['id']] : null;
+			$b['kept'] = $kept;
+			if ($all || !$removed || $kept) {
+				$out[] = $b;
+			}
+		}
+		// Groups in their order, the buttons of the core first in each group
+		$rank = array_flip(self::GROUPS);
+		usort($out, function ($a, $b) use ($rank) {
+			return ($rank[$a['group']] <=> $rank[$b['group']]) ?: (($a['source'] !== '') <=> ($b['source'] !== ''));
+		});
+
+		return $out;
+	}
+
+	/**
+	 * Rights a module asks for its button, each a list (module, permission[, sub permission]); all needed
+	 *
+	 * @param User  $user   User
+	 * @param mixed $rights Rights
+	 * @return bool
+	 */
+	public static function allowed(User $user, $rights)
+	{
+		foreach (is_array($rights) ? $rights : array() as $r) {
+			if (!is_array($r) || count($r) < 2 || count($r) > 3) {
+				return false;
+			}
+			$r = array_map('strval', array_values($r));
+			if (!(count($r) === 3 ? $user->hasRight($r[0], $r[1], $r[2]) : $user->hasRight($r[0], $r[1]))) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * An address inside Dolibarr: one starting slash, never « // » nor « /\ » (another host for the browsers), no space,
+	 * control character, backslash nor quote (audit INBX-101, as the actions of the modules)
+	 *
+	 * @param string $u Address
+	 * @return bool
+	 */
+	public static function localUrl($u)
+	{
+		return strlen($u) <= 1000 && $u !== '' && $u[0] === '/' && !(isset($u[1]) && ($u[1] === '/' || $u[1] === '\\')) && !preg_match('/[\s\x00-\x1f\\\\<>"\']/', $u);
+	}
+
+	/**
+	 * Buttons the admin of inbox kept for a mailbox although a module removes them
+	 *
+	 * @param int $accountId Mailbox
+	 * @return string[]
+	 */
+	public function kept($accountId)
+	{
+		$row = $this->db->getRow("SELECT value FROM ".$this->db->prefix()."inbox_userparam WHERE fk_user = 0 AND fk_account = ".((int) $accountId)." AND param = '".self::KEEP_PARAM."'");
+		$v = is_object($row) ? json_decode((string) $row->value, true) : null;
+
+		return is_array($v) ? array_values(array_filter(array_map('strval', $v), function ($id) {
+			return (bool) preg_match('/^([a-z0-9_]{1,40}:)?[a-z0-9_-]{1,40}$/', $id);
+		})) : array();
+	}
+
+	/**
+	 * Keep a button removed by a module for a mailbox, or let the removal apply again (admin of inbox, journal)
+	 *
+	 * @param User   $user      User
+	 * @param int    $accountId Mailbox
+	 * @param string $id        Button
+	 * @param bool   $keep      Keep it
+	 * @return int 1 done, 0 nothing to do, -1 invalid, -3 error of the database
+	 */
+	public function keep(User $user, $accountId, $id, $keep)
+	{
+		if (!preg_match('/^([a-z0-9_]{1,40}:)?[a-z0-9_-]{1,40}$/', (string) $id)) {
+			return -1;
+		}
+		$list = $this->kept((int) $accountId);
+		$has = in_array($id, $list, true);
+		if ($has === (bool) $keep) {
+			return 0;
+		}
+		$list = $keep ? array_merge($list, array((string) $id)) : array_values(array_diff($list, array((string) $id)));
+		$p = $this->db->prefix();
+		$where = " WHERE fk_user = 0 AND fk_account = ".((int) $accountId)." AND param = '".self::KEEP_PARAM."'";
+		$this->db->query("DELETE FROM ".$p."inbox_userparam".$where);
+		if ($list && !$this->db->query("INSERT INTO ".$p."inbox_userparam (fk_user, fk_account, param, value) VALUES (0, ".((int) $accountId).", '".self::KEEP_PARAM."', '".$this->db->escape((string) json_encode($list))."')")) {
+			return -3;
+		}
+		require_once __DIR__.'/inboxaccountlog.class.php';
+		(new InboxAccountLog($this->db))->add((int) $accountId, $user, 'create_keep', array('button' => (string) $id, 'keep' => !$keep), array('button' => (string) $id, 'keep' => (bool) $keep));
+
+		return 1;
+	}
+
+	/**
 	 * Keep the intent and give the page of creation, filled from the mail
 	 *
 	 * @param User        $user   User
@@ -111,9 +346,10 @@ class InboxCreate
 	 * @param array{soc:int,contact:int} $known Thirdparty and contact recognized
 	 * @return string Address of the page, '' if refused
 	 */
-	public function intent(User $user, InboxReader $reader, $type, $attach, array $known)
+	public function intent(User $user, InboxReader $reader, $type, $attach, array $known, $button = null)
 	{
-		if (!isset(self::TYPES[$type]) || !InboxElements::canWriteType($user, $type)) {
+		$types = self::types();
+		if (!isset($types[$type]) || !InboxElements::canWriteType($user, $type)) {
 			$this->error = 'InboxErrorCannotCreate';
 			return '';
 		}
@@ -136,7 +372,31 @@ class InboxCreate
 		$intents = $this->intents($user);
 		$contact = (int) ($known['contact'] ?? 0);
 		$contactAfter = isset(self::CONTACT_AFTER[$type]) && $this->isContactOf($contact, (int) ($known['soc'] ?? 0)) ? $contact : 0;
-		$url = $this->createUrl($type, $row, $known);
+		// An event: the page of creation of the agenda module of the user when there is one (its markers filled by the
+		// browser, the address taken from the hook, never from the request); the piece saved there is linked the same way
+		$this->provider = null;
+		$url = '';
+		if (is_array($button) && !empty($button['source'])) {
+			// A button of a module (1.161.0): its page, taken from the hook on the server, in a window or a tab
+			$url = (string) $button['url'];
+			$this->provider = $button['window'] ? array('label' => (string) $button['label']) : null;
+		} elseif ($type === 'action') {
+			require_once __DIR__.'/inboxagendapanel.class.php';
+			$p = (new InboxAgendaPanel($this->db))->provider($user);
+			if ($p && !empty($p['urls']['create'])) {
+				$url = (string) $p['urls']['create'];
+				$this->provider = array('label' => (string) $p['label']);
+			}
+		}
+		$this->moduleUrl = $url !== '';
+		if ($url === '' && !empty($types[$type]['module'])) {
+			// An object of a module (1.164.0): its page of creation, its markers filled by the browser
+			$url = $types[$type]['url'];
+			$this->moduleUrl = true;
+		}
+		if ($url === '') {
+			$url = $this->createUrl($type, $row, $known);
+		}
 		$token = bin2hex(random_bytes(8));
 		$intents[] = array('type' => $type, 'mailref' => $refId, 'mail' => (int) $row->rowid, 'subject' => (string) $row->subject, 'file' => $file, 'at' => dol_now(),
 			'contactid' => $contactAfter, 'token' => $token, 'path' => (string) parse_url($url, PHP_URL_PATH));
@@ -146,7 +406,7 @@ class InboxCreate
 	}
 
 	/**
-	 * Full page of creation of a thirdparty from the panel « New customer » (lot A1, 1.79.0): the intent keeps the
+	 * Full page of creation of a thirdparty from the panel « New customer » (1.79.0): the intent keeps the
 	 * contact of the panel, created when the thirdparty is saved
 	 *
 	 * @param User                      $user    User
@@ -317,7 +577,7 @@ class InboxCreate
 			}
 		}
 
-		// Values of a mail in the address of a page of the core: the one door (lot S2), not only the filter of that page
+		// Values of a mail in the address of a page of the core: the one door, not only the filter of that page
 		foreach ($q as $k => $v) {
 			if (!is_int($v)) {
 				$q[$k] = $k === 'email' ? InboxSafe::line($v, 128) : InboxSafe::line($v, 255);
@@ -339,9 +599,10 @@ class InboxCreate
 	public function onCreate(User $user, $code, $object)
 	{
 		$type = '';
-		foreach (self::TYPES as $t => $def) {
+		foreach (self::types() as $t => $def) {
 			if ($def['trigger'] === $code) {
 				$type = $t;
+				break;
 			}
 		}
 		if ($type === '' || empty($object->id)) {
@@ -394,8 +655,8 @@ class InboxCreate
 			$this->error = 'InboxErrorCannotAttach';
 			return '';
 		}
-		$object = fetchObjectByElement((int) $id, $type);
-		if (!is_object($object) || empty($object->id)) {
+		$object = InboxElements::fetch((int) $id, $type);
+		if (!$object) {
 			$this->error = 'InboxErrorPieceNotReadable';
 			return '';
 		}

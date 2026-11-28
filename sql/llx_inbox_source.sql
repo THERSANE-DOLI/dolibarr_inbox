@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Data sources (lot A2 level 1, 1.72.0): mails sent by a site or an application from its own address, the real
+-- Data sources (1.72.0): mails sent by a site or an application from its own address, the real
 -- requester written in structured headers; believed only for a trusted sender, authenticated. Declared by the
 -- administrators of Dolibarr; code = source shipped with the module (example, disabled)
 CREATE TABLE llx_inbox_source(

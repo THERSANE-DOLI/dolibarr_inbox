@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxlink.class.php
  * \ingroup inbox
- * \brief   Links between a mail (its mailref) and a piece of Dolibarr (lot W5 1.13.0), public for the other modules
+ * \brief   Links between a mail (its mailref) and a piece of Dolibarr (1.13.0), public for the other modules
  */
 
 require_once __DIR__.'/inboxmailref.class.php';
@@ -173,7 +173,7 @@ class InboxLink
 		$p = $this->db->prefix();
 		$or = array("(element_type = '".$this->db->escape((string) $type)."' AND fk_element = ".((int) $elementId).")");
 		if ($type === 'societe') {
-			foreach (InboxElements::TYPES as $t => $def) {
+			foreach (InboxElements::types() as $t => $def) {
 				// Only the modules enabled: the table of a disabled one may not exist
 				if ($t !== 'societe' && $def['soc'] === 'fk_soc' && InboxElements::enabled($t)) {
 					$or[] = "(element_type = '".$t."' AND fk_element IN (SELECT ".($def['key'] ?? 'rowid')." FROM ".$p.$def['table']." WHERE fk_soc = ".((int) $elementId)."))";

@@ -57,6 +57,104 @@ public function inboxSituationIndicators($parameters, &$object, &$action, $hookm
 Level `alert`, `attention` or `normal` (only the first two show on the closed card, `short` is that text); the
 address stays inside Dolibarr; values of other modules are never shown for an indicator the user cannot read.
 
+## Capabilities of inbox
+
+The hooks of a mail (`inboxMailLinks`, `inboxMailActions`, `inboxMailAlerts`, `inboxMailPanels`) receive
+`$parameters['capabilities']` (1.160.0): the words of what this inbox knows how to do. A module switches by these words,
+never by the version of inbox (branches and backports make a version number wrong); an older inbox gives none.
+
+| Word | Since | Meaning |
+|---|---|---|
+| `agenda_create` | 1.160.0 | « Create > Event » opens the page of creation of the agenda provider (`inboxAgendaProvider`) and links the event saved there to the mail ([agenda.md](agenda.md)) |
+| `create_buttons` | 1.161.0 | the hook `inboxCreateButtons` (below) adds and removes buttons of « Create from this mail » |
+| `element_types` | 1.164.0 | the hook `inboxElementTypes` declares an object of your module as a type of piece (below) |
+| `agenda_todo` | 1.163.0 | an event of `inboxAgendaEvents` may carry `todo` (a button under the event in the agenda panel, [agenda.md](agenda.md)) |
+| `widgets` | 1.162.0 | the hook `inboxWidgets` declares widgets of the Dolibarr panel ([widgets.md](widgets.md)): declare a widget instead of a block of `inboxMailPanels` |
+
+```php
+$caps = $parameters['capabilities'] ?? array();
+if (!in_array('agenda_create', $caps, true)) {
+	$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true, 'url' => $url);
+}
+```
+
+## Objects of a module as pieces
+
+Hook `inboxElementTypes`, context `inbox` (1.164.0): an object of your module becomes a type of piece. It is linked
+to mails, shown in the pieces of the Dolibarr panel, found by « Link », may receive the files of a mail, and may be
+created from a mail (a button of « Create », with `inboxCreateButtons`). Answer `$this->results['types']`, a list of:
+
+- `source` and `name` (`[a-z0-9_]`): the type is `source_name` (never one of the core);
+- `element`: the element of Dolibarr loaded by `fetchObjectByElement()` (`myobject@mymodule`), `module`: the module
+  tested by `isModEnabled()`;
+- `label` (already translated), `icon` (usage name);
+- `rights`: rights to read, any of them, each `array(module, permission[, sub])`; `write`: rights to change (create one,
+  add a file), may be empty;
+- `access`: the parameters of `checkUserAccessToObject()` for one record (features, tableandshare, feature2, dbt_keyfield,
+  dbt_select), checked for every piece shown;
+- `table`, `key` (default `rowid`), `search` (fields searched by « Link », the first one first), `soc` (field of the
+  thirdparty, empty when none), `entity` (key of `getEntity()`);
+- `create` (optional): `url` (an address of this site, markers as for the buttons) and `trigger` (the trigger of the
+  creation, `MYOBJECT_CREATE`, never one of the core): the object created from a mail is linked to it;
+- `delete` (optional): the trigger of the deletion, the links of the object to the mails are forgotten.
+
+Inbox reads the hook once per request and checks every name and field by strict patterns: a declaration not valid
+is left out as a whole.
+
+```php
+public function inboxElementTypes($parameters, &$object, &$action, $hookmanager)
+{
+	$this->results['types'][] = array('source' => 'mymodule', 'name' => 'myobject', 'element' => 'myobject@mymodule',
+		'module' => 'mymodule', 'label' => 'My object', 'icon' => 'briefcase',
+		'rights' => array(array('mymodule', 'myobject', 'read')), 'write' => array(array('mymodule', 'myobject', 'write')),
+		'access' => array('mymodule', 'mymodule_myobject&societe', 'myobject'), 'table' => 'mymodule_myobject',
+		'search' => array('ref', 'label'), 'soc' => 'fk_soc', 'entity' => 'myobject',
+		'create' => array('url' => dol_buildpath('/mymodule/myobject_card.php', 1).'?action=create&socid={socid}', 'trigger' => 'MYOBJECT_CREATE'),
+		'delete' => 'MYOBJECT_DELETE');
+	return 0;
+}
+```
+
+## Buttons of « Create from this mail »
+
+Hook `inboxCreateButtons`, context `inbox` (1.161.0). The dialog « Create » of the Dolibarr panel creates a piece filled
+from the mail and links it to the mail. Your module may add buttons and remove buttons, **mailbox by mailbox**: the
+hook is called for each mail with its mailbox, and once without mail (`mail` = 0) for the list of the setup.
+
+`$parameters`: the parameters of the hooks of a mail (`mail`, `account`, `socid`, `contactid`, `capabilities`...),
+`user`, `mailbox` (`id`, `email`, `label`, `usage`: auto, sales, accounting, support, purchase, transport, none) and
+`buttons`: the buttons of the core (`id`, `type`, `label`, `group`, `source` empty). Answer in `$this->results`:
+
+- `add`: a list of buttons. `source` (your technical name, `[a-z0-9_]`), `id` (`[a-z0-9_-]`, the button is then
+  `source:id`), `type` (a type of piece of the core: `societe`, `contact`, `propal`, `commande`, `supplier_proposal`,
+  `order_supplier`, `action`, `ticket`, `project`), `label`, `icon` (usage name), `url` (an address of this site, with
+  the markers `{socid}`, `{contactids}`, `{projectid}`, `{elements}`, `{ctx}`), `window` (true: a window of inbox,
+  else a new tab), `group` (`contacts`, `sales`, `purchases`, `followup`, else `other`), `rights` (rights of Dolibarr
+  needed, each `array(module, permission[, sub permission])`). Several buttons may create the same type of piece.
+- `remove`: buttons to take away in this mailbox, each `array('id' => ..., 'source' => your technical name)`: a button
+  of the core (its type) or of another module (`source:id`). All the modules are asked first, then the removals apply:
+  the order of the modules does not matter. The admin of inbox may keep back a removed button for a mailbox
+  (Settings > the mailbox > Reception > Buttons of « Create »).
+
+Inbox checks the address (this site only), the rights you ask and the right to create the type. The piece is linked to
+the mail as for the buttons of the core: inbox adds `inboxintent` to your address; keep it in the address of the page
+that saves, and create the object with its `create()` method and its triggers (`PROPAL_CREATE`...). Check the rights in
+your page as well.
+
+```php
+public function inboxCreateButtons($parameters, &$object, &$action, $hookmanager)
+{
+	if (($parameters['mailbox']['usage'] ?? '') === 'support') {
+		$this->results['remove'][] = array('id' => 'propal', 'source' => 'mymodule');
+		return 0;
+	}
+	$this->results['add'][] = array('source' => 'mymodule', 'id' => 'express', 'type' => 'propal', 'label' => 'Express quote',
+		'icon' => 'quote', 'group' => 'sales', 'window' => true, 'rights' => array(array('propal', 'creer')),
+		'url' => dol_buildpath('/mymodule/express.php', 1).'?socid={socid}&inboxctx={ctx}');
+	return 0;
+}
+```
+
 ## Blocks of a module in the panel of a mail
 
 Hook `inboxMailPanels`, context `inbox`: `$parameters` gives `mail` (row of the index), `account`, `message_id`,
@@ -71,6 +169,51 @@ an `icon` (usage name) and a `url` inside Dolibarr. The panel reads that address
   has something to show; keep the answer so that the hook gives no block the next time.
 
 Every text is escaped by the panel. Check the rights in the page: the hook runs for any mail the user opens.
+
+With the widgets of the panel (1.157.0), each block is a widget of the template `free` (id `panel:` and the `id` of
+the block): it comes by itself at the end of the grid, the user may move or remove it ([Widgets of the Dolibarr
+panel](widgets.md)). Keep the `id` of a block stable: it is the key of its place in the layouts of the users. The
+module actions (`inboxMailActions`) are the widget `mail_actions` in the same way.
+
+A block of the panel is for a short summary. For a rich content (figures, charts, lists), prefer a column of the
+strip (below): it is read only when the user opens it, never at each mail opened.
+
+## Columns of a module in the strip on the right
+
+Since 1.153.0 the strip on the right of the mail space (Dolibarr, Overview, Today) takes the columns of the modules,
+three at most, after the overview of inbox. Hook `inboxSidePanes`, context `inbox`, called once when the application
+loads (not for each mail): `$parameters` gives `user`. The method adds to `$this->results['panes']`, for each column:
+
+- `id` (`[a-z0-9_-]`, 40 at most), `title`, `icon` (usage name of the sprite, `dev/icons.json`);
+- `url`: an address inside Dolibarr (one starting slash, no space nor quote), read while the column is shown with
+  `?mail=<row of the index>` added (`&mail=` when it already has a query), then again when the user opens another mail;
+- `needs_mail` (default true): the icon is greyed without a mail open.
+
+The column is docked beside the mail, a drawer when the window is narrow, as the other columns; the choice of the
+column is kept (`side_panel` = `mod:<id>`). On a phone the columns of the modules are not offered yet.
+
+The address answers JSON in the format of the overview, drawn by inbox (every text escaped, links kept inside
+Dolibarr):
+
+- `tags`, `alerts`: lists of `{label, level}` (`ok`, `info`, `warning`, `danger`, `neutral`), shown as chips;
+- `kpis`: up to 4 `{label, value, note, level, delta}`, `delta` = `{text, level, dir: up|down, title}`;
+- `note`: `{label, text}`;
+- `sections`: `{id, title, sum, sumLevel, open, url, rows, hero, chart, spark, season, mails, mailsLabel}`, `rows` =
+  `{label, value, note, level, url, item}`, `chart`/`spark`/`season` = `{label, value, hint, current, bars}` with
+  `bars` = `{x, v, short, text, partial}`, `mails` = `{id, folder, out, date, subject, current}`;
+- `labels`: `{open, received, sent, current, empty}` for the list of mails;
+- `hidden: true` or `error`: a short text instead of the content.
+
+The page reads the mail itself from `mail` and checks every right: the browser gives nothing else, and the user may
+have been given a column for a mail he cannot read. A module that draws its column itself listens to the JavaScript
+hook `inbox:sidepane:render` (context `id`, `mail`, `el`, `data`, `handled`), draws in `el` (escape what it shows) and
+sets `handled = true`.
+
+## Open a mail from a module
+
+A module that lists mails (its column, its window) opens one in the mail space with the JavaScript hook
+`inbox:mail:goto`: `Dolibarr.executeHook('inbox:mail:goto', { folder: <row of the folder>, mail: <row of the mail> })`,
+the same jump as the links of inbox between two mails. Nothing happens for a mail the user cannot read.
 
 ## Viewers of the attachments
 

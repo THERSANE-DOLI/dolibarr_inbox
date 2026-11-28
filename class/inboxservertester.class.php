@@ -24,7 +24,7 @@
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
 /**
- * Test of a mailbox, read only, step by step (analyse-lot-w1 §6): each step is ok (green), warning (orange) or error
+ * Test of a mailbox, read only, step by step: each step is ok (green), warning (orange) or error
  * (red), with a sentence saying what to do. Works on a saved mailbox or on the values of the form (unsaved object):
  * the password typed is never in the result.
  */

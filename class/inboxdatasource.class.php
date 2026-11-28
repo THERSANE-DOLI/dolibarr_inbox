@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxdatasource.class.php
  * \ingroup inbox
- * \brief   Data sources (lot A2 level 1, 1.72.0): mails sent by a site or an application (quote form, shop, ticket
+ * \brief   Data sources (1.72.0): mails sent by a site or an application (quote form, shop, ticket
  *          tool) from its own address, the real requester written in structured headers
  */
 
@@ -1006,7 +1006,7 @@ class InboxDataSource
 	 */
 	protected static function clean($value)
 	{
-		// The one door (lot S2): tags written in entities removed too, no double quote, no bidi override
+		// The one door: tags written in entities removed too, no double quote, no bidi override
 		return InboxSafe::line($value, 255);
 	}
 

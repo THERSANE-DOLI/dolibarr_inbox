@@ -46,7 +46,7 @@ class InboxMail
 	/** @var string First error of the database of the last addMany() */
 	public $lastError = '';
 
-	/** @var int[] Rows added by the last addMany() (ignored threads, lot W4 1.11.0) */
+	/** @var int[] Rows added by the last addMany() (ignored threads, 1.11.0) */
 	public $lastNewIds = array();
 
 	/** @var bool|null The column date_folder is there (1.41.0) */
@@ -169,7 +169,7 @@ class InboxMail
 			// Conversation of each new mail (and threads merged when it links them)
 			$threader = new InboxThreader($this->db);
 			$threader->assign((int) $accountId, $newIds);
-			// The link follows the conversation (lot A3, 1.73.0): the new mails of a linked conversation are linked
+			// The link follows the conversation (1.73.0): the new mails of a linked conversation are linked
 			require_once __DIR__.'/inboxthreadlink.class.php';
 			(new InboxThreadLink($this->db))->followNew((int) $accountId, $newIds);
 		}

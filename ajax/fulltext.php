@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/fulltext.php
  * \ingroup inbox
- * \brief   Settings > General > Search (lot W7 1.20.0): Meilisearch, by the admin of the mailboxes only. The keys
+ * \brief   Settings > General > Search (1.20.0): Meilisearch, by the admin of the mailboxes only. The keys
  *          are never sent back to the browser.
  */
 

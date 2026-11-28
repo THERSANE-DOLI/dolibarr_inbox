@@ -372,7 +372,7 @@ class InboxNotification
 	}
 
 	/**
-	 * Unread counter of the tab, of the installed application and of the top bar of Dolibarr (lot W8 1.21.0)
+	 * Unread counter of the tab, of the installed application and of the top bar of Dolibarr (1.21.0)
 	 *
 	 * @param User $user User
 	 * @return array{mails:int,mail_folders:int[]} Unread mails, and the folders counted (the application sums them

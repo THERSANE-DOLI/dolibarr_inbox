@@ -73,7 +73,7 @@ class InboxSearchSql implements InboxSearchEngine
 		$desc = !isset($query['dir']) || $query['dir'] !== 'asc';
 		$rank = array_slice(array_values(array_unique(array_filter(array_map('intval', (array) ($query['rank'] ?? array()))))), 0, self::TEXT_IDS_MAX);
 		if (($query['sort'] ?? '') === 'relevance' && $rank) {
-			// Order of Meilisearch first (lot W7 1.20.0), then the other mails, the last arrived first: one number per
+			// Order of Meilisearch first (1.20.0), then the other mails, the last arrived first: one number per
 			// row, unique, so the cursor stays exact
 			$case = "CASE m.rowid";
 			foreach ($rank as $i => $id) {
@@ -240,7 +240,7 @@ class InboxSearchSql implements InboxSearchEngine
 		};
 		$words = $this->wordsCondition($query);
 		if ($words !== '') {
-			// Mails found in their text by the deep search (lot W7 1.19.0): found as well, even without the words in the index
+			// Mails found in their text by the deep search (1.19.0): found as well, even without the words in the index
 			$textIds = $this->textIds($query);
 			$where[] = $textIds ? "(".$words." OR m.rowid IN (".implode(',', $textIds)."))" : $words;
 		}
@@ -424,14 +424,14 @@ class InboxSearchSql implements InboxSearchEngine
 			'draft' => (int) $o->draft,
 			'tags' => trim((string) $o->keywords) === '' ? array() : array_values(array_filter(explode(' ', (string) $o->keywords))),
 			'soc' => $o->fk_soc ? array('id' => (int) $o->fk_soc, 'name' => (string) $o->soc_name) : null,
-			// A Message-ID: the key of an assignment (lot W4 1.9.0)
+			// A Message-ID: the key of an assignment (1.9.0)
 			// Every mail has a key now (Message-ID, or a print without it, 1.13.0): assignable, linkable
 			'has_mid' => 1,
-			// Key of the conversation (ignored, watched: lot W4 1.11.0)
+			// Key of the conversation (ignored, watched: 1.11.0)
 			'tkey' => (string) ($o->thread_key ?? ''),
 			// Junk: legit (known and authenticated) or imitation (1.15.0)
 			'junk_hint' => (string) ($o->junk_hint ?? ''),
-			// Found only in its text by the deep search (lot W7 1.19.0)
+			// Found only in its text by the deep search (1.19.0)
 			'in_text' => (int) ($o->in_text ?? 0),
 		);
 	}

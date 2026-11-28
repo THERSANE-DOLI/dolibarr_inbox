@@ -290,7 +290,7 @@
 		return boxes;
 	}
 
-	// ---------- Sendings left on the server (lot S3, §7.1 points 5 and 6, §7.2) ----------
+	// ---------- Sendings left on the server (§7.1 points 5 and 6, §7.2) ----------
 	let pendingTimer = 0;
 	const timers = new Map();
 	const asked = new Set();

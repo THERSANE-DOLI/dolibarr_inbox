@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxdomains.class.php
  * \ingroup inbox
- * \brief   Shared domains (lot A7, 1.76.0): public mail services, disposable addresses, domains shared by several of
+ * \brief   Shared domains (1.76.0): public mail services, disposable addresses, domains shared by several of
  *          our thirdparties. Never a thirdparty by such a domain; the shared ones offer the thirdparties to choose.
  */
 

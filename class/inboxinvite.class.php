@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxinvite.class.php
  * \ingroup inbox
- * \brief   Invitations received (lot W8 1.22.0): card of the reading pane, answer to the organizer, agenda of Dolibarr
+ * \brief   Invitations received (1.22.0): card of the reading pane, answer to the organizer, agenda of Dolibarr
  */
 
 require_once __DIR__.'/inboxical.class.php';

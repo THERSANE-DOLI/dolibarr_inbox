@@ -395,7 +395,7 @@ switch ($action) {
 		// no break
 
 	case 'pending':
-		// Lot S3 (§7.1 point 5 and 6, §7.2): the copies left in Drafts by a page gone during its delay, the sendings
+		// The copies left in Drafts by a page gone during its delay, the sendings
 		// scheduled, the failures told once (then forgotten)
 		dol_include_once('/inbox/class/inboxlivesend.class.php');
 		$liveSend = new InboxLiveSend($db);

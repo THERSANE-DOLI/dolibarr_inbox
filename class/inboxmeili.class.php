@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxmeili.class.php
  * \ingroup inbox
- * \brief   Small client of the HTTP API of Meilisearch (lot W7 1.20.0): keys, indexes, documents, federated search
+ * \brief   Small client of the HTTP API of Meilisearch (1.20.0): keys, indexes, documents, federated search
  */
 
 /**

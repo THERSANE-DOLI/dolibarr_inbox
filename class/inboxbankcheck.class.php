@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxbankcheck.class.php
  * \ingroup inbox
- * \brief   Bank details in a mail (lot A6, 1.75.0): change of IBAN, new bank details. Never « all is fine »: a mailbox
+ * \brief   Bank details in a mail (1.75.0): change of IBAN, new bank details. Never « all is fine »: a mailbox
  *          whose password was stolen sends authenticated mails from the real address, in a real conversation.
  */
 

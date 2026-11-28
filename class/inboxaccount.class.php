@@ -519,7 +519,7 @@ class InboxAccount extends CommonObject
 			return -1;
 		}
 
-		// Its index in Meilisearch (lot W7 1.20.0) goes with it, as far as Meilisearch answers
+		// Its index in Meilisearch (1.20.0) goes with it, as far as Meilisearch answers
 		require_once __DIR__.'/inboxfulltext.class.php';
 		$fulltext = new InboxFulltext($this->db);
 		$fulltext->dropIndex((int) $this->id);

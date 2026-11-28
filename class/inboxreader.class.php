@@ -36,7 +36,7 @@ require_once __DIR__.'/inboxlive.class.php';
 
 /**
  * A mail of the index read for a user: the row must be in a mailbox the user may read (else « not found », never
- * « forbidden »). The body is read with BODY.PEEK (never marked read by the reading), kept in the raw cache of lot 0
+ * « forbidden »). The body is read with BODY.PEEK (never marked read by the reading), kept in the raw cache of the readings by Message-ID
  * and analysed by InboxMimeParser. Nothing of the mail is trusted.
  */
 class InboxReader
@@ -329,7 +329,7 @@ class InboxReader
 			'report' => $bounce->view($raw, $readable),
 			'bounces' => $bounce->forMail($message->messageId, $readable),
 			'sender_check' => $senderCheck,
-			// Bank details in the mail (lot A6, 1.75.0): a lesson with its signals, never « all is fine »
+			// Bank details in the mail (1.75.0): a lesson with its signals, never « all is fine »
 			// Setting of the administrator (1.78.0): on by default
 			'bank' => !getDolGlobalInt('INBOX_BANK_CHECK', 1) ? null : (new InboxBankCheck($this->db))->check($user, $this->row, $message->subject."\n".$message->bodyText."\n".InboxMimeParser::htmlToText($message->bodyHtml),
 				array_column($attachments, 'name'), $passed, $senderCheck, (string) $message->replyToEmail),
@@ -345,9 +345,9 @@ class InboxReader
 			'spam_ignored' => self::spamIgnored($headers),
 			// Blocked sender (1.85.0): who blocked it and when, the user may unblock or not
 			'blocked' => (new InboxBlockedSender($this->db))->viewFor($user, $message->fromEmail),
-			// Unsubscribe (lot W4 1.11.0): what the sender offers, never its address (the server calls it, not the browser)
+			// Unsubscribe (1.11.0): what the sender offers, never its address (the server calls it, not the browser)
 			'unsubscribe' => self::unsubscribeView($headers, $auth),
-			// Lot W8 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
+			// 1.22.0: invitation (card with its answers) and read receipt asked (never sent without a click)
 			'invite' => $this->inviteView($user, $message),
 			// DMARC aggregate report (1.111.0): found by the names of the attachments and the subject, nothing unpacked
 			// here; the analysis is asked by the dialog (ajax/dmarc.php)
@@ -429,27 +429,69 @@ class InboxReader
 		}, array_slice($emails, 0, 200)));
 		$rows = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, email, job, office_phone, user_mobile, photo FROM ".$this->db->prefix()."user"
 			." WHERE LOWER(email) IN (".$in.") AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") ORDER BY rowid LIMIT 200");
-		$canCard = $user->hasRight('user', 'user', 'lire') || !empty($user->admin);
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$email = strtolower((string) $r->email);
-			if (isset($out[$email])) {
-				continue;
+			if (!isset($out[$email])) {
+				$out[$email] = self::personOf($user, $r);
 			}
-			$name = trim($r->firstname.' '.$r->lastname);
-			$out[$email] = array(
-				'id' => (int) $r->rowid,
-				'name' => $name !== '' ? $name : (string) $r->login,
-				'job' => (string) $r->job,
-				'email' => $email,
-				'phone' => (string) $r->office_phone,
-				'mobile' => (string) $r->user_mobile,
-				'photo' => self::userPhotoUrl((int) $r->rowid, (string) $r->photo, (int) $r->entity),
-				'url' => $canCard || (int) $r->rowid === (int) $user->id ? DOL_URL_ROOT.'/user/card.php?id='.((int) $r->rowid) : '',
-			);
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Users of Dolibarr (active, internal) by their ids, in the order given: the people of a piece (attendees of an
+	 * event, user assigned to a ticket)
+	 *
+	 * @param User  $user User reading
+	 * @param int[] $ids  Users
+	 * @return list<array<string,mixed>> id, name, job, email, phone, mobile, photo, url
+	 */
+	public function peopleByIds(User $user, array $ids)
+	{
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+		if (!$ids) {
+			return array();
+		}
+		$rows = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, email, job, office_phone, user_mobile, photo FROM ".$this->db->prefix()."user"
+			." WHERE rowid IN (".implode(',', array_slice($ids, 0, 50)).") AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") LIMIT 50");
+		$byId = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$byId[(int) $r->rowid] = self::personOf($user, $r);
+		}
+		$out = array();
+		foreach ($ids as $id) {
+			if (isset($byId[$id])) {
+				$out[] = $byId[$id];
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Card of a user of Dolibarr, as the application shows it
+	 *
+	 * @param User   $user User reading
+	 * @param object $r    Row of llx_user
+	 * @return array<string,mixed>
+	 */
+	protected static function personOf(User $user, $r)
+	{
+		$name = trim($r->firstname.' '.$r->lastname);
+		$canCard = $user->hasRight('user', 'user', 'lire') || !empty($user->admin);
+
+		return array(
+			'id' => (int) $r->rowid,
+			'name' => $name !== '' ? $name : (string) $r->login,
+			'job' => (string) $r->job,
+			'email' => strtolower((string) $r->email),
+			'phone' => (string) $r->office_phone,
+			'mobile' => (string) $r->user_mobile,
+			'photo' => self::userPhotoUrl((int) $r->rowid, (string) $r->photo, (int) $r->entity),
+			'url' => $canCard || (int) $r->rowid === (int) $user->id ? DOL_URL_ROOT.'/user/card.php?id='.((int) $r->rowid) : '',
+		);
 	}
 
 	/**
@@ -483,8 +525,8 @@ class InboxReader
 	}
 
 	/**
-	 * Imitation of a known sender (red alert), or a mail of the junk from a known and authenticated sender (lot W5
-	 * 1.15.0); null when nothing is to say (unknown sender, or no trusted server in the setup)
+	 * Imitation of a known sender (red alert), or a mail of the junk from a known and authenticated sender
+	 * (1.15.0); null when nothing is to say (unknown sender, or no trusted server in the setup)
 	 *
 	 * @param string $raw Raw mail
 	 * @return array{state:string,address:string,name:string,detail:string}|null
@@ -548,7 +590,7 @@ class InboxReader
 	}
 
 	/**
-	 * Setting of the administrator (lot F1 1.78.0): « always show the pictures » for a sender or its domain, a sender
+	 * Setting of the administrator (1.78.0): « always show the pictures » for a sender or its domain, a sender
 	 * only, or never (each mail on a click)
 	 *
 	 * @return string domain, sender, never
@@ -561,7 +603,7 @@ class InboxReader
 	}
 
 	/**
-	 * Setting of the administrator (lot F1 1.78.0): unsubscribe in one click or by mail, by mail only, or off
+	 * Setting of the administrator (1.78.0): unsubscribe in one click or by mail, by mail only, or off
 	 *
 	 * @return string oneclick, mail, off
 	 */

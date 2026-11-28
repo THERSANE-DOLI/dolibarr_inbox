@@ -46,7 +46,7 @@ class InboxMimeParser
 	/** HTML body kept (bytes) */
 	const MAX_HTML_LENGTH = 1048576;
 
-	/** Elements removed with their content: see InboxSafe::HTML_DROP (lot S1, moved there) */
+	/** Elements removed with their content: see InboxSafe::HTML_DROP (moved there) */
 	const HTML_DROP = InboxSafe::HTML_DROP;
 
 	/**
@@ -499,7 +499,7 @@ class InboxMimeParser
 	}
 
 	/**
-	 * HTML body of a mail => document to show in a sandboxed iframe: InboxSafe::display() (lot S1). Allow list on top of
+	 * HTML body of a mail => document to show in a sandboxed iframe: InboxSafe::display(). Allow list on top of
 	 * the sandbox: no script, frame, form or event attribute, links opened in a new tab, pictures of the mail (cid:)
 	 * as data URIs, remote pictures counted (the CSP of the page showing it must block them)
 	 *

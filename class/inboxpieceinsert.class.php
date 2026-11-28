@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxpieceinsert.class.php
  * \ingroup inbox
- * \brief   Insert a piece of Dolibarr in a writing (lot A5, 1.83.0): the pieces of the thirdparties of the recipients,
+ * \brief   Insert a piece of Dolibarr in a writing (1.83.0): the pieces of the thirdparties of the recipients,
  *          and what a piece gives to the mail: a line that recalls it, the table of its lines, its PDF, the links of
  *          the online signature and payment of Dolibarr
  */
