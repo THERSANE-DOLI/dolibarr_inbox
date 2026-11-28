@@ -4297,3 +4297,26 @@ InboxWgTemplate_thread = Thread
 InboxWgTemplate_free = Free
 InboxDocTitle_dev_widgets = Widgets of the Dolibarr panel
 InboxDocDesc_dev_widgets = Templates, sizes, previews and data of the widgets; the format a module follows
+
+# Widgets in the Dolibarr panel (1.155.0)
+InboxWgMenu = Options of the panel
+InboxWgPersonalize = Personalize the widgets
+InboxWgRevert = Back to the model of the mailbox
+InboxWgReverted = Back to the model of the mailbox
+InboxWgSaveModel = Save as the model of the mailbox
+InboxWgModelSaved = Model of the mailbox saved: the users without a layout of their own follow it
+InboxWgDone = Done
+InboxWgCatalogue = Catalogue of widgets
+InboxWgCatalogueSearch = Search a widget
+InboxWgCatalogueHelp = Drag a preview into the panel to add it, or a widget of the panel here to remove it. Previews with sample values, nothing is computed.
+InboxWgPlaced = placed
+InboxWgRemove = Remove
+InboxWgRemoved = « %s » removed
+InboxWgModelChanged = The model of the mailbox changed
+InboxWgAdopt = Adopt
+InboxWgAdopted = Model of the mailbox adopted
+InboxWgDockResize = Height of the notes
+InboxLogWidgetsModel = Model of the widgets of the panel saved
+InboxLogWidgetsModelRemoved = Model of the widgets of the panel removed
+InboxDocTitle_panel_widgets = Widgets of the Dolibarr panel
+InboxDocDesc_panel_widgets = Lay out the widgets of the panel per mailbox, the model of the mailbox, back to the model

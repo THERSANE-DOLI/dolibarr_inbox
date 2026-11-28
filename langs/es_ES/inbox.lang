@@ -4297,3 +4297,26 @@ InboxWgTemplate_thread = Hilo
 InboxWgTemplate_free = Libre
 InboxDocTitle_dev_widgets = Widgets del panel Dolibarr
 InboxDocDesc_dev_widgets = Plantillas, tamaños, vistas previas y datos de los widgets; el formato que sigue un módulo
+
+# Widgets en el panel Dolibarr (1.155.0)
+InboxWgMenu = Opciones del panel
+InboxWgPersonalize = Personalizar los widgets
+InboxWgRevert = Volver al modelo del buzón
+InboxWgReverted = Vuelto al modelo del buzón
+InboxWgSaveModel = Guardar como modelo del buzón
+InboxWgModelSaved = Modelo del buzón guardado: los usuarios sin diseño propio lo siguen
+InboxWgDone = Terminar
+InboxWgCatalogue = Catálogo de widgets
+InboxWgCatalogueSearch = Buscar un widget
+InboxWgCatalogueHelp = Arrastre una vista previa al panel para añadirla, o un widget del panel aquí para quitarlo. Vistas previas con valores de ejemplo, no se calcula nada.
+InboxWgPlaced = ya colocado
+InboxWgRemove = Quitar
+InboxWgRemoved = « %s » quitado
+InboxWgModelChanged = El modelo del buzón ha cambiado
+InboxWgAdopt = Adoptar
+InboxWgAdopted = Modelo del buzón adoptado
+InboxWgDockResize = Altura de las notas
+InboxLogWidgetsModel = Modelo de los widgets del panel guardado
+InboxLogWidgetsModelRemoved = Modelo de los widgets del panel eliminado
+InboxDocTitle_panel_widgets = Widgets del panel Dolibarr
+InboxDocDesc_panel_widgets = Disponer los widgets del panel por buzón, el modelo del buzón, volver al modelo

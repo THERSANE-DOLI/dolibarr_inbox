@@ -5,6 +5,7 @@
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "dompurify": "3.4.17",
-    "jsqr": "1.4.0"
+    "jsqr": "1.4.0",
+    "gridstack": "14.1.1"
   }
 }

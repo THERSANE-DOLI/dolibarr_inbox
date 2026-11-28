@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: widgets in the Dolibarr panel, laid out by each user per mailbox, model of the mailbox :   1.155.0
+  - grid between the fixed top and the notes docked at the bottom; « Personalize the widgets »: catalogue beside the
+    panel, drag or click to add, drag back to remove, each change saved at once.
+  - model of the mailbox saved by its managers, « Back to the model »; GridStack.js loaded only while personalizing.
+
 - NEW: registry of the widgets of the Dolibarr panel, with their templates, sizes and previews :   1.154.0
   - mini, line, figure, list, chart, action: drawn from the data of the overview, by the rights of each section.
   - ajax/widget.php gives the catalogue of the user and the data of the widgets of a mail; section Widgets in ux.php.

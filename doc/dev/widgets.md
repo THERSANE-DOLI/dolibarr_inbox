@@ -63,5 +63,19 @@ Formats (every text escaped when drawn, links kept inside Dolibarr):
   `small` (bars by month);
 - `action`: the fields of `list` and `actions` (`label`, `icon`, `url`).
 
+## Layouts (1.155.0)
+
+Stored in `llx_inbox_userparam`: `widgets_desktop` / `widgets_mobile` for a user and a mailbox, `widgets_model_desktop`
+/ `widgets_model_mobile` with `fk_user` = 0 for the model of a mailbox. Value: `{items: [{id, x, y, w, h}], dock, at}`
+(`dock`: height of the notes in pixels, 0 the default; `at`: date of the saving). Checked by `InboxWidgets::clean()`:
+known widgets, each once, 40 at most, sizes and places kept inside the grid and the bounds of the template.
+
+`ajax/widget.php`: `action=layout&account=<mailbox>` gives `manager`, `preset` and, per version, `user` and `model`
+(null when none); `save`, `reset` (the user's), `savemodel`, `removemodel` (a manager of the mailbox, written in its
+journal) are POST with the token, `account`, `version` (`desktop`, `mobile`) and `layout`.
+
+The panel (`js/inbox-panel-widgets.js`) draws the grid as a CSS grid outside the edit mode; GridStack.js
+(`js/vendor/gridstack`, MIT) is loaded only when the user personalizes, and only through `Dolibarr.tools.inbox.grid`.
+
 In JavaScript, `Dolibarr.tools.inbox.widgets`: `catalogue()` (cached for the page), `data(mail, ids)` and
 `render(template, data)`, which returns the HTML of one widget.

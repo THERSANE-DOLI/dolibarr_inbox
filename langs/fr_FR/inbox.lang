@@ -4297,3 +4297,26 @@ InboxWgTemplate_thread = Fil
 InboxWgTemplate_free = Libre
 InboxDocTitle_dev_widgets = Widgets du panneau Dolibarr
 InboxDocDesc_dev_widgets = Gabarits, tailles, aperçus et données des widgets ; le format qu'un module suit
+
+# Widgets dans le panneau Dolibarr (1.155.0)
+InboxWgMenu = Options du panneau
+InboxWgPersonalize = Personnaliser les widgets
+InboxWgRevert = Revenir au modèle de la boîte
+InboxWgReverted = Revenu au modèle de la boîte
+InboxWgSaveModel = Enregistrer comme modèle de la boîte
+InboxWgModelSaved = Modèle de la boîte enregistré : les utilisateurs sans mise en page à eux le suivent
+InboxWgDone = Terminer
+InboxWgCatalogue = Catalogue de widgets
+InboxWgCatalogueSearch = Rechercher un widget
+InboxWgCatalogueHelp = Glissez un aperçu dans le panneau pour l'ajouter, ou un widget du panneau ici pour le retirer. Aperçus avec des valeurs d'exemple, rien n'est calculé.
+InboxWgPlaced = déjà posé
+InboxWgRemove = Retirer
+InboxWgRemoved = « %s » retiré
+InboxWgModelChanged = Le modèle de la boîte a changé
+InboxWgAdopt = Adopter
+InboxWgAdopted = Modèle de la boîte adopté
+InboxWgDockResize = Hauteur des notes
+InboxLogWidgetsModel = Modèle des widgets du panneau enregistré
+InboxLogWidgetsModelRemoved = Modèle des widgets du panneau supprimé
+InboxDocTitle_panel_widgets = Widgets du panneau Dolibarr
+InboxDocDesc_panel_widgets = Disposer les widgets du panneau par boîte, le modèle de la boîte, revenir au modèle

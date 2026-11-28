@@ -69,14 +69,20 @@
 	 * One widget from its data
 	 * @param {string} template Template
 	 * @param {object|null} data Data (null: nothing to show for this mail)
+	 * @param {object} [hint] Preview of the widget (icon, title), for a mini without data
 	 * @returns {SafeHtml|string}
 	 */
-	function render(template, data) {
+	function render(template, data, hint) {
 		const fn = TEMPLATES[template];
 		if (!fn || !D()) {
 			return '';
 		}
 		if (!data) {
+			// Nothing for this mail: a mini keeps its icon with a dash, the others say it (the widget keeps its place)
+			if (template === 'mini') {
+				const icon = hint && ICON.test(String(hint.icon)) ? hint.icon : 'info';
+				return html`<div class="ibx-wg ibx-wg--mini ibx-wg--none" title="${(hint && hint.title) || ''} · ${t('InboxOvSectionEmpty')}"><span class="ibx-wg__mini">${raw(ic(icon))}<b class="ibx-wg__value">–</b></span></div>`;
+			}
 			return html`<div class="ibx-wg ibx-wg--empty">${t('InboxOvSectionEmpty')}</div>`;
 		}
 		return fn(data);

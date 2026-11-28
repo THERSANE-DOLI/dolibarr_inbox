@@ -22,6 +22,7 @@
  */
 
 require_once __DIR__.'/inboxoverview.class.php';
+require_once __DIR__.'/inboxaccess.class.php';
 
 /**
  * Widgets: small pieces of information about the other side of a mail, laid out by each user in the Dolibarr panel
@@ -84,6 +85,21 @@ class InboxWidgets
 
 	/** Widgets read in one call at most */
 	const BATCH_MAX = 30;
+	/** Widgets in a layout at most */
+	const LAYOUT_MAX = 40;
+	/** Versions of a layout: by the width of the screen, never by the device (small: under 64 rem) */
+	const VERSIONS = array('desktop', 'mobile');
+	/**
+	 * Presets of the usage of the mailbox (InboxSituation::USAGES), the layout of who has none and when the mailbox has
+	 * no model: kept small on purpose, the panel shows the least by default and each user builds what he needs
+	 */
+	const PRESETS = array(
+		'sales' => array(array('invoices_late', 0, 0), array('event_next', 1, 0), array('mails_count', 2, 0)),
+		'accounting' => array(array('invoices_late', 0, 0), array('figure_due', 0, 2)),
+		'support' => array(array('tickets_open', 0, 0), array('mails_count', 1, 0)),
+		'purchase' => array(array('figure_to_pay', 0, 0)),
+		'transport' => array(),
+	);
 
 	/** @var DoliDB */
 	protected $db;
@@ -318,6 +334,171 @@ class InboxWidgets
 		}
 
 		return array('title' => $sec ? $sec['title'] : $title, 'sum' => $sec['sum'] ?? '', 'sumLevel' => $sec['sumLevel'] ?? '', 'rows' => $sec['rows'] ?? array(), 'actions' => $actions);
+	}
+
+	// ---------- Layouts: the user's, the model of the mailbox, the preset of the usage ----------
+
+	/**
+	 * Layouts of the Dolibarr panel of a mailbox for a user, for both versions: his own (null when he has none), the
+	 * model of the mailbox (null when none), the preset of the usage; whether he may save the model
+	 *
+	 * @param User $user      User
+	 * @param int  $accountId Mailbox
+	 * @return array<string,mixed>|null Null when the user cannot read the mailbox
+	 */
+	public function layouts(User $user, $accountId)
+	{
+		$access = new InboxAccess($this->db);
+		if (!InboxOverview::enabled($user) || !$access->check($user, (int) $accountId)) {
+			return null;
+		}
+		$out = array('manager' => $access->check($user, (int) $accountId, InboxAccess::LEVEL_MANAGE), 'preset' => $this->preset((int) $accountId));
+		foreach (self::VERSIONS as $v) {
+			$out[$v] = array('user' => $this->stored((int) $user->id, (int) $accountId, 'widgets_'.$v), 'model' => $this->stored(0, (int) $accountId, 'widgets_model_'.$v));
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Save the layout of a user for a mailbox (version desktop or mobile), or remove it (null: back to the model)
+	 *
+	 * @param User                     $user      User
+	 * @param int                      $accountId Mailbox
+	 * @param string                   $version   desktop or mobile
+	 * @param array<string,mixed>|null $layout    {items: [{id, x, y, w, h}], dock}
+	 * @return int 1 saved, 0 nothing to do, -1 not allowed, -2 invalid
+	 */
+	public function saveUser(User $user, $accountId, $version, $layout)
+	{
+		if (!in_array($version, self::VERSIONS, true) || !InboxOverview::enabled($user) || !(new InboxAccess($this->db))->check($user, (int) $accountId)) {
+			return -1;
+		}
+		if ($layout === null) {
+			return $this->store((int) $user->id, (int) $accountId, 'widgets_'.$version, null);
+		}
+		$clean = $this->clean($layout);
+
+		return $clean === null ? -2 : $this->store((int) $user->id, (int) $accountId, 'widgets_'.$version, $clean);
+	}
+
+	/**
+	 * Save the model of a mailbox (its managers), or remove it (null); written in the journal of the mailbox. The
+	 * users who have their own layout keep it: they are told the model changed (date of the model)
+	 *
+	 * @param User                     $user      User
+	 * @param int                      $accountId Mailbox
+	 * @param string                   $version   desktop or mobile
+	 * @param array<string,mixed>|null $layout    Layout
+	 * @return int 1 saved, 0 nothing to do, -1 not allowed, -2 invalid
+	 */
+	public function saveModel(User $user, $accountId, $version, $layout)
+	{
+		if (!in_array($version, self::VERSIONS, true) || !InboxOverview::enabled($user)
+			|| !(new InboxAccess($this->db))->check($user, (int) $accountId, InboxAccess::LEVEL_MANAGE)) {
+			return -1;
+		}
+		$clean = $layout === null ? null : $this->clean($layout);
+		if ($layout !== null && $clean === null) {
+			return -2;
+		}
+		$res = $this->store(0, (int) $accountId, 'widgets_model_'.$version, $clean);
+		if ($res > 0) {
+			require_once __DIR__.'/inboxaccountlog.class.php';
+			(new InboxAccountLog($this->db))->add((int) $accountId, $user, 'widgets_model', array('version' => $version),
+				$clean === null ? null : array('version' => $version, 'count' => count($clean['items'])));
+		}
+
+		return $res;
+	}
+
+	/**
+	 * Preset of the usage of a mailbox (automatic and none: the one of the sales)
+	 *
+	 * @param int $accountId Mailbox
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,at:int}
+	 */
+	public function preset($accountId)
+	{
+		$row = $this->db->getRow("SELECT usage_profile FROM ".$this->db->prefix()."inbox_account WHERE rowid = ".((int) $accountId));
+		$usage = is_object($row) ? (string) $row->usage_profile : 'auto';
+		$items = array();
+		foreach (self::PRESETS[$usage] ?? self::PRESETS['sales'] as $x) {
+			$size = self::size($x[0]);
+			$items[] = array('id' => $x[0], 'x' => $x[1], 'y' => $x[2], 'w' => $size['w'], 'h' => $size['h']);
+		}
+
+		return array('items' => $items, 'dock' => 0, 'at' => 0);
+	}
+
+	/**
+	 * A layout checked: known widgets, each once, inside the grid and the bounds of its template
+	 *
+	 * @param mixed $layout Layout sent
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,at:int}|null
+	 */
+	protected function clean($layout)
+	{
+		if (!is_array($layout) || !is_array($layout['items'] ?? null) || count($layout['items']) > self::LAYOUT_MAX) {
+			return null;
+		}
+		$items = array();
+		$seen = array();
+		foreach ($layout['items'] as $it) {
+			$id = is_array($it) ? (string) ($it['id'] ?? '') : '';
+			if (!isset(self::WIDGETS[$id]) || isset($seen[$id])) {
+				return null;
+			}
+			$seen[$id] = 1;
+			$size = self::size($id);
+			$w = max(1, min((int) $size['max_w'], (int) ($it['w'] ?? $size['w'])));
+			$h = max((int) $size['min_h'], min((int) $size['max_h'], (int) ($it['h'] ?? $size['h'])));
+			$x = max(0, min(4 - $w, (int) ($it['x'] ?? 0)));
+			$y = max(0, min(1000, (int) ($it['y'] ?? 0)));
+			$items[] = array('id' => $id, 'x' => $x, 'y' => $y, 'w' => $w, 'h' => $h);
+		}
+		// Height of the notes docked at the bottom, in pixels (0: the default)
+		$dock = max(0, min(2000, (int) ($layout['dock'] ?? 0)));
+
+		return array('items' => $items, 'dock' => $dock, 'at' => (int) dol_now());
+	}
+
+	/**
+	 * @param int    $userId    User, 0 for the model of the mailbox
+	 * @param int    $accountId Mailbox
+	 * @param string $param     Name
+	 * @return array<string,mixed>|null
+	 */
+	protected function stored($userId, $accountId, $param)
+	{
+		$row = $this->db->getRow("SELECT value FROM ".$this->db->prefix()."inbox_userparam WHERE fk_user = ".((int) $userId)." AND fk_account = ".((int) $accountId)
+			." AND param = '".$this->db->escape($param)."'");
+		$v = is_object($row) ? json_decode((string) $row->value, true) : null;
+
+		return is_array($v) && is_array($v['items'] ?? null) ? $v : null;
+	}
+
+	/**
+	 * @param int                      $userId    User, 0 for the model of the mailbox
+	 * @param int                      $accountId Mailbox
+	 * @param string                   $param     Name
+	 * @param array<string,mixed>|null $value     Layout, null to remove
+	 * @return int 1 done, -3 error of the database
+	 */
+	protected function store($userId, $accountId, $param, $value)
+	{
+		$p = $this->db->prefix();
+		$where = " WHERE fk_user = ".((int) $userId)." AND fk_account = ".((int) $accountId)." AND param = '".$this->db->escape($param)."'";
+		if ($value === null) {
+			return $this->db->query("DELETE FROM ".$p."inbox_userparam".$where) ? 1 : -3;
+		}
+		$json = (string) json_encode($value);
+		$exists = $this->db->getRow("SELECT rowid FROM ".$p."inbox_userparam".$where);
+		$ok = is_object($exists)
+			? $this->db->query("UPDATE ".$p."inbox_userparam SET value = '".$this->db->escape($json)."'".$where)
+			: $this->db->query("INSERT INTO ".$p."inbox_userparam (fk_user, fk_account, param, value) VALUES (".((int) $userId).", ".((int) $accountId).", '".$this->db->escape($param)."', '".$this->db->escape($json)."')");
+
+		return $ok ? 1 : -3;
 	}
 
 	/**

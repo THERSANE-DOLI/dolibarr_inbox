@@ -113,4 +113,51 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 			unset($conf->global->INBOX_OVERVIEW_HIDE_INVOICES);
 		}
 	}
+
+	/**
+	 * Layouts: the user's for a mailbox he reads, the model by its managers only, checked against the registry
+	 *
+	 * @return void
+	 */
+	public function testLayouts()
+	{
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$reader = $this->withRights('wglayout', array(array('facture', 'lire')));
+		$stranger = $this->withRights('wgstranger', array(array('facture', 'lire')));
+		$acc = new InboxAccess($this->db);
+		$acc->grant($this->admin, $box->id, $reader->id, 0, 'read');
+		$acc->grant($this->admin, $box->id, $this->admin->id, 0, 'manage');
+		InboxAccess::clearCache();
+		$w = new InboxWidgets($this->db);
+
+		$l = $w->layouts($reader, (int) $box->id);
+		$this->assertNull($l['desktop']['user']);
+		$this->assertFalse($l['manager']);
+		$this->assertNotEmpty($l['preset']['items'], 'the preset of the usage (sales by default)');
+		$this->assertNull($w->layouts($stranger, (int) $box->id), 'a mailbox he cannot read');
+
+		$layout = array('items' => array(array('id' => 'figure_due', 'x' => 3, 'y' => 0, 'w' => 9, 'h' => 50), array('id' => 'invoices_late', 'x' => 0, 'y' => 0)), 'dock' => 240);
+		$this->assertSame(1, $w->saveUser($reader, (int) $box->id, 'desktop', $layout));
+		$mine = $w->layouts($reader, (int) $box->id)['desktop']['user'];
+		$this->assertSame('figure_due', $mine['items'][0]['id']);
+		$this->assertSame(4, $mine['items'][0]['w'], 'width kept inside the bounds of its template');
+		$this->assertSame(8, $mine['items'][0]['h']);
+		$this->assertSame(0, $mine['items'][0]['x'], 'moved back inside the grid');
+		$this->assertSame(240, $mine['dock']);
+		$this->assertSame(-2, $w->saveUser($reader, (int) $box->id, 'desktop', array('items' => array(array('id' => 'nope')))), 'unknown widget refused');
+		$this->assertSame(-2, $w->saveUser($reader, (int) $box->id, 'desktop', array('items' => array(array('id' => 'invoices_late'), array('id' => 'invoices_late')))), 'twice refused');
+		$this->assertSame(-1, $w->saveUser($stranger, (int) $box->id, 'desktop', $layout));
+		$this->assertSame(-1, $w->saveUser($reader, (int) $box->id, 'tablet', $layout), 'unknown version');
+
+		$this->assertSame(-1, $w->saveModel($reader, (int) $box->id, 'desktop', $layout), 'the model by a manager of the mailbox only');
+		$this->assertSame(1, $w->saveModel($this->admin, (int) $box->id, 'desktop', $layout));
+		$l = $w->layouts($reader, (int) $box->id);
+		$this->assertNotNull($l['desktop']['model']);
+		$this->assertNotNull($l['desktop']['user'], 'his own layout is kept when the model changes');
+		$this->assertSame(1, $w->saveUser($reader, (int) $box->id, 'desktop', null));
+		$this->assertNull($w->layouts($reader, (int) $box->id)['desktop']['user'], 'back to the model');
+		$this->assertSame(1, $w->saveModel($this->admin, (int) $box->id, 'desktop', null));
+		$this->assertNull($w->layouts($reader, (int) $box->id)['desktop']['model']);
+		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_userparam WHERE fk_account = ".((int) $box->id));
+	}
 }

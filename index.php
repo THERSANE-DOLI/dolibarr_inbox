@@ -85,6 +85,9 @@ $vars['INBOX_EDITOR_URL'] = $asset('/js/vendor/tiptap/tiptap.min.js');
 $vars = array_merge($vars, inboxEditorContextVars());
 // QR code reader when the browser has none (import of the mailboxes, 1.24.0): loaded at the first image
 $vars['INBOX_JSQR_URL'] = $asset('/js/vendor/jsqr/jsQR.js');
+// Grid of the widgets of the Dolibarr panel (1.155.0): loaded only when the user personalizes the panel
+$vars['INBOX_GRIDSTACK_URL'] = $asset('/js/vendor/gridstack/gridstack-all.js');
+$vars['INBOX_GRIDSTACK_CSS_URL'] = $asset('/js/vendor/gridstack/gridstack.min.css');
 $title = $langs->trans('InboxAppName').($vars['INBOX_COMPANY'] !== '' ? ' '.$vars['INBOX_COMPANY'] : '');
 $theme = in_array($params['theme'], array('light', 'dark', 'contrast'), true) ? $params['theme'] : '';
 $accent = preg_match('/^#[0-9a-f]{6}$/i', (string) $vars['INBOX_ACCENT']) ? $vars['INBOX_ACCENT'] : '#8a2b6e';
@@ -131,6 +134,7 @@ print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-mail.js').'" defe
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-agenda.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-overview.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-widgets.js').'" defer></script>'."\n";
+print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-panel-widgets.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-lead.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-settings.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-notify.js').'" defer></script>'."\n";

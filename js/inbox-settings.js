@@ -2883,6 +2883,9 @@
 					return t(l.after && l.after.ids ? 'InboxLogIndicatorsOwn' : 'InboxLogIndicatorsReset');
 				case 'carriers':
 					return t('InboxLogCarriers');
+				// Model of the widgets of the panel (1.155.0)
+				case 'widgets_model':
+					return t(l.after ? 'InboxLogWidgetsModel' : 'InboxLogWidgetsModelRemoved');
 				// Modules subscribed (1.112.0): the name of the module, as it was when the line was written
 				case 'consumer_grant':
 				case 'consumer_change':

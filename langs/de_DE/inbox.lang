@@ -4297,3 +4297,26 @@ InboxWgTemplate_thread = Verlauf
 InboxWgTemplate_free = Frei
 InboxDocTitle_dev_widgets = Widgets des Dolibarr-Bereichs
 InboxDocDesc_dev_widgets = Vorlagen, Größen, Vorschauen und Daten der Widgets; das Format, dem ein Modul folgt
+
+# Widgets im Dolibarr-Bereich (1.155.0)
+InboxWgMenu = Optionen des Bereichs
+InboxWgPersonalize = Widgets anpassen
+InboxWgRevert = Zurück zur Vorlage des Postfachs
+InboxWgReverted = Zurück zur Vorlage des Postfachs
+InboxWgSaveModel = Als Vorlage des Postfachs speichern
+InboxWgModelSaved = Vorlage des Postfachs gespeichert: Benutzer ohne eigenes Layout folgen ihr
+InboxWgDone = Fertig
+InboxWgCatalogue = Widget-Katalog
+InboxWgCatalogueSearch = Widget suchen
+InboxWgCatalogueHelp = Ziehen Sie eine Vorschau in den Bereich, um sie hinzuzufügen, oder ein Widget des Bereichs hierher, um es zu entfernen. Vorschauen mit Beispielwerten, nichts wird berechnet.
+InboxWgPlaced = platziert
+InboxWgRemove = Entfernen
+InboxWgRemoved = « %s » entfernt
+InboxWgModelChanged = Die Vorlage des Postfachs hat sich geändert
+InboxWgAdopt = Übernehmen
+InboxWgAdopted = Vorlage des Postfachs übernommen
+InboxWgDockResize = Höhe der Notizen
+InboxLogWidgetsModel = Vorlage der Widgets des Bereichs gespeichert
+InboxLogWidgetsModelRemoved = Vorlage der Widgets des Bereichs gelöscht
+InboxDocTitle_panel_widgets = Widgets des Dolibarr-Bereichs
+InboxDocDesc_panel_widgets = Widgets des Bereichs pro Postfach anordnen, die Vorlage des Postfachs, zurück zur Vorlage

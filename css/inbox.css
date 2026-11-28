@@ -3483,3 +3483,55 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 @container (max-width: 12rem) {
 	.ibx-wg--line .ibx-wg__note { display: none; }
 }
+
+/* ---------- Widgets in the Dolibarr panel (1.155.0, js/inbox-panel-widgets.js) ----------
+   Column of a computer: the fixed top (sender, pieces...), the grid of the widgets, a splitter, the notes docked at the
+   bottom. Outside the edit mode the grid is a CSS grid; GridStack only while personalizing. */
+.ibx-wgzone[hidden] { display: none; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets { display: flex; flex-direction: column; overflow: hidden; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-dolibar__row { flex: none; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-wgzone { flex: 1 1 auto; min-height: 4rem; overflow: auto; overscroll-behavior: contain; }
+.ibx-pane--dolside .ibx-dolibar__body.has-widgets > .ibx-dolibar__notes { flex: none; height: var(--ibx-dock-h, 16rem); min-height: 9rem; }
+.ibx-wgsplit { display: none; flex: none; height: 0.4375rem; cursor: row-resize; align-items: center; justify-content: center; border-top: 1px solid var(--ibx-border); }
+.ibx-wgsplit::after { content: ""; width: 2rem; height: 3px; border-radius: 2px; background: var(--ibx-border-strong); }
+.ibx-wgsplit:hover::after, .ibx-wgsplit:focus-visible::after { background: var(--ibx-accent); }
+.ibx-wgsplit:focus-visible { outline: none; }
+.has-widgets > .ibx-wgsplit { display: flex; }
+.ibx-wggrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: var(--ibx-wg-unit, 15px); grid-auto-flow: row dense; gap: 4px; }
+.ibx-wgbanner { display: flex; align-items: center; gap: var(--ibx-s2); margin-bottom: var(--ibx-s2); padding: 0.375rem 0.5rem; border-radius: var(--ibx-radius); background: var(--ibx-accent-soft); font-size: var(--ibx-fs-sm); }
+.ibx-wgbanner > span { flex: 1; }
+.ibx-wgbanner .ibx-icon { flex: none; color: var(--ibx-accent); }
+/* Edit mode: a veil over the application, the panel above it and framed, the catalogue on its left */
+.ibx-wgbackdrop { position: fixed; inset: 0; z-index: 64; background: color-mix(in srgb, #000 38%, transparent); }
+.ibx-pane.is-wgedit { position: relative; z-index: 65; outline: 2px dashed var(--ibx-accent); outline-offset: -2px; }
+.is-wgediting .ibx-pane--dolside.is-wgedit .ibx-js-wgmenu { visibility: hidden; }
+.ibx-wgedit-grid { min-height: 6rem; }
+.ibx-wgedit-grid .grid-stack-item-content { overflow: visible; cursor: grab; }
+.ibx-wgedit-grid .grid-stack-item-content > .ibx-wg-cell { position: absolute; inset: 0; }
+.ibx-wgedit-grid .ibx-wg { background: color-mix(in srgb, var(--ibx-bg) 85%, var(--ibx-accent-soft)); border-style: dashed; border-color: var(--ibx-accent); }
+.ibx-wgframe { position: absolute; top: 2px; right: 2px; z-index: 2; display: none; }
+.ibx-wgedit-grid .grid-stack-item:hover .ibx-wgframe, .ibx-wgedit-grid .grid-stack-item:focus-within .ibx-wgframe { display: block; }
+.ibx-wgframe .ibx-btn { background: var(--ibx-bg); }
+.ibx-wgedit-grid .grid-stack-placeholder > .placeholder-content { border: 2px dashed var(--ibx-accent) !important; background: var(--ibx-accent-soft) !important; border-radius: var(--ibx-radius); }
+.ibx-wgcat { position: fixed; top: var(--ibx-s3); bottom: var(--ibx-s3); z-index: 66; display: flex; flex-direction: column; width: 19rem; max-width: calc(100vw - 2rem);
+	background: var(--ibx-bg-pane); border: 1px solid var(--ibx-border-strong); border-radius: var(--ibx-radius-lg); box-shadow: var(--ibx-shadow-float); font-size: var(--ibx-fs-sm); }
+.ibx-wgcat__head { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s2) var(--ibx-s2) var(--ibx-s2) var(--ibx-s3); border-bottom: 1px solid var(--ibx-border); }
+.ibx-wgcat__search { margin: var(--ibx-s2) var(--ibx-s3) 0; }
+.ibx-wgcat__hint { margin: var(--ibx-s1) var(--ibx-s3) 0; color: var(--ibx-text-muted); font-size: var(--ibx-fs-xs); }
+.ibx-wgcat__list { flex: 1; min-height: 0; overflow: auto; padding: var(--ibx-s2) var(--ibx-s3); display: flex; flex-direction: column; gap: var(--ibx-s2); }
+.ibx-wgcat__group { margin-top: var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }
+.ibx-wgcat__items { display: flex; flex-wrap: wrap; gap: var(--ibx-s2); }
+.ibx-wgcat__foot { display: flex; flex-wrap: wrap; gap: var(--ibx-s1); padding: var(--ibx-s2) var(--ibx-s3); border-top: 1px solid var(--ibx-border); }
+.ibx-wgcat.grid-stack-trash, .ibx-wgcat.ui-droppable-over { outline: 3px dashed var(--ibx-danger); outline-offset: -3px; }
+.ibx-wgprev { position: relative; flex: 1 1 100%; cursor: grab; touch-action: none; border-radius: var(--ibx-radius); }
+.ibx-wgprev.is-mini { flex: 0 0 auto; }
+.ibx-wgprev:focus-visible { outline: 2px solid var(--ibx-accent); outline-offset: 2px; }
+.ibx-wgprev__box { height: var(--ibx-wgprev-h); pointer-events: none; }
+.ibx-wgprev.is-mini .ibx-wgprev__box { width: 4.25rem; }
+.ibx-wgprev__box > .ibx-wg-cell { height: 100%; }
+.ibx-wgprev__name { display: block; margin-top: 0.125rem; font-size: var(--ibx-fs-xs); color: var(--ibx-text-muted); }
+.ibx-wgprev.is-placed { opacity: .45; cursor: default; }
+.ibx-wgghost { position: fixed; z-index: 100; width: 10rem; pointer-events: none; opacity: .92; border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
+.ibx-wgghost > .ibx-wg-cell { height: 100%; }
+.ibx-wgedit-grid.is-dropover { outline: 2px dashed var(--ibx-accent); outline-offset: 2px; background: var(--ibx-accent-soft); border-radius: var(--ibx-radius); }
+.ibx-wg--none { color: var(--ibx-text-faint); }
