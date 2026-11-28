@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: on a phone, the chips of Dolibarr under the head of a mail stay on one line :   1.164.5
+  - only the name of the thirdparty shrinks; chips 44 px high under the finger.
+
 - FIX: Escape while a widget is held in the layout cancels that gesture only, nothing is saved :   1.164.4
   - the widget taken from the catalogue goes away, the one moved or taken out goes back to its place.
 
