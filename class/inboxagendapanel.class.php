@@ -212,7 +212,7 @@ class InboxAgendaPanel
 			$hookmanager = new HookManager($this->db);
 		}
 		$hookmanager->initHooks(array('inbox'));
-		$parameters = array('mode' => 'count', 'user' => $user, 'from' => (int) $from, 'late' => $count);
+		$parameters = array('mode' => 'count', 'user' => $user, 'from' => (int) $from, 'late' => $count, 'capabilities' => self::capabilities());
 		$object = null;
 		$action = '';
 		$res = $hookmanager->executeHooks('inboxAgendaEvents', $parameters, $object, $action);
@@ -269,7 +269,7 @@ class InboxAgendaPanel
 			$hookmanager = new HookManager($this->db);
 		}
 		$hookmanager->initHooks(array('inbox'));
-		$parameters = array('mode' => 'list', 'user' => $user, 'from' => $from, 'to' => $to, 'events' => $events, 'late' => $late);
+		$parameters = array('mode' => 'list', 'user' => $user, 'from' => $from, 'to' => $to, 'events' => $events, 'late' => $late, 'capabilities' => self::capabilities());
 		$object = null;
 		$action = '';
 		$res = $hookmanager->executeHooks('inboxAgendaEvents', $parameters, $object, $action);
@@ -456,7 +456,38 @@ class InboxAgendaPanel
 			'answer' => in_array((int) ($e['answer'] ?? 1), array(0, 1, 2), true) ? (int) ($e['answer'] ?? 1) : 1,
 			// An event of a module is never ticked by inbox: its click goes through the hooks of the page
 			'canDone' => false,
+			// Something left to do on it (1.163.0): a button under the event, the page of the module in a window
+			'todo' => self::todo($e['todo'] ?? null),
 		);
+	}
+
+	/**
+	 * What is left to do on an event of a module (« Write the report »...): a label and an address of this site
+	 *
+	 * @param mixed $t Declared
+	 * @return array{label:string,url:string}|null
+	 */
+	public static function todo($t)
+	{
+		if (!is_array($t)) {
+			return null;
+		}
+		$label = trim(dol_string_nohtmltag((string) ($t['label'] ?? '')));
+		$url = self::localUrl((string) ($t['url'] ?? ''));
+
+		return $label !== '' && $url !== '' ? array('label' => dol_trunc($label, 60, 'right', 'UTF-8', 1), 'url' => $url) : null;
+	}
+
+	/**
+	 * Capabilities of inbox announced to the hooks of the agenda, as to the hooks of a mail
+	 *
+	 * @return string[]
+	 */
+	private static function capabilities()
+	{
+		require_once __DIR__.'/inboxcreate.class.php';
+
+		return InboxCreate::CAPABILITIES;
 	}
 
 	/**

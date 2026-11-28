@@ -67,6 +67,7 @@ never by the version of inbox (branches and backports make a version number wron
 |---|---|---|
 | `agenda_create` | 1.160.0 | « Create > Event » opens the page of creation of the agenda provider (`inboxAgendaProvider`) and links the event saved there to the mail ([agenda.md](agenda.md)) |
 | `create_buttons` | 1.161.0 | the hook `inboxCreateButtons` (below) adds and removes buttons of « Create from this mail » |
+| `agenda_todo` | 1.163.0 | an event of `inboxAgendaEvents` may carry `todo` (a button under the event in the agenda panel, [agenda.md](agenda.md)) |
 | `widgets` | 1.162.0 | the hook `inboxWidgets` declares widgets of the Dolibarr panel ([widgets.md](widgets.md)): declare a widget instead of a block of `inboxMailPanels` |
 
 ```php

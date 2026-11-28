@@ -29,6 +29,13 @@ page reads the mail on the server, nothing of the mail is in its address. The ol
 the addresses in the address are removed. A module not yet moved to `{ctx}` gets them back with the hidden constant
 `INBOX_LEGACY_MAIL_MARKERS` = `1` (Setup > Other setup); remove it once the module is updated.
 
+## Something left to do on an event
+
+An agenda module may show a button under one of its events in the agenda panel, for what is left to do on it (for
+example « Write the report » after a meeting). The button opens the page of the module in a window of inbox; the panel
+is read again when the window closes. The module decides whether such an event counts as late (warning on the icon of
+the agenda).
+
 ## « Create > Event » with an agenda module
 
 When an agenda module declares its page of creation of an event, « Create > Event » in the Dolibarr panel of a mail

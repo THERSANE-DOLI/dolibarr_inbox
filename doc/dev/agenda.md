@@ -101,8 +101,15 @@ mailbox.
 and the native `events` and `late`): add yours in `$this->results['events']` and `['late']`; return 1 to replace the
 native ones. Fields: `id`, `source` (your module), `label`, `start`, `end` (timestamps), `allday`, `percent` (-1
 without progress), `location`, `color` (`#rrggbb`), `thirdparty` (`id`, `name`), `url` (of this site), `messageId`,
-`answer` (1 accepted, 2 maybe). Anything else is dropped; inbox never ticks an event of a module (its clicks go to
-your JS hooks).
+`answer` (1 accepted, 2 maybe), `todo` (1.163.0, see below). Anything else is dropped; inbox never ticks an event of
+a module (its clicks go to your JS hooks).
+
+**Something left to do on an event** (1.163.0, capability `agenda_todo`): give `todo` => `array('label' => ..., 'url'
+=> ...)` (an address of this site, markers `{id}` of the event and those of the mail open, `{ctx}` too). The agenda
+panel shows a button under the event (« Write the report »...) that opens your page in a window of inbox, and reads
+the panel again when the window closes. To have it among the late events (and in the warning of the icon of the
+agenda), put the event in `late` in mode `list` and count it in `late_count` in mode `count`. The hook receives
+`$parameters['capabilities']` in the modes `list` and `count`.
 
 Mode `count` (1.152.0, `user`, `from`, and `late`, the number of native late events): the icon of the agenda shows a
 warning when events are late to do, asked every few minutes while the panel is closed. Give the number of your late

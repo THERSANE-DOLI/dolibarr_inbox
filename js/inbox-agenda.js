@@ -373,7 +373,10 @@
 			+ box + '<span class="ibx-agenda__when">' + esc(when) + '</span>'
 			+ '<button type="button" class="ibx-agenda__label ibx-js-agaction" data-action="open" title="' + esc(e.label) + (+e.answer === 2 ? ' (' + th('InboxAgendaMaybe') + ')' : '') + '">' + esc(e.label) + '</button>'
 			+ (e.mail && +e.mail.mail > 0 ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-btn--sm ibx-agenda__mail ibx-js-agaction" data-action="openMail" title="' + th('InboxAgendaOpenMail') + '" aria-label="' + th('InboxAgendaOpenMail') + '">' + ic('mail') + '</button>' : '')
-			+ (sub ? '<span class="ibx-agenda__sub">' + sub + '</span>' : '') + '</li>';
+			+ (sub ? '<span class="ibx-agenda__sub">' + sub + '</span>' : '')
+			// Something left to do, declared by its module (1.163.0): its page in a window
+			+ (e.todo && e.todo.label ? '<span class="ibx-agenda__todo"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-agaction" data-action="todo">' + esc(e.todo.label) + '</button></span>' : '')
+			+ '</li>';
 	}
 
 	function findEvent(li) {
@@ -444,6 +447,13 @@
 			openPage('open', event.url, event.label);
 		} else if (action === 'openAll' && spaceUrl()) {
 			I.go('#/agenda');
+		} else if (action === 'todo' && event && event.todo && event.todo.url) {
+			// The page of the module in a window; the panel is read again when it closes (done or not)
+			if (String(event.todo.url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx) {
+				I.moduleUrlCtx(event.todo.url, mail, { id: event.id }).then(u => openPage('todo', u, event.todo.label));
+			} else {
+				openPage('todo', fill(event.todo.url, event, mail), event.todo.label);
+			}
 		} else if (action === 'openMail' && event && event.mail) {
 			Dolibarr.executeHook('inbox:mail:goto', { folder: +event.mail.folder, mail: +event.mail.mail });
 		}

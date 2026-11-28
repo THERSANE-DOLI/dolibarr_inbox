@@ -28,6 +28,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require_once __DIR__.'/InboxTestCase.php';
+require_once dirname(__DIR__, 2).'/class/inboxcreate.class.php';
 dol_include_once('/inbox/class/inboxagendapanel.class.php');
 
 /**
@@ -292,5 +293,23 @@ class InboxAgendaPanelTest extends InboxTestCase
 		$this->assertSame(1, $e['answer']);
 		$this->assertArrayNotHasKey('extra', $e);
 		$this->assertNull($panel->clean(array('label' => 'no date')));
+	}
+
+	/**
+	 * Something left to do on an event of a module (1.163.0): a label and an address of this site, else nothing
+	 *
+	 * @return void
+	 */
+	public function testTodoOfModuleEvent()
+	{
+		$panel = new InboxAgendaPanel($this->db);
+		$base = array('id' => 'm1', 'source' => 'mymodule', 'label' => 'Visit', 'start' => dol_now() - 86400);
+		$e = $panel->clean($base + array('todo' => array('label' => '<b>Write the report</b>', 'url' => '/custom/mymodule/report.php?event={id}')));
+		$this->assertSame(array('label' => 'Write the report', 'url' => '/custom/mymodule/report.php?event={id}'), $e['todo'], 'tags dropped, address kept');
+		$this->assertNull($panel->clean($base + array('todo' => array('label' => 'X', 'url' => 'https://evil.example/x')))['todo'], 'another site');
+		$this->assertNull($panel->clean($base + array('todo' => array('label' => 'X', 'url' => '//evil.example/x')))['todo']);
+		$this->assertNull($panel->clean($base + array('todo' => array('label' => '', 'url' => '/x.php')))['todo'], 'no label');
+		$this->assertNull($panel->clean($base)['todo']);
+		$this->assertContains('agenda_todo', InboxCreate::CAPABILITIES);
 	}
 }

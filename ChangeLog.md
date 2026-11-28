@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: something left to do on an event of a module, as a button under the event in the agenda panel :   1.163.0
+  - field « todo » of the hook inboxAgendaEvents: its page opens in a window of inbox, the panel read again after.
+  - capability « agenda_todo » announced to the hooks of the agenda and of a mail.
+
 - FIX: a widget dragged from the catalogue takes its real place in the grid while dragged, the others making room :   1.162.1
   - centred under the pointer, it stays where it is shown when released; out of the grid or Escape, it goes away.
 

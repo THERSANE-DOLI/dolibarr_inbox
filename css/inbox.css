@@ -3257,6 +3257,9 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-agenda__label { min-width: 0; padding: 0; border: 0; background: none; color: var(--ibx-text); font: inherit; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .ibx-agenda__label:hover, .ibx-agenda__label:focus-visible { text-decoration: underline; }
 .ibx-agenda__mail { grid-column: 4; }
+/* Something left to do on an event (1.163.0), under its label */
+.ibx-agenda__todo { grid-column: 3 / -1; padding-top: 0.25rem; }
+.ibx-agenda__todo .ibx-btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-agenda__sub { grid-column: 3 / 5; font-size: var(--ibx-fs-sm); color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ibx-agenda__sub .ibx-icon { width: 0.75rem; height: 0.75rem; vertical-align: -0.0625rem; margin-right: 0.125rem; }
 .ibx-agenda__item.is-done .ibx-agenda__label { text-decoration: line-through; color: var(--ibx-text-muted); }

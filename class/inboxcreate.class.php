@@ -51,7 +51,7 @@ class InboxCreate
 	 * Capabilities announced to the hooks of a mail ($parameters['capabilities'], 1.160.0), a word only once it is
 	 * delivered: agenda_create = « Create > Event » opens the page of creation of the agenda provider
 	 */
-	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets');
+	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets', 'agenda_todo');
 
 	/** Groups of the dialog « Create from this mail » (1.161.0), in their order; a module never makes one */
 	const GROUPS = array('contacts', 'sales', 'purchases', 'followup', 'other');
