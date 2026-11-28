@@ -7281,6 +7281,8 @@
 		actionsHtml: box => modActionsHtml(box && box._data ? box._data : {}),
 		panels: box => (box && box._data ? box._data.panels || [] : []),
 		panelBody: (box, id) => panelBody(box && box._panelsMail === box.dataset.mail ? (box._panels || {})[id] : null),
+		// The summary of a block from its data (widget « free » of a module, 1.162.0): badges, lines, action, links
+		render: d => panelBody(d),
 	};
 	function paintDolibar(box) {
 		const wgOn = !!(I.panelWidgets && I.ctx('INBOX_OVERVIEW', false));

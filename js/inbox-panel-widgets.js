@@ -48,12 +48,12 @@
 	/** Size of a block of a module: the template free (InboxWidgets::TEMPLATES) */
 	const FREE = { w: 12, h: 4, min_rem: 3.5, min_h: 2, max_w: 12, max_h: 20, resize: 'both' };
 	const PANEL = 'panel:';
-	/** Module actions and blocks: they come by themselves, the user may take them away */
-	const isLocal = id => id === 'mail_actions' || String(id).indexOf(PANEL) === 0;
+	/** Module actions, blocks and widgets of modules: not computed by inbox; the auto ones may be taken away */
+	const isLocal = id => id === 'mail_actions' || String(id).indexOf(PANEL) === 0 || String(id).indexOf('mod:') === 0;
 	const list = v => (Array.isArray(v) ? v : []);
 
 	/** layouts per mailbox, data per mail, the panel shown, the edit mode */
-	const P = { layouts: new Map(), data: new Map(), box: null, zone: null, mail: 0, account: 0, edit: null, cat: null };
+	const P = { layouts: new Map(), data: new Map(), mod: new Map(), box: null, zone: null, mail: 0, account: 0, edit: null, cat: null };
 
 	// ---------- Units of the grid ----------
 	function rowUnit() {
@@ -114,7 +114,10 @@
 	/** Catalogue of the user, and the blocks the modules declare for the mail shown */
 	async function catalogue() {
 		const cat = await I.widgets.catalogue();
-		const blocks = I.dolPanel ? I.dolPanel.panels(P.box).map(p => ({ id: PANEL + p.id, template: 'free', title: p.title, icon: p.icon, size: FREE, local: true, block: p.id })) : [];
+		// A block replaced by a widget of its module (« replaces », 1.162.0) is not offered any more
+		const replaced = new Set(cat.map(w => w.replaces).filter(Boolean));
+		const blocks = I.dolPanel ? I.dolPanel.panels(P.box).filter(p => !replaced.has(PANEL + p.id))
+			.map(p => ({ id: PANEL + p.id, template: 'free', title: p.title, icon: p.icon, size: FREE, local: true, block: p.id })) : [];
 		return cat.filter(w => w.template !== 'thread').concat(blocks);
 	}
 	/**
@@ -128,12 +131,45 @@
 		const off = list(layout.off);
 		const out = items.map(it => ({ it, w: cat.find(c => c.id === it.id) })).filter(x => x.w);
 		// Not placed yet: as high as their content (from one row in the static grid, the least of the template in the edit grid)
-		cat.filter(w => w.local && !placed.has(w.id) && !off.includes(w.id)).forEach(w => out.push({ it: { id: w.id, x: 0, y: 9999, w: w.size.w, h: w.size.min_h || 2 }, w, auto: true }));
+		cat.filter(w => (w.local || w.auto) && !placed.has(w.id) && !off.includes(w.id)).forEach(w => out.push({ it: { id: w.id, x: 0, y: 9999, w: w.size.w, h: w.size.min_h || 2 }, w, auto: true }));
 		return out;
 	}
-	/** Something to show for this mail (no module action: the widget of the actions stays away) */
+	/** Something to show for this mail (no module action: the widget of the actions stays away; a module says hidden) */
 	function present(w) {
+		if (w.module) {
+			const d = (P.mod.get(P.mail) || {})[w.id];
+			return !(d && d.hidden === true);
+		}
 		return w.id !== 'mail_actions' || (I.dolPanel && I.dolPanel.actions(P.box).length > 0);
+	}
+	/**
+	 * Data of the widgets of modules for a mail (1.162.0): read at their address, markers filled from the mail
+	 * ({ctx}: a token of the mail), kept for the mail; a failure gives an error in the widget
+	 */
+	async function modData(mail, ws) {
+		const have = P.mod.get(mail) || {};
+		const missing = ws.filter(w => w.module && !(w.id in have));
+		if (missing.length) {
+			const ctx = I.mailContext ? I.mailContext() : null;
+			await Promise.all(missing.map(async w => {
+				try {
+					const url = String(w.url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx ? await I.moduleUrlCtx(w.url, ctx, {}) : I.moduleUrl(w.url, ctx, {});
+					const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+					if (!res.ok) {
+						throw new Error(res.statusText || String(res.status));
+					}
+					const d = await res.json();
+					have[w.id] = d && typeof d === 'object' ? d : null;
+				} catch (err) {
+					have[w.id] = { error: err.message || 'Error' };
+				}
+			}));
+			P.mod.set(mail, have);
+			while (P.mod.size > 20) {
+				P.mod.delete(P.mod.keys().next().value);
+			}
+		}
+		return have;
 	}
 	/**
 	 * One widget: from its data, or from the panel for the module actions and blocks
@@ -142,6 +178,17 @@
 	 * @returns {string}
 	 */
 	function widgetHtml(w, data) {
+		if (w.module) {
+			const d = (P.mod.get(P.mail) || {})[w.id];
+			if (w.template === 'free') {
+				return String(html`<div class="ibx-wg ibx-wg--free"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div>`)
+					+ '<div class="ibx-mpanel__body ibx-wg__free">' + (I.dolPanel ? I.dolPanel.render(d === undefined ? w.preview : d) : '') + '</div></div>';
+			}
+			if (d && d.error) {
+				return String(html`<div class="ibx-wg ibx-wg--empty">${raw(ic('warning'))} ${d.error}</div>`);
+			}
+			return String(I.widgets.render(w.template, d === undefined ? w.preview : d, w.preview));
+		}
 		if (w.block) {
 			return String(html`<div class="ibx-wg ibx-wg--free ibx-mpanel" data-panel="${w.block}"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div>`)
 				+ '<div class="ibx-mpanel__body ibx-wg__free">' + I.dolPanel.panelBody(P.box, w.block) + '</div></div>';
@@ -154,6 +201,10 @@
 	}
 	/** Preview in the catalogue: sample values; a block of a module, its title and what it is */
 	function previewHtml(w) {
+		if (w.module && w.template === 'free') {
+			return String(html`<div class="ibx-wg ibx-wg--free"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div>`)
+				+ '<div class="ibx-mpanel__body ibx-wg__free">' + (I.dolPanel ? I.dolPanel.render(w.preview || {}) : '') + '</div></div>';
+		}
 		if (w.block) {
 			return String(html`<div class="ibx-wg ibx-wg--free"><div class="ibx-wg__head"><span class="ibx-wg__title">${raw(ic(/^[a-z0-9-]{1,40}$/.test(String(w.icon)) ? w.icon : 'magic'))} ${w.title}</span></div><p class="ibx-wg__note">${t('InboxWgModuleBlockHint')}</p></div>`);
 		}
@@ -202,7 +253,13 @@
 			return;
 		}
 		// A placed widget the user may no longer read is left out (rights changed), its place kept in the layout
-		const shown = arrange(eff.layout, cat).filter(x => present(x.w));
+		// Widgets of modules read first: one hidden for this mail is left out like a block (1.162.0)
+		const arranged = arrange(eff.layout, cat);
+		await modData(mail, arranged.map(x => x.w)).catch(() => ({}));
+		if (P.zone !== zone || P.mail !== mail) {
+			return;
+		}
+		const shown = arranged.filter(x => present(x.w));
 		const body = zone.closest('.ibx-dolibar__body');
 		if (body) {
 			body.classList.toggle('has-widgets', shown.length > 0);
@@ -274,7 +331,13 @@
 		const eff = effective(l);
 		zone.hidden = false;
 		const cat = await catalogue().catch(() => []);
-		const shown = arrange(eff.layout, cat).filter(x => present(x.w));
+		// Widgets of modules read first: one hidden for this mail is left out like a block (1.162.0)
+		const arranged = arrange(eff.layout, cat);
+		await modData(mail, arranged.map(x => x.w)).catch(() => ({}));
+		if (P.zone !== zone || P.mail !== mail) {
+			return;
+		}
+		const shown = arranged.filter(x => present(x.w));
 		const data = shown.length ? await dataOf(mail, shown.map(x => x.it.id)).catch(() => ({})) : {};
 		if (P.zone !== zone || P.mail !== mail) {
 			return;

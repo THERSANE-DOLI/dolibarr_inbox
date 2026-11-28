@@ -218,4 +218,37 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 		$this->assertSame(-2, $w->saveUser($reader, (int) $box->id, 'desktop', array('items' => array(array('id' => 'panel:Bad')))), 'id of a block checked');
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_userparam WHERE fk_account = ".((int) $box->id));
 	}
+
+	/**
+	 * Widgets of the modules (1.162.0): checked declarations, and the layouts where a block became a widget of its
+	 * module (« replaces ») keep its place and its removal
+	 *
+	 * @return void
+	 */
+	public function testModuleWidgets()
+	{
+		$defs = InboxWidgets::normalize($this->admin, array(
+			array('source' => 'agenda', 'id' => 'meetings', 'template' => 'list', 'title' => 'Meetings', 'url' => '/custom/agenda/w.php?socid={socid}', 'replaces' => 'panel:agenda_meetings', 'auto' => true),
+			array('source' => 'agenda', 'id' => 'far', 'template' => 'mini', 'title' => 'Far', 'url' => 'https://evil.example/x'),
+			array('source' => 'agenda', 'id' => 'thread', 'template' => 'thread', 'title' => 'T', 'url' => '/t.php'),
+			array('source' => 'agenda', 'id' => 'norights', 'template' => 'mini', 'title' => 'N', 'url' => '/n.php', 'rights' => array(array('nomodule', 'noright'))),
+			array('source' => 'Bad Source', 'id' => 'x', 'template' => 'mini', 'title' => 'X', 'url' => '/x.php'),
+		));
+		$this->assertSame(array('mod:agenda:meetings'), array_keys($defs), 'only the valid declaration');
+		$this->assertSame('panel:agenda_meetings', $defs['mod:agenda:meetings']['replaces']);
+		$this->assertTrue($defs['mod:agenda:meetings']['auto']);
+		$this->assertTrue(InboxWidgets::known('mod:agenda:meetings'));
+
+		$layout = array('items' => array(array('id' => 'invoices_late', 'x' => 0, 'y' => 0, 'w' => 3, 'h' => 2), array('id' => 'panel:agenda_meetings', 'x' => 0, 'y' => 2, 'w' => 6, 'h' => 9)),
+			'off' => array('panel:other'), 'cols' => 12);
+		$map = array('panel:agenda_meetings' => 'mod:agenda:meetings', 'panel:other' => 'mod:other:w');
+		$moved = InboxWidgets::replaceIds($layout, $map);
+		$this->assertSame('mod:agenda:meetings', $moved['items'][1]['id']);
+		$this->assertSame(array(0, 2, 6, 9), array($moved['items'][1]['x'], $moved['items'][1]['y'], $moved['items'][1]['w'], $moved['items'][1]['h']), 'its place and size kept');
+		$this->assertSame(array('mod:other:w'), $moved['off'], 'taken away stays taken away');
+		$layout['items'][] = array('id' => 'mod:agenda:meetings', 'x' => 6, 'y' => 2, 'w' => 6, 'h' => 4);
+		$twice = InboxWidgets::replaceIds($layout, $map);
+		$this->assertSame(array('invoices_late', 'mod:agenda:meetings'), array_column($twice['items'], 'id'), 'the widget already placed wins, no double');
+		$this->assertContains('widgets', InboxCreate::CAPABILITIES);
+	}
 }

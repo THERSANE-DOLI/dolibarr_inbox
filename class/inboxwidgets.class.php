@@ -23,6 +23,7 @@
 
 require_once __DIR__.'/inboxoverview.class.php';
 require_once __DIR__.'/inboxaccess.class.php';
+require_once __DIR__.'/inboxcreate.class.php';
 
 /**
  * Widgets: small pieces of information about the other side of a mail, laid out by each user in the Dolibarr panel
@@ -106,6 +107,11 @@ class InboxWidgets
 	 * blocks and the module actions show at the end of the grid as long as the user did not take them away (« off »)
 	 */
 	const PANEL_ID = '/^panel:[a-z0-9_-]{1,40}$/';
+	/** A widget declared by a module (hook inboxWidgets, 1.162.0): « mod: », its source, its id */
+	const MOD_ID = '/^mod:[a-z0-9_]{1,40}:[a-z0-9_-]{1,40}$/';
+
+	/** @var array<int,array<string,array<string,mixed>>> Widgets of the modules, by user, read once per request */
+	protected static $modules = array();
 
 	/** Widgets read in one call at most */
 	const BATCH_MAX = 30;
@@ -162,7 +168,124 @@ class InboxWidgets
 	 */
 	public static function known($id)
 	{
-		return isset(self::WIDGETS[$id]) || preg_match(self::PANEL_ID, $id);
+		return isset(self::WIDGETS[$id]) || preg_match(self::PANEL_ID, $id) || preg_match(self::MOD_ID, $id);
+	}
+
+	/**
+	 * Size of a widget of the registry or of a module (its template); a block of a module: free
+	 *
+	 * @param string $id Widget
+	 * @return array{w:int,h:int,min_rem:float,min_h:int,max_w:int,max_h:int,resize:string}
+	 */
+	public function sizeOf($id)
+	{
+		global $user;
+
+		if (preg_match(self::MOD_ID, (string) $id) && $user instanceof User) {
+			$m = $this->modules($user)[$id] ?? null;
+			return self::TEMPLATES[$m ? $m['template'] : 'free'];
+		}
+
+		return self::size($id);
+	}
+
+	/**
+	 * Widgets the modules declare (hook inboxWidgets, context inbox, 1.162.0), the ones the user may see; read once
+	 *
+	 * @param User $user User
+	 * @return array<string,array<string,mixed>> Id (mod:source:id) => definition
+	 */
+	public function modules(User $user)
+	{
+		global $hookmanager;
+
+		$key = (int) $user->id;
+		if (!isset(self::$modules[$key])) {
+			self::$modules[$key] = array();
+			if (!is_object($hookmanager)) {
+				include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+				$hookmanager = new HookManager($this->db);
+			}
+			$hookmanager->initHooks(array('inbox'));
+			$parameters = array('user' => $user, 'capabilities' => InboxCreate::CAPABILITIES, 'templates' => array_keys(self::TEMPLATES));
+			$object = null;
+			$action = '';
+			if ($hookmanager->executeHooks('inboxWidgets', $parameters, $object, $action) >= 0 && is_array($hookmanager->resArray['widgets'] ?? null)) {
+				self::$modules[$key] = self::normalize($user, $hookmanager->resArray['widgets']);
+			}
+		}
+
+		return self::$modules[$key];
+	}
+
+	/**
+	 * Widgets declared by modules, checked: source and id, a template of inbox (not the thread), a title, an address
+	 * of this site for the data, the rights asked; « replaces » a block of a module (panel:<id>), « auto »: shown by
+	 * itself at the end of the grid as long as the user did not place nor take it away
+	 *
+	 * @param User                    $user     User
+	 * @param array<int|string,mixed> $declared Declared
+	 * @return array<string,array<string,mixed>>
+	 */
+	public static function normalize(User $user, array $declared)
+	{
+		$out = array();
+		foreach ($declared as $w) {
+			$source = is_array($w) ? (string) ($w['source'] ?? '') : '';
+			$id = is_array($w) ? (string) ($w['id'] ?? '') : '';
+			$tpl = is_array($w) ? (string) ($w['template'] ?? '') : '';
+			$url = is_array($w) ? (string) ($w['url'] ?? '') : '';
+			if (!preg_match('/^[a-z0-9_]{1,40}$/', $source) || !preg_match('/^[a-z0-9_-]{1,40}$/', $id) || !isset(self::TEMPLATES[$tpl]) || $tpl === 'thread'
+				|| empty($w['title']) || !InboxCreate::localUrl($url) || !InboxCreate::allowed($user, $w['rights'] ?? array())) {
+				continue;
+			}
+			$key = 'mod:'.$source.':'.$id;
+			if (isset($out[$key])) {
+				continue;
+			}
+			$replaces = (string) ($w['replaces'] ?? '');
+			$out[$key] = array('id' => $key, 'template' => $tpl, 'title' => dol_trunc((string) $w['title'], 60, 'right', 'UTF-8', 1),
+				'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($w['icon'] ?? '')) ? (string) $w['icon'] : 'magic',
+				'url' => $url, 'preview' => is_array($w['preview'] ?? null) ? $w['preview'] : array(), 'auto' => !empty($w['auto']),
+				'replaces' => preg_match(self::PANEL_ID, $replaces) ? $replaces : '', 'source' => $source);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * A layout where blocks of modules became widgets of theirs (« replaces »): the block's place, size and removal
+	 * carried to the widget, unless the widget is already there
+	 *
+	 * @param array<string,mixed>  $layout Layout
+	 * @param array<string,string> $map    Block (panel:<id>) => widget (mod:source:id)
+	 * @return array<string,mixed>
+	 */
+	public static function replaceIds(array $layout, array $map)
+	{
+		if (!$map) {
+			return $layout;
+		}
+		$ids = array_column(is_array($layout['items'] ?? null) ? $layout['items'] : array(), 'id');
+		foreach (is_array($layout['items'] ?? null) ? $layout['items'] : array() as $k => $it) {
+			$to = is_array($it) ? ($map[(string) ($it['id'] ?? '')] ?? '') : '';
+			if ($to !== '') {
+				if (in_array($to, $ids, true)) {
+					unset($layout['items'][$k]);
+				} else {
+					$layout['items'][$k]['id'] = $to;
+					$ids[] = $to;
+				}
+			}
+		}
+		$layout['items'] = array_values($layout['items'] ?? array());
+		if (is_array($layout['off'] ?? null)) {
+			$layout['off'] = array_values(array_unique(array_map(function ($id) use ($map) {
+				return $map[(string) $id] ?? (string) $id;
+			}, $layout['off'])));
+		}
+
+		return $layout;
 	}
 
 	/**
@@ -189,6 +312,11 @@ class InboxWidgets
 			}
 			$out[] = array('id' => $id, 'template' => $w['template'], 'title' => $langs->transnoentities($w['title']), 'size' => self::size($id),
 				'preview' => $this->preview($id), 'local' => !empty($w['local']));
+		}
+		// Widgets of the modules (1.162.0): their data read by the panel at their address, never computed here
+		foreach ($this->modules($user) as $m) {
+			$out[] = array('id' => $m['id'], 'template' => $m['template'], 'title' => $m['title'], 'icon' => $m['icon'], 'size' => self::TEMPLATES[$m['template']],
+				'preview' => $m['preview'], 'local' => false, 'module' => true, 'url' => $m['url'], 'auto' => $m['auto'], 'replaces' => $m['replaces']);
 		}
 
 		return $out;
@@ -487,7 +615,7 @@ class InboxWidgets
 				return null;
 			}
 			$seen[$id] = 1;
-			$size = self::size($id);
+			$size = $this->sizeOf($id);
 			$w = max(1, min((int) $size['max_w'], (int) ($it['w'] ?? $size['w'])));
 			$h = max((int) $size['min_h'], min((int) $size['max_h'], (int) ($it['h'] ?? $size['h'])));
 			$x = max(0, min(self::COLUMNS - $w, (int) ($it['x'] ?? 0)));
@@ -500,7 +628,7 @@ class InboxWidgets
 		$off = array();
 		foreach (is_array($layout['off'] ?? null) ? array_slice($layout['off'], 0, self::LAYOUT_MAX) : array() as $id) {
 			$id = (string) $id;
-			if (($id === 'mail_actions' || preg_match(self::PANEL_ID, $id)) && !isset($seen[$id]) && !in_array($id, $off, true)) {
+			if (($id === 'mail_actions' || preg_match(self::PANEL_ID, $id) || preg_match(self::MOD_ID, $id)) && !isset($seen[$id]) && !in_array($id, $off, true)) {
 				$off[] = $id;
 			}
 		}
@@ -551,7 +679,21 @@ class InboxWidgets
 			." AND param = '".$this->db->escape($param)."'");
 		$v = is_object($row) ? json_decode((string) $row->value, true) : null;
 
-		return is_array($v) && is_array($v['items'] ?? null) ? self::upgrade($v) : null;
+		if (!is_array($v) || !is_array($v['items'] ?? null)) {
+			return null;
+		}
+		// Blocks of modules now widgets of theirs (« replaces »): their places carried over
+		global $user;
+		$map = array();
+		if ($user instanceof User) {
+			foreach ($this->modules($user) as $m) {
+				if ($m['replaces'] !== '') {
+					$map[$m['replaces']] = $m['id'];
+				}
+			}
+		}
+
+		return self::replaceIds(self::upgrade($v), $map);
 	}
 
 	/**

@@ -51,7 +51,7 @@ class InboxCreate
 	 * Capabilities announced to the hooks of a mail ($parameters['capabilities'], 1.160.0), a word only once it is
 	 * delivered: agenda_create = « Create > Event » opens the page of creation of the agenda provider
 	 */
-	const CAPABILITIES = array('agenda_create', 'create_buttons');
+	const CAPABILITIES = array('agenda_create', 'create_buttons', 'widgets');
 
 	/** Groups of the dialog « Create from this mail » (1.161.0), in their order; a module never makes one */
 	const GROUPS = array('contacts', 'sales', 'purchases', 'followup', 'other');
@@ -238,7 +238,7 @@ class InboxCreate
 	 * @param mixed $rights Rights
 	 * @return bool
 	 */
-	protected static function allowed(User $user, $rights)
+	public static function allowed(User $user, $rights)
 	{
 		foreach (is_array($rights) ? $rights : array() as $r) {
 			if (!is_array($r) || count($r) < 2 || count($r) > 3) {

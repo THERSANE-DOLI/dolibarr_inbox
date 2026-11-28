@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: widgets of the modules in the Dolibarr panel, drawn with the templates of inbox :   1.162.0
+  - hook inboxWidgets: template, data read at the address of the module for each mail, preview, shown by itself or not.
+  - « replaces »: a block of a module that became a widget keeps its place in the layouts; capability « widgets ».
+
 - NEW: buttons of « Create from this mail » open to the modules, in titled groups, mailbox by mailbox :   1.161.0
   - hook inboxCreateButtons: a module adds buttons (several for a type of piece) and removes any, for each mailbox;
     the piece created is linked to the mail as with the buttons of the core.

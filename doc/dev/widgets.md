@@ -1,8 +1,7 @@
 # Widgets of the Dolibarr panel
 
 Since 1.154.0 inbox has a registry of widgets (`class/inboxwidgets.class.php`): small pieces of information about the
-other side of a mail that each user will lay out in the Dolibarr panel of a mail, per mailbox (the layout, the grid
-and the edit mode come with the next lot). Each widget is drawn by `js/inbox-widgets.js` from its data, the same way
+other side of a mail that each user lays out in the Dolibarr panel of a mail, per mailbox. Each widget is drawn by `js/inbox-widgets.js` from its data, the same way
 for a widget placed in the panel and for its preview in the catalogue. The UI catalogue (`ux.php`, section Widgets)
 shows every template at its default size.
 
@@ -88,3 +87,36 @@ The panel (`js/inbox-panel-widgets.js`) draws the grid as a CSS grid outside the
 
 In JavaScript, `Dolibarr.tools.inbox.widgets`: `catalogue()` (cached for the page), `data(mail, ids)` and
 `render(template, data)`, which returns the HTML of one widget.
+
+## Widgets of a module (1.162.0)
+
+Hook `inboxWidgets`, context `inbox`: your module declares widgets drawn with the templates of inbox. `$parameters`:
+`user`, `capabilities`, `templates`. Answer `$this->results['widgets']`, a list of:
+
+- `source` (your technical name, `[a-z0-9_]`) and `id` (`[a-z0-9_-]`): the widget is `mod:source:id` in the layouts;
+- `template`: `mini`, `line`, `figure`, `list`, `chart`, `action` or `free` (its size and bounds, table above);
+- `title`, `icon` (usage name), `rights` (rights of Dolibarr needed, each `array(module, permission[, sub])`);
+- `url`: an address of this site the panel reads for each mail, markers `{socid}`, `{contactids}`, `{projectid}`,
+  `{elements}`, `{ctx}` (a token of the mail, see [agenda.md](agenda.md)). It answers JSON in the format of the
+  template (formats above); `free` takes the format of a block of the panel (`badges`, `lines`, `action`, `links`, see
+  [extend-application.md](extend-application.md)). `{"hidden": true}`: nothing for this mail, the widget is left out;
+- `preview`: sample data in the same format, shown in the catalogue (never computed);
+- `auto`: true to show by itself at the end of the grid, as the blocks of the modules, until the user places it or takes
+  it away;
+- `replaces`: `panel:<id>` of a block your module declared with `inboxMailPanels`. The layouts that hold the block are
+  read with your widget in its place (its size, or its removal), and the block is no longer offered.
+
+Inbox announces the capability `widgets` to the hooks of a mail: declare your block with `inboxMailPanels` only when
+the word is missing (an older inbox), your widget otherwise.
+
+```php
+public function inboxWidgets($parameters, &$object, &$action, $hookmanager)
+{
+	$this->results['widgets'][] = array('source' => 'mymodule', 'id' => 'meetings', 'template' => 'list', 'title' => 'Meetings',
+		'icon' => 'agenda', 'auto' => true, 'replaces' => 'panel:mymodule_meetings', 'rights' => array(array('mymodule', 'read')),
+		'url' => dol_buildpath('/mymodule/ajax/widget.php', 1).'?socid={socid}',
+		'preview' => array('title' => 'Meetings', 'rows' => array(array('label' => 'Visit', 'value' => '02/12'))));
+	return 0;
+}
+```
+
