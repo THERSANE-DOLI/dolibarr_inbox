@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: a warning on the icon of the agenda when events are late to do :   1.152.0
+  - on the icon of the strip and of the rail, in red as « Late » in the panel; its name says how many.
+  - counted with the state of the mail space every 5 minutes while the panel is closed; hook inboxAgendaEvents mode
+    count for the events of a module.
+
 - FIX: the notes of the Dolibarr side panel could open on the oldest one instead of the last one :   1.151.5
   - the thread stays on its last note when its height changes after it is drawn (blocks of modules read later,
     window), unless the user scrolled up to read older notes.

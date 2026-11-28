@@ -155,6 +155,32 @@ class InboxAgendaPanelTest extends InboxTestCase
 	}
 
 	/**
+	 * The count of the late events (warning on the icon) is the one of the panel: the late ones to do only, not the
+	 * done ones nor the ones without progress, nor the ones of others
+	 *
+	 * @return void
+	 */
+	public function testLateCount()
+	{
+		$me = (int) $this->admin->id;
+		$other = (int) $this->db->getRow("SELECT rowid FROM ".$this->db->prefix()."user WHERE rowid <> ".$me." AND statut = 1 ORDER BY rowid")->rowid;
+		$panel = new InboxAgendaPanel($this->db);
+		$before = $panel->lateCount($this->admin, $this->today);
+		$this->assertIsInt($before);
+		$this->assertSame($panel->events($this->admin, $this->today, 7)['lateTotal'], $before);
+
+		$todo = $this->event('late todo', 'AC_TEL', $this->today - 2 * 86400, 0, $me);
+		$this->event('late done', 'AC_TEL', $this->today - 2 * 86400, 100, $me);
+		$this->event('late no progress', 'AC_RDV', $this->today - 2 * 86400, -1, $me);
+		$this->event('late of another', 'AC_TEL', $this->today - 2 * 86400, 0, $other);
+		$this->event('today todo', 'AC_TEL', $this->today + 3600, 0, $me);
+		$this->assertSame($before + 1, $panel->lateCount($this->admin, $this->today));
+
+		$this->db->query("UPDATE ".$this->db->prefix()."actioncomm SET percent = 100 WHERE id = ".$todo);
+		$this->assertSame($before, $panel->lateCount($this->admin, $this->today));
+	}
+
+	/**
 	 * The mail of an event is found by its Message-ID, brackets or not; nothing when no mailbox of the user has it
 	 *
 	 * @return void

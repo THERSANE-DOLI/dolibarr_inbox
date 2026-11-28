@@ -90,6 +90,11 @@ without progress), `location`, `color` (`#rrggbb`), `thirdparty` (`id`, `name`),
 `answer` (1 accepted, 2 maybe). Anything else is dropped; inbox never ticks an event of a module (its clicks go to
 your JS hooks).
 
+Mode `count` (1.152.0, `user`, `from`, and `late`, the number of native late events): the icon of the agenda shows a
+warning when events are late to do, asked every few minutes while the panel is closed. Give the number of your late
+events in `$this->results['late_count']` (added to the native ones), or return 1 to replace the native number. Keep
+it cheap: a `COUNT`, never the events themselves.
+
 **JS hooks** (your script loaded by `module_parts['inboxjs']`). Each one gets a context object; change it with
 `Dolibarr.on(name, ctx => {...})`, or with `Dolibarr.onAwait(name, async ctx => {...; return ctx;})` when you need to
 wait. A listener that throws is written in the console and inbox goes on as without it.

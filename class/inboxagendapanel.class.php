@@ -176,6 +176,55 @@ class InboxAgendaPanel
 	}
 
 	/**
+	 * Events of the user still to do that ended before $from (the late ones)
+	 *
+	 * @param User $user User
+	 * @param int  $from Start of today for the user (timestamp)
+	 * @return string    SQL from FROM
+	 */
+	private function lateWhere(User $user, $from)
+	{
+		return $this->baseSql($user)." AND a.percent >= 0 AND a.percent < 100 AND COALESCE(a.datep2, a.datep) < '".$this->db->idate((int) $from)."'";
+	}
+
+	/**
+	 * How many events of the user are late (1.152.0): the warning on the icon of the agenda, asked with the state of the
+	 * mail space while the panel is closed. The native ones, then the hook inboxAgendaEvents in mode count: a module
+	 * gives its own number in late_count (added), or replaces the native one when it returns 1.
+	 *
+	 * @param User $user User
+	 * @param int  $from Start of today for the user (timestamp)
+	 * @return int|null  Null when the user has no agenda panel
+	 */
+	public function lateCount(User $user, $from)
+	{
+		if (!$this->config($user)['enabled']) {
+			return null;
+		}
+		$count = 0;
+		if (self::nativeReadable($user)) {
+			$row = $this->db->getRow("SELECT COUNT(a.id) as nb".$this->lateWhere($user, $from));
+			$count = is_object($row) ? (int) $row->nb : 0;
+		}
+		global $hookmanager;
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($this->db);
+		}
+		$hookmanager->initHooks(array('inbox'));
+		$parameters = array('mode' => 'count', 'user' => $user, 'from' => (int) $from, 'late' => $count);
+		$object = null;
+		$action = '';
+		$res = $hookmanager->executeHooks('inboxAgendaEvents', $parameters, $object, $action);
+		if ($res >= 0 && isset($hookmanager->resArray['late_count'])) {
+			$added = max(0, (int) $hookmanager->resArray['late_count']);
+			$count = $res > 0 ? $added : $count + $added;
+		}
+
+		return $count;
+	}
+
+	/**
 	 * Events of the user: the late ones to do (before $from) and the ones of [$from, $from + days)
 	 *
 	 * @param User $user User
@@ -203,7 +252,7 @@ class InboxAgendaPanel
 			foreach (is_array($coming) ? $coming : array() as $o) {
 				$events[] = $this->row($o, $user, $canDone);
 			}
-			$lateWhere = $base." AND a.percent >= 0 AND a.percent < 100 AND COALESCE(a.datep2, a.datep) < '".$this->db->idate($from)."'";
+			$lateWhere = $this->lateWhere($user, $from);
 			$count = $this->db->getRow("SELECT COUNT(a.id) as nb".$lateWhere);
 			$lateTotal = is_object($count) ? (int) $count->nb : 0;
 			if ($lateTotal) {

@@ -609,6 +609,16 @@ switch ($action) {
 		dol_include_once('/inbox/class/inboxnotification.class.php');
 		$notify = new InboxNotification($db);
 		$out['notif'] = $notify->counts($user) + $notify->mailCount($user);
+		// The late events of the agenda (1.152.0), for the warning on its icon: asked by the page every few minutes only,
+		// with the start of its day (a value far from now is ignored, time zones)
+		$agendaToday = (int) inboxAjaxParam('agenda_today', 'int');
+		if ($agendaToday > 0 && abs($agendaToday - dol_now()) <= 2 * 86400) {
+			dol_include_once('/inbox/class/inboxagendapanel.class.php');
+			$late = (new InboxAgendaPanel($db))->lateCount($user, $agendaToday);
+			if ($late !== null) {
+				$out['agenda_late'] = $late;
+			}
+		}
 		// Presence in the shared mailboxes: the mail open here is kept (60 s), the other users reading it are given back
 		dol_include_once('/inbox/class/inboxuserparam.class.php');
 		$mailId = (int) inboxAjaxParam('mail', 'int');

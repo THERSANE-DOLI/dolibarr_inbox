@@ -3601,6 +3601,7 @@ InboxAgendaPanel = Aujourd'hui
 InboxAgendaNewEvent = Nouvel événement
 InboxAgendaClose = Fermer l'agenda
 InboxAgendaLate = En retard (%s)
+InboxAgendaLateIcon = %s en retard
 InboxAgendaShowMore = Voir les %s autres
 InboxAgendaShowLess = Voir moins
 InboxAgendaLateMore = %s plus anciens dans l'agenda

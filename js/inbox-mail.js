@@ -6141,7 +6141,8 @@
 	function stripHtml() {
 		return '<nav class="ibx-sidestrip ibx-js-sidestrip" aria-label="' + th('InboxSideStrip') + '">'
 			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sidedol" aria-pressed="false">' + ic('dolibarr') + '</button>'
-			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sideagenda" aria-pressed="false" hidden>' + ic('today') + '<span class="ibx-sidestrip__day ibx-js-sideday" aria-hidden="true"></span></button>'
+			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sideagenda" aria-pressed="false" hidden>' + ic('today') + '<span class="ibx-sidestrip__day ibx-js-sideday" aria-hidden="true"></span>'
+			+ '<span class="ibx-latemark" aria-hidden="true" hidden>' + ic('warning') + '</span></button>'
 			+ '</nav>';
 	}
 	function paintStrip() {
@@ -6162,8 +6163,12 @@
 		}
 		const ag = $('.ibx-js-sideagenda', strip);
 		ag.hidden = !agendaOn();
-		ag.title = t('InboxAgendaPanel') + ' (Maj+F9)';
-		ag.setAttribute('aria-label', t('InboxAgendaPanel'));
+		// Events late to do (1.152.0): a warning on the icon, said in its name too (never the colour alone)
+		const late = I.agenda && I.agenda.late ? I.agenda.late() : 0;
+		const agLabel = t('InboxAgendaPanel') + (late > 0 ? ', ' + t('InboxAgendaLateIcon', late) : '');
+		ag.title = agLabel + ' (Maj+F9)';
+		ag.setAttribute('aria-label', agLabel);
+		$('.ibx-latemark', ag).hidden = !(late > 0);
 		ag.setAttribute('aria-pressed', cur === 'agenda' ? 'true' : 'false');
 		$('.ibx-js-sideday', strip).textContent = String(new Date().getDate());
 	}
@@ -6204,7 +6209,7 @@
 		}
 		applySide('init');
 	}
-	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide };
+	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide, paint: paintStrip };
 
 	// ---------- Phone (1.102.0): the Dolibarr part as chips under the head, details in a bottom sheet ----------
 	/** Slot of the chips in the head of a mail or of a conversation (filled by the panel once loaded) */
@@ -12207,10 +12212,14 @@
 			if (S.folderId && !I.isLeader()) {
 				requestSync(S.folderId, false);
 			}
-			const st = await post('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0, writing: I.composeWriting ? I.composeWriting() : 0 });
+			const st = await post('list', 'state', { folder: S.folderId || 0, mail: S.mail ? S.mail.id : 0, writing: I.composeWriting ? I.composeWriting() : 0,
+				agenda_today: I.agenda && I.agenda.lateAsk ? I.agenda.lateAsk() : 0 });
 			showPresence(st.presence);
 			if (st.notif) {
 				Dolibarr.executeHook('inbox:notif:state', st.notif);
+			}
+			if (st.agenda_late !== undefined && I.agenda && I.agenda.setLate) {
+				I.agenda.setLate(st.agenda_late);
 			}
 			let treeChanged = false;
 			const busy = pendingFolders();

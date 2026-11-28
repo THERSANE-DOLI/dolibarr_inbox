@@ -40,7 +40,10 @@
 	const A = {
 		el: null, app: null, visible: false, mailId: 0, data: null, seq: 0, timer: 0, loading: false,
 		pastOpen: false, lateOpen: false, error: '',
+		// Events late to do (1.152.0): -1 unknown; asked with the state of the mail space every LATE_ASK_MS at most
+		late: -1, lateAskedAt: 0,
 	};
+	const LATE_ASK_MS = 5 * 60 * 1000;
 	// Choice of the user: '' (automatic), 'pinned', 'closed'
 	let mode = ['pinned', 'closed'].includes(params.agenda_mode) ? params.agenda_mode : '';
 	// Opened by hand beside a mail (not pinned): closed again when the mail changes
@@ -252,6 +255,7 @@
 		body.removeAttribute('aria-busy');
 		if (res) {
 			A.data = Object.assign(res, { at: Date.now() / 1000, from });
+			setLate(Math.max((A.data.late || []).length, +A.data.lateTotal || 0));
 		}
 		render();
 	}
@@ -540,7 +544,7 @@
 		b.title = t('InboxAgendaPanel') + ' (Maj+F9)';
 		b.setAttribute('aria-label', t('InboxAgendaPanel'));
 		b.setAttribute('aria-expanded', 'false');
-		b.innerHTML = ic('today');
+		b.innerHTML = ic('today') + '<span class="ibx-latemark" aria-hidden="true" hidden>' + ic('warning') + '</span>';
 		const theme = $('.ibx-js-themeswitch', rail);
 		rail.insertBefore(b, theme || null);
 		b.addEventListener('click', () => {
@@ -562,7 +566,43 @@
 		const b = railButton();
 		if (b) {
 			b.setAttribute('aria-expanded', A.visible && I.route().space === 'mail' ? 'true' : 'false');
+			const label = t('InboxAgendaPanel') + (A.late > 0 ? ', ' + t('InboxAgendaLateIcon', A.late) : '');
+			b.title = label + ' (Maj+F9)';
+			b.setAttribute('aria-label', label);
+			const mark = $('.ibx-latemark', b);
+			if (mark) {
+				mark.hidden = !(A.late > 0);
+			}
 		}
+	}
+	/**
+	 * Number of late events known (the panel read them, or the state of the mail space brought it): the warning on the
+	 * icons of the agenda, in the strip of the mail space and in the rail
+	 * @param {number} n Count
+	 */
+	function setLate(n) {
+		n = Math.max(0, +n || 0);
+		A.lateAskedAt = Date.now();
+		if (n === A.late) {
+			return;
+		}
+		A.late = n;
+		paintRail();
+		if (I.side && I.side.paint) {
+			I.side.paint();
+		}
+	}
+	/**
+	 * Start of today to send with the state of the mail space when the count of the late events is due (0 otherwise):
+	 * not while the panel is shown (it reads them itself), and every LATE_ASK_MS at most
+	 * @returns {number}
+	 */
+	function lateAsk() {
+		if (!enabled() || (A.visible && A.data) || Date.now() - A.lateAskedAt < LATE_ASK_MS) {
+			return 0;
+		}
+		A.lateAskedAt = Date.now();
+		return todayStart();
 	}
 
 	// ---------- API ----------
@@ -657,6 +697,10 @@
 		open: () => open('api'),
 		close: () => close('api'),
 		isVisible: () => A.visible,
+		/** Late events to do (1.152.0): their number (0 when unknown), set by the state of the mail space */
+		late: () => Math.max(0, A.late),
+		setLate,
+		lateAsk,
 		/** Called by the strip of the mail space (1.109.0): shown or not, docked or over, as it says */
 		sync(reason) {
 			if (enabled() && mount()) {
