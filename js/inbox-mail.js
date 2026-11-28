@@ -7899,9 +7899,20 @@
 			createPiece(box, b.dataset.type, attach, dlg);
 		});
 	}
-	/** The page of creation of a type, in a new tab; the piece saved there is linked to the mail */
+	/** An agenda module declares its page of creation of an event (hook inboxAgendaProvider) */
+	function agendaCreatePage() {
+		const conf = I.ctxJson('INBOX_AGENDA_JSON', {}) || {};
+		return !!(conf.provider && conf.provider.urls && conf.provider.urls.create);
+	}
+	/**
+	 * The page of creation of a type, in a new tab; an event goes to the page of the agenda module when there is one,
+	 * in a window of inbox (1.160.0). The piece saved there is linked to the mail
+	 */
 	async function createPiece(box, type, attach, dlg) {
 		const d = box._data;
+		if (type === 'action' && agendaCreatePage()) {
+			return createInWindow(box, type, attach, dlg);
+		}
 		// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
 		const tab = window.open('about:blank', '_blank');
 		let res;
@@ -7927,6 +7938,34 @@
 		toast(t('InboxCreateOpened'));
 		// Back in inbox: the piece created is shown linked
 		window.addEventListener('focus', () => loadDolibar(box), { once: true });
+	}
+	/** The page of the agenda module in a window of inbox: its markers filled from the mail, the token of the intent kept */
+	async function createInWindow(box, type, attach, dlg) {
+		const d = box._data;
+		let res;
+		try {
+			res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type, attach: attach ? 1 : 0,
+				soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+		} catch (err) {
+			toast(err.message, { error: true });
+			return;
+		}
+		const mail = I.mailContext ? I.mailContext() : null;
+		const url = String(res.url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx ? await I.moduleUrlCtx(res.url, mail, {}) : I.moduleUrl(res.url, mail, {});
+		if (!insideUrl(url)) {
+			return;
+		}
+		if (dlg) {
+			dlg.close();
+		}
+		if (res.window) {
+			// Back from the window (saved or closed): the event created is shown linked
+			openModuleWindow({ mailId: +box.dataset.mail, box, url, title: t('InboxCreateEvent'), panel: 'create:' + type, onClose: () => box.isConnected && loadDolibar(box) });
+		} else {
+			// No agenda module any more (its page gone since the page was loaded): the page of Dolibarr, in a tab
+			window.open(url, '_blank', 'noopener');
+			window.addEventListener('focus', () => loadDolibar(box), { once: true });
+		}
 	}
 	/** Toast of a link given to the other mails of the conversation too */
 	function threadLinkedToast(res) {

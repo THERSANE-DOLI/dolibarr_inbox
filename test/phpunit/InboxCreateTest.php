@@ -29,6 +29,8 @@ if (PHP_SAPI !== 'cli') {
 
 require_once dirname(__DIR__, 2).'/class/inboxcreate.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+require_once dirname(__DIR__, 2).'/class/inboxreader.class.php';
+require_once dirname(__DIR__, 2).'/class/inboxagendapanel.class.php';
 
 /**
  * Database and documents folder of the test instance, no mail server
@@ -146,5 +148,50 @@ class InboxCreateTest extends InboxTestCase
 		if ($name !== '') {
 			$this->assertFileExists($dir.'/'.$name);
 		}
+	}
+
+	/**
+	 * An event from a mail goes to the page of creation of the agenda module when it declares one (1.160.0): its
+	 * address from the hook only, the token of the intent kept, the page of Dolibarr otherwise
+	 *
+	 * @return void
+	 */
+	public function testEventByAgendaProvider()
+	{
+		$p = $this->db->prefix();
+		$devis = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		(new InboxAccess($this->db))->grant($this->admin, $devis->id, $this->admin->id, 0, 'manage');
+		InboxAccess::clearCache();
+		$this->db->query("INSERT INTO ".$p."inbox_folder (fk_account, path, name, delimiter, role, status) VALUES (".((int) $devis->id).", 'INBOX', 'INBOX', '.', 'inbox', 1)");
+		$folder = (int) $this->db->last_insert_id($p.'inbox_folder');
+		$this->db->query("INSERT INTO ".$p."inbox_mail (fk_account, fk_folder, remote_id, sort_key, message_id, date_mail, from_email, from_name, subject, size, date_index) VALUES ("
+			.((int) $devis->id).", ".$folder.", '1', 1, 'ev1@inbox-test.invalid', '2026-11-02 10:00:00', 'jane@client.inbox-test.invalid', 'Jane Martin', 'Visite', 10,"
+			." '".$this->db->idate(dol_now())."')");
+		$reader = new InboxReader($this->db);
+		$reader->row = $this->db->getRow("SELECT * FROM ".$p."inbox_mail WHERE message_id = 'ev1@inbox-test.invalid'");
+		$cache = new ReflectionProperty('InboxAgendaPanel', 'provider');
+		$cache->setAccessible(true);
+		$creator = new InboxCreate($this->db);
+		try {
+			$cache->setValue(null, array('label' => 'Calendar', 'source' => 'test', 'urls' => array('create' => '/custom/agendatest/event.php?action=create&socid={socid}#x')));
+			$url = $creator->intent($this->admin, $reader, 'action', false, array('soc' => 0, 'contact' => 0));
+			$this->assertStringStartsWith('/custom/agendatest/event.php?action=create&socid={socid}&inboxintent=', $url, 'the page of the module, its markers left to the browser');
+			$this->assertStringEndsWith('#x', $url, 'the token before the fragment');
+			$this->assertSame(array('label' => 'Calendar'), $creator->provider);
+			$intent = end($_SESSION['inbox_create_intents']);
+			$this->assertSame('action', $intent['type']);
+			$this->assertSame('/custom/agendatest/event.php', $intent['path']);
+			$this->assertNotNull(InboxCreate::intentOf($_SESSION['inbox_create_intents'], 'action', 'https://erp.inbox-test.invalid'.$url), 'its own token found back');
+
+			// Another type, or no page of creation declared: the page of Dolibarr
+			$this->assertStringContainsString('/societe/card.php', $creator->intent($this->admin, $reader, 'societe', false, array('soc' => 0, 'contact' => 0)));
+			$this->assertNull($creator->provider);
+			$cache->setValue(null, array());
+			$this->assertStringContainsString('/comm/action/card.php?action=create', $creator->intent($this->admin, $reader, 'action', false, array('soc' => 0, 'contact' => 0)));
+			$this->assertNull($creator->provider);
+		} finally {
+			$cache->setValue(null, null);
+		}
+		$this->assertContains('agenda_create', InboxCreate::CAPABILITIES, 'announced to the hooks of a mail');
 	}
 }

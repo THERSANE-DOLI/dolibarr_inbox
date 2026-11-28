@@ -295,7 +295,9 @@ switch ($action) {
 		$hookParams = array('mail' => (int) $row->rowid, 'account' => (int) $row->fk_account, 'message_id' => (string) $row->message_id, 'from' => $requester ? $email : strtolower((string) $row->from_email),
 			'subject' => (string) $row->subject, 'mailref' => (int) ($byRow[(int) $row->rowid] ?? 0),
 			// Recognized on the mail (1.108.0): the thirdparty and the contact of the sender the user may read, else 0
-			'socid' => !empty($sender['soc']['readable']) ? (int) $socId : 0, 'contactid' => !empty($sender['contact']['readable']) ? (int) $contactId : 0);
+			'socid' => !empty($sender['soc']['readable']) ? (int) $socId : 0, 'contactid' => !empty($sender['contact']['readable']) ? (int) $contactId : 0,
+			// What this inbox knows how to do (1.160.0): a module drops what became a duplicate, never by the version of inbox
+			'capabilities' => InboxCreate::CAPABILITIES);
 		$extraLinks = array();
 		$alerts = array();
 		$hookObject = null;
@@ -373,7 +375,8 @@ switch ($action) {
 		if ($url === '') {
 			inboxDolibarrFail($creator->error);
 		}
-		inboxAjaxReply(array('url' => $url));
+		// The page of the agenda module: in a window of inbox, its markers filled by the browser
+		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null));
 		// no break
 
 	case 'attach':

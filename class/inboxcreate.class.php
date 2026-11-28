@@ -47,6 +47,12 @@ class InboxCreate
 	const INTENT_PARAM = 'inboxintent';
 
 	/**
+	 * Capabilities announced to the hooks of a mail ($parameters['capabilities'], 1.160.0), a word only once it is
+	 * delivered: agenda_create = « Create > Event » opens the page of creation of the agenda provider
+	 */
+	const CAPABILITIES = array('agenda_create');
+
+	/**
 	 * Pieces that can be created from a mail: page of creation, trigger of the creation, label of the menu
 	 */
 	const TYPES = array(
@@ -72,6 +78,14 @@ class InboxCreate
 
 	/** @var string */
 	public $error = '';
+
+	/**
+	 * Page of a module the last intent opens (1.160.0): an event goes to the page of creation of the agenda provider
+	 * (hook inboxAgendaProvider) when it declares one, in a window of inbox; null for a page of Dolibarr
+	 *
+	 * @var array{label:string}|null
+	 */
+	public $provider = null;
 
 	/**
 	 * @param DoliDB $db Database handler
@@ -136,7 +150,21 @@ class InboxCreate
 		$intents = $this->intents($user);
 		$contact = (int) ($known['contact'] ?? 0);
 		$contactAfter = isset(self::CONTACT_AFTER[$type]) && $this->isContactOf($contact, (int) ($known['soc'] ?? 0)) ? $contact : 0;
-		$url = $this->createUrl($type, $row, $known);
+		// An event: the page of creation of the agenda module of the user when there is one (its markers filled by the
+		// browser, the address taken from the hook, never from the request); the piece saved there is linked the same way
+		$this->provider = null;
+		$url = '';
+		if ($type === 'action') {
+			require_once __DIR__.'/inboxagendapanel.class.php';
+			$p = (new InboxAgendaPanel($this->db))->provider($user);
+			if ($p && !empty($p['urls']['create'])) {
+				$url = (string) $p['urls']['create'];
+				$this->provider = array('label' => (string) $p['label']);
+			}
+		}
+		if ($url === '') {
+			$url = $this->createUrl($type, $row, $known);
+		}
 		$token = bin2hex(random_bytes(8));
 		$intents[] = array('type' => $type, 'mailref' => $refId, 'mail' => (int) $row->rowid, 'subject' => (string) $row->subject, 'file' => $file, 'at' => dol_now(),
 			'contactid' => $contactAfter, 'token' => $token, 'path' => (string) parse_url($url, PHP_URL_PATH));

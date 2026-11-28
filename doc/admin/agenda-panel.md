@@ -29,6 +29,14 @@ page reads the mail on the server, nothing of the mail is in its address. The ol
 the addresses in the address are removed. A module not yet moved to `{ctx}` gets them back with the hidden constant
 `INBOX_LEGACY_MAIL_MARKERS` = `1` (Setup > Other setup); remove it once the module is updated.
 
+## « Create > Event » with an agenda module
+
+When an agenda module declares its page of creation of an event, « Create > Event » in the Dolibarr panel of a mail
+opens that page in a window of inbox (1.160.0), filled from the mail (third party, contact, project, pieces), instead
+of the page of Dolibarr. The event saved there is linked to the mail, like the pieces created from it, with the mail
+in its documents when « Put this mail in the documents of the piece » is ticked. « New event » of the agenda panel
+opens the same page but links nothing: it belongs to the agenda of the user, not to the mail open.
+
 ## Events and tickets linked to a mail
 
 In the pieces of the Dolibarr panel, an event linked to a mail shows its subject and its date (1.157.1), and, since

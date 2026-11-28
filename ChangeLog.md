@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: « Create > Event » of a mail opens the page of the agenda module, the event linked to the mail :   1.160.0
+  - in a window of inbox, filled from the mail; the page of Dolibarr when no agenda module declares one.
+  - capabilities announced to the hooks of a mail (agenda_create): a module drops its duplicate action by itself.
+  - the help of « Create » no longer says « in a new tab » only.
+
 - FIX: the bar above the notes always follows the pointer, the room kept for the notes shows dashed :   1.159.1
   - it sets the maximum height of the notes; above the notes now, the room they will take shows dashed (hover,
     focus, drag), the notes still as high as their content.

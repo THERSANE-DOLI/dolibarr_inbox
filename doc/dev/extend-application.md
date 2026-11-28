@@ -57,6 +57,23 @@ public function inboxSituationIndicators($parameters, &$object, &$action, $hookm
 Level `alert`, `attention` or `normal` (only the first two show on the closed card, `short` is that text); the
 address stays inside Dolibarr; values of other modules are never shown for an indicator the user cannot read.
 
+## Capabilities of inbox
+
+The hooks of a mail (`inboxMailLinks`, `inboxMailActions`, `inboxMailAlerts`, `inboxMailPanels`) receive
+`$parameters['capabilities']` (1.160.0): the words of what this inbox knows how to do. A module switches by these words,
+never by the version of inbox (branches and backports make a version number wrong); an older inbox gives none.
+
+| Word | Since | Meaning |
+|---|---|---|
+| `agenda_create` | 1.160.0 | « Create > Event » opens the page of creation of the agenda provider (`inboxAgendaProvider`) and links the event saved there to the mail ([agenda.md](agenda.md)) |
+
+```php
+$caps = $parameters['capabilities'] ?? array();
+if (!in_array('agenda_create', $caps, true)) {
+	$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true, 'url' => $url);
+}
+```
+
 ## Blocks of a module in the panel of a mail
 
 Hook `inboxMailPanels`, context `inbox`: `$parameters` gives `mail` (row of the index), `account`, `message_id`,
