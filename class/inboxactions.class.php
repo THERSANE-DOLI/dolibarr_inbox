@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxactions.class.php
  * \ingroup inbox
- * \brief   Actions on mails (lot W4): flags, tags, move, archive, remove, junk, with their undo
+ * \brief   Actions on mails: flags, tags, move, archive, remove, junk, with their undo
  */
 
 require_once __DIR__.'/inboxaccess.class.php';
@@ -33,8 +33,8 @@ require_once __DIR__.'/inboxlive.class.php';
 
 /**
  * Every write follows the same order (P8): write on the mail server, check, then the index. Never the index first.
- * The rights are checked here, per mailbox: « read » for read / unread and starred, « manage » for the rest (lot W4
- * §10 point 2). Each action gives back the steps of its undo (other actions, checked the same way).
+ * The rights are checked here, per mailbox: « read » for read / unread and starred, « manage » for the rest.
+ * Each action gives back the steps of its undo (other actions, checked the same way).
  */
 class InboxActions
 {

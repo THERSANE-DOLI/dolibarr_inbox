@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxelements.class.php
  * \ingroup inbox
- * \brief   Pieces of Dolibarr a mail can be linked to (lot W5 1.13.0): rights, description, search
+ * \brief   Pieces of Dolibarr a mail can be linked to (1.13.0): rights, description, search
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
@@ -64,7 +64,7 @@ class InboxElements
 			'table' => 'actioncomm', 'key' => 'id', 'search' => array('label'), 'soc' => 'fk_soc', 'entity' => 'agenda', 'icon' => 'agenda', 'label' => 'Event'),
 	);
 
-	/** Rights to change a piece (its documents): any of them (lot W5 1.14.0) */
+	/** Rights to change a piece (its documents): any of them (1.14.0) */
 	const WRITE = array(
 		'societe' => array(array('societe', 'creer')),
 		'contact' => array(array('societe', 'contact', 'creer')),

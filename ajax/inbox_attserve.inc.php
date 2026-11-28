@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/inbox_attserve.inc.php
  * \ingroup inbox
- * \brief   One file shown or given, the same way for an attachment of a mail and a file of a writing (lot A5, 1.82.0):
+ * \brief   One file shown or given, the same way for an attachment of a mail and a file of a writing (1.82.0):
  *          verdict of the antivirus, beginning of a text, files of a .zip, preview of a PDF or a picture, download
  */
 

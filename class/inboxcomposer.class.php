@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxcomposer.class.php
  * \ingroup inbox
- * \brief   Writing of a mail (lot W6 1.16.0): new, reply, forward, drafts on the server, sending, copy in Sent
+ * \brief   Writing of a mail (1.16.0): new, reply, forward, drafts on the server, sending, copy in Sent
  */
 
 // dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
@@ -346,7 +346,7 @@ class InboxComposer
 		if (!$identities) {
 			return $this->fail('no_send');
 		}
-		// opened: an answer sent to the same mail after this moment is said before the sending (lot E2, 1.77.0)
+		// opened: an answer sent to the same mail after this moment is said before the sending (1.77.0)
 		$state = array('user' => (int) $user->id, 'mode' => $mode, 'source' => null, 'draft' => null, 'attachments' => array(), 'quote' => 0, 'opened' => dol_now());
 		$out = array('to' => array(), 'cc' => array(), 'bcc' => array(), 'subject' => '', 'html' => '', 'quote' => '', 'receipt' => 0);
 		$sourceAccount = (int) $accountId;
@@ -556,7 +556,7 @@ class InboxComposer
 				$identityId = $identities[0]['id'];
 			}
 		}
-		// Pieces linked to the mail answered: the sending may be recorded on them (lot W6 1.17.0); their templates and
+		// Pieces linked to the mail answered: the sending may be recorded on them (1.17.0); their templates and
 		// their documents are offered (1.18.0)
 		$state['linked'] = $this->linkedOf($user, $state['source'] ?? null);
 		$state['pieces'] = $this->piecesOf($user, $state['linked']);
@@ -592,7 +592,7 @@ class InboxComposer
 		}
 		$out['identities'] = $identities;
 		$out['quote'] = !empty($state['quote']) ? (string) self::getFile($dir, 'quote.html') : '';
-		// Remote pictures taken out of the quote (lot F1 1.78.0), said under it
+		// Remote pictures taken out of the quote (1.78.0), said under it
 		$out['quote_removed'] = $state['quote_removed'] ?? array('trackers' => 0, 'images' => 0);
 		$out['attachments'] = self::attachmentsView($state);
 		$out['source'] = null;
@@ -1268,7 +1268,7 @@ class InboxComposer
 			// Pictures of the mail (cid:) are not sent again in an answer: their text stays
 			$body = preg_replace('#<img\b[^>]*src=["\']?cid:[^>]*>#i', '', $body);
 			$body = self::quoteRemote($body, $mode, $removed);
-			// The one door (lot S2): the quote leaves the reading frame for the editor, HTML Purifier first, then the
+			// The one door: the quote leaves the reading frame for the editor, HTML Purifier first, then the
 			// filter of the sending (marks of inbox, borders of the tables)
 			$body = InboxMailBuilder::cleanHtml(InboxSafe::html($body));
 		} else {
@@ -1306,7 +1306,7 @@ class InboxComposer
 	}
 
 	/**
-	 * Remote pictures of a quote (lot F1 1.78.0). The tracking pictures always go: kept, the reader of the answer
+	 * Remote pictures of a quote (1.78.0). The tracking pictures always go: kept, the reader of the answer
 	 * would tell the sender of the first mail that it was answered, and when; the copy in the Sent folder would tell it
 	 * again to whoever shows its pictures. The other pictures follow the setting of the administrator
 	 * INBOX_QUOTE_REMOTE_IMAGES: keep (default), reply (taken out of the answers), all (answers and forwards); a
@@ -1440,7 +1440,7 @@ class InboxComposer
 	}
 
 	/**
-	 * Pieces to insert in a writing (lot A5, 1.83.0): of the thirdparties of the recipients and of the pieces linked to
+	 * Pieces to insert in a writing (1.83.0): of the thirdparties of the recipients and of the pieces linked to
 	 * the mail answered, or of all the thirdparties
 	 *
 	 * @param User     $user   User
@@ -1571,7 +1571,7 @@ class InboxComposer
 	}
 
 	/**
-	 * A file of a writing, to check it before sending (lot A5, 1.82.0): the very file that leaves with the mail
+	 * A file of a writing, to check it before sending (1.82.0): the very file that leaves with the mail
 	 *
 	 * @param User   $user  User
 	 * @param string $token Writing (of this user, in this session)
@@ -1936,7 +1936,7 @@ class InboxComposer
 	 * @param array<string,mixed> $opts  at (date of a scheduled sending), record (pieces « type:id » to record it on), force (send
 	 *                                   even when a colleague answered the same mail meanwhile)
 	 * @return array<string,mixed>|null Sent: message_id, sent_copy, account, outbox; queued: queued (id), send_at, delay;
-	 *                                   not sent: conflict (an answer of a colleague, lot E2)
+	 *                                   not sent: conflict (an answer of a colleague)
 	 */
 	public function send(User $user, $token, array $data, array $opts = array())
 	{
@@ -1966,7 +1966,7 @@ class InboxComposer
 		if ($at && ($at < dol_now() + 60 || $at > dol_now() + 366 * 86400)) {
 			return $this->fail('bad_date');
 		}
-		// An answer already sent to this mail from the mailbox since the writing was opened (lot E2, 1.77.0): said, not
+		// An answer already sent to this mail from the mailbox since the writing was opened (1.77.0): said, not
 		// sent; « Send anyway » asks again with force
 		$src = $state['source'] ?? null;
 		if (empty($opts['force']) && is_array($src) && in_array((string) ($src['mode'] ?? ''), array('reply', 'replyall', 'replylist'), true)) {
@@ -2010,7 +2010,7 @@ class InboxComposer
 				$record[] = array('type' => $allowed[$key]['type'], 'id' => (int) $allowed[$key]['id']);
 			}
 		}
-		// Protected mailbox (1.89.0): never in the queue of the server, kept for the session (lot S3)
+		// Protected mailbox (1.89.0): never in the queue of the server, kept for the session
 		if ($account->isProtected()) {
 			return $this->sendProtected($user, $account, $prepared, $b, $built, $state, $token, $data, $at, (string) ($opts['catchup'] ?? 'ask'));
 		}

@@ -68,7 +68,7 @@ switch ($action) {
 			$out['live'] = 1;
 			inboxAjaxReply($out);
 		}
-		// « Assigned to » of the reading (lot W4 1.9.0)
+		// « Assigned to » of the reading (1.9.0)
 		dol_include_once('/inbox/class/inboxassign.class.php');
 		$assign = new InboxAssign($db);
 		$assignees = $assign->forRows(array($reader->row));

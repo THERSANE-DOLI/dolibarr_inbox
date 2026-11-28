@@ -15,7 +15,7 @@
  */
 
 /**
- * Settings space of the inbox application (lot W1, analyse-lot-w1 §5):
+ * Settings space of the inbox application:
  *   #/settings/accounts                list of the mailboxes
  *   #/settings/accounts/new            new mailbox (tab Server)
  *   #/settings/accounts/<id>/<section> card of a mailbox (1.89.0): 6 tabs (overview, connection, access, writing,
@@ -1082,7 +1082,7 @@
 		});
 	}
 
-	// ----- Tab Journal (lot W4 §4.2): who moved, archived, removed, tagged the mails; managers of the mailbox only -----
+	// ----- Tab Journal: who moved, archived, removed, tagged the mails; managers of the mailbox only -----
 	const JOURNAL_ACTIONS = ['move', 'archive', 'delete', 'destroy', 'junk', 'notjunk', 'tag', 'assign', 'unassign', 'folder_create', 'folder_rename', 'folder_move', 'folder_delete', 'folder_destroy', 'empty', 'thread_ignore', 'thread_unignore', 'unsubscribe', 'import', 'export', 'attach', 'send', 'redirect', 'invite_reply', 'receipt', 'rules', 'away', 'resoc', 'thread_split', 'thread_join', 'rescue', 'consumer_read', 'consumer_seen', 'consumer_link', 'consumer_draft'];
 	async function tabJournal(box, account) {
 		// Author: a user (id), or a module subscribed (1.146.0, « c:code »)
@@ -1257,7 +1257,7 @@
 		const protWhy = !account ? '' : (a.imap_auth_mode !== 'login' ? t('InboxProtectErrorAuthMode') : (a.status !== 1 ? t('InboxProtectNeedActive') : noAccess));
 		const mailboxSection = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionMailbox') + '</h2><div class="ibx-form">'
 			+ field('email', t('InboxAccountEmail'), a.email, { type: 'email', required: true, autocomplete: 'off', placeholder: 'devis@example.com', cls: 'ibx-field--medium', help: account ? '' : t('InboxAutoconfigEmailHelp') })
-			// New mailbox (lot H1): the servers found from the address, where they come from
+			// New mailbox: the servers found from the address, where they come from
 			+ (account ? '' : '<div class="ibx-autoconf ibx-js-autoconf" aria-live="polite"></div>')
 			+ field('label', t('InboxAccountLabel'), a.label, { help: t('InboxAccountLabelHelp'), cls: 'ibx-field--medium' })
 			+ field('type', t('InboxAccountType'), a.type, { options: [['shared', t('InboxTypeShared')], ['personal', t('InboxTypePersonal')]], cls: 'ibx-field--medium' })
@@ -1314,7 +1314,7 @@
 		const imapTitle = '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionImap') + '</h2><div class="ibx-form">';
 		let html = '<form class="ibx-form" novalidate autocomplete="off">' + mailboxSection
 			+ (account ? imapTitle + imapHostRows + authRows + certRow + protRows + '</div></section>' + smtpSection + moreSection
-				// New mailbox (lot H1): one field to start, the login beside it, the servers folded and filled from the address
+				// New mailbox: one field to start, the login beside it, the servers folded and filled from the address
 				: '<section class="ibx-section"><h2 class="ibx-section__title">' + th('InboxSectionLogin') + '</h2><div class="ibx-form">' + authRows + '</div></section>'
 				+ '<details class="ibx-servers ibx-js-servers"><summary><span class="ibx-servers__title">' + th('InboxAutoconfigServers') + '</span> <span class="ibx-servers__sum ibx-js-serverssum">' + th('InboxAutoconfigServersEmpty') + '</span></summary>'
 				+ imapTitle + imapHostRows + certRow + '</div></section>' + smtpSection + moreSection + '</details>')
@@ -1532,7 +1532,7 @@
 	}
 
 	/**
-	 * New mailbox (lot H1): the servers looked for by the server of Dolibarr from the address typed (a mailbox of the
+	 * New mailbox: the servers looked for by the server of Dolibarr from the address typed (a mailbox of the
 	 * same domain, file published by the domain, Autodiscover, known providers, ISPDB of Thunderbird, DNS, usual
 	 * names), put in the folded fields with where they come from. Servers changed by hand are never replaced: the
 	 * result is then offered. The connection test checks what was found.
@@ -1979,7 +1979,7 @@
 		}
 		let html = '<p class="ibx-section__help">' + th('InboxIdentitiesHelp') + '</p>';
 		if (!list.length) {
-			// No identity: the mailbox sends with its own name and address, without signature (lot W6)
+			// No identity: the mailbox sends with its own name and address, without signature
 			const label = account.label && account.label.toLowerCase() !== String(account.email).toLowerCase() ? account.label + ' <' + account.email + '>' : account.email;
 			html += '<div class="ibx-notice ibx-notice--info">' + ic('info') + '<div class="ibx-notice__text">' + th('InboxNoIdentity', label) + '</div></div>';
 		} else {
@@ -2419,7 +2419,7 @@
 		});
 	}
 
-	// ----- Tab Templates (lot W6 1.18.0): mail templates offered in the writings of this mailbox -----
+	// ----- Tab Templates (1.18.0): mail templates offered in the writings of this mailbox -----
 	async function tabTemplates(box, account) {
 		box.innerHTML = skeleton(3);
 		let data;
@@ -3935,7 +3935,7 @@
 			+ '</tbody></table></section>';
 	}
 
-	// ---------- Security (lot F1 1.78.0, admins): what protects the users, each choice with what it protects from ----------
+	// ---------- Security (1.78.0, admins): what protects the users, each choice with what it protects from ----------
 	async function renderSecurity(main) {
 		if (!isAdmin()) {
 			I.go('#/settings/accounts');
@@ -4350,7 +4350,7 @@
 				+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="' + k + '" aria-checked="' + (s[k] === '1' ? 'true' : 'false') + '" aria-label="' + th(label) + '"></button>'
 				+ '<div class="ibx-formrow__help">' + th(label + 'Help') + '</div></div></div>').join('')
 			+ '</div></section>'
-			// New mailboxes (lot H1): the ISPDB of Thunderbird asked at each search, else offered by a click
+			// New mailboxes: the ISPDB of Thunderbird asked at each search, else offered by a click
 			+ '<section class="ibx-section" data-section="newbox">' + title('newbox') + '<p class="ibx-section__help">' + th('InboxAutoconfigSectionHelp') + '</p><div class="ibx-form">'
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxAutoconfigIspdbSetting') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-gswitch" role="switch" data-switch="INBOX_AUTOCONFIG_ISPDB" aria-checked="' + (s.INBOX_AUTOCONFIG_ISPDB === '1' ? 'true' : 'false') + '" aria-label="' + th('InboxAutoconfigIspdbSetting') + '"></button>'
@@ -4562,7 +4562,7 @@
 
 
 	/**
-	 * Settings > Public and shared domains (lot A7, 1.76.0): the shipped list (never downloaded by inbox), the local entries, the ones of
+	 * Settings > Public and shared domains (1.76.0): the shipped list (never downloaded by inbox), the local entries, the ones of
 	 * the other modules; search, filters, thirdparties and mails using each domain; every change at once, with undo
 	 */
 	const DOMAIN_CATS = ['public', 'disposable', 'shared'];
@@ -4760,7 +4760,7 @@
 	}
 
 	/**
-	 * Settings > Data sources (lot A2 level 1, 1.72.0): mails sent by a site or an application from its own address,
+	 * Settings > Data sources (1.72.0): mails sent by a site or an application from its own address,
 	 * the requester in its headers; believed for its trusted senders only, authenticated. Admins of Dolibarr.
 	 */
 	/**
@@ -5596,7 +5596,7 @@
 			+ I.html`<h3 class="ibx-guide__then">${t('InboxMeiliGuideThen')}</h3><p>${t('InboxPushGuideThenText', origin)}</p>`);
 	}
 
-	// ---------- Search: Meilisearch (lot W7 1.20.0) ----------
+	// ---------- Search: Meilisearch (1.20.0) ----------
 	// ---------- Installation guides (1.33.0): parts to open, steps, commands copied by a button ----------
 	const guideCode = text => '<div class="ibx-codeblock"><pre>' + esc(text) + '</pre><button type="button" class="ibx-btn ibx-btn--sm ibx-js-copycode">' + ic('copy') + ' ' + th('InboxCopy') + '</button></div>';
 	const guideStep = (key, text) => '<li><p>' + th(key) + '</p>' + guideCode(text) + '</li>';
@@ -6131,10 +6131,10 @@
 			+ '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxReadOnArchive') + '</span><div>'
 			+ '<button type="button" class="ibx-switch ibx-js-readswitch" data-readparam="read_on_archive" role="switch" aria-checked="' + (p.read_on_archive === '0' ? 'false' : 'true') + '" aria-label="' + th('InboxReadOnArchive') + '"></button>'
 			+ '<div class="ibx-formrow__help">' + th('InboxReadOnArchiveHelp') + '</div></div></div>'
-			// Read receipts asked (lot W8 1.22.0): never sent without a click
+			// Read receipts asked (1.22.0): never sent without a click
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-mdn_mode">' + th('InboxMdnMode') + '</label><div>' + opt('mdn_mode', ['ask', 'never'], p.mdn_mode) + '<div class="ibx-formrow__help">' + th('InboxMdnModeHelp') + '</div></div></div>'
 			+ '</div></section>';
-		// Rules and out of office of the personal mailboxes (lot W8 1.23.0): kept on the card of the mailbox
+		// Rules and out of office of the personal mailboxes (1.23.0): kept on the card of the mailbox
 		const mine = data.mailboxes.filter(m => m.personal);
 		if (mine.length) {
 			html += '<section class="ibx-section" data-section="mybox">' + title('mybox') + '<p class="ibx-section__help">' + th('InboxMyBoxHelp') + '</p><div class="ibx-form">'
@@ -6177,7 +6177,7 @@
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-tree_mode">' + th('InboxTreeMode') + '</label><div>' + opt('tree_mode', ['auto', 'all', 'single'], p.tree_mode) + '<div class="ibx-formrow__help">' + th('InboxTreeModeHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_delay">' + th('InboxSendDelayMine') + '</label><div>' + opt('send_delay', ['-1', '0', '5', '10', '20', '30', '60'], String(p.send_delay)) + '<div class="ibx-formrow__help">' + th('InboxSendDelayMineHelp') + '</div></div></div>'
 			+ '<div class="ibx-formrow"><label class="ibx-formrow__label" for="me-send_shortcut">' + th('InboxSendShortcut') + '</label><div>' + opt('send_shortcut', ['ctrl_enter', 'off'], p.send_shortcut) + '<div class="ibx-formrow__help">' + th('InboxSendShortcutHelp') + '</div></div></div>'
-			// mailto: links of the browser opened in inbox (lot W6 1.18.0): asked by the browser, per computer
+			// mailto: links of the browser opened in inbox (1.18.0): asked by the browser, per computer
 			+ (I.ctx('INBOX_CAN_SEND', false) && window.isSecureContext && navigator.registerProtocolHandler ? '<div class="ibx-formrow"><span class="ibx-formrow__label">' + th('InboxMailtoLinks') + '</span><div><button type="button" class="ibx-btn ibx-js-mailto">' + ic('mail') + ' ' + th('InboxMailtoRegister') + '</button><div class="ibx-formrow__help">' + th('InboxMailtoHelp') + '</div></div></div>' : '')
 			+ '</div></section>'
 			+ '<section class="ibx-section" data-section="actions">' + title('actions') + '<div class="ibx-form">'
@@ -6252,7 +6252,7 @@
 			});
 		});
 	}
-	// ---------- Notifications (lot W8 1.21.0) ----------
+	// ---------- Notifications (1.21.0) ----------
 	/**
 	 * Settings > Notifications: what the unread counter counts, the counter in the top bar of Dolibarr, the
 	 * notifications of the browser (permission asked on the click only), the new mails told per mailbox, the channels

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/thread.php
  * \ingroup inbox
- * \brief   Conversations ignored (the mailbox) or watched (the user), lot W4 1.11.0; a new conversation started from
+ * \brief   Conversations ignored (the mailbox) or watched (the user), 1.11.0; a new conversation started from
  *          a mail, joined back (1.139.0)
  */
 

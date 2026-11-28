@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxmailtransfer.class.php
  * \ingroup inbox
- * \brief   Mails imported into a folder (.eml, mbox of the local folders of Thunderbird) and folders exported (lot W4 1.12.0, B14)
+ * \brief   Mails imported into a folder (.eml, mbox of the local folders of Thunderbird) and folders exported (1.12.0, B14)
  */
 
 require_once __DIR__.'/inboxaccess.class.php';

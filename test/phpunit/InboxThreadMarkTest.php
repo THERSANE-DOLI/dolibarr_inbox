@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxThreadMarkTest.php
  * \ingroup inbox
- * \brief   Lot W4 1.11.0: threads ignored (answers arrive read) or watched; unsubscribe refused when unsafe
+ * \brief   1.11.0: threads ignored (answers arrive read) or watched; unsubscribe refused when unsafe
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

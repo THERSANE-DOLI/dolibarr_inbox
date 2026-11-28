@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Journal of the actions on the mailboxes (lot W4, decision A4): who moved, archived, removed, tagged... (kept 12 months
+-- Journal of the actions on the mailboxes (decision A4): who moved, archived, removed, tagged... (kept 12 months
 -- by default). Read / unread and starred are not written (too frequent). No content of the mail beyond its subject.
 CREATE TABLE llx_inbox_action_log(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

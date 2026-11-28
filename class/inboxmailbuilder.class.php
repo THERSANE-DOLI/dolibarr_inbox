@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxmailbuilder.class.php
  * \ingroup inbox
- * \brief   Source of a mail written in inbox (lot W6 1.16.0): headers, HTML cleaned, text part, attachments
+ * \brief   Source of a mail written in inbox (1.16.0): headers, HTML cleaned, text part, attachments
  */
 
 require_once __DIR__.'/inboxmimeparser.class.php';

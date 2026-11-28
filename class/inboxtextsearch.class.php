@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxtextsearch.class.php
  * \ingroup inbox
- * \brief   Deep search (lot W7 1.19.0): the text of the mails searched by the mail server, one mailbox per call
+ * \brief   Deep search (1.19.0): the text of the mails searched by the mail server, one mailbox per call
  */
 
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';

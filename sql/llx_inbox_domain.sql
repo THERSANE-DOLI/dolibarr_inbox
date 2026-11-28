@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Shared domains (lot A7, 1.76.0): only the differences with the list shipped in data/domains/ (read in its files,
+-- Shared domains (1.76.0): only the differences with the list shipped in data/domains/ (read in its files,
 -- never copied here): a domain added in Settings > Public and shared domains (origin local, with its category), a shipped domain
 -- disabled (origin shipped, status 0)
 CREATE TABLE llx_inbox_domain(

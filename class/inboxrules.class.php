@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxrules.class.php
  * \ingroup inbox
- * \brief   Rules and out of office of a mailbox, written as a Sieve script on its server (lot W8 1.23.0)
+ * \brief   Rules and out of office of a mailbox, written as a Sieve script on its server (1.23.0)
  */
 
 require_once __DIR__.'/inboxaccount.class.php';

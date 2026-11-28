@@ -455,7 +455,7 @@ class InboxProtectTest extends InboxTestCase
 	}
 
 	/**
-	 * Numbers of the live reading (lot S2): negative, the mailbox found again, kept encrypted in the session
+	 * Numbers of the live reading: negative, the mailbox found again, kept encrypted in the session
 	 *
 	 * @return void
 	 */
@@ -547,7 +547,7 @@ class InboxProtectTest extends InboxTestCase
 	}
 
 	/**
-	 * Sending of a protected mailbox (lot S3) on the local Dovecot: the delay kept in the session (never in the queue),
+	 * Sending of a protected mailbox on the local Dovecot: the delay kept in the session (never in the queue),
 	 * the copy marked in Drafts, sent once; scheduled: waits in Drafts, sent with its marks removed
 	 *
 	 * @return void

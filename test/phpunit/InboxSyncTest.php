@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxSyncTest.php
  * \ingroup inbox
- * \brief   Synchronisation of the index on the local test Dovecot (lot W2: CA-01 to CA-11)
+ * \brief   Synchronisation of the index on the local test Dovecot (CA-01 to CA-11)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/assign.php
  * \ingroup inbox
- * \brief   Who handles a mail (lot W4 1.9.0): people of a mailbox, assign / remove
+ * \brief   Who handles a mail (1.9.0): people of a mailbox, assign / remove
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

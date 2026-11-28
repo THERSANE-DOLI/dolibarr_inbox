@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxthreader.class.php
  * \ingroup inbox
- * \brief   Conversations: key of the thread of each mail of the index (lot W3, 1.5.0)
+ * \brief   Conversations: key of the thread of each mail of the index (1.5.0)
  */
 
 /**

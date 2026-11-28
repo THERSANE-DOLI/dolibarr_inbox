@@ -162,14 +162,12 @@ InboxErrorTagLabel = Name of the tag needed (128 characters at most)
 InboxErrorTagColor = Colour not valid
 InboxErrorUserParam = Setting or value not valid
 
-# Application (lot W1)
+# Application
 InboxAppName = Inbox
 InboxSettings = Settings
 InboxSpaces = Spaces
 InboxSpaceMail = Mail
 InboxBackToDolibarr = Back to Dolibarr
-InboxMailComing = Reading of the emails: next lot
-InboxMailComingText = The mailboxes are set up in the Settings; the reading of the emails comes with the next version.
 InboxGoToAccounts = Set up the mailboxes
 InboxNeedBackportDolContext = On Dolibarr 23, the inbox application needs the module backportdolcontext (JavaScript context of Dolibarr 24): enable it in Setup > Modules.
 InboxNeedJavascript = The inbox application needs JavaScript.
@@ -528,7 +526,7 @@ InboxSystem = System (scheduled job)
 InboxFromCache = from the cache
 InboxCatalogue = Catalogue of the components
 
-# Synchronisation (lot W2)
+# Synchronisation
 InboxCronSync = Inbox : synchronisation of the mailboxes
 InboxCronSyncComment = Reads the new, changed and removed emails of the active mailboxes (read only) and goes on with the first indexing
 InboxTabSync = Synchronisation
@@ -571,7 +569,7 @@ InboxSyncFolderOff = Folder not followed: its emails leave the index
 InboxSyncAlreadyRunning = A synchronisation of this mailbox is already in progress, or the mailbox waits after an error.
 InboxFolderRoleInbox = Inbox
 
-# Lot W3: reading of the mails
+# Reading of the mails
 InboxAddAccount = Add a mailbox
 InboxAllBoxes = All my mailboxes
 InboxAllDone = Everything is dealt with
@@ -1612,7 +1610,7 @@ InboxLookPreview = Preview
 InboxLookPreviewMail = Quote request
 InboxLookPreviewText = Hello, could you send us...
 
-# Search panel and deep search (lot W7 1.19.0)
+# Search panel and deep search (1.19.0)
 InboxSxWhere = Where to search
 InboxScopeFolder = This folder
 InboxScopeAccount = This mailbox
@@ -1660,7 +1658,7 @@ InboxDeepExact = Exact search: case ignored, accents kept.
 InboxDeepSearchNoWords = Type at least one word to search in the text of the emails.
 InboxDeepNotSearched = The text of the emails was not searched.
 
-# Meilisearch (lot W7 1.20.0)
+# Meilisearch (1.20.0)
 InboxSectionSearch = Search
 InboxMeiliHelp = Option: Meilisearch makes the search in the text of the emails fast, with typos and accents tolerated and a sort by relevance. Without it, the text can still be searched on the mail server, on demand. Meilisearch must be installed on this server or on the private network: the text of the emails is copied there.
 InboxMeiliOn = On
@@ -1730,7 +1728,7 @@ InboxSortRelevance = relevance
 InboxCronFulltext = Inbox: Meilisearch search index
 InboxCronFulltextComment = Sends to Meilisearch the text of the new emails of the mailboxes indexed; once a day, removes the emails deleted
 
-# Notifications (lot W8 1.21.0)
+# Notifications (1.21.0)
 InboxNavNotifications = Notifications
 InboxNotifSettings = Settings of the notifications
 InboxNotifBoxError = A mailbox cannot be synchronised
@@ -1792,7 +1790,7 @@ InboxNotifMailFooter = You receive this summary because you chose the email for 
 InboxCronNotifMail = Inbox: notifications by email
 InboxCronNotifMailComment = Sends by email the notifications still unread after 15 minutes to the users who chose it, one summary per user
 
-# Invitations and read receipts (lot W8 1.22.0)
+# Invitations and read receipts (1.22.0)
 InboxInvite = Invitation
 InboxInviteCancelled = Event cancelled
 InboxInviteAnswer = Answer to an invitation
@@ -1893,7 +1891,7 @@ InboxSxNoAddress = No known address holds « %s »: Enter searches it as typed.
 InboxSxOpsToggle = Operators
 InboxUserCard = Card in Dolibarr
 
-# Rules and out of office (lot W8 1.23.0)
+# Rules and out of office (1.23.0)
 InboxTabRules = Rules
 InboxTabAway = Out of office
 InboxRulesHelp = The rules run on the server when each email arrives, in this order, even with inbox and Dolibarr closed, for every mail software.
@@ -2709,7 +2707,7 @@ InboxCarrierHelp = Category of suppliers whose emails speak of our parcels: no s
 InboxCarrierSaved = Category of the carriers saved
 InboxSituationCarrier = Carrier: no situation. The shipment of a tracking number of the email is in « Cited in the email ».
 InboxLogCarriers = Category of the carriers changed
-# Data sources (lot A2 level 1, 1.72.0)
+# Data sources (1.72.0)
 InboxVia = through
 InboxViaTitle = Sent by « %s » from %s for this requester
 InboxRequester = Requester
@@ -2797,7 +2795,7 @@ InboxSourceErrorLine = Line not understood: « %s ».
 InboxSourceErrorNoHeader = Give at least one header to read.
 InboxSourceErrorMany = %s sources at most.
 InboxSourceExampleLabel = Quote request (example)
-# The link follows the conversation (lot A3, 1.73.0)
+# The link follows the conversation (1.73.0)
 InboxLinkedByThread = linked by the conversation
 InboxLinkThreadToo = Link also the %s other emails of the conversation on the same subject
 InboxLinkedThreadToo = Linked, with the %s other emails of the conversation on the same subject
@@ -2911,7 +2909,7 @@ InboxSourceRole_data = Data (JSON)
 InboxSourceRole_field = One field
 InboxSourceAnalyzeApply = Use these settings
 InboxSourceAnalyzeApplied = Settings filled below: check them, name the source, then save.
-# Bank details in a mail (lot A6, 1.75.0)
+# Bank details in a mail (1.75.0)
 InboxBankTitle = This email talks of bank details
 InboxBankLead = Before any change of bank details, check with a call you make yourself. The signals below help, they do not decide.
 InboxBankLeadDanger = Nothing proves this email (sender not authenticated or imitated). Change nothing without a call you make yourself.
@@ -2956,7 +2954,7 @@ InboxBankCheckedNote = Bank details checked by phone at %s, with %s.
 InboxBankCheckedDone = Check written on the email
 InboxBankFold = Collapse
 InboxBankUnfold = Show the advice
-# Shared domains (lot A7, 1.76.0)
+# Shared domains (1.76.0)
 InboxNavDomains = Public and shared domains
 InboxDomainsHelp = Public email services, access providers and disposable addresses gather people who do not know each other: their domain never designates a thirdparty. The domain of a company is a good clue, unless several of your thirdparties share it.
 InboxDomainsWhy = Why? What each category does
@@ -3027,7 +3025,7 @@ InboxDomainsMatchLabel = Recognize the sender by the domain of his address
 InboxDomainsMatchHelp = On by default. Off, only the exact address of a contact or a thirdparty is recognized: the emails of a new contact of a known company no longer show it, and no thirdparty is offered for a shared domain. To turn off only when the searches by domain slow a big database down (the log of Dolibarr says their duration when it passes 200 ms).
 InboxDomainsMatchOn = Recognition by the domain turned on
 InboxDomainsMatchOff = Recognition by the domain turned off: exact addresses only
-# Fil of the mail: answers sent (lot E2, 1.77.0)
+# Fil of the mail: answers sent (1.77.0)
 InboxActivityReplied = %s answered
 InboxActivityWrote = %s wrote
 InboxActivityRepliedTo = Replied to %s
@@ -3049,7 +3047,7 @@ InboxComposeConflictQueued = %s is sending an answer to this email (left at %s, 
 InboxComposeConflictOther = An answer to this email left the mailbox at %s from another software, since you opened this answer.
 InboxComposeConflictSee = See the answer
 InboxComposeConflictSend = Send anyway
-# Security settings, remote pictures of the quote (lot F1, 1.78.0)
+# Security settings, remote pictures of the quote (1.78.0)
 InboxNavSecurity = Security
 InboxSecurityHelp = What protects the users of the mailboxes. Each choice says what it protects from: the safest one is not always the default, so that daily work stays simple.
 InboxQuoteRemoteImages = Remote pictures in the quote
@@ -3078,7 +3076,7 @@ InboxImagesAlwaysUnproven = Sender not authenticated: « Always show » cannot b
 InboxImagesAlwaysUnprovenHosts = Sender not authenticated: « Always show » can be remembered for a host of pictures only, not for this sender.
 InboxImagesOwnDomains = Pictures of our own domains
 InboxImagesOwnDomainsHelp = The remote pictures hosted on the domain of a mailbox (and its subdomains) are shown without a click, whoever sends the email: the signature of your own emails quoted in an answer, for example. Loading a picture from your own server tells nothing to anyone outside. A public mail service (the domain of a free mailbox) never counts as yours. Applies even with « Never » above.
-# New customer from a mail (lot A1, 1.79.0)
+# New customer from a mail (1.79.0)
 InboxLeadOpen = New customer
 InboxLeadTitle = New customer from this email
 InboxLeadClose = Close the panel
@@ -3173,7 +3171,7 @@ InboxLeadSalesRepWhy_assigned = The email is assigned to this person
 InboxLeadSalesRepWhy_owner = Owner of the personal mailbox that received the email
 InboxLeadVatNotSubject = Not subject to VAT
 InboxLeadCategoriesCount = %s categories
-# Insert a piece of Dolibarr in a writing (lot A5, 1.83.0)
+# Insert a piece of Dolibarr in a writing (1.83.0)
 InboxPieceInsert = Insert a piece
 InboxPieceSearch = Reference or thirdparty
 InboxPieceAll = All thirdparties
@@ -3544,7 +3542,7 @@ InboxProtectLevelToPasswordConfirm = The mailbox will be indexed again by the ne
 InboxLog_protect_level = Level of the protection changed
 
 #
-# New mailbox: servers found from the address (lot H1)
+# New mailbox: servers found from the address
 #
 InboxSectionLogin = Login
 InboxAutoconfigEmailHelp = The servers are looked for from the address.

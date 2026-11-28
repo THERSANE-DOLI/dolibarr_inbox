@@ -3,7 +3,7 @@
 # - Dovecot: IMAP 127.0.0.1:10143, ManageSieve 127.0.0.1:14190, SMTP submission 127.0.0.1:10587 (AUTH, then relays
 #   to Mailpit only);
 # - Mailpit: catches every mail sent, delivers nothing (web and API 127.0.0.1:18025);
-# - Meilisearch (lot W7 1.20.0): full text search of the tests, 127.0.0.1:17700, test master key below.
+# - Meilisearch (1.20.0): full text search of the tests, 127.0.0.1:17700, test master key below.
 # Test values only (conf/users, conf/master-users). Usage: dev/dovecot/run.sh [stop]
 cd "$(dirname "$0")" || exit 1
 docker rm -f inbox-dovecot inbox-mailpit inbox-meili >/dev/null 2>&1

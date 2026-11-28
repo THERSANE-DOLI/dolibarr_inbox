@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Put the reading corpus of lot W3 in the local test Dovecot of inbox (perso@inbox-test.invalid): HTML with remote
+"""Put the reading corpus in the local test Dovecot of inbox (perso@inbox-test.invalid): HTML with remote
 pictures and a tracker, picture of the body (cid:), misleading link, PDF, text, CSV, zip, EICAR test file, report of non
 delivery, display name imitating the company, attached mail, encrypted mail. Test data only, never a real mailbox."""
 import base64, email.utils, imaplib, io, time, zipfile

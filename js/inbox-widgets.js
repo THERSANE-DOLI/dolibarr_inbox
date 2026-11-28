@@ -16,7 +16,7 @@
 
 /**
  * Widgets of the Dolibarr panel (1.154.0): drawing of the templates, catalogue of the user, data of the widgets of a
- * mail (ajax/widget.php). The layout of the panel (grid, edit mode, catalogue drawer) comes with lot WG2; this file
+ * mail (ajax/widget.php). The layout of the panel (grid, edit mode, catalogue drawer) is in js/inbox-panel-widgets.js; this file
  * only draws one widget from its data, the same for a widget placed and for a preview of the catalogue.
  *
  * Templates: mini, line, figure, list, chart, action (thread: the notes, drawn by the panel; free: a module, WG4).

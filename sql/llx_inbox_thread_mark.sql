@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Conversations ignored (the whole mailbox: the answers arrive read) or watched (one user: highlighted), lot W4 1.11.0
+-- Conversations ignored (the whole mailbox: the answers arrive read) or watched (one user: highlighted), 1.11.0
 -- (B8, keys K and W). Tied to the key of the thread in the mailbox, which follows the threads merged.
 CREATE TABLE llx_inbox_thread_mark(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

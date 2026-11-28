@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxTextSearchTest.php
  * \ingroup inbox
- * \brief   Lot W7 1.19.0: deep search in the text of the mails on the mail server
+ * \brief   1.19.0: deep search in the text of the mails on the mail server
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -33,7 +33,7 @@ dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxtextsearch.class.php');
 
 /**
- * Lot W7 (analyse-lot-w7.md §4, CA-66 to CA-68)
+ * Deep search in the text of the mails
  */
 class InboxTextSearchTest extends InboxTestCase
 {

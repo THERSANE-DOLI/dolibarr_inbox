@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/dolibarr.php
  * \ingroup inbox
- * \brief   Bandeau Dolibarr of the reading (lot W5 1.13.0): sender known, pieces linked, internal notes, search of pieces
+ * \brief   Bandeau Dolibarr of the reading (1.13.0): sender known, pieces linked, internal notes, search of pieces
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -230,7 +230,7 @@ switch ($action) {
 		$contactId = $found['contact'];
 		$sender['by'] = $found['by'];
 		$matcher = null;
-		// Shared domains (lot A7, 1.76.0): the category of the domain (a disposable address is said), the
+		// Shared domains (1.76.0): the category of the domain (a disposable address is said), the
 		// thirdparties that share it offered to choose (never linked without the user), and who may correct the list
 		$matcher = $matcher ?? new InboxContactMatcher($db);
 		$byDomain = $email !== '' ? $matcher->domainCandidates($email) : array('socs' => array(), 'category' => '', 'domain' => '');
@@ -351,14 +351,14 @@ switch ($action) {
 			// The piece the source offers to create, when the user may
 			$requester['create'] = $requester['type'] !== '' && InboxElements::canWriteType($user, $requester['type']) ? $requester['type'] : '';
 		}
-		// Fil of the mail (lot E2, 1.77.0): the answers sent from the mailbox in its conversation, beside the notes
+		// Fil of the mail (1.77.0): the answers sent from the mailbox in its conversation, beside the notes
 		$activity = array_map(function ($a) use ($user) {
 			$a['mine'] = $a['author'] > 0 && $a['author'] === (int) $user->id;
 			unset($a['message_id']);
 			return $a;
 		}, (new InboxActivity($db))->sentIn($row));
 		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
-			// New customer from a mail (lot A1, 1.79.0): contacts left to create from their page
+			// New customer from a mail (1.79.0): contacts left to create from their page
 			'lead_pending' => (new InboxLead($db))->pendingFor($user, (int) $row->rowid),
 			// Buttons of « Create » for the mailbox of the mail (1.161.0): the core, then the modules (their pages read
 			// again on the server at the click, never sent)
@@ -466,7 +466,7 @@ switch ($action) {
 		if ($id < 0) {
 			inboxDolibarrFail($linker->error);
 		}
-		// « Link also the other mails of the conversation » (lot A3, 1.73.0), ticked by default
+		// « Link also the other mails of the conversation » (1.73.0), ticked by default
 		$others = 0;
 		if ((int) inboxAjaxParam('thread', 'int') === 1) {
 			$others = max(0, (new InboxThreadLink($db))->linkThread($user, $reader->row, $type, $element));
@@ -483,7 +483,7 @@ switch ($action) {
 		// no break
 
 	case 'detach':
-		// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go
+		// « Detach this mail from its conversation » (1.73.0): its links of the conversation go
 		$reader = inboxDolibarrMail();
 		// The links of the conversation are shared by every copy of the mail: changed by who may send from the
 		// mailbox (as INBX-006), never by a reader (audit INBX-068)

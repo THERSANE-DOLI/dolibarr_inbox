@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxSenderCheckTest.php
  * \ingroup inbox
- * \brief   Lot W5 1.15.0: imitation of a known sender, junk probably legitimate; known senders out of the junk (1.147.0)
+ * \brief   1.15.0: imitation of a known sender, junk probably legitimate; known senders out of the junk (1.147.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

@@ -15,7 +15,7 @@
  */
 
 /**
- * Writing windows of inbox (lot W6 1.16.0, interface §8): new mail, reply, reply all, reply to the list, forward
+ * Writing windows of inbox (1.16.0, interface §8): new mail, reply, reply all, reply to the list, forward
  * (inline or as an attachment), draft reopened.
  * - Floating window at the bottom right (full screen on a phone), reduced into the dock, several side by side.
  * - The server keeps the writing (token): quote, headers of the answer, files of a forward and the signature are read
@@ -87,7 +87,7 @@
 		});
 		return out;
 	}
-	/** « 2 tracking pictures taken out of the quote » (lot F1 1.78.0), nothing when none */
+	/** « 2 tracking pictures taken out of the quote » (1.78.0), nothing when none */
 	function quoteRemovedHtml(r) {
 		const parts = [];
 		if (r && r.trackers) {
@@ -420,7 +420,7 @@
 			$('.ibx-js-attachbtn', w.dlg).title = w.attachments.length ? t('InboxComposeAttachHave', w.attachments.length) : t('InboxComposeAttach');
 		}
 		box.innerHTML = w.attachments.map(a => '<li class="ibx-compose__att' + (a.scan === 'infected' ? ' is-bad' : '') + (a.pending ? ' is-pending' : '') + '">' + ic(a.pending ? 'send-later' : 'attachment')
-			// The name opens the file in the viewer (lot A5, 1.82.0): the very file that leaves with the mail, checked
+			// The name opens the file in the viewer (1.82.0): the very file that leaves with the mail, checked
 			+ (a.pending || a.scan === 'infected' || !I.viewComposeFiles ? '<span class="ibx-compose__attname is-static" title="' + esc(a.name) + '">' + attName(a.name) + '</span>'
 				: '<button type="button" class="ibx-compose__attname ibx-js-attview" data-id="' + esc(a.id) + '" title="' + esc(t('InboxComposeViewFile', a.name)) + '">' + attName(a.name) + '</button>')
 			+ '<span class="ibx-muted ibx-compose__attsize">' + esc(a.pending ? t('InboxComposeUploading') : size(a.size)) + '</span>'
@@ -733,7 +733,7 @@
 		try {
 			const res = await post('compose', 'send', Object.assign({}, ctx.data, opts.force ? { force: 1 } : {}));
 			if (res.conflict) {
-				// A colleague answered the same mail since this writing was opened (lot E2, 1.77.0): nothing sent
+				// A colleague answered the same mail since this writing was opened (1.77.0): nothing sent
 				w.sending = false;
 				btn.removeAttribute('aria-disabled');
 				w.dlg.removeAttribute('aria-busy');
@@ -788,7 +788,7 @@
 		box.focus();
 	}
 
-	// ---------- Before the sending: the usual slips (lot W6 1.17.0, B16, B17, B18) ----------
+	// ---------- Before the sending: the usual slips (1.17.0, B16, B17, B18) ----------
 	/** An answer from another mailbox than the one that got the mail: said in the window, never blocking */
 	function paintBoxWarning(w) {
 		const box = $('.ibx-js-boxwarn', w.dlg);
@@ -1882,7 +1882,7 @@
 			+ '<div class="ibx-ai__row"><button type="button" class="ibx-btn ibx-btn--primary ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'insert' : 'replace') + '">' + th(req.kind === 'write' ? 'InboxAiInsert' : replaceWhat) + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-aiuse" data-use="' + (req.kind === 'write' ? 'replace' : 'insert') + '">' + th(req.kind === 'write' ? replaceWhat : 'InboxAiInsert') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-airetry">' + th('InboxAiRetry') + '</button></div>';
-		// The one door too (lot S4): the answer of the AI may be steered by the mail it read; a second layer after the server
+		// The one door too: the answer of the AI may be steered by the mail it read; a second layer after the server
 		$('.ibx-ai__proposal', res).innerHTML = I.safeHtml(r.html);
 		$('.ibx-js-airetry', res).addEventListener('click', () => aiRun(w, box, req));
 		$$('.ibx-js-aiuse', res).forEach(b => b.addEventListener('click', () => {
@@ -2187,7 +2187,7 @@
 		]));
 	}
 
-	// ---------- Templates (lot W6 1.18.0): those of the mailbox, those of the linked pieces ----------
+	// ---------- Templates (1.18.0): those of the mailbox, those of the linked pieces ----------
 	function firstTo(w) {
 		const to = w.to.list();
 		return to.length ? to[0].email : '';
@@ -2653,9 +2653,9 @@
 	}
 	I.templateDefaults = templateDefaults;
 
-	// ---------- Documents of the linked pieces (lot W6 1.18.0) ----------
+	// ---------- Documents of the linked pieces (1.18.0) ----------
 	/**
-	 * Insert a piece of Dolibarr (lot A5, 1.83.0): the pieces of the thirdparties of the recipients first; for the one
+	 * Insert a piece of Dolibarr (1.83.0): the pieces of the thirdparties of the recipients first; for the one
 	 * chosen, what goes in the mail (recall, table of its lines, PDF, online signature or payment)
 	 */
 	function pieceDialog(w) {
@@ -2975,7 +2975,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-sigadd" hidden>' + ic('signature') + ' ' + th('InboxComposeSignatureOn') + '</button>'
 			+ (d.quote ? '<div class="ibx-compose__quote ibx-js-quote"><div class="ibx-compose__quotebar"><button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quotetoggle" aria-expanded="false">··· ' + th(w.mode === 'forward' ? 'InboxComposeShowForward' : 'InboxComposeShowQuote') + '</button>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteoff">' + th(w.mode === 'forward' ? 'InboxComposeRemoveForward' : 'InboxComposeRemoveQuote') + '</button></div>'
-				// Remote pictures taken out of the quote by the server (lot F1 1.78.0): said, never a choice here
+				// Remote pictures taken out of the quote by the server (1.78.0): said, never a choice here
 				+ quoteRemovedHtml(d.quote_removed)
 				+ '<iframe sandbox="allow-same-origin" hidden title="' + th('InboxComposeQuote') + '"></iframe></div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-quoteon" hidden>' + th('InboxComposePutQuoteBack') + '</button>' : '')
@@ -2990,7 +2990,7 @@
 			+ '<span class="ibx-sendsplit"><button type="button" class="ibx-btn ibx-btn--primary ibx-js-send"' + (params.send_shortcut === 'off' ? '' : ' title="' + th('InboxComposeSendKey') + '"') + '>' + ic('sent') + ' ' + th('InboxComposeSend') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--primary ibx-sendsplit__arrow ibx-js-sendlater" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxSendLater') + '" aria-label="' + th('InboxSendLater') + '">' + ic('chevron-down') + '</button></span>'
 			+ '<label class="ibx-btn ibx-btn--icon ibx-compose__attachbtn ibx-js-attachbtn" title="' + th('InboxComposeAttach') + '">' + ic('attachment') + '<span class="ibx-sr-only">' + th('InboxComposeAttach') + '</span><span class="ibx-compose__attcount ibx-js-attcount" aria-hidden="true" hidden></span><input type="file" multiple class="ibx-sr-only ibx-js-file"></label>'
-			// Insert a piece of Dolibarr (lot A5, 1.83.0): recall, lines, PDF, online links
+			// Insert a piece of Dolibarr (1.83.0): recall, lines, PDF, online links
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-insertpiece" aria-haspopup="dialog" title="' + th('InboxPieceInsert') + '" aria-label="' + th('InboxPieceInsert') + '">' + ic('piece') + '</button>'
 			+ ((d.linked || []).length ? '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-docs" title="' + th('InboxComposeAttachDocs') + '" aria-label="' + th('InboxComposeAttachDocs') + '">' + ic('document') + '</button>' : '')
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-templates" aria-haspopup="menu" aria-expanded="false" title="' + th('InboxTemplates') + '" aria-label="' + th('InboxTemplates') + '">' + ic('template') + '</button>'
@@ -3768,7 +3768,7 @@
 		}
 		return compose(o);
 	};
-	/** Mail answered in the writing in front (presence « is writing an answer », lot W3 call of state) */
+	/** Mail answered in the writing in front (presence « is writing an answer ») */
 	I.composeWriting = () => {
 		const w = writings.find(x => x.dlg.classList.contains('is-front') && x.source && x.mode !== 'draft' && x.mode !== 'unsubscribe' && !x.closed);
 		return w ? w.source : 0;

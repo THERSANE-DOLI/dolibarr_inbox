@@ -163,7 +163,7 @@ if ($devProbes) {
 	print '</div>';
 }
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupHelp').'</span><br>';
-// The webmail settings live in the application, not here (analyse-lot-w1 §5)
+// The webmail settings live in the application, not here
 print '<span class="opacitymedium">'.$langs->trans('InboxSetupAppHelp').'</span> <a href="'.dol_buildpath('/inbox/index.php', 1).'#/settings">'.img_picto('', 'fa-external-link-alt', 'class="pictofixedwidth"').$langs->trans('InboxOpenSettings').'</a><br><br>';
 // Companion module for the attachments, suggested only while it is missing: link to the page of its last
 // GitHub release (stable URL, the zip there keeps the name module_docstudio-x.y.z.zip asked by Dolibarr)

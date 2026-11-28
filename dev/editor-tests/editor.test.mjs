@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 const root = new URL('../../', import.meta.url);
 const bundle = readFileSync(new URL('js/vendor/tiptap/tiptap.min.js', root), 'utf8');
 const adapter = readFileSync(new URL('js/inbox-editor.js', root), 'utf8');
-// The one door of the HTML in the page (lot S1), loaded before the editor as index.php does
+// The one door of the HTML in the page, loaded before the editor as index.php does
 const purify = readFileSync(new URL('js/vendor/dompurify/purify.min.js', root), 'utf8');
 const safe = readFileSync(new URL('js/inbox-safe.js', root), 'utf8');
 // A 1 x 1 PNG, as a pasted picture becomes
@@ -280,7 +280,7 @@ test('a styled bold of a signature keeps its colour', async () => {
 	assert.doesNotMatch(styles(html), /font-weight/);
 });
 
-// ---------- Lot S3: every way in of an HTML goes through Dolibarr.tools.inbox.safeHtml ----------
+// ---------- Every way in of an HTML goes through Dolibarr.tools.inbox.safeHtml ----------
 
 const EVIL = '<p>Bonjour<img src="x" onerror="window.__xss=1"><a href="javascript:window.__xss=2">lien</a>'
 	+ '<svg onload="window.__xss=3"></svg><span class="butAction" data-cmd="delete" style="color:red">x</span></p>';

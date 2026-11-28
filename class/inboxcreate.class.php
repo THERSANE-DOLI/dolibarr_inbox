@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxcreate.class.php
  * \ingroup inbox
- * \brief   Pieces created from a mail and files of a mail put in the documents of a piece (lot W5 1.14.0)
+ * \brief   Pieces created from a mail and files of a mail put in the documents of a piece (1.14.0)
  */
 
 require_once __DIR__.'/inboxelements.class.php';
@@ -406,7 +406,7 @@ class InboxCreate
 	}
 
 	/**
-	 * Full page of creation of a thirdparty from the panel « New customer » (lot A1, 1.79.0): the intent keeps the
+	 * Full page of creation of a thirdparty from the panel « New customer » (1.79.0): the intent keeps the
 	 * contact of the panel, created when the thirdparty is saved
 	 *
 	 * @param User                      $user    User
@@ -577,7 +577,7 @@ class InboxCreate
 			}
 		}
 
-		// Values of a mail in the address of a page of the core: the one door (lot S2), not only the filter of that page
+		// Values of a mail in the address of a page of the core: the one door, not only the filter of that page
 		foreach ($q as $k => $v) {
 			if (!is_int($v)) {
 				$q[$k] = $k === 'email' ? InboxSafe::line($v, 128) : InboxSafe::line($v, 255);

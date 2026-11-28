@@ -78,13 +78,13 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 		if ($action === 'USER_DELETE' || $action === 'USERGROUP_DELETE') {
 			return $this->forget($action === 'USER_DELETE' ? 'fk_user' : 'fk_usergroup', (int) $object->id, $user);
 		}
-		// A piece created from a mail (« Create ▾ », lot W5 1.14.0): linked to it, the .eml in its documents when asked
+		// A piece created from a mail (« Create ▾ », 1.14.0): linked to it, the .eml in its documents when asked
 		if (substr($action, -7) === '_CREATE' && !empty($_SESSION['inbox_create_intents'])) {
 			dol_include_once('/inbox/class/inboxcreate.class.php');
 			$creator = new InboxCreate($this->db);
 			$creator->onCreate($user, $action, $object);
 		}
-		// A piece removed from Dolibarr: its links to mails go, the mails and their notes stay (lot W5 1.13.0)
+		// A piece removed from Dolibarr: its links to mails go, the mails and their notes stay (1.13.0)
 		$removed = array('COMPANY_DELETE' => 'societe', 'CONTACT_DELETE' => 'contact', 'PROPAL_DELETE' => 'propal', 'ORDER_DELETE' => 'commande', 'BILL_DELETE' => 'facture',
 			'ORDER_SUPPLIER_DELETE' => 'order_supplier', 'BILL_SUPPLIER_DELETE' => 'invoice_supplier', 'SUPPLIER_PROPOSAL_DELETE' => 'supplier_proposal',
 			'PROJECT_DELETE' => 'project', 'TICKET_DELETE' => 'ticket', 'FICHINTER_DELETE' => 'fichinter', 'SHIPPING_DELETE' => 'shipping');
@@ -138,7 +138,7 @@ class InterfaceInboxTriggers extends DolibarrTriggers
 		if ($id <= 0) {
 			return 0;
 		}
-		// Mailboxes the group gave access to: its members may lose their assignments there (lot W4 1.9.0)
+		// Mailboxes the group gave access to: its members may lose their assignments there (1.9.0)
 		$accounts = array();
 		if ($column === 'fk_usergroup') {
 			$rows = $this->db->getRows("SELECT DISTINCT fk_account FROM ".$this->db->prefix()."inbox_account_access WHERE fk_usergroup = ".((int) $id)." LIMIT 10000");

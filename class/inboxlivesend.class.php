@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxlivesend.class.php
  * \ingroup inbox
- * \brief   Sending of a protected mailbox (1.89.0, lot S3): delay of the undo in the session, never in the queue
+ * \brief   Sending of a protected mailbox (1.89.0): delay of the undo in the session, never in the queue
  */
 
 require_once __DIR__.'/inboxprotect.class.php';

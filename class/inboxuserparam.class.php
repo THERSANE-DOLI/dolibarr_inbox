@@ -54,14 +54,14 @@ class InboxUserParam
 	public static function definitions()
 	{
 		return array(
-			// Mail marked as read: at once, after a delay, or only by hand (key M), lot W3
+			// Mail marked as read: at once, after a delay, or only by hand (key M)
 			'read_mode' => array('delay', array('immediate', 'delay', 'manual')),
 			'read_delay' => array('3', 'int:0:600'),
 			// A mail put in the trash or in junk by the user is marked read first (1.90.0)
 			'read_on_trash' => array('1', 'int:0:1'),
 			// An archived mail is marked read first (1.96.0), a setting of its own
 			'read_on_archive' => array('1', 'int:0:1'),
-			// Display (lot W3): table or cards for all the folders, as Thunderbird
+			// Display: table or cards for all the folders, as Thunderbird
 			'view' => array('cards', array('table', 'cards')),
 			'list_columns' => array('', 'json'),
 			// Tags in the table: names (badges) or dots (colour and initial, the name on hover and for screen readers)
@@ -71,10 +71,10 @@ class InboxUserParam
 			'text_size' => array('100', 'int:90:150'),
 			'theme' => array('auto', array('auto', 'light', 'dark', 'contrast')),
 			'attachments_open' => array('0', 'int:0:1'),
-			// New customer from a mail (lot A1 1.79.0): last choices of the panel; contacts left to create after a full page
+			// New customer from a mail (1.79.0): last choices of the panel; contacts left to create after a full page
 			'lead_last' => array('', 'json'),
 			'lead_pending' => array('', 'json'),
-			// Mail space (lot W3): folders folded, sort of the lists, quick filter bar, preview windows, zoom of the
+			// Mail space: folders folded, sort of the lists, quick filter bar, preview windows, zoom of the
 			// text of the mails
 			'tree_collapsed' => array('', 'json'),
 			'list_sort' => array('date:desc', array('date:desc', 'date:asc', 'from:asc', 'from:desc', 'subject:asc', 'subject:desc', 'size:desc', 'size:asc')),

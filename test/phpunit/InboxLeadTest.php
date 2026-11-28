@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxLeadTest.php
  * \ingroup inbox
- * \brief   1.79.0 (lot A1): new customer from a mail. Values read in the mail and their source, same thirdparties,
+ * \brief   1.79.0: new customer from a mail. Values read in the mail and their source, same thirdparties,
  *          what the page of creation would ask, quick creation, module hook
  */
 
@@ -182,7 +182,7 @@ class InboxLeadTest extends InboxTestCase
 		$this->assertSame(array('75016'), $v['soc']['zipcode']);
 		$this->assertSame(array('zzlead.example'), $v['soc']['url']);
 
-		// Values cleaned (lot A1, 1.79.1): target of a link of a HTML converted, phones written plainly, a street without
+		// Values cleaned (1.79.1): target of a link of a HTML converted, phones written plainly, a street without
 		// its zip code, the company named by the domain
 		$this->assertSame('+33 1 99 00 12 34', InboxLead::cleanValue('phone', '+ 33 199 00 12 34<tel: %20+%2033 199%2000%2012%2034>'));
 		$this->assertSame('01 99 00 12 34', InboxLead::formatPhone('01.99.00.12.34'));

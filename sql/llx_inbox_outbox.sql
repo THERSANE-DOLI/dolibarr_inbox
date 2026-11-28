@@ -14,7 +14,7 @@
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 
--- Queue of the sending (lot W6 1.17.0): a mail built and frozen when « Send » is clicked, sent after the delay, at the
+-- Queue of the sending (1.17.0): a mail built and frozen when « Send » is clicked, sent after the delay, at the
 -- date chosen, or at once; what remains to do after the sending kept with it (mail answered, draft, pieces).
 -- status: 0 waiting, 1 sending (lock), 2 sent, -1 failed
 CREATE TABLE llx_inbox_outbox(

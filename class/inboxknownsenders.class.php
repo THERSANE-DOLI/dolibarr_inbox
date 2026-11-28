@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxknownsenders.class.php
  * \ingroup inbox
- * \brief   Senders known to Dolibarr and the checks of a sender: imitation, junk probably legitimate (lot W5 1.15.0)
+ * \brief   Senders known to Dolibarr and the checks of a sender: imitation, junk probably legitimate (1.15.0)
  */
 
 require_once __DIR__.'/inboxsenderauth.class.php';

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxActionsTest.php
  * \ingroup inbox
- * \brief   Lot W4 1.6.0: actions on the mails written on the server, checked, undone; rights; only the UID aimed
+ * \brief   1.6.0: actions on the mails written on the server, checked, undone; rights; only the UID aimed
  *          expunged; another mailbox without loss; journal
  */
 

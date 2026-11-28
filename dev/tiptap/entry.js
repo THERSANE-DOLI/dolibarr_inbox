@@ -1,5 +1,5 @@
 // Everything inbox uses from Tiptap, exposed as window.InboxTiptap (the adapter js/inbox-editor.js reads it).
-// Only extensions whose HTML is understood by the mail software (inline styles, simple tables): see analyse-lot-w6.md
+// Only extensions whose HTML is understood by the mail software (inline styles, simple tables)
 export { Editor, Node, Mark, Extension, mergeAttributes } from '@tiptap/core';
 export { default as StarterKit } from '@tiptap/starter-kit';
 export { default as Image } from '@tiptap/extension-image';

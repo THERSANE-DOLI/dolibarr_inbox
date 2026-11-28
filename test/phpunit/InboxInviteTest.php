@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxInviteTest.php
  * \ingroup inbox
- * \brief   Invitations (iCalendar, answer, agenda) and read receipts (lot W8 1.22.0)
+ * \brief   Invitations (iCalendar, answer, agenda) and read receipts (1.22.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

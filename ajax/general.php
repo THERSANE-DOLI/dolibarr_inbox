@@ -51,11 +51,11 @@ function inboxGeneralSettings()
 		'INBOX_DEFAULT_READ_DELAY' => array('right' => 'manager', 'default' => '3', 'check' => 'int:0:600'),
 		'INBOX_SEND_DELAY' => array('right' => 'manager', 'default' => '10', 'check' => 'int:0:120'),
 		'INBOX_ANTIVIRUS_MAX_MB' => array('right' => 'manager', 'default' => '25', 'check' => 'int:1:200'),
-		// Journal of the actions on the mails (lot W4): months kept, 0 = kept without limit
+		// Journal of the actions on the mails: months kept, 0 = kept without limit
 		'INBOX_ACTION_LOG_MONTHS' => array('right' => 'manager', 'default' => '12', 'check' => 'int:0:120'),
-		// Lot W5 1.15.0: receiving servers whose Authentication-Results are trusted (imitation, junk probably legitimate)
+		// 1.15.0: receiving servers whose Authentication-Results are trusted (imitation, junk probably legitimate)
 		'INBOX_AUTH_SERVERS' => array('right' => 'manager', 'default' => '', 'check' => 'hosts'),
-		// Lot W6 1.16.0: size of the attachments of a mail, copy of Dolibarr (MAIN_MAIL_AUTOCOPY_TO) added or not
+		// 1.16.0: size of the attachments of a mail, copy of Dolibarr (MAIN_MAIL_AUTOCOPY_TO) added or not
 		'INBOX_SEND_MAX_MB' => array('right' => 'manager', 'default' => '20', 'check' => 'int:1:100'),
 		'INBOX_SEND_AUTOCOPY' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 		// 1.139.0: a mail whose subject is not the one of the mail it answers opens a new conversation
@@ -77,7 +77,7 @@ function inboxGeneralSettings()
 		'INBOX_EDITOR_SMALL' => array('right' => 'manager', 'default' => 'tiptap', 'check' => array('tiptap', 'ckeditor', 'same')),
 		// Voice typing (1.28.0): off by default; each user then agrees once per receiver of the voice
 		'INBOX_DICTATION_ENABLED' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
-		// Security (lot F1 1.78.0): remote pictures of a quote (the tracking ones always go), « always show the
+		// Security (1.78.0): remote pictures of a quote (the tracking ones always go), « always show the
 		// pictures », unsubscribe, alert on bank details (A6)
 		'INBOX_QUOTE_REMOTE_IMAGES' => array('right' => 'manager', 'default' => 'keep', 'check' => array('keep', 'reply', 'all')),
 		'INBOX_IMAGES_ALWAYS' => array('right' => 'manager', 'default' => 'domain', 'check' => array('domain', 'sender', 'never')),
@@ -106,7 +106,7 @@ function inboxGeneralSettings()
 		'INBOX_RSPAMD_LEARN' => array('right' => 'manager', 'default' => '1', 'check' => 'int:0:1'),
 		// Lists of reputation asked by DNS to outside services (Spamhaus, SURBL...): off by default
 		'INBOX_RSPAMD_DNSLISTS' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
-		// New mailbox (lot H1): the ISPDB of Thunderbird (Mozilla) asked with the domain of the address, off by default
+		// New mailbox: the ISPDB of Thunderbird (Mozilla) asked with the domain of the address, off by default
 		'INBOX_AUTOCONFIG_ISPDB' => array('right' => 'manager', 'default' => '0', 'check' => 'int:0:1'),
 	);
 }

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxFolderAdminTest.php
  * \ingroup inbox
- * \brief   Lot W4 1.10.0: folders created, renamed, moved, removed, marked read, emptied, on the server then in the index
+ * \brief   1.10.0: folders created, renamed, moved, removed, marked read, emptied, on the server then in the index
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

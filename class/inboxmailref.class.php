@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxmailref.class.php
  * \ingroup inbox
- * \brief   A mail for Dolibarr whatever its place (webmail §5.7 bis): assignments now, links and notes in lot W5
+ * \brief   A mail for Dolibarr whatever its place: assignments, links and notes
  */
 
 /**

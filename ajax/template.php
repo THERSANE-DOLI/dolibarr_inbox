@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/template.php
  * \ingroup inbox
- * \brief   Mail templates of inbox (lot W6 1.18.0): tab Templates of a mailbox, « Save as a template » of a writing
+ * \brief   Mail templates of inbox (1.18.0): tab Templates of a mailbox, « Save as a template » of a writing
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

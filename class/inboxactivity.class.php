@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxactivity.class.php
  * \ingroup inbox
- * \brief   Activity of a mail (lot E2, 1.77.0): the answers sent from the mailbox in its conversation, beside the
+ * \brief   Activity of a mail (1.77.0): the answers sent from the mailbox in its conversation, beside the
  *          internal notes; before a sending, an answer sent to the same mail since the writing was opened
  */
 

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxNotifyTest.php
  * \ingroup inbox
- * \brief   Unread counter, notifications of the browser, box_error and summary by mail (lot W8 1.21.0)
+ * \brief   Unread counter, notifications of the browser, box_error and summary by mail (1.21.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

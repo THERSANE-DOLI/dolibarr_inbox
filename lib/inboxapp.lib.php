@@ -259,7 +259,7 @@ function inboxAppContextVars(User $user)
 		'INBOX_MODULES_URL' => !empty($user->admin) ? DOL_URL_ROOT.'/admin/modules.php?search_keyword=inbox' : '',
 		// Settings > Server (1.54.0): admins of Dolibarr only
 		'INBOX_RIGHT_DOLIBARR_ADMIN' => !empty($user->admin),
-		// Lot W6: the user may write (an active mailbox with the level « send » at least)
+		// The user may write (an active mailbox with the level « send » at least)
 		'INBOX_CAN_SEND' => inboxCanSend($user),
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
 		// Agenda panel (1.107.0): shown, case « done », pages of a module that took over (hook inboxAgendaProvider)

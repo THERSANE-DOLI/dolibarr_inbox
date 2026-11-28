@@ -22,8 +22,8 @@
  */
 
 /**
- * An engine finds mails in the mailboxes of the user. The SQL engine on the index is always there (lot W3); a full
- * text engine may come later (lot W7) with the same contract. The rights are applied by the caller: the engine only
+ * An engine finds mails in the mailboxes of the user. The SQL engine on the index is always there; a full
+ * text engine may come later with the same contract. The rights are applied by the caller: the engine only
  * receives mailboxes the user may read.
  */
 interface InboxSearchEngine

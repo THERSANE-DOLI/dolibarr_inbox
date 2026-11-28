@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxThreadLinkTest.php
  * \ingroup inbox
- * \brief   1.73.0 (lot A3): the link follows the conversation (link the thread, new mails linked, detach, undo)
+ * \brief   1.73.0: the link follows the conversation (link the thread, new mails linked, detach, undo)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

@@ -162,14 +162,12 @@ InboxErrorTagLabel = Nome dell'etichetta obbligatorio (al massimo 128 caratteri)
 InboxErrorTagColor = Colore non valido
 InboxErrorUserParam = Impostazione o valore non valido
 
-# Application (lot W1)
+# Application
 InboxAppName = Inbox
 InboxSettings = Impostazioni
 InboxSpaces = Spazi
 InboxSpaceMail = Posta
 InboxBackToDolibarr = Torna a Dolibarr
-InboxMailComing = Lettura delle e-mail: prossimo lotto
-InboxMailComingText = Le caselle si configurano nelle Impostazioni; la lettura delle e-mail arriva con la prossima versione.
 InboxGoToAccounts = Configurare le caselle
 InboxNeedBackportDolContext = Su Dolibarr 23 l'applicazione inbox richiede il modulo backportdolcontext (contesto JavaScript di Dolibarr 24): attivarlo in Impostazioni > Moduli.
 InboxNeedJavascript = L'applicazione inbox richiede JavaScript.
@@ -528,7 +526,7 @@ InboxSystem = Sistema (operazione pianificata)
 InboxFromCache = dalla cache
 InboxCatalogue = Catalogo dei componenti
 
-# Synchronisation (lot W2)
+# Synchronisation
 InboxCronSync = Inbox : sincronizzazione delle caselle
 InboxCronSyncComment = Legge le e-mail nuove, modificate ed eliminate delle caselle attive (sola lettura) e prosegue la prima indicizzazione
 InboxTabSync = Sincronizzazione
@@ -571,7 +569,7 @@ InboxSyncFolderOff = Cartella non seguita: le sue e-mail escono dall'indice
 InboxSyncAlreadyRunning = Una sincronizzazione di questa casella è già in corso, o la casella attende dopo un errore.
 InboxFolderRoleInbox = Posta in arrivo
 
-# Lot W3: reading of the mails
+# Reading of the mails
 InboxAddAccount = Aggiungi una casella
 InboxAllBoxes = Tutte le mie caselle
 InboxAllDone = Tutto gestito
@@ -1612,7 +1610,7 @@ InboxLookPreview = Anteprima
 InboxLookPreviewMail = Richiesta di preventivo
 InboxLookPreviewText = Buongiorno, potreste inviarci...
 
-# Search panel and deep search (lot W7 1.19.0)
+# Search panel and deep search (1.19.0)
 InboxSxWhere = Dove cercare
 InboxScopeFolder = Questa cartella
 InboxScopeAccount = Questa casella
@@ -1660,7 +1658,7 @@ InboxDeepExact = Ricerca esatta: maiuscole ignorate, accenti rispettati.
 InboxDeepSearchNoWords = Scrivi almeno una parola da cercare nel testo delle e-mail.
 InboxDeepNotSearched = Il testo delle e-mail non è stato cercato.
 
-# Meilisearch (lot W7 1.20.0)
+# Meilisearch (1.20.0)
 InboxSectionSearch = Ricerca
 InboxMeiliHelp = Opzione: Meilisearch rende veloce la ricerca nel testo delle e-mail, con errori di battitura e accenti tollerati e un ordinamento per pertinenza. Senza, il testo resta cercabile sul server di posta, su richiesta. Meilisearch deve essere installato su questo server o sulla rete privata: il testo delle e-mail vi viene copiato.
 InboxMeiliOn = Attivato
@@ -1730,7 +1728,7 @@ InboxSortRelevance = pertinenza
 InboxCronFulltext = Inbox: indice di ricerca Meilisearch
 InboxCronFulltextComment = Invia a Meilisearch il testo delle nuove e-mail delle caselle indicizzate; una volta al giorno, toglie le e-mail eliminate
 
-# Notifications (lot W8 1.21.0)
+# Notifications (1.21.0)
 InboxNavNotifications = Notifiche
 InboxNotifSettings = Impostazioni delle notifiche
 InboxNotifBoxError = Una casella non si sincronizza più
@@ -1792,7 +1790,7 @@ InboxNotifMailFooter = Ricevi questo riepilogo perché hai scelto la mail per qu
 InboxCronNotifMail = Inbox: notifiche via mail
 InboxCronNotifMailComment = Invia via mail le notifiche ancora non lette dopo 15 minuti agli utenti che l'hanno scelto, un riepilogo per utente
 
-# Invitations and read receipts (lot W8 1.22.0)
+# Invitations and read receipts (1.22.0)
 InboxInvite = Invito
 InboxInviteCancelled = Evento annullato
 InboxInviteAnswer = Risposta a un invito
@@ -1893,7 +1891,7 @@ InboxSxNoAddress = Nessun indirizzo noto contiene « %s »: Invio la cerca così
 InboxSxOpsToggle = Operatori
 InboxUserCard = Scheda Dolibarr
 
-# Rules and out of office (lot W8 1.23.0)
+# Rules and out of office (1.23.0)
 InboxTabRules = Regole
 InboxTabAway = Assenza
 InboxRulesHelp = Le regole si applicano sul server all'arrivo di ogni mail, in quest'ordine, anche con inbox e Dolibarr chiusi, per ogni programma di posta.
@@ -2709,7 +2707,7 @@ InboxCarrierHelp = Categoria di fornitori i cui messaggi parlano dei nostri pacc
 InboxCarrierSaved = Categoria dei corrieri salvata
 InboxSituationCarrier = Corriere: nessuna situazione. La spedizione di un numero di tracking del messaggio è in « Citati nel messaggio ».
 InboxLogCarriers = Categoria dei corrieri cambiata
-# Data sources (lot A2 level 1, 1.72.0)
+# Data sources (1.72.0)
 InboxVia = tramite
 InboxViaTitle = Inviato da « %s » da %s per questo richiedente
 InboxRequester = Richiedente
@@ -2797,7 +2795,7 @@ InboxSourceErrorLine = Riga non compresa: « %s ».
 InboxSourceErrorNoHeader = Indicate almeno un'intestazione da leggere.
 InboxSourceErrorMany = Al massimo %s fonti.
 InboxSourceExampleLabel = Richiesta di preventivo (esempio)
-# The link follows the conversation (lot A3, 1.73.0)
+# The link follows the conversation (1.73.0)
 InboxLinkedByThread = collegato dalla conversazione
 InboxLinkThreadToo = Collega anche le altre %s mail della conversazione con lo stesso oggetto
 InboxLinkedThreadToo = Collegato, insieme alle altre %s mail della conversazione con lo stesso oggetto
@@ -2911,7 +2909,7 @@ InboxSourceRole_data = Dati (JSON)
 InboxSourceRole_field = Un campo
 InboxSourceAnalyzeApply = Usa queste impostazioni
 InboxSourceAnalyzeApplied = Impostazioni compilate qui sotto: verificatele, date un nome alla fonte, poi salvate.
-# Bank details in a mail (lot A6, 1.75.0)
+# Bank details in a mail (1.75.0)
 InboxBankTitle = Questa mail parla di coordinate bancarie
 InboxBankLead = Prima di qualsiasi cambio di IBAN, verificate con una telefonata fatta da voi. I segnali qui sotto aiutano, non decidono.
 InboxBankLeadDanger = Nulla prova questa mail (mittente non autenticato o imitato). Non cambiate nulla senza una telefonata fatta da voi.
@@ -2956,7 +2954,7 @@ InboxBankCheckedNote = Coordinate bancarie verificate per telefono al %s, con %s
 InboxBankCheckedDone = Verifica annotata sulla mail
 InboxBankFold = Riduci
 InboxBankUnfold = Mostra i consigli
-# Shared domains (lot A7, 1.76.0)
+# Shared domains (1.76.0)
 InboxNavDomains = Domini pubblici e condivisi
 InboxDomainsHelp = Le poste pubbliche, i provider e gli indirizzi usa e getta raggruppano persone che non si conoscono: il loro dominio non indica mai un soggetto terzo. Il dominio di un'azienda è un buon indizio, a meno che più vostri soggetti terzi lo condividano.
 InboxDomainsWhy = Perché? Cosa fa ogni categoria
@@ -3027,7 +3025,7 @@ InboxDomainsMatchLabel = Riconoscere il mittente dal dominio del suo indirizzo
 InboxDomainsMatchHelp = Attivo per impostazione predefinita. Disattivato, si riconosce solo l'indirizzo esatto di un contatto o di un soggetto terzo: le mail di un nuovo contatto di un'azienda nota non la mostrano più, e nessun soggetto terzo è proposto per un dominio condiviso. Da disattivare solo se le ricerche per dominio rallentano un grande database (il registro di Dolibarr annota la loro durata oltre 200 ms).
 InboxDomainsMatchOn = Riconoscimento dal dominio attivato
 InboxDomainsMatchOff = Riconoscimento dal dominio disattivato: solo indirizzi esatti
-# Fil of the mail: answers sent (lot E2, 1.77.0)
+# Fil of the mail: answers sent (1.77.0)
 InboxActivityReplied = %s ha risposto
 InboxActivityWrote = %s ha scritto
 InboxActivityRepliedTo = Risposto a %s
@@ -3049,7 +3047,7 @@ InboxComposeConflictQueued = %s sta inviando una risposta a questa mail (partita
 InboxComposeConflictOther = Una risposta a questa mail è partita dalla casella alle %s da un altro software, da quando avete aperto questa risposta.
 InboxComposeConflictSee = Vedi la risposta
 InboxComposeConflictSend = Invia comunque
-# Security settings, remote pictures of the quote (lot F1, 1.78.0)
+# Security settings, remote pictures of the quote (1.78.0)
 InboxNavSecurity = Sicurezza
 InboxSecurityHelp = Ciò che protegge gli utenti delle caselle. Ogni scelta dice da cosa protegge: la più sicura non è sempre quella predefinita, perché il lavoro quotidiano resti semplice.
 InboxQuoteRemoteImages = Immagini remote nella citazione
@@ -3078,7 +3076,7 @@ InboxImagesAlwaysUnproven = Mittente non autenticato: « Mostra sempre » non pu
 InboxImagesAlwaysUnprovenHosts = Mittente non autenticato: « Mostra sempre » può essere memorizzato solo per un host di immagini, non per questo mittente.
 InboxImagesOwnDomains = Immagini dei nostri domini
 InboxImagesOwnDomainsHelp = Le immagini remote ospitate sul dominio di una casella (e sui suoi sottodomini) sono mostrate senza clic, chiunque sia il mittente: per esempio la firma delle vostre email citata in una risposta. Caricare un'immagine dal proprio server non rivela nulla a nessuno all'esterno. Un servizio di posta pubblico (il dominio di una casella gratuita) non conta mai come vostro. Vale anche con « Mai » qui sopra.
-# New customer from a mail (lot A1, 1.79.0)
+# New customer from a mail (1.79.0)
 InboxLeadOpen = Nuovo cliente
 InboxLeadTitle = Nuovo cliente da questa mail
 InboxLeadClose = Chiudi il pannello
@@ -3173,7 +3171,7 @@ InboxLeadSalesRepWhy_assigned = La mail è assegnata a questa persona
 InboxLeadSalesRepWhy_owner = Titolare della casella personale che ha ricevuto la mail
 InboxLeadVatNotSubject = Non soggetto a IVA
 InboxLeadCategoriesCount = %s categorie
-# Insert a piece of Dolibarr in a writing (lot A5, 1.83.0)
+# Insert a piece of Dolibarr in a writing (1.83.0)
 InboxPieceInsert = Inserisci un documento
 InboxPieceSearch = Riferimento o soggetto terzo
 InboxPieceAll = Tutti i soggetti terzi
@@ -3544,7 +3542,7 @@ InboxProtectLevelToPasswordConfirm = La casella sarà di nuovo indicizzata dalle
 InboxLog_protect_level = Livello di protezione cambiato
 
 #
-# New mailbox: servers found from the address (lot H1)
+# New mailbox: servers found from the address
 #
 InboxSectionLogin = Accesso
 InboxAutoconfigEmailHelp = I server vengono cercati a partire dall'indirizzo.

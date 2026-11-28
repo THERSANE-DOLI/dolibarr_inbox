@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxlive.class.php
  * \ingroup inbox
- * \brief   Live reading of a protected mailbox (1.89.0, lot S2): folders and mails read on the mail server, nothing kept
+ * \brief   Live reading of a protected mailbox (1.89.0): folders and mails read on the mail server, nothing kept
  */
 
 require_once __DIR__.'/inboxprotect.class.php';

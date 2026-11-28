@@ -1,4 +1,4 @@
-// Tests of the one door of the HTML of a mail in the page (js/inbox-safe.js, lot S1): DOMPurify then the Sanitizer
+// Tests of the one door of the HTML of a mail in the page (js/inbox-safe.js): DOMPurify then the Sanitizer
 // API of the browser, in a DOM made by jsdom. Run: cd dev/editor-tests && npm test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

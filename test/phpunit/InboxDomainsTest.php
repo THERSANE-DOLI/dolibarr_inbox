@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxDomainsTest.php
  * \ingroup inbox
- * \brief   1.76.0 (lot A7): shared domains (shipped list, subdomains, local entries, disabled ones, old setting,
+ * \brief   1.76.0: shared domains (shipped list, subdomains, local entries, disabled ones, old setting,
  *          thirdparties offered for a shared domain)
  */
 

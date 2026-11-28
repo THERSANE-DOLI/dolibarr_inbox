@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxMailTransferTest.php
  * \ingroup inbox
- * \brief   Lot W4 1.12.0: mails imported (.eml, mbox of Thunderbird with its flags), folders exported (mbox, zip)
+ * \brief   1.12.0: mails imported (.eml, mbox of Thunderbird with its flags), folders exported (mbox, zip)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

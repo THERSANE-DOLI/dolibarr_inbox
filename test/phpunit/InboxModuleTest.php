@@ -82,7 +82,7 @@ class InboxModuleTest extends InboxTestCase
 			// Nor the products the interface is inspired by (« as Thunderbird »). Named where the user acts in it: the
 			// import from its QR codes (InboxQr*, 1.24.0: where the export is found) and the tags kept in step with it
 			// (InboxTagsThunderbird*, InboxTagsAliasHelp, 1.65.0 and 1.66.0: what to change in Thunderbird), and the
-			// database of Thunderbird asked for the servers of a new mailbox (lot H1: the outside service named where the
+			// database of Thunderbird asked for the servers of a new mailbox (the outside service named where the
 			// domain goes, rule R4)
 			$text = preg_replace('/^(Inbox(Qr|ImportSourceQr|TagsThunderbird|AutoconfigIspdb|AutoconfigSource_ispdb|AutoconfigTriedSource_ispdb)[A-Za-z0-9_]*|InboxTagsAliasHelp|InboxOutsideWhat_ispdb)\s*=.*$/m', '', (string) file_get_contents($dir.'/'.$lang.'/inbox.lang'));
 			$this->assertDoesNotMatchRegularExpression('/thunderbird|gmail|trello|roundcube/i', $text, $lang);

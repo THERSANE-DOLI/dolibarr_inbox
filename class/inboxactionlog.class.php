@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxactionlog.class.php
  * \ingroup inbox
- * \brief   Journal of the actions on the mails (lot W4 §4.2): who moved, archived, removed, tagged
+ * \brief   Journal of the actions on the mails: who moved, archived, removed, tagged
  */
 
 /**

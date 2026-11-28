@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxRulesTest.php
  * \ingroup inbox
- * \brief   Rules and out of office written by ManageSieve (lot W8 1.23.0)
+ * \brief   Rules and out of office written by ManageSieve (1.23.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

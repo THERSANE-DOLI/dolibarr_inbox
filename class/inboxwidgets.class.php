@@ -26,14 +26,14 @@ require_once __DIR__.'/inboxaccess.class.php';
 require_once __DIR__.'/inboxcreate.class.php';
 
 /**
- * Widgets: small pieces of information about the other side of a mail, laid out by each user in the Dolibarr panel
- * (lot WG2). Each widget has a template (how it is drawn), a size (default, minimum, maximum, direction of resizing),
+ * Widgets: small pieces of information about the other side of a mail, laid out by each user in the Dolibarr panel.
+ * Each widget has a template (how it is drawn), a size (default, minimum, maximum, direction of resizing),
  * a preview with sample values (the catalogue, never computed) and its data, computed for one mail only when it is
  * shown, from the overview (InboxOverview): same sections, same key figures, same rights.
  *
  * Templates: mini (an icon and a number), line (one piece of information), figure (a value, its label, its change),
  * list (lines of a section), chart (bars), action (a list and buttons to create), thread (the notes, drawn by the
- * panel), free (HTML of a module, lot WG4).
+ * panel), free (HTML of a module).
  */
 class InboxWidgets
 {

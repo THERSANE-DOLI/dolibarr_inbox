@@ -15,7 +15,7 @@
 
 -- A mail for Dolibarr, whatever its place (webmail §5.7 bis, P9 bis): found by its Message-ID, never by mailbox,
 -- folder or UID, so that links, notes and assignments survive every move. Check print: date of sending + sender, to
--- tell apart two mails with the same Message-ID. Created in lot W4 for the assignments; links and notes come in W5.
+-- tell apart two mails with the same Message-ID. Used by the assignments, the links and the notes.
 CREATE TABLE llx_inbox_mailref(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
 	entity integer DEFAULT 1 NOT NULL,

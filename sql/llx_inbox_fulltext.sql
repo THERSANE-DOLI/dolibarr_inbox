@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Full text search with Meilisearch (lot W7 1.20.0): one row per mailbox indexed. The mails are sent in the order of
+-- Full text search with Meilisearch (1.20.0): one row per mailbox indexed. The mails are sent in the order of
 -- their row in the index (last_id: last row sent); a mail moved has a new row, so it is sent again. Nothing of the
 -- text of the mails is kept here.
 CREATE TABLE llx_inbox_fulltext(

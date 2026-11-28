@@ -30,7 +30,7 @@ require_once __DIR__.'/inboximapresponse.class.php';
 /**
  * IMAP connector, through the Webklex php-imap library shipped with Dolibarr (2.7.2, same from Dolibarr 18 to 24).
  *
- * Read only, always, in this lot: folders opened with EXAMINE (read-only select), mails read with BODY.PEEK sent as
+ * The reading never changes the mailbox: folders opened with EXAMINE (read-only select), mails read with BODY.PEEK sent as
  * a raw command. The leaveUnread() of Webklex 2.7 is not used: it fetches with RFC822 (which sets \Seen) and then
  * removes the flag, that is a write on the mailbox at every reading.
  *
@@ -65,7 +65,7 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Reading, flags (lot W3), tags, move, import, folders (lot W4); sending and drafts come with lot W6, each one checked
+	 * Reading, flags, tags, move, import, folders; sending and drafts, each one checked
 	 * against the capabilities of the server.
 	 *
 	 * @return string[]
@@ -84,10 +84,10 @@ class InboxImapConnector extends InboxConnector
 		if (in_array('QUOTA', $server, true)) {
 			$caps[] = self::CAP_QUOTA;
 		}
-		// Writes of lot W4: tags, move (MOVE, or COPY + UID EXPUNGE with UIDPLUS), import (APPEND), folders
+		// Writes of Tags, move (MOVE, or COPY + UID EXPUNGE with UIDPLUS), import (APPEND), folders
 		$caps[] = self::CAP_TAGS;
 		$caps[] = self::CAP_IMPORT;
-		// Rules and out of office (lot W8 1.23.0): by ManageSieve, when the mailbox has its port
+		// Rules and out of office (1.23.0): by ManageSieve, when the mailbox has its port
 		if ((int) $this->account->sieve_port > 0) {
 			$caps[] = self::CAP_RULES;
 			$caps[] = self::CAP_VACATION;
@@ -96,7 +96,7 @@ class InboxImapConnector extends InboxConnector
 		if (in_array('MOVE', $server, true) || in_array('UIDPLUS', $server, true)) {
 			$caps[] = self::CAP_MOVE;
 		}
-		// Lot W6: sending by the SMTP server of the mailbox, drafts in its folder (APPEND)
+		// Sending by the SMTP server of the mailbox, drafts in its folder (APPEND)
 		if ($this->account->getSmtpHost() !== '') {
 			$caps[] = self::CAP_SEND;
 		}
@@ -751,7 +751,7 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Headers of one mail (BODY.PEEK[HEADER]: the mail stays unread), for the checks of the sender (lot W5 1.15.0)
+	 * Headers of one mail (BODY.PEEK[HEADER]: the mail stays unread), for the checks of the sender (1.15.0)
 	 *
 	 * @param string $folder   Folder path
 	 * @param string $remoteId Identifier "uidvalidity:uid"
@@ -1836,7 +1836,7 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Send a mail by the SMTP server of the mailbox (lot W6 1.16.0). The copy in the sent folder is put by the caller
+	 * Send a mail by the SMTP server of the mailbox (1.16.0). The copy in the sent folder is put by the caller
 	 * (importRaw), as the source kept there has the Bcc that the one sent has not.
 	 *
 	 * @param string                                  $raw      Source to send (no Bcc header)
@@ -1948,7 +1948,7 @@ class InboxImapConnector extends InboxConnector
 	}
 
 	/**
-	 * Session on the rules of the mailbox (lot W8 1.23.0): ManageSieve opened, STARTTLS (never a password in clear
+	 * Session on the rules of the mailbox (1.23.0): ManageSieve opened, STARTTLS (never a password in clear
 	 * outside this server), authenticated. The caller closes it.
 	 *
 	 * @param string $error Code of the error (sieve_disabled, sieve_connect, sieve_tls, sieve_no_tls, sieve_auth...)

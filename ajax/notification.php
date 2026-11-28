@@ -28,7 +28,7 @@ dol_include_once('/inbox/class/inboxprotect.class.php');
 $action = (string) inboxAjaxParam('action', 'aZ09');
 inboxAjaxStart(in_array($action, array('read', 'open', 'archive', 'unarchive'), true));
 $notify = new InboxNotification($db);
-// The bell, and the unread mails counted for the tab, the installed application and the top bar (lot W8 1.21.0)
+// The bell, and the unread mails counted for the tab, the installed application and the top bar (1.21.0)
 $counts = function () use ($notify, $user) {
 	return $notify->counts($user) + $notify->mailCount($user);
 };

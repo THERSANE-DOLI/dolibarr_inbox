@@ -1,4 +1,4 @@
-# Disposable addresses: never a thirdparty, warning in the panel (inbox, lot A7).
+# Disposable addresses: never a thirdparty, warning in the panel (inbox).
 # Copied from https://github.com/disposable-email-domains/disposable-email-domains (CC0) on 2026-11-10 by dev/update-domains.php: do not edit, see never.txt.
 0-mail.com
 0-mailer.dynv6.net

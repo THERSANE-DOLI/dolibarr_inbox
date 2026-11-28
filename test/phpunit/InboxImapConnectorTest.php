@@ -63,7 +63,7 @@ class InboxImapConnectorTest extends InboxTestCase
 		$caps = $c->getCapabilities();
 		$this->assertCount(18, $caps);
 		$this->assertTrue($caps['read']);
-		$this->assertFalse($caps['move'], 'no write in lot W1');
+		$this->assertFalse($caps['move'], 'read only');
 		$before = $this->flags(1);
 		$found = $c->findByMessageId('seed-1@inbox-test.invalid');
 		$this->assertIsArray($found);

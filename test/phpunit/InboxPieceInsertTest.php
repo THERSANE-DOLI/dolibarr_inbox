@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxPieceInsertTest.php
  * \ingroup inbox
- * \brief   1.83.0 (lot A5): pieces of the thirdparties of the recipients, what a piece gives to a writing (recall, table
+ * \brief   1.83.0: pieces of the thirdparties of the recipients, what a piece gives to a writing (recall, table
  *          of its lines with its totals, online links only when Dolibarr offers them)
  */
 

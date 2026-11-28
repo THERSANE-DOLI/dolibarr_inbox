@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Invitations answered (lot W8 1.22.0): one row per user and event (UID of the invitation, whatever the mailbox or
+-- Invitations answered (1.22.0): one row per user and event (UID of the invitation, whatever the mailbox or
 -- the copy of the mail): the answer given, and the event of the agenda of Dolibarr made from it (updates, cancel).
 CREATE TABLE llx_inbox_invite(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

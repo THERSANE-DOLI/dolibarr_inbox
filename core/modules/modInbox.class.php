@@ -59,8 +59,8 @@ class modInbox extends DolibarrModules
 		$this->picto = 'inbox@inbox';
 
 		// Triggers: the recognised thirdparty of the indexed mails follows the contacts and thirdparties
-		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (lot W6 1.18.0), the unread
-		// counter in the top bar of the other pages of Dolibarr (lot W8 1.21.0), the copy in Sent of the mails sent by
+		// Hooks: the type of the mail templates of inbox in Setup > Emails > Templates (1.18.0), the unread
+		// counter in the top bar of the other pages of Dolibarr (1.21.0), the copy in Sent of the mails sent by
 		// Dolibarr itself from the address of a mailbox (context mail, 1.132.0)
 		$this->module_parts = array('triggers' => 1, 'hooks' => array('data' => array('emailtemplates', 'toprightmenu', 'mail'), 'entity' => '0'));
 		// Raw mails kept for a while (never served by document.php: no read right at the root of the module)
@@ -90,7 +90,7 @@ class modInbox extends DolibarrModules
 			$conf->inbox->enabled = 0;
 		}
 
-		// Tab « Mails » of the cards (lot W5 1.13.0): mails linked to the piece, and from / to the addresses of a thirdparty or a contact
+		// Tab « Mails » of the cards (1.13.0): mails linked to the piece, and from / to the addresses of a thirdparty or a contact
 		$this->tabs = array();
 		$cond = 'isModEnabled("inbox") && $user->hasRight("inbox", "webmail", "use") && empty($user->socid)';
 		foreach (array('thirdparty' => 'societe', 'contact' => 'contact', 'propal' => 'propal', 'order' => 'commande', 'invoice' => 'facture', 'supplier_order' => 'order_supplier',
@@ -135,7 +135,7 @@ class modInbox extends DolibarrModules
 			'priority' => 40,
 		);
 
-		// Queue of the sending (lot W6 1.17.0): mails due after their delay or at their date, every minute (the page
+		// Queue of the sending (1.17.0): mails due after their delay or at their date, every minute (the page
 		// sends them itself when it is open)
 		$this->cronjobs[] = array(
 			'label' => 'InboxCronOutbox',
@@ -152,7 +152,7 @@ class modInbox extends DolibarrModules
 			'priority' => 30,
 		);
 
-		// Full text search (lot W7 1.20.0): the next mails of the mailboxes indexed sent to Meilisearch, every minute
+		// Full text search (1.20.0): the next mails of the mailboxes indexed sent to Meilisearch, every minute
 		// (nothing done while the option is off)
 		$this->cronjobs[] = array(
 			'label' => 'InboxCronFulltext',
@@ -187,7 +187,7 @@ class modInbox extends DolibarrModules
 			'priority' => 70,
 		);
 
-		// Notifications (lot W8 1.21.0): those still unread after 15 minutes go by mail to the users who chose it
+		// Notifications (1.21.0): those still unread after 15 minutes go by mail to the users who chose it
 		$this->cronjobs[] = array(
 			'label' => 'InboxCronNotifMail',
 			'jobtype' => 'method',
@@ -311,7 +311,7 @@ class modInbox extends DolibarrModules
 			return -1;
 		}
 		if ($result > 0) {
-			// Shared domains (lot A7, 1.76.0): the shipped list is read in its files; the hidden setting of before
+			// Shared domains (1.76.0): the shipped list is read in its files; the hidden setting of before
 			// becomes local entries
 			dol_include_once('/inbox/class/inboxdomains.class.php');
 			InboxDomains::reset();

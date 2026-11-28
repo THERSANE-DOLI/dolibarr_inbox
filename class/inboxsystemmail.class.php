@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxsystemmail.class.php
  * \ingroup inbox
- * \brief   Small mails made by inbox on a click of the user (lot W8 1.22.0): answer to an invitation, read receipt
+ * \brief   Small mails made by inbox on a click of the user (1.22.0): answer to an invitation, read receipt
  */
 
 require_once __DIR__.'/inboxmailbuilder.class.php';

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxAutoconfigTest.php
  * \ingroup inbox
- * \brief   Lot H1: servers of a new mailbox found from its address (readers and sources without network)
+ * \brief   Servers of a new mailbox found from its address (readers and sources without network)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -118,7 +118,7 @@ class InboxAutoconfigOffline extends InboxAutoconfig
 }
 
 /**
- * Lot H1
+ * Servers of a new mailbox found from its address
  */
 class InboxAutoconfigTest extends InboxTestCase
 {

@@ -80,7 +80,7 @@ switch ($action) {
 			inboxAjaxError($access->error, 500);
 		}
 		if ($result > 0) {
-			// The people who cannot read the mailbox any more lose their assignments on its mails (lot W4 1.9.0)
+			// The people who cannot read the mailbox any more lose their assignments on its mails (1.9.0)
 			dol_include_once('/inbox/class/inboxassign.class.php');
 			$assign = new InboxAssign($db);
 			$assign->prune($user, (int) $account->id);

@@ -46,7 +46,7 @@ class ActionsInbox
 	}
 
 	/**
-	 * Setup > Emails > Templates: the type of the templates of inbox (lot W6 1.18.0), so they are written there too
+	 * Setup > Emails > Templates: the type of the templates of inbox (1.18.0), so they are written there too
 	 *
 	 * @param array<string,mixed> $parameters Parameters (elementList)
 	 * @param object|null         $object     Unused
@@ -68,7 +68,7 @@ class ActionsInbox
 	}
 
 	/**
-	 * Top bar of the other pages of Dolibarr: the unread counter of inbox (lot W8 1.21.0). Counted when the page is
+	 * Top bar of the other pages of Dolibarr: the unread counter of inbox (1.21.0). Counted when the page is
 	 * made (one light query), then kept up to date without any call by the tabs of inbox open in the browser (local
 	 * storage, js/inbox-topbar.js): no polling from every page of Dolibarr. The menu entries have no hook: the script
 	 * moves the badge onto the entry Inbox of the top menu; this envelope stays only when that entry is not in the page.

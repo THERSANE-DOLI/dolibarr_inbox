@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxReadingTest.php
  * \ingroup inbox
- * \brief   Lot W3: lists and search on the index, reading of a mail, safety of the body, antivirus
+ * \brief   Lists and search on the index, reading of a mail, safety of the body, antivirus
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -36,7 +36,7 @@ dol_include_once('/inbox/class/inboxreader.class.php');
 dol_include_once('/inbox/class/inboxattachmentscan.class.php');
 
 /**
- * Lot W3 (analyse-lot-w3.md §6.4, CA-01, CA-04, CA-05, CA-07 to CA-09)
+ * Reading: lists, search, mail analysis, body and attachments
  */
 class InboxReadingTest extends InboxTestCase
 {

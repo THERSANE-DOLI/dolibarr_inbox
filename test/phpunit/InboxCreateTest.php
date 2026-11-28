@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxCreateTest.php
  * \ingroup inbox
- * \brief   Lot W5 1.14.0: a piece created from a mail is linked to it (and gets the .eml), files put in a piece
+ * \brief   1.14.0: a piece created from a mail is linked to it (and gets the .eml), files put in a piece
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

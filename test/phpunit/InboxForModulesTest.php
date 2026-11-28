@@ -16,7 +16,7 @@
  */
 
 /**
- * \file    inbox/test/phpunit/InboxLot0Test.php
+ * \file    inbox/test/phpunit/InboxForModulesTest.php
  * \ingroup inbox
  * \brief   Reading by Message-ID on the mailboxes of inbox, hooks for the other modules, import (CA-07, CA-08, CA-17, CA-25)
  */
@@ -107,9 +107,9 @@ class InboxTestHookManager extends HookManager
 }
 
 /**
- * Tests of the lot 0 rewired on inbox
+ * Readings by Message-ID for other modules, import of mailboxes declared by a module
  */
-class InboxLot0Test extends InboxTestCase
+class InboxForModulesTest extends InboxTestCase
 {
 	/** @var HookManager|null */
 	protected $savedHookManager;
@@ -234,7 +234,7 @@ class InboxLot0Test extends InboxTestCase
 		$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
 		foreach ($it as $file) {
 			$path = substr((string) $file, strlen($root) + 1);
-			if (preg_match('#^(analyses|\.git|dev/tabler)/#', $path) || $path === 'ChangeLog.md' || !preg_match('/\.(php|js|lang|sql|md|json|css)$/', $path) || $path === 'test/phpunit/InboxLot0Test.php') {
+			if (preg_match('#^(analyses|\.git|dev/tabler)/#', $path) || $path === 'ChangeLog.md' || !preg_match('/\.(php|js|lang|sql|md|json|css)$/', $path) || $path === 'test/phpunit/InboxForModulesTest.php') {
 				continue;
 			}
 			if (preg_match('/crmclientconnector|crm client connector/i', (string) file_get_contents((string) $file))) {

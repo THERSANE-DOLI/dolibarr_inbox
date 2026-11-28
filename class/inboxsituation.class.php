@@ -768,7 +768,7 @@ class InboxSituation
 			return null;
 		}
 		$before = (string) $c->$field;
-		// A number read in a mail: the one door (lot S2), as any value of a mail written in Dolibarr
+		// A number read in a mail: the one door, as any value of a mail written in Dolibarr
 		$c->$field = InboxSafe::line((string) $number, 30);
 		if ($c->update((int) $c->id, $user) <= 0) {
 			$this->error = $c->error ?: implode(', ', (array) $c->errors);

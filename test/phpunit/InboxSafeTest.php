@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxSafeTest.php
  * \ingroup inbox
- * \brief   Lot S1: the one door of what comes from a mail (InboxSafe), with a corpus of attacks
+ * \brief   The one door of what comes from a mail (InboxSafe), with a corpus of attacks
  */
 
 use PHPUnit\Framework\TestCase;
@@ -252,7 +252,7 @@ class InboxSafeTest extends TestCase
 	}
 
 	/**
-	 * Lot S2: the values written in Dolibarr go through the one door
+	 * The values written in Dolibarr go through the one door
 	 *
 	 * @return void
 	 */

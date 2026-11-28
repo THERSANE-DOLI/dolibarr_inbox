@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxsafe.class.php
  * \ingroup inbox
- * \brief   The one door of what comes from a mail (analysis analyse-assainissement-xss.md, lot S1)
+ * \brief   The one door of what comes from a mail (analysis analyse-assainissement-xss.md)
  */
 
 /**

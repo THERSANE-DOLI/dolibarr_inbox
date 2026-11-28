@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxQuoteSecurityTest.php
  * \ingroup inbox
- * \brief   1.78.0 (lot F1): remote pictures of a quote (trackers always out, others by the setting), security settings
+ * \brief   1.78.0: remote pictures of a quote (trackers always out, others by the setting), security settings
  *          of the administrator (« always show the pictures », unsubscribe, alert on bank details)
  */
 

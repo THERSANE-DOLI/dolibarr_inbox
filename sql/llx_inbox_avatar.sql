@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Pictures of the correspondents looked for by the server (lot W3, 1.5.0): hash of the address (or of the domain for
+-- Pictures of the correspondents looked for by the server (1.5.0): hash of the address (or of the domain for
 -- BIMI), source (bimi, gravatar), file in documents/inbox/avatars ('' = none found), date of the check.
 CREATE TABLE llx_inbox_avatar(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

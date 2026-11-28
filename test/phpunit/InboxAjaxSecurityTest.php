@@ -199,7 +199,7 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertStringNotContainsString('http-secret-pass', $log['body']);
 	}
 	/**
-	 * Lot W3: lists, reading, body and attachments refuse a forged identifier, a write without token or by GET; the
+	 * Lists, reading, body and attachments refuse a forged identifier, a write without token or by GET; the
 	 * body answers with the headers that forbid any script (CA-01, CA-04)
 	 *
 	 * @return void
@@ -234,7 +234,7 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/mail.php?action=open&id='.$row->rowid)['code'], 'IDOR: a mailbox without access is not found');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/body.php?id='.$row->rowid)['code']);
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php?action=page&folder='.$row->fk_folder)['code']);
-		// Deep search (lot W7 1.19.0): a mailbox without access is never searched on its server
+		// Deep search (1.19.0): a mailbox without access is never searched on its server
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'all', 'q' => 'raccords', 'token' => $token))['code'], 'IDOR: deep search');
 		$this->assertSame(404, $this->call('/custom/inbox/ajax/list.php', array('action' => 'content', 'account' => (int) $a->id, 'scope' => 'folder', 'folder' => (int) $row->fk_folder, 'q' => 'raccords', 'token' => $token))['code']);
 		$sug = $this->call('/custom/inbox/ajax/list.php', array('action' => 'suggest', 'q' => 'dupont'));
@@ -266,7 +266,7 @@ class InboxAjaxSecurityTest extends InboxTestCase
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/mail.php', array('action' => 'seen', 'id' => (int) $row->rowid, 'seen' => 1))['code'], 'read without token refused');
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/mail.php?action=seen&seen=1&id='.$row->rowid.'&token='.urlencode($token))['code'], 'write by GET refused');
 
-		// Actions of lot W4 (CA-04): token and POST, level « manage » checked by the server whatever the page says
+		// Actions of Token and POST, level « manage » checked by the server whatever the page says
 		$act = array('action' => 'run', 'what' => 'move', 'ids' => array((int) $row->rowid), 'folder' => (int) $row->fk_folder);
 		$this->assertSame(403, $this->call('/custom/inbox/ajax/action.php', $act)['code'], 'action without token refused');
 		$this->assertSame(405, $this->call('/custom/inbox/ajax/action.php?action=run&what=flag&on=1&ids='.$row->rowid.'&token='.urlencode($token))['code'], 'action by GET refused');

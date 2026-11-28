@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/composefile.php
  * \ingroup inbox
- * \brief   A file of a writing in the viewer (lot A5, 1.82.0): the very file that leaves with the mail, checked by the
+ * \brief   A file of a writing in the viewer (1.82.0): the very file that leaves with the mail, checked by the
  *          user before sending. Same answers and protections as the attachments of a mail (inbox_attserve.inc.php);
  *          only the author of the writing, in its session.
  *

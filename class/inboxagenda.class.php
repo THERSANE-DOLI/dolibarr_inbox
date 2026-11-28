@@ -24,7 +24,7 @@
  * note as HTML (dol_string_onlythesehtmltags keeps img and its attributes) and prints the title and the place raw
  * in its form (value="...") and in its card. Everything inbox writes there comes from a mail or from a text typed
  * by a user, never filtered by GETPOST: it goes through here (audit INBX-030, INBX-046, INBX-047, INBX-048), that is
- * now the one door InboxSafe (lot S2).
+ * now the one door InboxSafe.
  */
 require_once __DIR__.'/inboxsafe.class.php';
 

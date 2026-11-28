@@ -27,7 +27,7 @@ require_once __DIR__.'/inboxmail.class.php';
 require_once __DIR__.'/connector/inboxconnectorfactory.class.php';
 
 /**
- * A pass on a mailbox (analyse-lot-w2 §3): lock, folders, changes of each followed folder, index written, state.
+ * A pass on a mailbox: lock, folders, changes of each followed folder, index written, state.
  * Read only on the server. Order of the folders: inbox and sent at every pass, the others every 15 min, then the
  * first indexing of the older mails, within the time budget.
  */
@@ -115,7 +115,7 @@ class InboxSync
 		}
 		$this->db->query($sql);
 		if (!in_array($state, array('ok', 'first_sync'), true)) {
-			// Lot W8 1.21.0: the managers of the mailbox are told (bell, and the browser or a mail if they chose it)
+			// 1.21.0: the managers of the mailbox are told (bell, and the browser or a mail if they chose it)
 			dol_include_once('/inbox/class/inboxnotification.class.php');
 			$notify = new InboxNotification($this->db);
 			$notify->boxError((int) $accountId, (string) $state);
@@ -407,7 +407,7 @@ class InboxSync
 			$indexError = $mails->failed ? $mails->failed.' mail(s) not indexed: '.$mails->lastError : '';
 			$flagged = $mails->updateFlags($folderId, $res['changed']);
 			$this->stats['changed'] += $flagged;
-			// Junk: a known sender, authenticated, is probably legitimate (lot W5 1.15.0; headers of these mails only);
+			// Junk: a known sender, authenticated, is probably legitimate (1.15.0; headers of these mails only);
 			// setting of Settings > Anti-spam (1.85.0)
 			if ((string) $f->role === 'junk' && getDolGlobalInt('INBOX_JUNK_LEGIT_CHECK', 1)) {
 				require_once __DIR__.'/inboxknownsenders.class.php';

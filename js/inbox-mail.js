@@ -15,7 +15,7 @@
  */
 
 /**
- * inbox application, space « Mail » (lot W3, analyse-lot-w3.md, interface §3 to §7):
+ * inbox application, space « Mail »:
  * - pane 1: mailboxes and folders from the index, unread counters, mailbox in error;
  * - pane 2: list of a folder as a table or as cards, sort, quick filters, search on the index, pages loaded while
  *   scrolling, refresh every 20 s without losing the selection;
@@ -50,18 +50,18 @@
 		pickOpen: false,
 		q: '',
 		filters: { unread: false, flagged: false, attachment: false, mine: false, archived: false, legit: false },
-		// Search panel (lot W7 1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
+		// Search panel (1.19.0): criteria chosen (pills), third party, tag, period, panel, deep search
 		chips: [],
 		soc: null,
 		tag: '',
 		period: '',
 		sx: { open: false, active: -1, opts: [], sug: null, sugSeq: 0, text: '', timer: 0 },
 		deep: null,
-		// Meilisearch (lot W7 1.20.0): state given by the last list, crops of the text per row
+		// Meilisearch (1.20.0): state given by the last list, crops of the text per row
 		ft: null,
 		crops: {},
 		// Names of the people assigned seen in the lists (user => name), their photo of Dolibarr (user => address,
-		// '' when none), and the user (lot W4 1.9.0)
+		// '' when none), and the user (1.9.0)
 		people: {},
 		photos: {},
 		me: +(I.ctx('INBOX_USER_ID', 0) || 0),
@@ -1128,7 +1128,7 @@
 	}
 
 	/**
-	 * Out of office of the mailboxes read (lot W8 1.23.0): said to every reader (they know the senders got an automatic
+	 * Out of office of the mailboxes read (1.23.0): said to every reader (they know the senders got an automatic
 	 * answer); Turn off and Change for the managers
 	 */
 	function awayNotes() {
@@ -1631,7 +1631,7 @@
 			}
 			S.listLocked = 0;
 			S.pills = res.query;
-			// Meilisearch (lot W7 1.20.0): mailboxes fully indexed, error, order, crops of the text
+			// Meilisearch (1.20.0): mailboxes fully indexed, error, order, crops of the text
 			S.ft = res.fulltext || null;
 			S.crops = Object.assign({}, res.crops || {});
 			learnPeople(res.people);
@@ -2760,7 +2760,7 @@
 		sxRenderPanel();
 	}
 
-	// ---------- Search panel and deep search (lot W7 1.19.0) ----------
+	// ---------- Search panel and deep search (1.19.0) ----------
 	// The field opens into a panel: scope, suggestions, filters (shown as pills in the field), the deep search in the
 	// text of the mails (asked, one mailbox after the other on its mail server), recent searches
 
@@ -4263,7 +4263,7 @@
 			}
 		};
 		walk(doc.body);
-		// Then the one door (lot S3): DOMPurify and the Sanitizer API, the classes of Dolibarr kept
+		// Then the one door: DOMPurify and the Sanitizer API, the classes of Dolibarr kept
 		return I.safeHtml(doc.body.innerHTML, 'tooltip');
 	}
 	function objTipLoad(key) {
@@ -4534,10 +4534,10 @@
 			+ '<h2 class="ibx-readhead__subject">' + esc(m.subject || t('InboxNoSubject')) + ' ' + (partial ? tagsHtml({ folder: m.folder, tags: m.tags }) : headTagsHtml(m.id, { folder: m.folder, tags: m.tags })) + '</h2>';
 	}
 
-	// ---------- Actions on mails (lot W4: write on the server, checked, undo 8 s) ----------
+	// ---------- Actions on mails (write on the server, checked, undo 8 s) ----------
 	/** Actions after which the mail leaves the folder */
 	const LEAVING = new Set(['move', 'archive', 'delete', 'junk', 'notjunk']);
-	/** Actions of the level « manage » (read / unread and starred: « read », lot W4 §10 point 2) */
+	/** Actions of the level « manage » (read / unread and starred: « read ») */
 	const MANAGING = new Set(['tag', 'move', 'archive', 'delete', 'junk', 'notjunk']);
 	/** Mails per call (a larger selection goes by batches, decision W4 point 3) */
 	const BATCH = 200;
@@ -5570,7 +5570,7 @@
 		return items;
 	}
 
-	// ---------- Assignment (lot W4 1.9.0, webmail §5.4 quinquies): who handles a mail ----------
+	// ---------- Assignment (1.9.0, webmail §5.4 quinquies): who handles a mail ----------
 	function learnPeople(map) {
 		Object.keys(map || {}).forEach(k => {
 			const p = map[k];
@@ -5818,7 +5818,7 @@
 		q.focus();
 	}
 
-	// ---------- Threads ignored or watched, newsletters (lot W4 1.11.0, B4, B8) ----------
+	// ---------- Threads ignored or watched, newsletters (1.11.0, B4, B8) ----------
 	/**
 	 * A spam (1.142.0): « Probably legitimate » (known sender, authenticated: a doubt, never green) and why it is in the
 	 * junk when inbox knows it (score of the anti-spam engine, blocked sender)
@@ -5942,7 +5942,7 @@
 		toast(t('InboxUnsubscribed', m.from.name || m.from.email), canHandle(m) ? { action: t('InboxDelete'), onAction: () => doDelete([m.id]) } : {});
 	}
 
-	// ---------- Bandeau Dolibarr of the reading (lot W5 1.13.0, analyse-interface §6 bloc 3) ----------
+	// ---------- Bandeau Dolibarr of the reading (1.13.0, analyse-interface §6 bloc 3) ----------
 	/**
 	 * Column Dolibarr of a computer (1.110.0): a pane of the mail space beside the reading, full height, at the place
 	 * of the agenda panel (same splitter, same drawer when narrow). The bandeau of the mail open is moved into it; on a
@@ -7320,7 +7320,7 @@
 				sender.push((d.sender.soc.readable ? socCardHtml(box, d.sender.soc, 'soc') : pieceHtml(d.sender.soc, 0) + '<span class="ibx-muted ibx-soccard__by">' + th('InboxSocHiddenHelp') + '</span>')
 					+ (d.sender.by === 'domain' ? '<span class="ibx-muted ibx-soccard__by">' + th('InboxKnownByDomain') + '</span>' + domainFixHtml(d) : ''));
 			}
-			// Shared domains (lot A7, 1.76.0): a disposable address said; the thirdparties sharing the domain offered
+			// Shared domains (1.76.0): a disposable address said; the thirdparties sharing the domain offered
 			if (d.sender.domain_category === 'disposable') {
 				sender.push('<span class="ibx-badge ibx-domwarn" title="' + th('InboxDomainsDisposableHelp') + '">' + ic('warning') + th('InboxDomainsDisposable') + '</span>');
 			}
@@ -7341,7 +7341,7 @@
 			// A piece linked though cited for another thirdparty keeps its warning
 			const pieces = d.links.map(l => {
 				const c = citedOf(l);
-				// Linked by its conversation (lot A3, 1.73.0): said under the piece
+				// Linked by its conversation (1.73.0): said under the piece
 				return pieceHtml(l, l.link, c && c.match === 'other' ? citedWarning(box, c) : '', socId, l.origin === 'thread' ? { theirs: t('InboxLinkedByThread') } : {});
 			}).concat(d.extra.map(x => pieceHtml(x, 0, '', socId)));
 			const convo = d.conversation || { others: 0, detached: false };
@@ -7366,7 +7366,7 @@
 					+ '</span></div>' : '')
 				// A mail written by us (1.92.2): the thirdparty is the one of its recipient
 				+ '<div class="ibx-dolibar__row" data-sec="sender"><span class="ibx-dolibar__label">' + th(d.sender.side === 'recipient' ? 'InboxRecipient' : 'InboxSender') + '</span><span class="ibx-dolibar__items">'
-				// New customer from this mail (lot A1, 1.79.0): its button says the sender is unknown, the text only without it
+				// New customer from this mail (1.79.0): its button says the sender is unknown, the text only without it
 				+ (sender.length ? sender.join('') : (canLead ? '' : '<span class="ibx-muted">' + th('InboxSenderUnknown') + '</span>')
 					+ '<span class="ibx-dolibar__tools">'
 					+ (canLead ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--primary ibx-js-newcustomer" aria-haspopup="dialog">' + ic('user-plus') + ' ' + th('InboxLeadOpen') + '</button>' : '')
@@ -7459,7 +7459,7 @@
 		}
 	}
 	/**
-	 * Fil of the mail (lot E2, 1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
+	 * Fil of the mail (1.77.0): the internal notes and the answers sent from the mailbox in its conversation, by
 	 * date. Only what is sure: an answer is tied to the mail by its headers or its conversation, never by its subject;
 	 * the forwards are not there.
 	 */
@@ -7697,7 +7697,7 @@
 			return;
 		}
 		if (e.target.closest('.ibx-js-threaddetach')) {
-			// « Detach this mail from its conversation » (lot A3, 1.73.0): its links of the conversation go, undo
+			// « Detach this mail from its conversation » (1.73.0): its links of the conversation go, undo
 			let res;
 			try {
 				res = await post('dolibarr', 'detach', { id: mailId });
@@ -7884,7 +7884,7 @@
 		const dlg = dialog({
 			title: t('InboxCreateTitle'),
 			noCancel: false,
-			// A disposable address (lot A7, 1.76.0): said before a thirdparty is made from it
+			// A disposable address (1.76.0): said before a thirdparty is made from it
 			body: (d.sender.domain_category === 'disposable' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxDomainsDisposableCreate', d.sender.domain) + '</div></div>' : '')
 				// Titled groups (1.161.0): the buttons of the core first, then those of the modules in the same group
 				+ groups.map(x => String(I.html`<h3 class="ibx-creategroup">${t('InboxCreateGroup_' + x.g)}</h3>`)
@@ -8031,7 +8031,7 @@
 				return true;
 			} }],
 		});
-		// The link follows the conversation (lot A3, 1.73.0): ticked by default, the other mails of the conversation
+		// The link follows the conversation (1.73.0): ticked by default, the other mails of the conversation
 		const conv = d.conversation;
 		if (!opts.attach && !opts.annotate && conv && conv.others && !conv.detached) {
 			$('.ibx-js-piecelist', dlg).insertAdjacentHTML('afterend', '<label class="ibx-inline ibx-linkthread"><input type="checkbox" class="ibx-js-linkthread" checked> ' + th('InboxLinkThreadToo', conv.others) + '</label>');
@@ -8674,7 +8674,7 @@
 		});
 	}
 
-	// ---------- Import and export of mails (lot W4 1.12.0, B14): local folders of Thunderbird before the switch ----------
+	// ---------- Import and export of mails (1.12.0, B14): local folders of Thunderbird before the switch ----------
 	function pickImport(account, f) {
 		const input = document.createElement('input');
 		input.type = 'file';
@@ -9096,7 +9096,7 @@
 	// ---------- Registry of actions (one definition: buttons, menu, keyboard; hook inbox:mail:actions) ----------
 	function actions(m) {
 		const list = [];
-		// Lot W6: writing. A draft is edited; the other mails are answered or forwarded from any mailbox where the
+		// Writing. A draft is edited; the other mails are answered or forwarded from any mailbox where the
 		// user may send (the identity of the mailbox that got the mail chosen first, by the server)
 		const noSend = I.ctx('INBOX_CAN_SEND', false) ? '' : t('InboxComposeNoIdentity');
 		if (m.folder_role === 'drafts') {
@@ -9112,18 +9112,18 @@
 				list.push({ id: 'replylist', icon: 'reply-all', label: t('InboxReplyList'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'replylist', mail: m.id }, e) });
 			}
 			list.push({ id: 'forwardatt', icon: 'attachment', label: t('InboxForwardAttached'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'forward_attach', mail: m.id }, e) });
-			// B19 (lot W6 1.18.0): the very mail sent again to someone else; a mail written again as a new one
+			// B19 (1.18.0): the very mail sent again to someone else; a mail written again as a new one
 			list.push({ id: 'redirect', icon: 'redirect', label: t('InboxRedirect'), disabled: !!noSend, reason: noSend, run: () => redirectDialog(m) });
 		}
 		list.push({ id: 'editnew', icon: 'edit-new', label: t('InboxEditAsNew'), disabled: !!noSend, reason: noSend, run: e => I.compose({ mode: 'editnew', mail: m.id }, e) });
-		// Rule made from this mail (lot W8 1.23.0): its sender and subject in the editor of the rules of the mailbox
+		// Rule made from this mail (1.23.0): its sender and subject in the editor of the rules of the mailbox
 		if (m.level === 'manage' && m.from && m.from.email && I.rules) {
 			// The editor over the mail (the mail stays read); the rules of the mailbox in the panel on the right
 			list.push({ id: 'rule', icon: 'folder-bolt', label: t('InboxRuleFromMail'), run: () => I.rules.fromMail(m) });
 			list.push({ id: 'rules', icon: 'folders', label: t('InboxRulesPanelOpen'), run: () => I.rules.openPanel(m.account) });
 		}
 		list.push({ id: 'read', icon: m.seen ? 'unread' : 'mark-read', label: t(m.seen ? 'InboxMarkUnread' : 'InboxMarkRead'), key: 'M', button: true, run: () => setSeenMany([m.id], !m.seen) });
-		// Actions of lot W4: starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
+		// Actions of Starred, archive and remove as buttons, the others in the menu; junk / not junk at hand too (1.84.1)
 		const shown = sel => $$(sel, S.el).find(b => b.offsetParent !== null);
 		const anchor = () => shown('.ibx-js-panebar .ibx-js-more') || $('.ibx-js-more', mailRoot(m)) || S.el;
 		mailActionItems([m.id]).filter(a => !a.sep).forEach(a => {
@@ -9175,7 +9175,7 @@
 	// The menus of inbox for the other spaces too (Settings: menu of a rule)
 	I.menu = (anchor, items, at) => menu(anchor, items, at);
 	/**
-	 * The files of a writing in the viewer of inbox (lot A5, 1.82.0), to check them before sending
+	 * The files of a writing in the viewer of inbox (1.82.0), to check them before sending
 	 * @param {string} token Writing
 	 * @param {string} subject Subject of the writing
 	 * @param {Array<{id:string,name:string,size:number,mime:string}>} files Attachments
@@ -9519,7 +9519,7 @@
 			banners += '<div class="ibx-banner ibx-banner--warning">' + ic('warning') + '<div class="ibx-banner__text">' + th('InboxJunkLegitText', sc.name) + '</div>'
 				+ '<button type="button" class="ibx-btn ibx-btn--sm ibx-js-notjunk">' + ic('inbox') + ' ' + th('InboxNotJunk') + '</button></div>';
 		}
-		// Bank details (lot A6, 1.75.0): red when not authenticated or imitated, orange otherwise, never green
+		// Bank details (1.75.0): red when not authenticated or imitated, orange otherwise, never green
 		if (m.bank && !opts.inline) {
 			const b = bankBanner(m);
 			banners = b + banners;
@@ -9562,7 +9562,7 @@
 				// The address copied only when inbox cannot write the mail itself
 				+ (byMail && why ? '<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-unsubcopy">' + ic('copy') + ' ' + th('InboxCopyUnsubscribeAddress') + '</button>' : '') + '</div>';
 		}
-		// Invitation and read receipt (lot W8 1.22.0, js/inbox-invite.js)
+		// Invitation and read receipt (1.22.0, js/inbox-invite.js)
 		if (I.mailExtrasHtml) {
 			banners += I.mailExtrasHtml(m, opts);
 		}
@@ -9604,7 +9604,7 @@
 	}
 
 	/**
-	 * Bank details in the mail (lot A6, 1.75.0): a lesson, not a verdict. What to do first (call with the numbers of
+	 * Bank details in the mail (1.75.0): a lesson, not a verdict. What to do first (call with the numbers of
 	 * Dolibarr, never the ones of the mail), what inbox saw (each signal a doubt, not a proof), why even a green mail
 	 * may come from a mailbox whose password was stolen, and the check written as a note of the mail
 	 */
@@ -10480,7 +10480,7 @@
 	}
 
 	function attUrl(m, a, mode, force) {
-		// A file of a writing (lot A5, 1.82.0): the very file that leaves with the mail, same answers and protections
+		// A file of a writing (1.82.0): the very file that leaves with the mail, same answers and protections
 		if (m.compose) {
 			return I.ctx('INBOX_AJAX_URL', '') + 'composefile.php?compose=' + encodeURIComponent(m.compose) + '&att=' + encodeURIComponent(a.part) + '&mode=' + mode + (force ? '&force=1' : '');
 		}
@@ -11528,7 +11528,7 @@
 		menu(el || S.el, items, at || rectPoint(el));
 	}
 
-	// ---------- Folders managed from inbox (lot W4 1.10.0, B10, B11) ----------
+	// ---------- Folders managed from inbox (1.10.0, B10, B11) ----------
 	function isInboxPath(f) {
 		return String(f.label || f.name || '').toUpperCase() === 'INBOX' && !f.parent;
 	}
@@ -12495,7 +12495,7 @@
 			box.setAttribute('role', 'status');
 			head.appendChild(box);
 		}
-		// « is writing an answer » first (lot W6): two people should not answer the same mail
+		// « is writing an answer » first: two people should not answer the same mail
 		const writers = users.filter(u => u.writing);
 		const readers = users.filter(u => !u.writing);
 		box.innerHTML = '<span class="ibx-assignees">' + users.slice(0, 4).map(u => userAvatar(u, 'ibx-avatar--xs')).join('') + '</span> '
@@ -12505,7 +12505,7 @@
 		hydrateUserPhotos(box);
 	}
 
-	// ---------- Keyboard (interface §11, read only keys of lot W3) ----------
+	// ---------- Keyboard (read only keys) ----------
 	/** Shared mailbox: the state (and so the presence) asked now, at most once per 2 s */
 	let presenceTimer = 0;
 	function presenceSoon() {
@@ -12874,7 +12874,7 @@
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-refresh" title="' + th('InboxRefreshMails') + '" aria-label="' + th('InboxRefreshMails') + '">' + ic('refresh') + '</button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-view ibx-desktoponly-phone"></button>'
 			+ '<button type="button" class="ibx-btn ibx-btn--icon ibx-js-listmenu" aria-haspopup="menu" aria-label="' + th('InboxListOptions') + '">' + ic('more') + '</button></div>'
-			// Search field opening into a panel (lot W7 1.19.0)
+			// Search field opening into a panel (1.19.0)
 			+ '<div class="ibx-toolbar"><div class="ibx-sx-holder"><div class="ibx-sx-backdrop ibx-js-sxbackdrop" hidden></div><div class="ibx-sx ibx-js-sx"><div class="ibx-sx__row ibx-js-sxrow">' + ic('search')
 			+ '<span class="ibx-sx__pills ibx-js-sxpills"></span>'
 			+ '<input type="search" class="ibx-sx__input ibx-js-search" enterkeyhint="search" autocomplete="off" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="ibx-sxpanel" aria-autocomplete="list"'

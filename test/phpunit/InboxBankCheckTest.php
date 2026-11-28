@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxBankCheckTest.php
  * \ingroup inbox
- * \brief   1.75.0 (lot A6): bank details in a mail, never green; numbers to call from the cards, never from the mail
+ * \brief   1.75.0: bank details in a mail, never green; numbers to call from the cards, never from the mail
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

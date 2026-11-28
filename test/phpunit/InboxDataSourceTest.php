@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxDataSourceTest.php
  * \ingroup inbox
- * \brief   1.72.0 (lot A2 level 1): data sources, requester of a mail sent by a site (trust, authentication, data,
+ * \brief   1.72.0: data sources, requester of a mail sent by a site (trust, authentication, data,
  *          thirdparty, creation, answer, list)
  */
 

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxcontactmatcher.class.php
  * \ingroup inbox
- * \brief   Thirdparty and contact of Dolibarr of an address (exact address; the domain comes with lot W5)
+ * \brief   Thirdparty and contact of Dolibarr of an address (exact address, then its domain)
  */
 
 /**
@@ -81,9 +81,9 @@ class InboxContactMatcher
 	}
 
 	/**
-	 * Thirdparty of an address by its domain (lot W5): a thirdparty or a contact of it with an address at this domain,
+	 * Thirdparty of an address by its domain: a thirdparty or a contact of it with an address at this domain,
 	 * or a website on it; never for a shared domain (public mail service, disposable address, domain marked shared:
-	 * lot A7, InboxDomains); nothing when several thirdparties share the domain (domainCandidates() offers them)
+	 * InboxDomains); nothing when several thirdparties share the domain (domainCandidates() offers them)
 	 *
 	 * @param string $email Address
 	 * @return int Thirdparty, 0 when none or not sure

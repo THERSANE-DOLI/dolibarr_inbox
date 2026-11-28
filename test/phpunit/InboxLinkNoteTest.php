@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxLinkNoteTest.php
  * \ingroup inbox
- * \brief   Lot W5 1.13.0: links to pieces of Dolibarr and notes, rights, sender by domain, mails without Message-ID
+ * \brief   1.13.0: links to pieces of Dolibarr and notes, rights, sender by domain, mails without Message-ID
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

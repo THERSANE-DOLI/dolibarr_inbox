@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxoutbox.class.php
  * \ingroup inbox
- * \brief   Queue of the sending (lot W6 1.17.0): delay with « Undo », sending at a date, failures told, record on a piece
+ * \brief   Queue of the sending (1.17.0): delay with « Undo », sending at a date, failures told, record on a piece
  */
 
 // dol_delete_dir_recursive(), dol_delete_file()...: the folders of the writings removed after a sending or a closing
@@ -200,7 +200,7 @@ class InboxOutbox
 		if ($account->fetch((int) $row->fk_account) <= 0 || !$account->isActive()) {
 			return $this->failed($row, 'no_send', 'Mailbox not active', $direct);
 		}
-		// Protected mailbox (1.89.0): never in this queue, sent from the session (lot S3)
+		// Protected mailbox (1.89.0): never in this queue, sent from the session
 		if ($account->isProtected()) {
 			return $this->failed($row, 'no_send', 'Protected mailbox', $direct);
 		}

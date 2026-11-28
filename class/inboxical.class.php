@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxical.class.php
  * \ingroup inbox
- * \brief   Small reader and writer of iCalendar (RFC 5545), what the invitations of inbox need (lot W8 1.22.0)
+ * \brief   Small reader and writer of iCalendar (RFC 5545), what the invitations of inbox need (1.22.0)
  */
 
 /**

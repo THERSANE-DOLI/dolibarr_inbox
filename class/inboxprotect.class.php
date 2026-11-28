@@ -231,7 +231,7 @@ class InboxProtect
 	}
 
 	/**
-	 * Encrypt bytes with the key of the cookie (a mail waiting for its sending, lot S3): readable only by a request of
+	 * Encrypt bytes with the key of the cookie (a mail waiting for its sending): readable only by a request of
 	 * this browser in this session
 	 *
 	 * @param string $bytes Bytes

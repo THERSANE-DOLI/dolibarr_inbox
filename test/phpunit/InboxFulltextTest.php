@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxFulltextTest.php
  * \ingroup inbox
- * \brief   Lot W7 1.20.0: Meilisearch (option, key limited to the prefix, one index per mailbox, indexing, search)
+ * \brief   1.20.0: Meilisearch (option, key limited to the prefix, one index per mailbox, indexing, search)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -34,7 +34,7 @@ dol_include_once('/inbox/class/inboxsearchsql.class.php');
 dol_include_once('/inbox/class/inboxfulltext.class.php');
 
 /**
- * Lot W7 (analyse-lot-w7.md §5, CA-68 to CA-71). Needs the test Meilisearch of dev/dovecot/run.sh (test key only).
+ * Full text search with Meilisearch. Needs the test Meilisearch of dev/dovecot/run.sh (test key only).
  */
 class InboxFulltextTest extends InboxTestCase
 {

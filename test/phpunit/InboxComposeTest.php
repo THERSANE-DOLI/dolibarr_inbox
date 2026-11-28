@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxComposeTest.php
  * \ingroup inbox
- * \brief   Lot W6 1.16.0: building of a mail, sending (local Dovecot relaying to Mailpit), Sent, drafts, rights
+ * \brief   1.16.0: building of a mail, sending (local Dovecot relaying to Mailpit), Sent, drafts, rights
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches
@@ -400,7 +400,7 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertSame(self::BOX, $open['identities'][0]['email']);
 		$this->assertNotNull($c->saveDraft($this->admin, $open['token'], array('identity' => $open['identity'], 'to' => 'jean@client.invalid', 'subject' => 'ZzCompose noid', 'html' => '<p>x</p>')), $c->error);
 		$this->assertCount(1, $this->onServerSubject('INBOX.Drafts', 'ZzCompose noid'));
-		// A file of the writing, checked in the viewer before sending (lot A5, 1.82.0): the very file, its author only
+		// A file of the writing, checked in the viewer before sending (1.82.0): the very file, its author only
 		$tmp = tempnam(sys_get_temp_dir(), 'ibxt');
 		file_put_contents($tmp, '%PDF-1.4 devis');
 		$att = $c->upload($this->admin, $open['token'], 'devis.pdf', $tmp, 'application/pdf');
@@ -410,7 +410,7 @@ class InboxComposeTest extends InboxImapTestCase
 		$this->assertSame(array('devis.pdf', '%PDF-1.4 devis'), array($file['name'], $file['content']));
 		$this->assertNull($c->attachmentFile($this->admin, $open['token'], 'deadbeefdeadbeef'), 'not one of the writing');
 		$this->assertNull($c->attachmentFile($this->user('composefile'), $open['token'], $att['id']), 'another user');
-		// A piece inserted (lot A5, 1.83.0): its recall in the text, offered to record the sending on it
+		// A piece inserted (1.83.0): its recall in the text, offered to record the sending on it
 		require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 		$soc = new Societe($this->db);
@@ -523,7 +523,7 @@ class InboxComposeTest extends InboxImapTestCase
 		$event = $this->db->getRow("SELECT fk_soc, code FROM ".$p."actioncomm WHERE email_msgid = '".$this->db->escape($sent['message_id'])."'");
 		$this->assertSame($socid, (int) $event->fk_soc);
 		$sentRef = $refs->fetchOrCreateByMessageId($sent['message_id']);
-		// The links of its conversation may follow it too (lot A3, 1.73.0): the piece recorded is among them
+		// The links of its conversation may follow it too (1.73.0): the piece recorded is among them
 		$this->assertContains('societe:'.$socid, array_map(function ($l) {
 			return $l['type'].':'.$l['element'];
 		}, $links->listFor(array($sentRef))), 'the mail sent is linked to the piece');

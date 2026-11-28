@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/lead.php
  * \ingroup inbox
- * \brief   New customer from a mail (lot A1, 1.79.0): panel (values of the mail, same thirdparties, form), quick
+ * \brief   New customer from a mail (1.79.0): panel (values of the mail, same thirdparties, form), quick
  *          creation and its undo, full page of creation, contacts left to create
  */
 

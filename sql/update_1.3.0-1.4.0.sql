@@ -13,9 +13,9 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Lot W3 (1.4.0): change date of a row of the index (refresh of the open folder)
+-- Change date of a row of the index (refresh of the open folder)
 ALTER TABLE llx_inbox_mail ADD COLUMN tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 ALTER TABLE llx_inbox_mail ADD INDEX idx_inbox_mail_tms (fk_folder, tms);
--- Lot W3 (1.4.0): quota of the mailbox in KB, read with the folders (NULL: no quota given by the server)
+-- Quota of the mailbox in KB, read with the folders (NULL: no quota given by the server)
 ALTER TABLE llx_inbox_account ADD COLUMN quota_used bigint DEFAULT NULL;
 ALTER TABLE llx_inbox_account ADD COLUMN quota_limit bigint DEFAULT NULL;

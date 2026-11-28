@@ -79,7 +79,7 @@ $asset = function ($path) use ($version) {
 	$file = __DIR__.$path;
 	return dol_buildpath('/inbox'.$path, 1).'?v='.$version.(is_file($file) ? '-'.filemtime($file) : '');
 };
-// Editor of the writing (lot W6): loaded only when a writing opens
+// Editor of the writing: loaded only when a writing opens
 $vars['INBOX_EDITOR_URL'] = $asset('/js/vendor/tiptap/tiptap.min.js');
 // Or the CKEditor of Dolibarr (1.94.0, Settings > General)
 $vars = array_merge($vars, inboxEditorContextVars());
@@ -124,7 +124,7 @@ if (!inboxPrintJsContext($vars)) {
 }
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/dolibarr-combo.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox.js').'" defer></script>'."\n";
-// HTML of a mail made safe for the page (lot S1): DOMPurify, then the tool of inbox that uses it
+// HTML of a mail made safe for the page: DOMPurify, then the tool of inbox that uses it
 // TODO core: when inbox moves to the core, DOMPurify is loaded by the core from htdocs/public/includes/dompurify/
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/vendor/dompurify/purify.min.js').'" defer></script>'."\n";
 print '<script nonce="'.getNonce().'" src="'.$asset('/js/inbox-safe.js').'" defer></script>'."\n";

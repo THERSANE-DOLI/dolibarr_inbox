@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/action.php
  * \ingroup inbox
- * \brief   Actions on mails (lot W4): read / unread, starred, tags, move, archive, remove, junk, with their undo; journal
+ * \brief   Actions on mails: read / unread, starred, tags, move, archive, remove, junk, with their undo; journal
  */
 
 require __DIR__.'/inbox_ajax.inc.php';
@@ -27,7 +27,7 @@ dol_include_once('/inbox/class/inboxactions.class.php');
 $action = (string) inboxAjaxParam('action', 'aZ09');
 
 if ($action === 'journal') {
-	// Journal of a mailbox: its managers only (lot W4 §4.2)
+	// Journal of a mailbox: its managers only 
 	inboxAjaxStart(false);
 	$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
 	// The journal names the mails (subjects, Message-ID): the level « manage » on the mailbox itself, the right to

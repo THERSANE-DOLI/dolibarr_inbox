@@ -15,7 +15,7 @@
  */
 
 /**
- * Invitations and read receipts of the mail read (lot W8 1.22.0), above the text of the mail:
+ * Invitations and read receipts of the mail read (1.22.0), above the text of the mail:
  * - card of an invitation: when, where, organizer, attendees, conflicts with the agenda; Accept / Maybe / Decline
  *   (answer to the organizer unless unchecked, event in the agenda of Dolibarr if checked); update and cancel received;
  * - read receipt asked: « Send the receipt » / « Ignore », never automatic.

@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxActivityTest.php
  * \ingroup inbox
- * \brief   1.77.0 (lot E2): answers sent in the conversation of a mail (author by the journal, other software, no
+ * \brief   1.77.0: answers sent in the conversation of a mail (author by the journal, other software, no
  *          forward), answer of a colleague since a writing was opened
  */
 

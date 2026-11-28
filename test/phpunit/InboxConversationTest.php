@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxConversationTest.php
  * \ingroup inbox
- * \brief   Lot W3 1.5.0: conversations, quotes folded, pictures of the correspondents
+ * \brief   1.5.0: conversations, quotes folded, pictures of the correspondents
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

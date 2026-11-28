@@ -18,7 +18,7 @@
 /**
  * \file    inbox/test/phpunit/InboxAssignTest.php
  * \ingroup inbox
- * \brief   Assignment of the mails and notifications of the bell (lot W4 1.9.0)
+ * \brief   Assignment of the mails and notifications of the bell (1.9.0)
  */
 
 // From the command line only, never from the web: test/ stays in the Git branches

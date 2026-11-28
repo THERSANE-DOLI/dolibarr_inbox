@@ -15,7 +15,7 @@
  */
 
 /**
- * Rules and out of office of a mailbox (lot W8 1.23.0), shared by the card of the mailbox (Settings, tabs Rules and
+ * Rules and out of office of a mailbox (1.23.0), shared by the card of the mailbox (Settings, tabs Rules and
  * Out of office) and the Mail space (panel on the right, editor over the mail read).
  */
 (function () {
@@ -26,7 +26,7 @@
 	const skeleton = lines => I.settingsUi.skeleton(lines);
 	const errorBox = (err, retry) => I.settingsUi.errorBox(err, retry);
 
-	// ---------- Rules and out of office (lot W8 1.23.0, maquette regles.html) ----------
+	// ---------- Rules and out of office (1.23.0, maquette regles.html) ----------
 	const RULE_FIELDS = ['from', 'to', 'cc', 'tocc', 'subject', 'list', 'header'];
 	const RULE_OPS = ['contains', 'not', 'is', 'starts', 'ends'];
 	const RULE_ACTIONS = ['move', 'copy', 'tag', 'read', 'flag', 'delete', 'redirect'];

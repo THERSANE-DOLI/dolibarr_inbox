@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/invite.php
  * \ingroup inbox
- * \brief   Invitations and read receipts of the mail read (lot W8 1.22.0): answer, agenda, receipt
+ * \brief   Invitations and read receipts of the mail read (1.22.0): answer, agenda, receipt
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

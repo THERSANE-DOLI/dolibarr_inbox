@@ -18,7 +18,7 @@
 /**
  * \file    inbox/class/inboxlink.class.php
  * \ingroup inbox
- * \brief   Links between a mail (its mailref) and a piece of Dolibarr (lot W5 1.13.0), public for the other modules
+ * \brief   Links between a mail (its mailref) and a piece of Dolibarr (1.13.0), public for the other modules
  */
 
 require_once __DIR__.'/inboxmailref.class.php';

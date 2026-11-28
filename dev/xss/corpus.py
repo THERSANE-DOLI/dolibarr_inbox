@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Corpus of the audit « XSS from an outside mail » (analysis analyse-assainissement-xss.md, lot S4).
+"""Corpus of the audit « XSS from an outside mail » (analysis analyse-assainissement-xss.md).
 
 Each attack sets a mark of its own when it runs: (window.__xss=window.__xss||[]).push(/ID/.source) and a console line
 « XSS-ID »,

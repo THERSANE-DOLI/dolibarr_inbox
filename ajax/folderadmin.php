@@ -18,7 +18,7 @@
 /**
  * \file    inbox/ajax/folderadmin.php
  * \ingroup inbox
- * \brief   Folders managed from inbox (lot W4 1.10.0): create, rename, move, remove, mark read, empty
+ * \brief   Folders managed from inbox (1.10.0): create, rename, move, remove, mark read, empty
  */
 
 require __DIR__.'/inbox_ajax.inc.php';

@@ -254,7 +254,7 @@ switch ($action) {
 		// no break
 
 	case 'discover':
-		// Servers of a new mailbox found from its address (lot H1): a proposal for the form, nothing saved; the ISPDB of
+		// Servers of a new mailbox found from its address: a proposal for the form, nothing saved; the ISPDB of
 		// Thunderbird asked when set, or once by the click of the user (ispdb=1)
 		inboxAjaxNeedAdmin();
 		$email = (string) inboxAjaxParam('email', 'email');

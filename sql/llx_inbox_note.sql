@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- Internal note on a mail (lot W5 1.13.0), seen by everyone who can read a mailbox where the mail is. Plain text.
+-- Internal note on a mail (1.13.0), seen by everyone who can read a mailbox where the mail is. Plain text.
 CREATE TABLE llx_inbox_note(
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
 	entity integer DEFAULT 1 NOT NULL,

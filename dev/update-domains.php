@@ -18,7 +18,7 @@
 /**
  * \file    inbox/dev/update-domains.php
  * \ingroup inbox
- * \brief   Development only (lot A7): refresh data/domains/ before a version. Downloads the list of disposable
+ * \brief   Development only: refresh data/domains/ before a version. Downloads the list of disposable
  *          addresses (CC0), keeps valid names, removes the public ones and the exceptions, writes disposable.txt and
  *          sources.json, prints what was added and removed. inbox itself never downloads anything (P16).
  *
@@ -100,7 +100,7 @@ if (!in_array('--local', $argv, true)) {
 	$disposable = array_values($disposable);
 	sort($disposable);
 	$copied = date('Y-m-d');
-	$head = "# Disposable addresses: never a thirdparty, warning in the panel (inbox, lot A7).\n# Copied from ".SOURCE_PAGE." (CC0) on ".$copied." by dev/update-domains.php: do not edit, see never.txt.\n";
+	$head = "# Disposable addresses: never a thirdparty, warning in the panel (inbox).\n# Copied from ".SOURCE_PAGE." (CC0) on ".$copied." by dev/update-domains.php: do not edit, see never.txt.\n";
 	file_put_contents($dir.'/disposable.txt', $head.implode("\n", $disposable)."\n");
 	$added = array_diff($disposable, $old);
 	$removed = array_diff($old, $disposable);
