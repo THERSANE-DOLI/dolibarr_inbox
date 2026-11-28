@@ -653,6 +653,10 @@
 		remove(g, el) {
 			g.removeWidget(el, true, false);
 		},
+		/** Move a widget to a cell (the others make room, as when it is dragged) */
+		move(g, el, x, y) {
+			g.update(el, { x, y });
+		},
 		items(g) {
 			// The nodes themselves: save() leaves out a width or a height equal to the default of GridStack
 			return g.engine.nodes.filter(n => n.id).map(n => ({ id: String(n.id), x: n.x, y: n.y, w: n.w || 1, h: n.h || 1 }));
@@ -813,21 +817,43 @@
 			el.scrollIntoView({ block: 'nearest' });
 		}
 	}
-	/** Drag of a preview of the catalogue: a ghost follows the pointer, the grid lights when it is over it */
+	/**
+	 * Drag of a preview of the catalogue (1.162.1): over the catalogue a ghost follows the pointer; over the grid the
+	 * widget takes its real place, centred under the pointer, the others making room as when a widget is moved: what
+	 * is seen is what is obtained. Released over the grid it stays there; out of the grid or Escape, it goes away
+	 */
 	function dragPreview(prev, e) {
 		const grid = $('.ibx-wgedit-grid');
-		if (!grid) {
+		const w = P.edit && P.edit.cat.find(c => c.id === prev.dataset.wid);
+		if (!grid || !w || !P.edit.grid || placedIds().includes(w.id)) {
 			return;
 		}
+		const g = P.edit.grid;
 		const x0 = e.clientX;
 		const y0 = e.clientY;
 		let ghost = null;
+		let placed = null;
+		let cell = null;
 		const over = ev => {
 			const r = grid.getBoundingClientRect();
 			return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom ? r : null;
 		};
+		/** The cell of the top left corner, the widget centred under the pointer and kept inside the grid */
+		const cellAt = (ev, r) => {
+			const unit = rowUnit();
+			const col = Math.floor((ev.clientX - r.left) / (P.edit.cellPx + GAP));
+			const row = Math.floor((ev.clientY - r.top) / (unit + GAP));
+			return { x: Math.max(0, Math.min(COLUMNS - w.size.w, col - Math.floor(w.size.w / 2))), y: Math.max(0, row - Math.floor(w.size.h / 2)) };
+		};
+		const leaveGrid = () => {
+			if (placed) {
+				I.grid.remove(g, placed);
+				placed = null;
+				cell = null;
+			}
+		};
 		const move = ev => {
-			if (!ghost && Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 6) {
+			if (!ghost && !placed && Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < 6) {
 				return;
 			}
 			if (!ghost) {
@@ -836,16 +862,31 @@
 				ghost.innerHTML = $('.ibx-wgprev__box', prev).innerHTML;
 				ghost.style.height = getComputedStyle(prev).getPropertyValue('--ibx-wgprev-h');
 				document.body.appendChild(ghost);
+				// While the widget is only proposed, nothing is saved (the moves of the others neither)
+				P.edit.silent = true;
 			}
-			ghost.style.left = (ev.clientX + 8) + 'px';
-			ghost.style.top = (ev.clientY + 8) + 'px';
-			grid.classList.toggle('is-dropover', !!over(ev));
+			const r = over(ev);
+			if (r) {
+				const c = cellAt(ev, r);
+				if (!placed) {
+					placed = addEdit(g, w, Object.assign({ w: w.size.w, h: w.size.h }, c), P.edit.cellPx);
+					placed.classList.add('is-dropping');
+				} else if (!cell || c.x !== cell.x || c.y !== cell.y) {
+					I.grid.move(g, placed, c.x, c.y);
+				}
+				cell = c;
+				ghost.hidden = true;
+			} else {
+				leaveGrid();
+				ghost.hidden = false;
+				ghost.style.left = (ev.clientX + 8) + 'px';
+				ghost.style.top = (ev.clientY + 8) + 'px';
+			}
 		};
 		const end = ev => {
 			document.removeEventListener('pointermove', move);
 			document.removeEventListener('pointerup', end);
 			document.removeEventListener('keydown', esc, true);
-			grid.classList.remove('is-dropover');
 			if (!ghost) {
 				// A click: at the first free place
 				if (ev) {
@@ -854,19 +895,22 @@
 				return;
 			}
 			ghost.remove();
-			const r = ev && over(ev);
-			if (r) {
-				const unit = rowUnit();
-				addFromCatalogue(prev.dataset.wid, { x: Math.floor((ev.clientX - r.left) / (P.edit.cellPx + GAP)), y: Math.floor((ev.clientY - r.top) / (unit + GAP)) });
+			if (!ev) {
+				leaveGrid();
+			}
+			if (P.edit) {
+				P.edit.silent = false;
+			}
+			if (placed) {
+				placed.classList.remove('is-dropping');
+				takeAway(w.id, false);
+				queueSave();
+				paintCatalogue();
 			}
 		};
 		const esc = ev => {
 			if (ev.key === 'Escape') {
 				ev.stopPropagation();
-				if (ghost) {
-					ghost.remove();
-					ghost = null;
-				}
 				end(null);
 			}
 		};

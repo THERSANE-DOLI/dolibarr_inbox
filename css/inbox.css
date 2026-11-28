@@ -3591,7 +3591,9 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-wgprev.is-placed { opacity: .45; cursor: default; }
 .ibx-wgghost { position: fixed; z-index: 100; width: 10rem; pointer-events: none; opacity: .92; border-radius: var(--ibx-radius); box-shadow: var(--ibx-shadow-float); }
 .ibx-wgghost > .ibx-wg-cell { height: 100%; }
-.ibx-wgedit-grid.is-dropover { outline: 2px dashed var(--ibx-accent); outline-offset: 2px; background: var(--ibx-accent-soft); border-radius: var(--ibx-radius); }
+/* A widget of the catalogue proposed at its real place while dragged (1.162.1) */
+.ibx-wgedit-grid .grid-stack-item.is-dropping .grid-stack-item-content { opacity: .7; }
+.ibx-wgedit-grid .grid-stack-item.is-dropping .ibx-wg { border-width: 2px; box-shadow: var(--ibx-shadow-float); }
 .ibx-wg--none { color: var(--ibx-text-faint); }
 /* Small screen (1.156.0): the widgets in one column, the minis side by side as chips; edit as a list to order, the
    catalogue as a sheet at the bottom */

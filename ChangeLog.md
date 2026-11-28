@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a widget dragged from the catalogue takes its real place in the grid while dragged, the others making room :   1.162.1
+  - centred under the pointer, it stays where it is shown when released; out of the grid or Escape, it goes away.
+
 - NEW: widgets of the modules in the Dolibarr panel, drawn with the templates of inbox :   1.162.0
   - hook inboxWidgets: template, data read at the address of the module for each mail, preview, shown by itself or not.
   - « replaces »: a block of a module that became a widget keeps its place in the layouts; capability « widgets ».
