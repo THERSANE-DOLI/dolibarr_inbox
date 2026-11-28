@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the card of a thirdparty opened in the Dolibarr side panel went past the panel over the icon strip :   1.151.4
+  - in the side panel it keeps the width of its place (it was 320 px at least, wider than the panel by default).
+
 - FIX: a folder whose first indexing fails while its changes are read could keep its mailbox in « first synchronisation » :   1.151.3
   - its failures are counted from zero at the end of a pass only when no reading of it failed.
   - files replaced before the module is activated again: no query on the missing column; « Rebuild the index » tries
