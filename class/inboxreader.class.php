@@ -429,27 +429,69 @@ class InboxReader
 		}, array_slice($emails, 0, 200)));
 		$rows = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, email, job, office_phone, user_mobile, photo FROM ".$this->db->prefix()."user"
 			." WHERE LOWER(email) IN (".$in.") AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") ORDER BY rowid LIMIT 200");
-		$canCard = $user->hasRight('user', 'user', 'lire') || !empty($user->admin);
 		$out = array();
 		foreach (is_array($rows) ? $rows : array() as $r) {
 			$email = strtolower((string) $r->email);
-			if (isset($out[$email])) {
-				continue;
+			if (!isset($out[$email])) {
+				$out[$email] = self::personOf($user, $r);
 			}
-			$name = trim($r->firstname.' '.$r->lastname);
-			$out[$email] = array(
-				'id' => (int) $r->rowid,
-				'name' => $name !== '' ? $name : (string) $r->login,
-				'job' => (string) $r->job,
-				'email' => $email,
-				'phone' => (string) $r->office_phone,
-				'mobile' => (string) $r->user_mobile,
-				'photo' => self::userPhotoUrl((int) $r->rowid, (string) $r->photo, (int) $r->entity),
-				'url' => $canCard || (int) $r->rowid === (int) $user->id ? DOL_URL_ROOT.'/user/card.php?id='.((int) $r->rowid) : '',
-			);
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Users of Dolibarr (active, internal) by their ids, in the order given: the people of a piece (attendees of an
+	 * event, user assigned to a ticket)
+	 *
+	 * @param User  $user User reading
+	 * @param int[] $ids  Users
+	 * @return list<array<string,mixed>> id, name, job, email, phone, mobile, photo, url
+	 */
+	public function peopleByIds(User $user, array $ids)
+	{
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+		if (!$ids) {
+			return array();
+		}
+		$rows = $this->db->getRows("SELECT rowid, entity, firstname, lastname, login, email, job, office_phone, user_mobile, photo FROM ".$this->db->prefix()."user"
+			." WHERE rowid IN (".implode(',', array_slice($ids, 0, 50)).") AND statut = 1 AND (fk_soc IS NULL OR fk_soc = 0) AND entity IN (0, ".getEntity('user').") LIMIT 50");
+		$byId = array();
+		foreach (is_array($rows) ? $rows : array() as $r) {
+			$byId[(int) $r->rowid] = self::personOf($user, $r);
+		}
+		$out = array();
+		foreach ($ids as $id) {
+			if (isset($byId[$id])) {
+				$out[] = $byId[$id];
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Card of a user of Dolibarr, as the application shows it
+	 *
+	 * @param User   $user User reading
+	 * @param object $r    Row of llx_user
+	 * @return array<string,mixed>
+	 */
+	protected static function personOf(User $user, $r)
+	{
+		$name = trim($r->firstname.' '.$r->lastname);
+		$canCard = $user->hasRight('user', 'user', 'lire') || !empty($user->admin);
+
+		return array(
+			'id' => (int) $r->rowid,
+			'name' => $name !== '' ? $name : (string) $r->login,
+			'job' => (string) $r->job,
+			'email' => strtolower((string) $r->email),
+			'phone' => (string) $r->office_phone,
+			'mobile' => (string) $r->user_mobile,
+			'photo' => self::userPhotoUrl((int) $r->rowid, (string) $r->photo, (int) $r->entity),
+			'url' => $canCard || (int) $r->rowid === (int) $user->id ? DOL_URL_ROOT.'/user/card.php?id='.((int) $r->rowid) : '',
+		);
 	}
 
 	/**

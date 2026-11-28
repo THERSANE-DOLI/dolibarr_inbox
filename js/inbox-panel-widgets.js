@@ -41,11 +41,12 @@
 	const SMALL = window.matchMedia('(max-width: 63.9375rem)');
 	/** Version of the layout by the width of the screen, never by the device */
 	const version = () => (SMALL.matches ? 'mobile' : 'desktop');
-	const COLUMNS = 4;
+	/** Columns of the grid (InboxWidgets::COLUMNS, 12 since 1.159.0: divided by 2, 3, 4 and 6) */
+	const COLUMNS = 12;
 	const GAP = 4;
 	const AUTO = ['list', 'action', 'free'];
 	/** Size of a block of a module: the template free (InboxWidgets::TEMPLATES) */
-	const FREE = { w: 4, h: 4, min_rem: 3.5, min_h: 2, max_w: 4, max_h: 20, resize: 'both' };
+	const FREE = { w: 12, h: 4, min_rem: 3.5, min_h: 2, max_w: 12, max_h: 20, resize: 'both' };
 	const PANEL = 'panel:';
 	/** Module actions and blocks: they come by themselves, the user may take them away */
 	const isLocal = id => id === 'mail_actions' || String(id).indexOf(PANEL) === 0;
@@ -338,7 +339,7 @@
 	 */
 	async function saveLayout(action, layout) {
 		try {
-			const res = await post('widget', action, { account: P.account, version: version(), layout: layout ? { items: layout.items, dock: layout.dock || 0, off: layout.off || [] } : null });
+			const res = await post('widget', action, { account: P.account, version: version(), layout: layout ? { items: layout.items, dock: layout.dock || 0, off: layout.off || [], cols: COLUMNS } : null });
 			P.layouts.set(P.account, Promise.resolve(res));
 			if (!P.edit && P.zone) {
 				await paintStatic(P.zone, P.mail, res);
@@ -350,52 +351,188 @@
 		}
 	}
 
-	// ---------- Splitter between the grid and the notes ----------
+	// ---------- Splitter between the grid and the notes: the maximum height of the notes ----------
+	/**
+	 * The notes are as high as their content, up to a maximum (1.158.7). The splitter sets that maximum (1.159.1):
+	 * on hover, focus and drag, the room kept for notes still to come shows dashed above the notes, its top edge a
+	 * grip too; the notes stay as high as their content
+	 */
+	const DOCK_MIN = 144;
+	function dockMax(body) {
+		const v = parseFloat(getComputedStyle(body).getPropertyValue('--ibx-dock-h'));
+		return v > 0 ? v : 16 * remPx();
+	}
+	function dockBound(body, h) {
+		return Math.round(Math.max(DOCK_MIN, Math.min(body.clientHeight - 80, h)));
+	}
+	/** The dashed room above the notes: from the top of the splitter up to the maximum, or nothing when the notes fill it */
+	function dockGhost(sp, on) {
+		const body = sp.closest('.ibx-dolibar__body');
+		const notes = body && $('.ibx-dolibar__notes', body);
+		let ghost = body && $(':scope > .ibx-dockghost', body);
+		const room = on && notes ? Math.round(dockMax(body) - notes.getBoundingClientRect().height) : 0;
+		// One grip while dragging: the one of the edge that moves (top of the room), the bar keeps its own otherwise
+		sp.classList.toggle('is-ghosted', room >= 8 && body.classList.contains('is-dockdrag'));
+		if (room < 8) {
+			if (ghost) {
+				ghost.hidden = true;
+			}
+			return;
+		}
+		if (!ghost) {
+			ghost = document.createElement('div');
+			ghost.className = 'ibx-dockghost';
+			ghost.setAttribute('aria-hidden', 'true');
+			// Its top edge is a grip too: the pointer on what it moves
+			ghost.innerHTML = String(html`<span class="ibx-dockghost__grip"></span><span class="ibx-dockghost__label">${t('InboxWgDockRoom')}</span>`);
+			body.appendChild(ghost);
+			const grip = $('.ibx-dockghost__grip', ghost);
+			grip.addEventListener('pointerenter', () => clearTimeout(sp._hide));
+			grip.addEventListener('pointerleave', () => {
+				if (!body.classList.contains('is-dockdrag')) {
+					sp._hide = setTimeout(() => dockGhost(sp, false), 150);
+				}
+			});
+			grip.addEventListener('pointerdown', e => sp._drag && sp._drag(e, false));
+		}
+		ghost.hidden = false;
+		ghost.style.top = (sp.offsetTop - room) + 'px';
+		ghost.style.height = room + 'px';
+	}
+	async function saveDock(h) {
+		const eff = effective(await layoutsOf(P.account));
+		await saveLayout('save', { items: eff.layout.items, dock: h, off: eff.layout.off });
+	}
 	function bindSplitter(box) {
 		const sp = $('.ibx-js-wgsplit', box);
 		if (!sp || sp._wg) {
 			return;
 		}
 		sp._wg = true;
-		sp.addEventListener('pointerdown', e => {
-			const body = sp.closest('.ibx-dolibar__body');
-			const notes = body && $('.ibx-dolibar__notes', body);
-			if (!notes) {
+		const body = () => sp.closest('.ibx-dolibar__body');
+		let dragging = false;
+		sp.addEventListener('pointerenter', () => {
+			clearTimeout(sp._hide);
+			dockGhost(sp, true);
+		});
+		sp.addEventListener('pointerleave', () => {
+			if (!dragging) {
+				// A short delay: the pointer may go up to the grip of the room
+				sp._hide = setTimeout(() => dockGhost(sp, false), 150);
+			}
+		});
+		sp.addEventListener('focus', () => dockGhost(sp, true));
+		sp.addEventListener('blur', () => dockGhost(sp, false));
+		/**
+		 * A drag from the bar or from the grip of the room: the top of the room follows the moves of the pointer. From
+		 * the bar, the pointer is locked (Pointer Lock): the real one hides, one drawn by inbox stands on the grip of the
+		 * room, the one that moves, and the moves go on at the edge of the screen (a large room made smaller without
+		 * taking the bar again). Without the lock (refused, Escape), the moves of the pointer as they are
+		 */
+		sp._drag = (e, fromBar) => {
+			const b = body();
+			if (!b || !$('.ibx-dolibar__notes', b) || e.button !== 0) {
 				return;
 			}
 			e.preventDefault();
+			clearTimeout(sp._hide);
 			sp.setPointerCapture(e.pointerId);
-			const y0 = e.clientY;
-			const h0 = notes.getBoundingClientRect().height;
+			dragging = true;
+			b.classList.add('is-dockdrag');
+			const h0 = dockMax(b);
 			let h = h0;
-			const move = ev => {
-				h = Math.max(144, Math.min(body.clientHeight - 80, h0 - (ev.clientY - y0)));
-				body.style.setProperty('--ibx-dock-h', Math.round(h) + 'px');
-			};
-			const up = async () => {
-				sp.removeEventListener('pointermove', move);
-				sp.removeEventListener('pointerup', up);
-				if (Math.abs(h - h0) < 2) {
+			let y0 = e.clientY;
+			let moved = 0;
+			let fake = null;
+			const locked = () => document.pointerLockElement === sp;
+			const place = () => {
+				if (!fake) {
 					return;
 				}
-				const l = await layoutsOf(P.account);
-				const eff = effective(l);
-				await saveLayout('save', { items: eff.layout.items, dock: Math.round(h), off: eff.layout.off });
+				const ghost = $(':scope > .ibx-dockghost', b);
+				const r = sp.getBoundingClientRect();
+				fake.style.left = Math.round(r.left + r.width / 2) + 'px';
+				fake.style.top = Math.round(ghost && !ghost.hidden ? ghost.getBoundingClientRect().top : r.top + r.height / 2) + 'px';
+			};
+			const apply = () => {
+				h = dockBound(b, h0 - moved);
+				b.style.setProperty('--ibx-dock-h', h + 'px');
+				dockGhost(sp, true);
+				place();
+			};
+			const move = ev => {
+				if (locked()) {
+					moved += ev.movementY || 0;
+				} else {
+					moved = ev.clientY - y0;
+				}
+				apply();
+			};
+			let up = null;
+			const lockChange = () => {
+				if (locked() && !fake) {
+					fake = document.createElement('div');
+					fake.className = 'ibx-dockcursor';
+					fake.setAttribute('aria-hidden', 'true');
+					document.body.appendChild(fake);
+					place();
+				} else if (!locked() && fake) {
+					// Escape (or the browser) gave the pointer back: the drag ends there
+					up();
+				}
+			};
+			up = async () => {
+				sp.removeEventListener('pointermove', move);
+				sp.removeEventListener('pointerup', up);
+				sp.removeEventListener('pointercancel', up);
+				document.removeEventListener('pointerlockchange', lockChange);
+				if (fake) {
+					fake.remove();
+					fake = null;
+				}
+				if (locked() && document.exitPointerLock) {
+					document.exitPointerLock();
+				}
+				if (!dragging) {
+					return;
+				}
+				dragging = false;
+				b.classList.remove('is-dockdrag');
+				const ghost = $(':scope > .ibx-dockghost', b);
+				dockGhost(sp, sp.matches(':hover') || document.activeElement === sp || !!(ghost && $('.ibx-dockghost__grip', ghost).matches(':hover')));
+				if (Math.abs(h - h0) >= 2) {
+					await saveDock(h);
+				}
 			};
 			sp.addEventListener('pointermove', move);
 			sp.addEventListener('pointerup', up);
-		});
+			sp.addEventListener('pointercancel', up);
+			if (fromBar && sp.requestPointerLock) {
+				document.addEventListener('pointerlockchange', lockChange);
+				try {
+					const asked = sp.requestPointerLock();
+					if (asked && asked.catch) {
+						asked.catch(() => {
+							y0 = e.clientY;
+						});
+					}
+				} catch (err) {
+					// Refused: the moves of the pointer as they are
+				}
+			}
+			dockGhost(sp, true);
+		};
+		sp.addEventListener('pointerdown', e => sp._drag(e, true));
 		sp.addEventListener('keydown', async e => {
 			if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
 				return;
 			}
 			e.preventDefault();
-			const body = sp.closest('.ibx-dolibar__body');
-			const notes = body && $('.ibx-dolibar__notes', body);
-			const h = Math.max(144, notes.getBoundingClientRect().height + (e.key === 'ArrowUp' ? 24 : -24));
-			body.style.setProperty('--ibx-dock-h', h + 'px');
-			const eff = effective(await layoutsOf(P.account));
-			await saveLayout('save', { items: eff.layout.items, dock: Math.round(h), off: eff.layout.off });
+			const b = body();
+			const h = dockBound(b, dockMax(b) + (e.key === 'ArrowUp' ? 24 : -24));
+			b.style.setProperty('--ibx-dock-h', h + 'px');
+			dockGhost(sp, true);
+			await saveDock(h);
 		});
 	}
 
@@ -519,6 +656,8 @@
 		}
 		openCatalogue(side, l, cat);
 		const el = $('.ibx-wgedit-grid', zone);
+		// Height of a row for the lines of the background
+		el.style.setProperty('--ibx-wg-unit', rowUnit() + 'px');
 		const cellPx = (el.clientWidth - GAP * (COLUMNS - 1)) / COLUMNS;
 		const g = I.grid.create(el, {
 			cellHeight: rowUnit(), catalogue: '.ibx-wgcat', minRow: Math.max(8, Math.floor(zone.clientHeight / (rowUnit() + GAP))),
@@ -688,7 +827,7 @@
 		if (P.edit.flow) {
 			items = placedIds().map((id, i) => {
 				const w = P.edit.cat.find(c => c.id === id);
-				return { id, x: 0, y: i, w: w ? w.size.w : 4, h: w ? w.size.h : 2 };
+				return { id, x: 0, y: i, w: w ? w.size.w : COLUMNS, h: w ? w.size.h : 2 };
 			});
 		} else {
 			items = I.grid.items(P.edit.grid);

@@ -162,6 +162,50 @@ class InboxElements
 	}
 
 	/**
+	 * Colleagues of an event (its owner first, then the users invited, with their answer) or of a ticket (the user
+	 * assigned), as cards of users of Dolibarr
+	 *
+	 * @param User   $user User reading (the piece is readable)
+	 * @param string $type action or ticket
+	 * @param object $o    Piece loaded
+	 * @return list<array<string,mixed>> Cards with role (owner, attendee, assigned) and answer (accepted, tentative,
+	 *                                   declined, or '' when not answered)
+	 */
+	protected function peopleOf(User $user, $type, $o)
+	{
+		require_once __DIR__.'/inboxreader.class.php';
+		$roles = array();
+		$answers = array();
+		if ($type === 'ticket') {
+			if ((int) ($o->fk_user_assign ?? 0) > 0) {
+				$roles[(int) $o->fk_user_assign] = 'assigned';
+			}
+		} else {
+			if ((int) ($o->userownerid ?? 0) > 0) {
+				$roles[(int) $o->userownerid] = 'owner';
+			}
+			$rows = $this->db->getRows("SELECT fk_element, answer_status FROM ".$this->db->prefix()."actioncomm_resources WHERE fk_actioncomm = ".((int) $o->id)
+				." AND element_type = 'user' ORDER BY rowid LIMIT 50");
+			$names = array(1 => 'accepted', 2 => 'tentative', -1 => 'declined');
+			foreach (is_array($rows) ? $rows : array() as $r) {
+				$uid = (int) $r->fk_element;
+				if (!isset($roles[$uid])) {
+					$roles[$uid] = 'attendee';
+				}
+				$answers[$uid] = $names[(int) $r->answer_status] ?? '';
+			}
+		}
+		$out = array();
+		foreach ((new InboxReader($this->db))->peopleByIds($user, array_keys($roles)) as $p) {
+			$p['role'] = $roles[$p['id']];
+			$p['answer'] = $answers[$p['id']] ?? '';
+			$out[] = $p;
+		}
+
+		return $out;
+	}
+
+	/**
 	 * What the bandeau and the cards show of a piece; readable = false gives nothing but the type
 	 *
 	 * @param User   $user User
@@ -236,6 +280,10 @@ class InboxElements
 		$out = array('type' => $type, 'id' => (int) $o->id, 'readable' => true, 'ref' => $ref, 'label' => $label, 'socid' => $socId, 'title' => $title, 'status' => '', 'url' => $url, 'tip_params' => $tipParams, 'tip_html' => $tipHtml, 'icon' => $icon, 'kind' => $kind);
 		if (method_exists($o, 'getLibStatut')) {
 			$out = array_merge($out, self::statusOf((string) $o->getLibStatut(0), (string) $o->getLibStatut(5)));
+		}
+		// Colleagues of the piece (1.158.0): the owner and the users invited to an event, the user assigned to a ticket
+		if ($type === 'action' || $type === 'ticket') {
+			$out['people'] = $this->peopleOf($user, $type, $o);
 		}
 		// Expected status of a sender (open thirdparty, active contact): the application shows a discreet dot, the badge
 		// only for another status (closed, inactive)

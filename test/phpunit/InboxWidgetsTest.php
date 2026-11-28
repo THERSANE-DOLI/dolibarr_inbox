@@ -136,11 +136,12 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 		$this->assertNotEmpty($l['preset']['items'], 'the preset of the usage (sales by default)');
 		$this->assertNull($w->layouts($stranger, (int) $box->id), 'a mailbox he cannot read');
 
-		$layout = array('items' => array(array('id' => 'figure_due', 'x' => 3, 'y' => 0, 'w' => 9, 'h' => 50), array('id' => 'invoices_late', 'x' => 0, 'y' => 0)), 'dock' => 240);
+		$layout = array('items' => array(array('id' => 'figure_due', 'x' => 3, 'y' => 0, 'w' => 20, 'h' => 50), array('id' => 'invoices_late', 'x' => 0, 'y' => 0)), 'dock' => 240);
 		$this->assertSame(1, $w->saveUser($reader, (int) $box->id, 'desktop', $layout));
 		$mine = $w->layouts($reader, (int) $box->id)['desktop']['user'];
 		$this->assertSame('figure_due', $mine['items'][0]['id']);
-		$this->assertSame(4, $mine['items'][0]['w'], 'width kept inside the bounds of its template');
+		$this->assertSame(12, $mine['items'][0]['w'], 'width kept inside the bounds of its template');
+		$this->assertSame(InboxWidgets::COLUMNS, $mine['cols']);
 		$this->assertSame(8, $mine['items'][0]['h']);
 		$this->assertSame(0, $mine['items'][0]['x'], 'moved back inside the grid');
 		$this->assertSame(240, $mine['dock']);
@@ -158,6 +159,18 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 		$this->assertNull($w->layouts($reader, (int) $box->id)['desktop']['user'], 'back to the model');
 		$this->assertSame(1, $w->saveModel($this->admin, (int) $box->id, 'desktop', null));
 		$this->assertNull($w->layouts($reader, (int) $box->id)['desktop']['model']);
+
+		// A layout saved with 4 columns (before 1.159.0): read with its places and widths scaled to 12
+		$old = json_encode(array('items' => array(array('id' => 'event_next', 'x' => 1, 'y' => 0, 'w' => 1, 'h' => 2), array('id' => 'list_invoices', 'x' => 0, 'y' => 2, 'w' => 4, 'h' => 8)), 'dock' => 0, 'at' => 1));
+		$this->db->query("INSERT INTO ".$this->db->prefix()."inbox_userparam (fk_user, fk_account, param, value) VALUES (".((int) $reader->id).", ".((int) $box->id).", 'widgets_desktop', '".$this->db->escape($old)."')");
+		$mine = $w->layouts($reader, (int) $box->id)['desktop']['user'];
+		$this->assertSame(array(3, 3), array($mine['items'][0]['x'], $mine['items'][0]['w']));
+		$this->assertSame(array(0, 12), array($mine['items'][1]['x'], $mine['items'][1]['w']));
+		$this->assertSame(1, $w->saveUser($reader, (int) $box->id, 'desktop', array('items' => array(array('id' => 'event_next', 'x' => 1, 'y' => 0, 'w' => 1, 'h' => 2)), 'cols' => 4)));
+		$this->assertSame(3, $w->layouts($reader, (int) $box->id)['desktop']['user']['items'][0]['x'], 'sent with 4 columns by a page opened before the update');
+		$this->assertSame(array('items' => array(array('x' => 11, 'w' => 1)), 'cols' => 12), InboxWidgets::upgrade(array('items' => array(array('x' => 7, 'w' => 1)), 'cols' => 8)), 'kept inside the grid');
+		$side = InboxWidgets::upgrade(array('items' => array(array('x' => 2, 'w' => 3), array('x' => 5, 'w' => 3)), 'cols' => 8));
+		$this->assertSame($side['items'][0]['x'] + $side['items'][0]['w'], $side['items'][1]['x'], 'side by side, never over each other');
 		$this->db->query("DELETE FROM ".$this->db->prefix()."inbox_userparam WHERE fk_account = ".((int) $box->id));
 	}
 

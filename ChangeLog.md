@@ -1,5 +1,41 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the bar above the notes always follows the pointer, the room kept for the notes shows dashed :   1.159.1
+  - it sets the maximum height of the notes; above the notes now, the room they will take shows dashed (hover,
+    focus, drag), the notes still as high as their content.
+  - one grip while dragging, the one of the edge that moves; grabbed from the bar, the pointer jumps onto it (pointer
+    lock) and its moves go on at the edge of the screen; that edge can be grabbed too.
+
+- NEW: grid of 12 columns for the widgets of the Dolibarr panel, instead of 4 :   1.159.0
+  - 2, 3, 4 or 6 widgets of the same width on a line; finer places and widths (half a chart...).
+  - the layouts saved with 4 columns are read in 12.
+
+- FIX: the notes docked under the widgets are as high as their content, up to the height set by the bar :   1.158.7
+  - without notes only the head and the field to write remain, the widgets take the room; the bar sets a maximum.
+
+- FIX: the content of a widget no longer moves when its tools show on hover while personalizing :   1.158.6
+  - a scroll bar of the grid library took its width from the widget.
+  - on a widget two rows high (mini, line), the cross goes to the top left, clear of the resize grip.
+
+- FIX: no horizontal scroll bar in the widgets of the panel while a widget is resized :   1.158.5
+  - the grid always fits the width of the panel, only the height scrolls.
+
+- FIX: the column on the right (Dolibarr, agenda) stops growing when the mail reaches its least width :   1.158.4
+  - it no longer slides under the strip; the splitter stops there, with the mouse and with the keyboard.
+
+- FIX: the cells of the grid drawn very finely behind the widgets while personalizing :   1.158.3
+  - a line per column and per row, to see where a widget will land.
+
+- FIX: the widgets explain themselves in the bubble of the application, no longer in a bare title :   1.158.2
+  - a mini: its name, its figure, its note and where a click goes; the change of a figure: what it is compared to.
+
+- FIX: a widget placed beside another one no longer jumps up into an empty place of the panel :   1.158.1
+  - the grid shown keeps the order of the layout (no more dense packing), as laid out while personalizing.
+
+- NEW: colleagues of an event or a ticket linked to a mail, as small faces on the piece :   1.158.0
+  - the organizer and the users invited to an event (an invitation declined in grey), the user assigned to a ticket.
+  - on hover a bubble with the name, the role and the answer; on a click the card of the colleague.
+
 - FIX: an event linked to a mail shows its subject and its date, no longer its id :   1.157.1
   - in the pieces of the panel and in the search of « Link ».
 

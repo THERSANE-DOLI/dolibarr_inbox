@@ -81,7 +81,9 @@
 		return html`<span class="ibx-mbadge ibx-mbadge--${lv} ibx-ov-chip">${alert && (lv === 'danger' || lv === 'warning') ? raw(ic('warning')) : ''}${c.label}</span>`;
 	}
 	function delta(d) {
-		return d ? html`<span class="ibx-ov-delta ibx-ov-delta--${level(d.level)}" title="${d.title || ''}"><span aria-hidden="true">${d.dir === 'down' ? '\u25BC' : '\u25B2'}</span> ${d.text}</span>` : '';
+		// The comparison in the bubble of the application (1.158.2), said to a screen reader too
+		const key = d && d.title && I.tip ? I.tip(html`<div>${d.title}</div>`) : '';
+		return d ? html`<span class="ibx-ov-delta ibx-ov-delta--${level(d.level)}"${key ? html` data-objtip="${key}"` : ''}><span aria-hidden="true">${d.dir === 'down' ? '\u25BC' : '\u25B2'}</span> ${d.text}${d.title ? html`<span class="ibx-sr-only">${d.title}</span>` : ''}</span>` : '';
 	}
 	function kpi(k) {
 		const lv = LEVELS.includes(k.level) ? k.level : '';

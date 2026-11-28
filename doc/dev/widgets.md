@@ -8,22 +8,23 @@ shows every template at its default size.
 
 ## Templates and sizes
 
-The grid of the panel has 4 columns; a row is half a line of list (`--ibx-row-h` / 2: 13 px compact, 15 px normal,
+The grid of the panel has 12 columns, divided by 2, 3, 4 and 6 (4 before 1.159.0: a layout saved without `cols` is
+read with its `x` and `w` scaled to 12); a row is half a line of list (`--ibx-row-h` / 2: 13 px compact, 15 px normal,
 18 px comfortable), 4 px between two cells. A widget takes `w` × `h` cells. Each template declares
 (`InboxWidgets::TEMPLATES`):
 
 | Template | Default | Minimum width | Height min / max | Resize | Content |
 |---|---|---|---|---|---|
-| `mini` | 1 × 2 | 3.5 rem | 2 / 2 | horizontal | an icon, a number, a short label |
-| `line` | 4 × 2 | 9 rem | 2 / 2 | horizontal | one piece of information |
-| `figure` | 2 × 5 | 3.5 rem | 2 / 8 | both | a value, its label, its note, its change |
-| `list` | 4 × 8 | 9 rem | 4 / 20 | both | the lines of a section |
-| `chart` | 4 × 8 | 14 rem | 6 / 16 | vertical | bars by year or by month |
-| `action` | 4 × 7 | 9 rem | 4 / 14 | both | a list and buttons to create |
-| `thread` | 4 × 12 | 14 rem | 8 / 40 | vertical | the notes and replies (drawn by the panel) |
-| `free` | 4 × 4 | 3.5 rem | 2 / 20 | both | HTML of a module |
+| `mini` | 3 × 2 | 3.5 rem | 2 / 2 | horizontal | an icon, a number, a short label |
+| `line` | 12 × 2 | 9 rem | 2 / 2 | horizontal | one piece of information |
+| `figure` | 6 × 5 | 3.5 rem | 2 / 8 | both | a value, its label, its note, its change |
+| `list` | 12 × 8 | 9 rem | 4 / 20 | both | the lines of a section |
+| `chart` | 12 × 8 | 14 rem | 6 / 16 | both | bars by year or by month |
+| `action` | 12 × 7 | 9 rem | 4 / 14 | both | a list and buttons to create |
+| `thread` | 12 × 12 | 14 rem | 8 / 40 | vertical | the notes and replies (drawn by the panel) |
+| `free` | 12 × 4 | 3.5 rem | 2 / 20 | both | HTML of a module |
 
-The minimum width is in rem, not in cells: a cell is 60 to 95 px wide depending on the width of the panel, and the
+The minimum width is in rem, not in cells: a cell is 25 to 55 px wide depending on the width of the panel, and the
 grid turns the rem into cells. The content adapts to the size obtained (container queries on `.ibx-wg-cell`): what
 does not fit goes away (label of a mini, note of a figure, lines of a list), never a word cut in the middle.
 
@@ -71,8 +72,8 @@ Formats (every text escaped when drawn, links kept inside Dolibarr):
 
 Stored in `llx_inbox_userparam`: `widgets_desktop` / `widgets_mobile` for a user and a mailbox, `widgets_model_desktop`
 / `widgets_model_mobile` with `fk_user` = 0 for the model of a mailbox. Value: `{items: [{id, x, y, w, h}], dock, off,
-at}` (`dock`: height of the notes in pixels, 0 the default; `off`: the module widgets, `mail_actions` and `panel:*`,
-the user took away; `at`: date of the saving). Checked by `InboxWidgets::clean()`: known widgets (or `panel:` and an
+cols, at}` (`dock`: maximum height of the notes in pixels, 0 the default; `off`: the module widgets, `mail_actions` and `panel:*`,
+the user took away; `cols`: columns of the grid, 12; `at`: date of the saving). Checked by `InboxWidgets::clean()`: known widgets (or `panel:` and an
 id), each once, 40 at most, sizes and places kept inside the grid and the bounds of the template.
 
 The module widgets not placed and not in `off` are drawn at the end of the grid (1.157.0); a placed one with nothing

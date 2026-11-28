@@ -1,7 +1,12 @@
 # Widgets of the Dolibarr panel
 
 On a computer, the column Dolibarr of a mail has three parts: the fixed top (sender, pieces), a grid of
-widgets, and the notes docked at the bottom (drag the bar between them to change the height of the notes). The
+widgets, and the notes docked at the bottom. The notes are as high as their content: without notes they keep only
+their head and the field to write one, and the widgets take the room; with more notes they grow up to a maximum, set by
+dragging the bar between the widgets and the notes (or its arrows), then their list scrolls. On the bar, the room kept
+for notes still to come shows dashed above the notes: the bar always moves the top of that room, even when the notes do
+not need the room yet. Grabbed from the bar, the pointer jumps onto the top of the room (the browser locks it, Escape
+gives it back) and its moves go on at the edge of the screen; the top edge of the dashed room can be dragged as well. The
 widgets are small pieces of information about the other side of the mail: late invoices, open tickets, next event,
 mails exchanged, key figures (revenue, left to pay, last order...), lists (invoices, orders, proposals...), charts,
 and quick actions (open tickets and « New ticket », open proposals and « New proposal », invoices and « New

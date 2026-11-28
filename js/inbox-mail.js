@@ -4186,6 +4186,23 @@
 	 */
 	const OT = { src: new Map(), cache: new Map(), el: null, for: null, show: 0, hide: 0, styled: false };
 	/** Key of the tooltip of a piece ('' when Dolibarr gives none), its source kept aside */
+	/**
+	 * A bubble of the application on hover or keyboard focus (1.158.2), the same as for the pieces: put the key
+	 * returned in data-objtip. The HTML is built by the caller with I.html (escaped), the same content gives the same key
+	 * @param {string} html Content
+	 * @param {string} [title] Title
+	 * @returns {string} Key
+	 */
+	const tipKeys = new Map();
+	I.tip = (html, title) => {
+		const text = String(html);
+		if (!tipKeys.has(text)) {
+			const key = 'tip:' + (tipKeys.size + 1);
+			tipKeys.set(text, key);
+			OT.src.set(key, { params: null, html: text, title: title || '' });
+		}
+		return tipKeys.get(text);
+	};
 	function objTipKey(d) {
 		if (!d.tip_params && !d.tip_html) {
 			return '';
@@ -4444,13 +4461,14 @@
 			}
 		};
 		root.addEventListener('click', e => {
-			const a = e.target.closest('.ibx-addr--user');
+			const a = e.target.closest('.ibx-addr--user, .ibx-js-pieceperson');
 			if (a && root.contains(a)) {
+				objTipHide();
 				toggle(a, false);
 			}
 		});
 		root.addEventListener('keydown', e => {
-			const a = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.ibx-addr--user');
+			const a = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('.ibx-addr--user, .ibx-js-pieceperson');
 			if (a && e.target === a) {
 				e.preventDefault();
 				toggle(a, true);
@@ -6730,6 +6748,37 @@
 	 * @param {object} [more] {theirs: text of the second line, action: html of a button}
 	 * @returns {string} html
 	 */
+	/**
+	 * Colleagues of a piece (1.158.0): the owner and the users invited to an event, the user assigned to a ticket.
+	 * Three faces at most; on hover a bubble (name, role, answer), on a click the card of the colleague
+	 * @param {object} d Piece (describe)
+	 * @returns {string}
+	 */
+	function piecePeopleHtml(d) {
+		const people = Array.isArray(d.people) ? d.people : [];
+		if (!people.length) {
+			return '';
+		}
+		const role = p => t({ owner: 'InboxPiecePersonOwner', attendee: 'InboxPiecePersonAttendee', assigned: 'InboxPiecePersonAssigned' }[p.role] || 'InboxPiecePersonAttendee');
+		const answer = p => (p.role === 'assigned' ? '' : t({ accepted: 'InboxPiecePersonAccepted', tentative: 'InboxPiecePersonTentative', declined: 'InboxPiecePersonDeclined' }[p.answer] || 'InboxPiecePersonPending'));
+		const line = p => [role(p), p.role === 'owner' && !p.answer ? '' : answer(p)].filter(Boolean).join(' · ');
+		const shown = people.slice(0, 3);
+		const rest = people.slice(3);
+		const faces = shown.map(p => {
+			const key = String(p.email || ('u:' + p.id)).toLowerCase();
+			peopleCache.set(key, p);
+			const tip = 'person:' + d.type + ':' + d.id + ':' + p.id + ':' + (p.answer || '');
+			OT.src.set(tip, { html: String(I.html`<div class="ibx-persontip"><b>${p.name}</b>${p.job ? I.html`<div>${p.job}</div>` : ''}<div class="ibx-muted">${line(p)}</div></div>`), title: p.name });
+			return String(I.html`<button type="button" class="ibx-piecepeople__one ibx-js-pieceperson${p.answer === 'declined' ? ' is-declined' : ''}" data-user="${key}" data-objtip="${tip}" aria-haspopup="dialog" aria-label="${p.name} · ${line(p)}">${I.raw(userAvatar(p))}</button>`);
+		}).join('');
+		let more = '';
+		if (rest.length) {
+			const tip = 'people:' + d.type + ':' + d.id + ':' + rest.map(p => p.id + (p.answer || '')).join(',');
+			OT.src.set(tip, { html: String(I.html`<div class="ibx-persontip">${rest.map(p => I.html`<div><b>${p.name}</b> <span class="ibx-muted">${line(p)}</span></div>`)}</div>`), title: '' });
+			more = String(I.html`<span class="ibx-piecepeople__more" tabindex="0" data-objtip="${tip}" aria-label="${t('InboxPiecePeopleMore', rest.length)}">+${rest.length}</span>`);
+		}
+		return '<span class="ibx-piecepeople">' + faces + more + '</span>';
+	}
 	function pieceHtml(d, unlink, warn, socId, more) {
 		more = more || {};
 		const attrs = d.readable && d.type ? ' data-type="' + esc(d.type) + '" data-id="' + d.id + '"' : '';
@@ -6737,8 +6786,9 @@
 			return '<span class="ibx-piece"' + attrs + '><span class="ibx-piece__link ibx-muted">' + ic(d.icon) + esc(d.kind) + ' · ' + th('InboxPieceNotReadable') + '</span></span>';
 		}
 		const sub = [pieceSub(d, socId || 0), more.theirs || ''].filter(Boolean).join(' · ');
-		const foot = sub || more.action
-			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + (more.action || '') + '</span>'
+		const people = piecePeopleHtml(d);
+		const foot = sub || more.action || people
+			? '<span class="ibx-piece__foot">' + (sub ? '<span class="ibx-muted ibx-piece__sub" title="' + esc(sub) + '">' + esc(sub) + '</span>' : '') + people + (more.action || '') + '</span>'
 			: '';
 		// Tooltip of Dolibarr in a card of the application (objTip) when getNomUrl gives one; else a plain title
 		const tip = objTipKey(d);
@@ -12665,6 +12715,22 @@
 			app.style.removeProperty('--ibx-w3');
 		}
 	}
+	/**
+	 * Widest a column may grow: the reading column keeps its minimum (as css/inbox.css, 22.5 rem under 80 rem, else
+	 * 26.25 rem), the column stops there instead of pushing the others out of the window
+	 * @param {number} base Width of the column now
+	 * @param {number} cap  Bound of the column (part of the window)
+	 * @returns {number}
+	 */
+	function splitMax(base, cap) {
+		const read = $('.ibx-pane--read', S.el);
+		if (!read || !read.offsetWidth) {
+			return cap;
+		}
+		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+		const minRead = (window.matchMedia('(max-width: 79.9375rem)').matches ? 22.5 : 26.25) * rem;
+		return Math.min(cap, base + Math.max(0, read.getBoundingClientRect().width - minRead));
+	}
 	function bindSplitters() {
 		$$('.ibx-splitter', S.el).forEach(sp => {
 			const which = 'w' + sp.dataset.split;
@@ -12681,8 +12747,9 @@
 				const target = which === 'w3' && dolSide() && !dolSide().hidden ? dolSide() : pane;
 				const base = target.getBoundingClientRect().width;
 				const app = $('.ibx-mailapp', S.el);
+				const max = splitMax(base, window.innerWidth * (which === 'w3' ? 0.4 : 0.6));
 				const move = ev => {
-					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(window.innerWidth * (which === 'w3' ? 0.4 : 0.6), base + dir * (ev.clientX - start))) + 'px');
+					app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(max, base + dir * (ev.clientX - start))) + 'px');
 				};
 				const up = () => {
 					sp.classList.remove('is-dragging');
@@ -12718,8 +12785,10 @@
 				}
 				e.preventDefault();
 				const app = $('.ibx-mailapp', S.el);
-				const cur = pane.getBoundingClientRect().width;
-				app.style.setProperty('--ibx-' + which, Math.max(min, cur + dir * (e.key === 'ArrowRight' ? 24 : -24)) + 'px');
+				const target = which === 'w3' && dolSide() && !dolSide().hidden ? dolSide() : pane;
+				const cur = target.getBoundingClientRect().width;
+				const max = splitMax(cur, window.innerWidth * (which === 'w3' ? 0.4 : 0.6));
+				app.style.setProperty('--ibx-' + which, Math.max(min, Math.min(max, cur + dir * (e.key === 'ArrowRight' ? 24 : -24))) + 'px');
 			});
 		});
 	}

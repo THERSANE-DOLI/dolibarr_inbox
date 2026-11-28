@@ -37,20 +37,25 @@ require_once __DIR__.'/inboxaccess.class.php';
 class InboxWidgets
 {
 	/**
-	 * Sizes of the templates in the grid of the panel (4 columns, a row = half a line of list, --ibx-row-h / 2):
+	 * Sizes of the templates in the grid of the panel (12 columns since 1.159.0, a row = half a line of list, --ibx-row-h / 2):
 	 * w, h = default cells; min_rem = minimum width in rem (each grid turns it into cells); min_h, max_w, max_h in
 	 * cells; resize = both, horizontal, vertical or none
 	 */
 	const TEMPLATES = array(
-		'mini' => array('w' => 1, 'h' => 2, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 2, 'max_h' => 2, 'resize' => 'horizontal'),
-		'line' => array('w' => 4, 'h' => 2, 'min_rem' => 9, 'min_h' => 2, 'max_w' => 4, 'max_h' => 2, 'resize' => 'horizontal'),
-		'figure' => array('w' => 2, 'h' => 5, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 4, 'max_h' => 8, 'resize' => 'both'),
-		'list' => array('w' => 4, 'h' => 8, 'min_rem' => 9, 'min_h' => 4, 'max_w' => 4, 'max_h' => 20, 'resize' => 'both'),
-		'chart' => array('w' => 4, 'h' => 8, 'min_rem' => 14, 'min_h' => 6, 'max_w' => 4, 'max_h' => 16, 'resize' => 'vertical'),
-		'action' => array('w' => 4, 'h' => 7, 'min_rem' => 9, 'min_h' => 4, 'max_w' => 4, 'max_h' => 14, 'resize' => 'both'),
-		'thread' => array('w' => 4, 'h' => 12, 'min_rem' => 14, 'min_h' => 8, 'max_w' => 4, 'max_h' => 40, 'resize' => 'vertical'),
-		'free' => array('w' => 4, 'h' => 4, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 4, 'max_h' => 20, 'resize' => 'both'),
+		'mini' => array('w' => 3, 'h' => 2, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 6, 'max_h' => 2, 'resize' => 'horizontal'),
+		'line' => array('w' => 12, 'h' => 2, 'min_rem' => 9, 'min_h' => 2, 'max_w' => 12, 'max_h' => 2, 'resize' => 'horizontal'),
+		'figure' => array('w' => 6, 'h' => 5, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 12, 'max_h' => 8, 'resize' => 'both'),
+		'list' => array('w' => 12, 'h' => 8, 'min_rem' => 9, 'min_h' => 4, 'max_w' => 12, 'max_h' => 20, 'resize' => 'both'),
+		'chart' => array('w' => 12, 'h' => 8, 'min_rem' => 14, 'min_h' => 6, 'max_w' => 12, 'max_h' => 16, 'resize' => 'both'),
+		'action' => array('w' => 12, 'h' => 7, 'min_rem' => 9, 'min_h' => 4, 'max_w' => 12, 'max_h' => 14, 'resize' => 'both'),
+		'thread' => array('w' => 12, 'h' => 12, 'min_rem' => 14, 'min_h' => 8, 'max_w' => 12, 'max_h' => 40, 'resize' => 'vertical'),
+		'free' => array('w' => 12, 'h' => 4, 'min_rem' => 3.5, 'min_h' => 2, 'max_w' => 12, 'max_h' => 20, 'resize' => 'both'),
 	);
+	/**
+	 * Columns of the grid: 12, divided by 2, 3, 4 and 6 (as many widgets of the same width on a line). 4 before
+	 * 1.159.0: a layout saved without « cols » is read with its places and widths scaled to 12
+	 */
+	const COLUMNS = 12;
 
 	/**
 	 * Widgets of inbox: template, translation key of the title, the section of the overview whose right and switch
@@ -113,9 +118,9 @@ class InboxWidgets
 	 * no model: kept small on purpose, the panel shows the least by default and each user builds what he needs
 	 */
 	const PRESETS = array(
-		'sales' => array(array('invoices_late', 0, 0), array('event_next', 1, 0), array('mails_count', 2, 0)),
+		'sales' => array(array('invoices_late', 0, 0), array('event_next', 3, 0), array('mails_count', 6, 0)),
 		'accounting' => array(array('invoices_late', 0, 0), array('figure_due', 0, 2)),
-		'support' => array(array('tickets_open', 0, 0), array('mails_count', 1, 0)),
+		'support' => array(array('tickets_open', 0, 0), array('mails_count', 3, 0)),
 		'purchase' => array(array('figure_to_pay', 0, 0)),
 		'transport' => array(),
 	);
@@ -446,7 +451,7 @@ class InboxWidgets
 	 * Preset of the usage of a mailbox (automatic and none: the one of the sales)
 	 *
 	 * @param int $accountId Mailbox
-	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,at:int}
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,cols:int,at:int}
 	 */
 	public function preset($accountId)
 	{
@@ -458,20 +463,22 @@ class InboxWidgets
 			$items[] = array('id' => $x[0], 'x' => $x[1], 'y' => $x[2], 'w' => $size['w'], 'h' => $size['h']);
 		}
 
-		return array('items' => $items, 'dock' => 0, 'off' => array(), 'at' => 0);
+		return array('items' => $items, 'dock' => 0, 'off' => array(), 'cols' => self::COLUMNS, 'at' => 0);
 	}
 
 	/**
 	 * A layout checked: known widgets, each once, inside the grid and the bounds of its template
 	 *
 	 * @param mixed $layout Layout sent
-	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,at:int}|null
+	 * @return array{items:list<array{id:string,x:int,y:int,w:int,h:int}>,dock:int,off:list<string>,cols:int,at:int}|null
 	 */
 	protected function clean($layout)
 	{
 		if (!is_array($layout) || !is_array($layout['items'] ?? null) || count($layout['items']) > self::LAYOUT_MAX) {
 			return null;
 		}
+		// Sent with fewer columns (a page opened before the update): scaled to 12; without « cols », already in 12
+		$layout = isset($layout['cols']) ? self::upgrade($layout) : $layout;
 		$items = array();
 		$seen = array();
 		foreach ($layout['items'] as $it) {
@@ -483,11 +490,11 @@ class InboxWidgets
 			$size = self::size($id);
 			$w = max(1, min((int) $size['max_w'], (int) ($it['w'] ?? $size['w'])));
 			$h = max((int) $size['min_h'], min((int) $size['max_h'], (int) ($it['h'] ?? $size['h'])));
-			$x = max(0, min(4 - $w, (int) ($it['x'] ?? 0)));
+			$x = max(0, min(self::COLUMNS - $w, (int) ($it['x'] ?? 0)));
 			$y = max(0, min(1000, (int) ($it['y'] ?? 0)));
 			$items[] = array('id' => $id, 'x' => $x, 'y' => $y, 'w' => $w, 'h' => $h);
 		}
-		// Height of the notes docked at the bottom, in pixels (0: the default)
+		// Maximum height of the notes docked at the bottom, in pixels (0: the default)
 		$dock = max(0, min(2000, (int) ($layout['dock'] ?? 0)));
 		// Module actions and blocks taken away by the user: they no longer show by themselves at the end
 		$off = array();
@@ -498,7 +505,38 @@ class InboxWidgets
 			}
 		}
 
-		return array('items' => $items, 'dock' => $dock, 'off' => $off, 'at' => (int) dol_now());
+		return array('items' => $items, 'dock' => $dock, 'off' => $off, 'cols' => self::COLUMNS, 'at' => (int) dol_now());
+	}
+
+	/**
+	 * A layout saved with another number of columns (4 before 1.159.0) in the grid of 12: places and widths scaled,
+	 * each widget kept inside the grid
+	 *
+	 * @param array<string,mixed> $layout Layout
+	 * @return array<string,mixed>
+	 */
+	public static function upgrade(array $layout)
+	{
+		$cols = (int) ($layout['cols'] ?? 4);
+		if ($cols === self::COLUMNS || $cols <= 0 || !is_array($layout['items'] ?? null)) {
+			return $layout;
+		}
+		$f = self::COLUMNS / $cols;
+		foreach ($layout['items'] as $k => $it) {
+			if (is_array($it)) {
+				// Both edges scaled the same way: two widgets side by side stay side by side, never over each other
+				$x0 = (int) ($it['x'] ?? 0);
+				$x = min(self::COLUMNS - 1, (int) round($x0 * $f));
+				$layout['items'][$k]['x'] = $x;
+				if (isset($it['w'])) {
+					$end = min(self::COLUMNS, (int) round(($x0 + (int) $it['w']) * $f));
+					$layout['items'][$k]['w'] = max(1, $end - $x);
+				}
+			}
+		}
+		$layout['cols'] = self::COLUMNS;
+
+		return $layout;
 	}
 
 	/**
@@ -513,7 +551,7 @@ class InboxWidgets
 			." AND param = '".$this->db->escape($param)."'");
 		$v = is_object($row) ? json_decode((string) $row->value, true) : null;
 
-		return is_array($v) && is_array($v['items'] ?? null) ? $v : null;
+		return is_array($v) && is_array($v['items'] ?? null) ? self::upgrade($v) : null;
 	}
 
 	/**

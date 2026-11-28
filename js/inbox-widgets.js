@@ -47,11 +47,19 @@
 			${sum ? html`<span class="ibx-wg__sum${lv ? ' ibx-wg__sum--' + lv : ''}">${D().mark(lv)}${sum}</span>` : ''}</div>`;
 	}
 
+	/** Bubble of a widget (the one of the application, never a bare title): its name, what it shows, where a click goes */
+	function tip(title, lines, url) {
+		if (!I.tip) {
+			return '';
+		}
+		return I.tip(html`<div class="ibx-wgtip"><b>${title || ''}</b>${lines.filter(Boolean).map(l => html`<div>${l}</div>`)}${D().inside(url) ? html`<div class="ibx-muted">${t('InboxWgTipOpen')}</div>` : ''}</div>`);
+	}
+
 	const TEMPLATES = {
 		mini: d => {
 			const lv = level(d.level);
-			const inner = html`${raw(ic(ICON.test(String(d.icon)) ? d.icon : 'info'))}<b class="ibx-wg__value">${d.value}</b><span class="ibx-wg__label">${d.label || ''}</span>`;
-			return html`<div class="ibx-wg ibx-wg--mini${lv ? ' ibx-wg--' + lv : ''}" title="${d.title || ''}${d.note ? ' · ' + d.note : ''}">${link(d.url, inner, 'ibx-wg__mini')}</div>`;
+			const inner = html`${raw(ic(ICON.test(String(d.icon)) ? d.icon : 'info'))}<b class="ibx-wg__value">${d.value}</b><span class="ibx-wg__label">${d.label || ''}</span><span class="ibx-sr-only">${d.title || ''}</span>`;
+			return html`<div class="ibx-wg ibx-wg--mini${lv ? ' ibx-wg--' + lv : ''}" data-objtip="${tip(d.title, [[d.value, d.label].filter(Boolean).join(' '), d.note], d.url)}">${link(d.url, inner, 'ibx-wg__mini')}</div>`;
 		},
 		line: d => html`<div class="ibx-wg ibx-wg--line">${raw(ic(ICON.test(String(d.icon)) ? d.icon : 'info'))}<span class="ibx-wg__text">${link(d.url, d.text)}</span>${d.note ? html`<span class="ibx-wg__note">${d.note}</span>` : ''}</div>`,
 		figure: d => html`<div class="ibx-wg ibx-wg--figure"><dl class="ibx-ov-kpis">${D().kpi(d)}</dl></div>`,
@@ -81,7 +89,7 @@
 			// Nothing for this mail: a mini keeps its icon with a dash, the others say it (the widget keeps its place)
 			if (template === 'mini') {
 				const icon = hint && ICON.test(String(hint.icon)) ? hint.icon : 'info';
-				return html`<div class="ibx-wg ibx-wg--mini ibx-wg--none" title="${(hint && hint.title) || ''} · ${t('InboxOvSectionEmpty')}"><span class="ibx-wg__mini">${raw(ic(icon))}<b class="ibx-wg__value">–</b></span></div>`;
+				return html`<div class="ibx-wg ibx-wg--mini ibx-wg--none" data-objtip="${tip(hint && hint.title, [t('InboxOvSectionEmpty')], '')}" tabindex="0"><span class="ibx-wg__mini">${raw(ic(icon))}<b class="ibx-wg__value">–</b><span class="ibx-sr-only">${(hint && hint.title) || ''} · ${t('InboxOvSectionEmpty')}</span></span></div>`;
 			}
 			return html`<div class="ibx-wg ibx-wg--empty">${t('InboxOvSectionEmpty')}</div>`;
 		}

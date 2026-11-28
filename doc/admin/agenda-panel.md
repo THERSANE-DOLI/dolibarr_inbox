@@ -28,3 +28,11 @@ A module opens its pages from a mail (actions of the mail, panel) with a token o
 page reads the mail on the server, nothing of the mail is in its address. The old markers that put the subject and
 the addresses in the address are removed. A module not yet moved to `{ctx}` gets them back with the hidden constant
 `INBOX_LEGACY_MAIL_MARKERS` = `1` (Setup > Other setup); remove it once the module is updated.
+
+## Events and tickets linked to a mail
+
+In the pieces of the Dolibarr panel, an event linked to a mail shows its subject and its date (1.157.1), and, since
+1.158.0, the faces of its colleagues: the organizer first, then the users invited (an invitation declined in grey),
+three at most and « +n » for the others. A ticket shows the user it is assigned to. On hover a bubble gives the name,
+the role and the answer to the invitation; a click opens the card of the colleague (write to him, his card in
+Dolibarr, his mails). Only active internal users are shown, and only for a piece the user may read.
