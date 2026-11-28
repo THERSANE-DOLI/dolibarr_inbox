@@ -133,7 +133,7 @@ class InboxWidgetsTest extends InboxOverviewTestCase
 		$l = $w->layouts($reader, (int) $box->id);
 		$this->assertNull($l['desktop']['user']);
 		$this->assertFalse($l['manager']);
-		$this->assertNotEmpty($l['preset']['items'], 'the preset of the usage (sales by default)');
+		$this->assertSame(array(), $l['preset']['items'], 'no widget by default');
 		$this->assertNull($w->layouts($stranger, (int) $box->id), 'a mailbox he cannot read');
 
 		$layout = array('items' => array(array('id' => 'figure_due', 'x' => 3, 'y' => 0, 'w' => 20, 'h' => 50), array('id' => 'invoices_late', 'x' => 0, 'y' => 0)), 'dock' => 240);

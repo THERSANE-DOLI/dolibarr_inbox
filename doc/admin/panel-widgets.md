@@ -15,8 +15,9 @@ Dolibarr and the switches of the overview ([Overview of a mail](overview.md)): a
 never offered nor computed. A widget with nothing to show for a mail keeps its place (a dash, or « Nothing to show »)
 so that the layout does not move from a mail to the next one.
 
-By default the panel shows the least: a few widgets chosen by the usage of the mailbox (Settings > Mailboxes >
-Usage), or none. Each user builds what he needs.
+By default the panel has no widget: the sender, the pieces and the notes, plus the actions and the blocks of the other
+modules, which come by themselves. Each user adds what he needs from the catalogue, or a manager saves a model for the
+mailbox.
 
 ## Actions and blocks of the other modules
 
@@ -47,8 +48,7 @@ The lists and the actions are as high as their content, up to their maximum.
 - **Model of the mailbox**: a manager of the mailbox (level « Manage ») saves his layout as the model, written in
   the journal of the mailbox. The users who have no layout of their own follow it; a user who has his own keeps it
   and sees « The model of the mailbox changed · Adopt ». There is no way to force a layout on everybody.
-- **Back to the model of the mailbox** (menu « ⋯ ») removes the layout of the user: the model, else the preset of the
-  usage.
+- **Back to the model of the mailbox** (menu « ⋯ ») removes the layout of the user: the model, else no widget.
 - Kept on the server, so the same on every computer of the user.
 
 ## Small screen

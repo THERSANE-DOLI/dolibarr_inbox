@@ -474,11 +474,14 @@
 		sp._wg = true;
 		const body = () => sp.closest('.ibx-dolibar__body');
 		let dragging = false;
+		// Shown after a short stay on the bar (1.164.2): a pointer only passing by does not make it flash
 		sp.addEventListener('pointerenter', () => {
 			clearTimeout(sp._hide);
-			dockGhost(sp, true);
+			clearTimeout(sp._show);
+			sp._show = setTimeout(() => dockGhost(sp, true), 450);
 		});
 		sp.addEventListener('pointerleave', () => {
+			clearTimeout(sp._show);
 			if (!dragging) {
 				// A short delay: the pointer may go up to the grip of the room
 				sp._hide = setTimeout(() => dockGhost(sp, false), 150);
@@ -499,6 +502,7 @@
 			}
 			e.preventDefault();
 			clearTimeout(sp._hide);
+			clearTimeout(sp._show);
 			sp.setPointerCapture(e.pointerId);
 			dragging = true;
 			b.classList.add('is-dockdrag');

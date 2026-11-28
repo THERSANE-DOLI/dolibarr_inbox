@@ -1,5 +1,11 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the room of the notes shows after a short stay on the bar, no more flash when the pointer passes by :   1.164.2
+  - right away from the keyboard and as soon as the drag begins.
+
+- FIX: no widget by default in the Dolibarr panel, without a layout of the user nor a model of the mailbox :   1.164.1
+  - the module actions and blocks still come by themselves; the rest from the catalogue or the model.
+
 - NEW: objects of the modules as pieces, linked to the mails, found by « Link », created from a mail :   1.164.0
   - hook inboxElementTypes: element, rights, access, table and fields searched, page and trigger of creation,
     trigger of deletion; every declaration checked, never a type nor a trigger of the core.

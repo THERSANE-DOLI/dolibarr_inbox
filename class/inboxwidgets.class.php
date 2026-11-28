@@ -121,13 +121,14 @@ class InboxWidgets
 	const VERSIONS = array('desktop', 'mobile');
 	/**
 	 * Presets of the usage of the mailbox (InboxSituation::USAGES), the layout of who has none and when the mailbox has
-	 * no model: kept small on purpose, the panel shows the least by default and each user builds what he needs
+	 * no model: empty since 1.164.1, no widget by default; the module actions and blocks still come by themselves, each
+	 * user (or the model of the mailbox) adds the rest from the catalogue. Kept by usage for a later choice
 	 */
 	const PRESETS = array(
-		'sales' => array(array('invoices_late', 0, 0), array('event_next', 3, 0), array('mails_count', 6, 0)),
-		'accounting' => array(array('invoices_late', 0, 0), array('figure_due', 0, 2)),
-		'support' => array(array('tickets_open', 0, 0), array('mails_count', 3, 0)),
-		'purchase' => array(array('figure_to_pay', 0, 0)),
+		'sales' => array(),
+		'accounting' => array(),
+		'support' => array(),
+		'purchase' => array(),
 		'transport' => array(),
 	);
 
