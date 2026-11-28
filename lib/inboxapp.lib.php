@@ -158,6 +158,47 @@ function inboxEditorContextVars()
 }
 
 /**
+ * Columns of the modules in the strip on the right (1.153.0, hook inboxSidePanes, context inbox): each module gives an
+ * id, a title, an icon (usage name of the sprite), the address of its content inside Dolibarr (called with the mail,
+ * ?mail=<row>, while the column is shown) and whether it needs a mail. Three at most; anything else is dropped.
+ *
+ * @param User $user User
+ * @return list<array{id:string,title:string,icon:string,url:string,needs_mail:bool}>
+ */
+function inboxSidePanes(User $user)
+{
+	global $db, $hookmanager;
+
+	if (!is_object($hookmanager)) {
+		include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+		$hookmanager = new HookManager($db);
+	}
+	$hookmanager->initHooks(array('inbox'));
+	$parameters = array('user' => $user);
+	$object = null;
+	$action = '';
+	$out = array();
+	if ($hookmanager->executeHooks('inboxSidePanes', $parameters, $object, $action) < 0 || !is_array($hookmanager->resArray['panes'] ?? null)) {
+		return $out;
+	}
+	foreach ($hookmanager->resArray['panes'] as $x) {
+		$url = is_array($x) ? (string) ($x['url'] ?? '') : '';
+		// An address inside Dolibarr: one starting slash, never « // » nor « /\ », no space, control character, quote
+		$local = strlen($url) <= 1000 && $url !== '' && $url[0] === '/' && !(isset($url[1]) && ($url[1] === '/' || $url[1] === '\\')) && !preg_match('/[\s\x00-\x1f\\\\<>"\']/', $url);
+		if (!$local || !preg_match('/^[a-z0-9_-]{1,40}$/', (string) ($x['id'] ?? '')) || empty($x['title']) || (string) $x['id'] === 'overview') {
+			continue;
+		}
+		$out[] = array('id' => 'mod:'.$x['id'], 'title' => dol_trunc((string) $x['title'], 60, 'right', 'UTF-8', 1), 'url' => $url,
+			'icon' => preg_match('/^[a-z0-9-]{1,40}$/', (string) ($x['icon'] ?? '')) ? (string) $x['icon'] : 'magic', 'needs_mail' => !isset($x['needs_mail']) || !empty($x['needs_mail']));
+		if (count($out) >= 3) {
+			break;
+		}
+	}
+
+	return $out;
+}
+
+/**
  * Values of the JavaScript context of the application
  *
  * @param User $user User
@@ -169,6 +210,7 @@ function inboxAppContextVars(User $user)
 
 	dol_include_once('/inbox/class/inboxuserparam.class.php');
 	dol_include_once('/inbox/class/inboxagendapanel.class.php');
+	dol_include_once('/inbox/class/inboxoverview.class.php');
 	$params = new InboxUserParam($db);
 	$moduleVersion = '';
 	if (class_exists('modInbox') || (include_once dol_buildpath('/inbox/core/modules/modInbox.class.php', 0))) {
@@ -222,6 +264,9 @@ function inboxAppContextVars(User $user)
 		'INBOX_PARAMS_JSON' => (string) json_encode($params->getAll($user)),
 		// Agenda panel (1.107.0): shown, case « done », pages of a module that took over (hook inboxAgendaProvider)
 		'INBOX_AGENDA_JSON' => (string) json_encode((new InboxAgendaPanel($db))->config($user)),
+		// Columns of the strip (1.153.0): the overview of inbox, and the columns of the modules (hook inboxSidePanes)
+		'INBOX_OVERVIEW' => InboxOverview::enabled($user),
+		'INBOX_SIDEPANES_JSON' => (string) json_encode(inboxSidePanes($user)),
 		'INBOX_ACCENT' => getDolGlobalString('INBOX_ACCENT', '#8a2b6e'),
 		// Colour blindness declared in the card of the user (tab Interface): flashy, protanopia, deuteranopes, tritanopes
 		'INBOX_COLORBLIND' => $colorblind,

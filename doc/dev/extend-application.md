@@ -72,6 +72,46 @@ an `icon` (usage name) and a `url` inside Dolibarr. The panel reads that address
 
 Every text is escaped by the panel. Check the rights in the page: the hook runs for any mail the user opens.
 
+A block of the panel is for a short summary. For a rich content (figures, charts, lists), prefer a column of the
+strip (below): it is read only when the user opens it, never at each mail opened.
+
+## Columns of a module in the strip on the right
+
+Since 1.153.0 the strip on the right of the mail space (Dolibarr, Overview, Today) takes the columns of the modules,
+three at most, after the overview of inbox. Hook `inboxSidePanes`, context `inbox`, called once when the application
+loads (not for each mail): `$parameters` gives `user`. The method adds to `$this->results['panes']`, for each column:
+
+- `id` (`[a-z0-9_-]`, 40 at most), `title`, `icon` (usage name of the sprite, `dev/icons.json`);
+- `url`: an address inside Dolibarr (one starting slash, no space nor quote), read while the column is shown with
+  `?mail=<row of the index>` added (`&mail=` when it already has a query), then again when the user opens another mail;
+- `needs_mail` (default true): the icon is greyed without a mail open.
+
+The column is docked beside the mail, a drawer when the window is narrow, as the other columns; the choice of the
+column is kept (`side_panel` = `mod:<id>`). On a phone the columns of the modules are not offered yet.
+
+The address answers JSON in the format of the overview, drawn by inbox (every text escaped, links kept inside
+Dolibarr):
+
+- `tags`, `alerts`: lists of `{label, level}` (`ok`, `info`, `warning`, `danger`, `neutral`), shown as chips;
+- `kpis`: up to 4 `{label, value, note, level, delta}`, `delta` = `{text, level, dir: up|down, title}`;
+- `note`: `{label, text}`;
+- `sections`: `{id, title, sum, sumLevel, open, url, rows, hero, chart, spark, season, mails, mailsLabel}`, `rows` =
+  `{label, value, note, level, url, item}`, `chart`/`spark`/`season` = `{label, value, hint, current, bars}` with
+  `bars` = `{x, v, short, text, partial}`, `mails` = `{id, folder, out, date, subject, current}`;
+- `labels`: `{open, received, sent, current, empty}` for the list of mails;
+- `hidden: true` or `error`: a short text instead of the content.
+
+The page reads the mail itself from `mail` and checks every right: the browser gives nothing else, and the user may
+have been given a column for a mail he cannot read. A module that draws its column itself listens to the JavaScript
+hook `inbox:sidepane:render` (context `id`, `mail`, `el`, `data`, `handled`), draws in `el` (escape what it shows) and
+sets `handled = true`.
+
+## Open a mail from a module
+
+A module that lists mails (its column, its window) opens one in the mail space with the JavaScript hook
+`inbox:mail:goto`: `Dolibarr.executeHook('inbox:mail:goto', { folder: <row of the folder>, mail: <row of the mail> })`,
+the same jump as the links of inbox between two mails. Nothing happens for a mail the user cannot read.
+
 ## Viewers of the attachments
 
 Inbox shows itself only what a mail needs to be read: PDF and pictures (by the browser), text, CSV, zip, attached

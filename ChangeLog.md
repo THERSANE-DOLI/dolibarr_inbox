@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: overview of the other side of a mail in its own column of the strip, and columns of the modules :   1.153.0
+  - revenue, invoices, orders, proposals, tickets, mails exchanged...: the head when the column opens, each section
+    only when unfolded, in the order of the usage of the mailbox; one switch per piece of information in the setup.
+  - taken from the module InboxInsight of Max (Air MKG); hook inboxSidePanes for the columns of the modules.
+
 - NEW: a warning on the icon of the agenda when events are late to do :   1.152.0
   - on the icon of the strip and of the rail, in red as « Late » in the panel; its name says how many.
   - counted with the state of the mail space every 5 minutes while the panel is closed; hook inboxAgendaEvents mode

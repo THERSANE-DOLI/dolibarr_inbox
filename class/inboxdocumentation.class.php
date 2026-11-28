@@ -61,6 +61,7 @@ class InboxDocumentation
 				'conversations' => array('icon' => 'fa-comments', 'version' => '1.139.0', 'files' => array('en_US' => 'admin/conversations.md')),
 				'views' => array('icon' => 'fa-layer-group', 'version' => '1.141.0', 'files' => array('en_US' => 'admin/views.md')),
 				'agenda_panel' => array('icon' => 'fa-calendar-alt', 'version' => '1.107.0', 'files' => array('en_US' => 'admin/agenda-panel.md')),
+				'overview' => array('icon' => 'fa-chart-bar', 'version' => '1.153.0', 'files' => array('en_US' => 'admin/overview.md')),
 				'new_customer' => array('icon' => 'fa-user-plus', 'version' => '1.79.0', 'files' => array('en_US' => 'admin/new-customer.md')),
 			)),
 			'InboxDocGroupReception' => array('icon' => 'fa-shield-alt', 'pages' => array(

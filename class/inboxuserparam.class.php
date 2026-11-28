@@ -46,7 +46,8 @@ class InboxUserParam
 	}
 
 	/**
-	 * Known settings: name => array(default, check). Check: list of values, 'int:min:max', 'json'.
+	 * Known settings: name => array(default, check). Check: list of values, 'int:min:max', 'json', 'side' (a column of
+	 * the strip).
 	 *
 	 * @return array<string,array{0:string,1:string|string[]}>
 	 */
@@ -102,8 +103,9 @@ class InboxUserParam
 			'system_folders' => array('strip', array('strip', 'list')),
 			// Bandeau Dolibarr of the reading folded (1.13.0)
 			'dolibar_folded' => array('0', 'int:0:1'),
-			// Column beside a mail open, chosen in the strip on the right (1.109.0): the Dolibarr part, the agenda panel or none
-			'side_panel' => array('dolibarr', array('dolibarr', 'agenda', 'none')),
+			// Column beside a mail open, chosen in the strip on the right (1.109.0): the Dolibarr part, the agenda panel or none;
+			// the overview and the columns of the modules (mod:<id>, hook inboxSidePanes) since 1.153.0
+			'side_panel' => array('dolibarr', 'side'),
 			// Agenda panel with no mail open (1.107.0, declared 1.109.0): shown (''), or closed by hand
 			'agenda_mode' => array('', array('', 'pinned', 'closed')),
 			// Writing (1.16.0): Ctrl+Enter sends (or nothing), size of the writing windows
@@ -181,6 +183,9 @@ class InboxUserParam
 		}
 		if ($check === 'json') {
 			return $value === '' || (strlen($value) <= 4000 && is_array(json_decode($value, true)));
+		}
+		if ($check === 'side') {
+			return in_array($value, array('dolibarr', 'agenda', 'overview', 'none'), true) || (bool) preg_match('/^mod:[a-z0-9_-]{1,40}$/', $value);
 		}
 
 		return false;

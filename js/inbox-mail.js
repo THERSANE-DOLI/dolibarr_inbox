@@ -6034,7 +6034,11 @@
 			return false;
 		}
 		const app = sideApp();
-		const docked = app.dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el) : (app.dataset.dolside === 'open' ? dolSide() : null);
+		// The column docked on the right: the agenda, else the column Dolibarr or the one of the overview and of the modules
+		// (1.153.0), whichever is shown (the hidden one measures 0 and would make the space narrow, then wide again)
+		const extra = $('.ibx-js-sidepane', S.el);
+		const docked = app.dataset.agenda === 'open' ? $('.ibx-pane--agenda', S.el)
+			: (app.dataset.dolside === 'open' ? (extra && !extra.hidden ? extra : dolSide()) : null);
 		const width = pane.clientWidth + (docked ? docked.getBoundingClientRect().width + 5 : 0);
 		const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 		return width / rem < 60;
@@ -6042,10 +6046,26 @@
 	function agendaOn() {
 		return !!(I.agenda && I.agenda.enabled());
 	}
+	/**
+	 * Columns of the strip beside Dolibarr and the agenda (1.153.0): the overview of inbox, then the ones of the
+	 * modules (hook inboxSidePanes), drawn by js/inbox-overview.js in the column .ibx-js-sidepane
+	 * @returns {Array<{id:string,title:string,icon:string,url:string,needs_mail:boolean}>}
+	 */
+	function sidePanes() {
+		if (!S.panes) {
+			const own = I.ctx('INBOX_OVERVIEW', false) ? [{ id: 'overview', title: t('InboxOverview'), icon: 'overview', url: '', needs_mail: true }] : [];
+			const mods = I.ctxJson('INBOX_SIDEPANES_JSON', []);
+			S.panes = own.concat((Array.isArray(mods) ? mods : []).filter(x => x && /^mod:[a-z0-9_-]{1,40}$/.test(String(x.id))));
+		}
+		return S.panes;
+	}
+	function sidePane(id) {
+		return sidePanes().find(x => x.id === id) || null;
+	}
 	/** Choice kept for a mail open: the last column chosen (the agenda pinned before 1.109.0 stays the agenda) */
 	function sideChoice() {
 		const c = params.side_panel;
-		if (['dolibarr', 'agenda', 'none'].includes(c)) {
+		if (['dolibarr', 'agenda', 'none'].includes(c) || sidePane(c)) {
 			return c;
 		}
 		return params.agenda_mode === 'pinned' ? 'agenda' : 'dolibarr';
@@ -6066,7 +6086,9 @@
 		} else {
 			c = params.agenda_mode === 'closed' ? '' : 'agenda';
 		}
-		if ((c === 'agenda' && !agendaOn()) || (c === 'dolibarr' && !S.openId) || c === 'none') {
+		const pane = sidePane(c);
+		if ((c === 'agenda' && !agendaOn()) || (c === 'dolibarr' && !S.openId) || c === 'none' || (pane && pane.needs_mail && !S.openId)
+			|| (!pane && !['dolibarr', 'agenda'].includes(c))) {
 			return '';
 		}
 		return c;
@@ -6086,8 +6108,15 @@
 		}
 		layoutDolside();
 		paintStrip();
+		// The overview or a column of a module (1.153.0): drawn for the mail open, read only while it is shown
+		if (I.sidePane && I.sidePane.sync) {
+			I.sidePane.sync(sidePane(cur) ? cur : '', S.openId || 0);
+		}
 	}
-	/** The column Dolibarr shown or not, docked or as a drawer; the splitter of the right column for the one docked */
+	/**
+	 * The column Dolibarr, or the one of the overview and of the modules (1.153.0), shown or not, docked or as a drawer;
+	 * the splitter of the right column for the one docked. Both sit in the same place of the grid (data-dolside).
+	 */
 	function layoutDolside() {
 		const app = sideApp();
 		const side = dolSide();
@@ -6096,7 +6125,12 @@
 		}
 		const on = !isPhone() && app.dataset.side === 'dolibarr';
 		side.hidden = !on;
-		if (on) {
+		const extra = $('.ibx-js-sidepane', S.el);
+		const paneOn = !isPhone() && !!sidePane(app.dataset.side || '');
+		if (extra) {
+			extra.hidden = !paneOn;
+		}
+		if (on || paneOn) {
 			app.dataset.dolside = app.dataset.narrow === '1' ? 'over' : 'open';
 		} else {
 			app.removeAttribute('data-dolside');
@@ -6112,7 +6146,9 @@
 	 * @param {string} reason
 	 */
 	function toggleSide(what, reason) {
-		if (!S.el || isPhone() || (what === 'dolibarr' && !S.openId) || (what === 'agenda' && !agendaOn())) {
+		const pane = sidePane(what);
+		if (!S.el || isPhone() || (what === 'dolibarr' && !S.openId) || (what === 'agenda' && !agendaOn()) || (pane && pane.needs_mail && !S.openId)
+			|| (!pane && !['dolibarr', 'agenda'].includes(what))) {
 			return;
 		}
 		const next = sideCurrent() === what ? '' : what;
@@ -6125,7 +6161,7 @@
 		}
 		applySide(reason || 'button');
 		if (next) {
-			const col = next === 'dolibarr' ? dolSide() : $('.ibx-pane--agenda', S.el);
+			const col = next === 'dolibarr' ? dolSide() : (sidePane(next) ? $('.ibx-js-sidepane', S.el) : $('.ibx-pane--agenda', S.el));
 			if (col && sideApp().dataset.narrow === '1') {
 				col.setAttribute('tabindex', '-1');
 				col.focus({ preventScroll: true });
@@ -6141,6 +6177,7 @@
 	function stripHtml() {
 		return '<nav class="ibx-sidestrip ibx-js-sidestrip" aria-label="' + th('InboxSideStrip') + '">'
 			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sidedol" aria-pressed="false">' + ic('dolibarr') + '</button>'
+			+ sidePanes().map(x => '<button type="button" class="ibx-sidestrip__btn ibx-js-sidepanebtn" data-pane="' + esc(x.id) + '" aria-pressed="false">' + ic(x.icon) + '</button>').join('')
 			+ '<button type="button" class="ibx-sidestrip__btn ibx-js-sideagenda" aria-pressed="false" hidden>' + ic('today') + '<span class="ibx-sidestrip__day ibx-js-sideday" aria-hidden="true"></span>'
 			+ '<span class="ibx-latemark" aria-hidden="true" hidden>' + ic('warning') + '</span></button>'
 			+ '</nav>';
@@ -6161,6 +6198,22 @@
 		} else {
 			dol.setAttribute('aria-disabled', 'true');
 		}
+		$$('.ibx-js-sidepanebtn', strip).forEach(b => {
+			const pane = sidePane(b.dataset.pane);
+			if (!pane) {
+				return;
+			}
+			const off = pane.needs_mail && !S.openId;
+			const name = off && pane.id === 'overview' ? t('InboxOverviewNoMail') : pane.title;
+			b.title = name;
+			b.setAttribute('aria-label', name);
+			b.setAttribute('aria-pressed', cur === pane.id ? 'true' : 'false');
+			if (off) {
+				b.setAttribute('aria-disabled', 'true');
+			} else {
+				b.removeAttribute('aria-disabled');
+			}
+		});
 		const ag = $('.ibx-js-sideagenda', strip);
 		ag.hidden = !agendaOn();
 		// Events late to do (1.152.0): a warning on the icon, said in its name too (never the colour alone)
@@ -6179,12 +6232,13 @@
 		}
 		$('.ibx-js-sidedol', strip).addEventListener('click', () => toggleSide('dolibarr'));
 		$('.ibx-js-sideagenda', strip).addEventListener('click', () => toggleSide('agenda'));
+		$$('.ibx-js-sidepanebtn', strip).forEach(b => b.addEventListener('click', () => toggleSide(b.dataset.pane)));
 		// A drawer closes by a click beside it (menus, dialogs and windows opened from it are not « beside »)
 		document.addEventListener('pointerdown', e => {
 			if (!S.el || sideApp().dataset.narrow !== '1' || !S.sideDrawer || !e.target.closest) {
 				return;
 			}
-			if (e.target.closest('.ibx-dolibar, .ibx-pane--dolside, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
+			if (e.target.closest('.ibx-dolibar, .ibx-pane--dolside, .ibx-pane--sidepane, .ibx-pane--agenda, .ibx-sidestrip, .ibx-dolchips, .ibx-menu, dialog, .ibx-toast, .ibx-window, .ibx-backdrop, .ibx-popover')) {
 				return;
 			}
 			closeSide('outside');
@@ -6209,7 +6263,7 @@
 		}
 		applySide('init');
 	}
-	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide, paint: paintStrip };
+	I.side = { current: sideCurrent, narrow: () => !!S.el && sideApp().dataset.narrow === '1', toggle: toggleSide, close: closeSide, apply: applySide, paint: paintStrip, panes: sidePanes };
 
 	// ---------- Phone (1.102.0): the Dolibarr part as chips under the head, details in a bottom sheet ----------
 	/** Slot of the chips in the head of a mail or of a conversation (filled by the panel once loaded) */
@@ -6261,10 +6315,22 @@
 		if (x.notes || x.canWrite) {
 			html += chip('notes', 'note', '', { badge: x.notes || '+', aria: x.notes ? t('InboxNotesCount', x.notes) : t('InboxNotes') });
 		}
+		// Overview (1.153.0): its own sheet on a phone, its column on a narrow computer
+		if (sidePane('overview') && S.openId) {
+			html += chip('overview', 'overview', '', { aria: t('InboxOverview') });
+		}
 		slot.innerHTML = html;
 		slot.hidden = false;
 		slot.classList.toggle('is-line', drawer);
 		$$('.ibx-dolchip', slot).forEach(b => b.addEventListener('click', () => {
+			if (b.dataset.sec === 'overview') {
+				if (!drawer && I.sidePane && I.sidePane.sheet) {
+					I.sidePane.sheet('overview', S.openId, b);
+				} else if (sideCurrent() !== 'overview') {
+					toggleSide('overview');
+				}
+				return;
+			}
 			if (!drawer) {
 				openDolSheet(box, b.dataset.sec, b);
 				return;
@@ -12675,6 +12741,8 @@
 			+ '<aside class="ibx-pane ibx-pane--agenda ibx-js-agenda" aria-label="' + th('InboxAgendaPanel') + '" hidden></aside>'
 			// Column Dolibarr (1.110.0): the bandeau of the mail open, moved here on a computer
 			+ '<aside class="ibx-pane ibx-pane--dolside ibx-js-dolside" aria-label="' + th('InboxDolibarr') + '" hidden></aside>'
+			// Column of the overview and of the modules (1.153.0, js/inbox-overview.js), in the same place of the grid
+			+ '<aside class="ibx-pane ibx-pane--sidepane ibx-js-sidepane" aria-label="' + th('InboxOverview') + '" hidden></aside>'
 			// Strip on the right (1.109.0): Dolibarr and the agenda, one column at a time
 			+ stripHtml()
 			+ (I.ctx('INBOX_CAN_SEND', false) ? '<button type="button" class="ibx-fab ibx-js-compose" aria-label="' + th('InboxNewMail') + '">' + ic('compose') + '</button>' : '')

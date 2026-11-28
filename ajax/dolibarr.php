@@ -26,6 +26,7 @@ dol_include_once('/inbox/class/inboxreader.class.php');
 dol_include_once('/inbox/class/inboxlink.class.php');
 dol_include_once('/inbox/class/inboxnote.class.php');
 dol_include_once('/inbox/class/inboxcontactmatcher.class.php');
+dol_include_once('/inbox/class/inboxcounterpart.class.php');
 dol_include_once('/inbox/class/inboxdatasource.class.php');
 dol_include_once('/inbox/class/inboxthreadlink.class.php');
 dol_include_once('/inbox/class/inboxactivity.class.php');
@@ -130,48 +131,7 @@ function inboxDolibarrCounterpart($row)
 {
 	global $db;
 
-	$requester = strtolower(trim((string) ($row->requester_email ?? '')));
-	if ($requester !== '') {
-		return array('email' => $requester, 'side' => 'sender');
-	}
-	$p = $db->prefix();
-	$own = array();
-	$rows = $db->getRows("SELECT email FROM ".$p."inbox_account WHERE rowid = ".((int) $row->fk_account)
-		." UNION SELECT email FROM ".$p."inbox_identity WHERE fk_account = ".((int) $row->fk_account)." LIMIT 500");
-	foreach (is_array($rows) ? $rows : array() as $r) {
-		if ((string) $r->email !== '') {
-			$own[] = strtolower(trim((string) $r->email));
-		}
-	}
-	$domains = (new InboxCited($db))->ownDomains();
-	$isOurs = function ($email) use ($own, $domains) {
-		$at = strrpos($email, '@');
-		return in_array($email, $own, true) || ($at !== false && in_array(substr($email, $at + 1), $domains, true));
-	};
-	$from = strtolower(trim((string) $row->from_email));
-	if ($from !== '' && !$isOurs($from)) {
-		return array('email' => $from, 'side' => 'sender');
-	}
-	if ($from === '') {
-		return array('email' => '', 'side' => 'sender');
-	}
-	$m = array();
-	preg_match_all('/[^\s<>,;"\']+@[^\s<>,;"\']+/', (string) $row->to_text.', '.(string) $row->cc_text, $m);
-	$others = array_values(array_filter(array_unique(array_map('strtolower', $m[0])), function ($e) use ($isOurs) {
-		return !$isOurs($e);
-	}));
-	if (!$others) {
-		return array('email' => '', 'side' => 'internal');
-	}
-	$matcher = new InboxContactMatcher($db);
-	foreach (array_slice($others, 0, 5) as $email) {
-		$found = $matcher->match($email);
-		if ($found['fk_soc'] || $found['fk_socpeople']) {
-			return array('email' => $email, 'side' => 'recipient');
-		}
-	}
-
-	return array('email' => $others[0], 'side' => 'recipient');
+	return InboxCounterpart::of($db, $row);
 }
 
 switch ($action) {
@@ -264,20 +224,12 @@ switch ($action) {
 		$counterpart = $requester ? array('email' => strtolower((string) $requester['email']), 'side' => 'sender') : inboxDolibarrCounterpart($row);
 		$email = $counterpart['email'];
 		$sender['side'] = $counterpart['side'];
-		$socId = (int) $row->fk_soc;
-		$contactId = (int) $row->fk_socpeople;
+		// Thirdparty and contact of the mail (InboxCounterpart, shared with the overview 1.153.0)
+		$found = InboxCounterpart::thirdparty($db, $row, $email);
+		$socId = $found['soc'];
+		$contactId = $found['contact'];
+		$sender['by'] = $found['by'];
 		$matcher = null;
-		if (!$socId && $email !== '') {
-			$matcher = new InboxContactMatcher($db);
-			$m = $matcher->match($email);
-			$socId = $m['fk_soc'];
-			$contactId = $contactId ?: $m['fk_socpeople'];
-			if (!$socId) {
-				$socId = $matcher->matchDomain($email);
-				$sender['by'] = $socId ? 'domain' : '';
-			}
-		}
-		$sender['by'] = $sender['by'] ?: ($socId || $contactId ? 'address' : '');
 		// Shared domains (lot A7, 1.76.0): the category of the domain (a disposable address is said), the
 		// thirdparties that share it offered to choose (never linked without the user), and who may correct the list
 		$matcher = $matcher ?? new InboxContactMatcher($db);
