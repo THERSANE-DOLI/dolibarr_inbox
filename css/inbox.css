@@ -3181,6 +3181,11 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 .ibx-sidestrip__btn[aria-disabled="true"] { opacity: .45; cursor: default; }
 .ibx-sidestrip__btn[aria-disabled="true"]:hover { background: none; color: var(--ibx-text-muted); }
 .ibx-sidestrip__day { font-size: 0.625rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+/* Late events of the agenda (1.152.0): a warning in the top right corner of its icons (strip and rail), the colour of
+   « Late » in the panel; its name says it too */
+.ibx-latemark { position: absolute; top: 0.125rem; right: 0.125rem; display: inline-flex; padding: 0.0625rem; color: var(--ibx-danger); background: var(--ibx-bg-pane); border-radius: 50%; line-height: 0; pointer-events: none; }
+.ibx-latemark[hidden] { display: none; }
+.ibx-sidestrip__btn .ibx-latemark .ibx-icon, .ibx-rail__item .ibx-latemark .ibx-icon { width: 0.75rem; height: 0.75rem; }
 .ibx-mailapp[data-agenda="over"] > .ibx-pane.ibx-pane--agenda { right: var(--ibx-strip-w); }
 /* The column not chosen is not shown: as a column of the mail, its place goes back to the mail */
 /* Column Dolibarr (1.110.0): a pane of the mail space at the place of the agenda, full height; the bandeau of the mail
