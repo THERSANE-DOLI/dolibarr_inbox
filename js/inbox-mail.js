@@ -6825,7 +6825,8 @@
 	}
 	/**
 	 * Open card: floats exactly over its slot (the slot keeps the height of the closed card), 20rem wide at least
-	 * (grows to the left near the right edge); only its detail scrolls when the window is short
+	 * (grows to the left near the right edge); only its detail scrolls when the window is short. In the side panel it
+	 * keeps the width of its slot: wider, it would go past the panel over the icon strip
 	 */
 	function placeSocCard(box) {
 		const card = $('.ibx-soccard.is-open', box);
@@ -6835,7 +6836,7 @@
 		const slot = card.parentElement;
 		slot.style.height = ($('.ibx-soccard__top', card).offsetHeight + 2) + 'px';
 		const r = slot.getBoundingClientRect();
-		const w = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
+		const w = Math.min(card.closest('.ibx-pane--dolside') ? r.width : Math.max(r.width, 320), window.innerWidth - 16);
 		card.style.width = w + 'px';
 		card.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
 		card.style.top = r.top + 'px';
