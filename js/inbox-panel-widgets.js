@@ -503,6 +503,9 @@
 			e.preventDefault();
 			clearTimeout(sp._hide);
 			clearTimeout(sp._show);
+			if (I.tipHide) {
+				I.tipHide();
+			}
 			sp.setPointerCapture(e.pointerId);
 			dragging = true;
 			b.classList.add('is-dockdrag');

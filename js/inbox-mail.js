@@ -4194,6 +4194,8 @@
 	 * @returns {string} Key
 	 */
 	const tipKeys = new Map();
+	/** The bubble closed (a drag begins on what it explains) */
+	I.tipHide = () => objTipHide();
 	I.tip = (html, title) => {
 		const text = String(html);
 		if (!tipKeys.has(text)) {
@@ -7398,7 +7400,7 @@
 					+ '<div class="ibx-dolibar__items ibx-mpanel__body">' + panelBody(box._panelsMail === box.dataset.mail ? (box._panels || {})[p.id] : null) + '</div></div>').join(''))
 				// Grid of the widgets between the fixed top and the notes docked at the bottom (column of a computer, 1.155.0)
 				+ (wgOn ? '<div class="ibx-dolibar__row ibx-wgzone ibx-js-wgzone" data-sec="widgets" hidden></div>'
-					+ (right && !sheet ? '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" title="' + th('InboxWgDockResize') + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '') : '')
+					+ (right && !sheet ? '<div class="ibx-wgsplit ibx-js-wgsplit" role="separator" aria-orientation="horizontal" tabindex="0" data-objtip="' + esc(I.tip(I.html`<div>${t('InboxWgDockResize')}</div>`)) + '" aria-label="' + th('InboxWgDockResize') + '"></div>' : '') : '')
 				+ '<div class="ibx-dolibar__row ibx-dolibar__notes" data-sec="notes"><span class="ibx-dolibar__label">' + th((d.activity || []).length ? 'InboxNotesAndReplies' : 'InboxNotes') + '</span><div class="ibx-dolibar__items ibx-notes">'
 				+ threadHtml(d)
 				+ '</div>'

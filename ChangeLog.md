@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the bar above the notes explains itself in the bubble of the application, no longer in a bare title :   1.164.3
+  - the bubble closes when the drag begins.
+
 - FIX: the room of the notes shows after a short stay on the bar, no more flash when the pointer passes by :   1.164.2
   - right away from the keyboard and as soon as the drag begins.
 
