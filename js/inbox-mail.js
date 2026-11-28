@@ -7750,7 +7750,7 @@
 		}
 		const rqBtn = e.target.closest('.ibx-js-createrequest');
 		if (rqBtn) {
-			createPiece(box, rqBtn.dataset.type, false, null);
+			createPiece(box, { id: rqBtn.dataset.type, type: rqBtn.dataset.type, window: false }, false, null);
 			return;
 		}
 		const x = e.target.closest('.ibx-js-unlink');
@@ -7871,14 +7871,20 @@
 	 * « Create ▾ »: the page of creation of Dolibarr opens in a new tab, filled from the mail; the piece saved there is
 	 * linked to the mail (and gets the mail in its documents when the box is ticked)
 	 */
+	/** Groups of the dialog « Create from this mail » (1.161.0), in their order (InboxCreate::GROUPS) */
+	const CREATE_GROUPS = ['contacts', 'sales', 'purchases', 'followup', 'other'];
 	function createDialog(box) {
 		const d = box._data;
+		const buttons = d.create || [];
+		const groups = CREATE_GROUPS.map(g => ({ g, list: buttons.filter(c => (CREATE_GROUPS.includes(c.group) ? c.group : 'other') === g) })).filter(x => x.list.length);
 		const dlg = dialog({
 			title: t('InboxCreateTitle'),
 			noCancel: false,
 			// A disposable address (lot A7, 1.76.0): said before a thirdparty is made from it
 			body: (d.sender.domain_category === 'disposable' ? '<div class="ibx-notice ibx-notice--warning">' + ic('warning') + '<div class="ibx-notice__text">' + th('InboxDomainsDisposableCreate', d.sender.domain) + '</div></div>' : '')
-				+ '<div class="ibx-creategrid">' + d.create.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>'
+				// Titled groups (1.161.0): the buttons of the core first, then those of the modules in the same group
+				+ groups.map(x => String(I.html`<h3 class="ibx-creategroup">${t('InboxCreateGroup_' + x.g)}</h3>`)
+					+ '<div class="ibx-creategrid">' + x.list.map(c => '<button type="button" class="ibx-createbtn ibx-js-createtype" data-type="' + esc(c.type) + '" data-button="' + esc(c.id || c.type) + '">' + ic(c.icon) + '<span>' + esc(c.label) + '</span></button>').join('') + '</div>').join('')
 				+ '<label class="ibx-inline ibx-createattach"><input type="checkbox" class="ibx-js-createattach"> ' + th('InboxCreateAttachMail') + '</label>'
 				+ '<p class="ibx-formrow__help">' + th('InboxCreateHelp') + '</p>',
 			actions: [],
@@ -7888,15 +7894,16 @@
 			if (!b) {
 				return;
 			}
+			const btn = buttons.find(c => (c.id || c.type) === b.dataset.button) || { id: b.dataset.type, type: b.dataset.type, label: b.textContent, window: false };
 			const attach = $('.ibx-js-createattach', dlg).checked;
 			// A thirdparty already known for this sender (readable or not): asked before a second one is made
-			if (b.dataset.type === 'societe' && d.sender && d.sender.soc) {
+			if (btn.type === 'societe' && d.sender && d.sender.soc) {
 				const ok = await I.confirmDialog({ title: t('InboxCreateSocExistsTitle'), text: t(d.sender.soc.readable ? 'InboxCreateSocExists' : 'InboxCreateSocExistsHidden'), confirm: t('InboxCreateSocAnyway') });
 				if (!ok) {
 					return;
 				}
 			}
-			createPiece(box, b.dataset.type, attach, dlg);
+			createPiece(box, btn, attach, dlg);
 		});
 	}
 	/** An agenda module declares its page of creation of an event (hook inboxAgendaProvider) */
@@ -7904,21 +7911,30 @@
 		const conf = I.ctxJson('INBOX_AGENDA_JSON', {}) || {};
 		return !!(conf.provider && conf.provider.urls && conf.provider.urls.create);
 	}
-	/**
-	 * The page of creation of a type, in a new tab; an event goes to the page of the agenda module when there is one,
-	 * in a window of inbox (1.160.0). The piece saved there is linked to the mail
-	 */
-	async function createPiece(box, type, attach, dlg) {
+	/** A button of a module (1.161.0) or of the core: its id for the server */
+	function createParams(box, btn, attach) {
 		const d = box._data;
-		if (type === 'action' && agendaCreatePage()) {
-			return createInWindow(box, type, attach, dlg);
+		return { id: +box.dataset.mail, type: btn.type, button: btn.id && btn.id !== btn.type ? btn.id : '', attach: attach ? 1 : 0,
+			soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 };
+	}
+	/** Address of a page of a module, its markers filled from the mail open */
+	async function createFill(url) {
+		const mail = I.mailContext ? I.mailContext() : null;
+		return String(url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx ? I.moduleUrlCtx(url, mail, {}) : I.moduleUrl(url, mail, {});
+	}
+	/**
+	 * The page of creation of a button, in a new tab; an event goes to the page of the agenda module when there is one,
+	 * a button of a module where it says (window or tab). The piece saved there is linked to the mail
+	 */
+	async function createPiece(box, btn, attach, dlg) {
+		if (btn.window || (btn.id === 'action' && agendaCreatePage())) {
+			return createInWindow(box, btn, attach, dlg);
 		}
 		// The tab is opened at the click (a tab opened after an answer is blocked by the browser)
 		const tab = window.open('about:blank', '_blank');
 		let res;
 		try {
-			res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type, attach: attach ? 1 : 0,
-				soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+			res = await post('dolibarr', 'intent', createParams(box, btn, attach));
 		} catch (err) {
 			if (tab) {
 				tab.close();
@@ -7926,11 +7942,18 @@
 			toast(err.message, { error: true });
 			return;
 		}
+		const url = res.module ? await createFill(res.url) : res.url;
+		if (!insideUrl(url)) {
+			if (tab) {
+				tab.close();
+			}
+			return;
+		}
 		if (tab) {
 			tab.opener = null;
-			tab.location.href = res.url;
+			tab.location.href = url;
 		} else {
-			window.open(res.url, '_blank', 'noopener');
+			window.open(url, '_blank', 'noopener');
 		}
 		if (dlg) {
 			dlg.close();
@@ -7939,19 +7962,16 @@
 		// Back in inbox: the piece created is shown linked
 		window.addEventListener('focus', () => loadDolibar(box), { once: true });
 	}
-	/** The page of the agenda module in a window of inbox: its markers filled from the mail, the token of the intent kept */
-	async function createInWindow(box, type, attach, dlg) {
-		const d = box._data;
+	/** The page of a module in a window of inbox: its markers filled from the mail, the token of the intent kept */
+	async function createInWindow(box, btn, attach, dlg) {
 		let res;
 		try {
-			res = await post('dolibarr', 'intent', { id: +box.dataset.mail, type, attach: attach ? 1 : 0,
-				soc: d.known ? d.known.soc : 0, contact: d.known ? d.known.contact : 0 });
+			res = await post('dolibarr', 'intent', createParams(box, btn, attach));
 		} catch (err) {
 			toast(err.message, { error: true });
 			return;
 		}
-		const mail = I.mailContext ? I.mailContext() : null;
-		const url = String(res.url).indexOf('{ctx}') >= 0 && I.moduleUrlCtx ? await I.moduleUrlCtx(res.url, mail, {}) : I.moduleUrl(res.url, mail, {});
+		const url = await createFill(res.url);
 		if (!insideUrl(url)) {
 			return;
 		}
@@ -7959,10 +7979,10 @@
 			dlg.close();
 		}
 		if (res.window) {
-			// Back from the window (saved or closed): the event created is shown linked
-			openModuleWindow({ mailId: +box.dataset.mail, box, url, title: t('InboxCreateEvent'), panel: 'create:' + type, onClose: () => box.isConnected && loadDolibar(box) });
+			// Back from the window (saved or closed): the piece created is shown linked
+			openModuleWindow({ mailId: +box.dataset.mail, box, url, title: btn.label || t('InboxCreateEvent'), panel: 'create:' + (btn.id || btn.type), onClose: () => box.isConnected && loadDolibar(box) });
 		} else {
-			// No agenda module any more (its page gone since the page was loaded): the page of Dolibarr, in a tab
+			// No module page any more (gone since the page was loaded): the page of Dolibarr, in a tab
 			window.open(url, '_blank', 'noopener');
 			window.addEventListener('focus', () => loadDolibar(box), { once: true });
 		}

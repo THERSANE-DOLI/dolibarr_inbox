@@ -26,9 +26,10 @@ dol_include_once('/inbox/class/inboxservertester.class.php');
 dol_include_once('/inbox/class/inboxidentity.class.php');
 dol_include_once('/inbox/class/connector/inboximapconnector.class.php');
 dol_include_once('/inbox/class/inboxsituation.class.php');
+dol_include_once('/inbox/class/inboxcreate.class.php');
 
 $action = (string) inboxAjaxParam('action', 'aZ09');
-$write = in_array($action, array('save', 'test', 'discover', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators', 'carriers'), true);
+$write = in_array($action, array('save', 'test', 'discover', 'status', 'delete', 'roles', 'twin', 'retention', 'usage', 'indicators', 'carriers', 'createkeep'), true);
 inboxAjaxStart($write);
 $isAdmin = $user->hasRight('inbox', 'account', 'admin');
 
@@ -340,6 +341,27 @@ switch ($action) {
 			inboxAjaxError($situation->error, 422);
 		}
 		inboxAjaxReply(array('usage' => (string) $account->usage_profile));
+		// no break
+
+	case 'createbuttons':
+		// Buttons of « Create » in this mailbox (1.161.0): its managers see them, removed ones too, and by which module
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'));
+		$creator = new InboxCreate($db);
+		$list = $creator->buttons($user, (int) $account->id, array('mail' => 0, 'account' => (int) $account->id, 'socid' => 0, 'contactid' => 0), true);
+		inboxAjaxReply(array('admin' => $isAdmin, 'buttons' => array_map(function ($b) {
+			return array('id' => $b['id'], 'type' => $b['type'], 'label' => $b['label'], 'icon' => $b['icon'], 'group' => $b['group'], 'source' => $b['source'],
+				'removed_by' => $b['removed_by'], 'kept' => $b['kept']);
+		}, $list)));
+		// no break
+
+	case 'createkeep':
+		// A button removed by a module kept for this mailbox, or the removal applied again: the admin of inbox only
+		$account = inboxAjaxManagedAccount((int) inboxAjaxParam('id', 'int'), true);
+		$res = (new InboxCreate($db))->keep($user, (int) $account->id, (string) inboxAjaxParam('button', 'alphanohtml'), (int) inboxAjaxParam('keep', 'int') === 1);
+		if ($res < 0) {
+			inboxAjaxError('Bad button', $res === -1 ? 400 : 500);
+		}
+		inboxAjaxReply(array('done' => $res));
 		// no break
 
 	case 'carriers':

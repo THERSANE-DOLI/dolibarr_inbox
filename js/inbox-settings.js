@@ -677,6 +677,7 @@
 		{ id: 'sync', key: 'InboxTabSync', admin: false },
 		{ id: 'rules', key: 'InboxTabRules', admin: false },
 		{ id: 'consumers', key: 'InboxTabConsumers', admin: false },
+		{ id: 'create', key: 'InboxTabCreate', admin: false },
 		{ id: 'away', key: 'InboxTabAway', admin: false },
 		{ id: 'protection', key: 'InboxTabProtection', admin: false },
 		{ id: 'journal', key: 'InboxTabJournal', admin: false },
@@ -694,7 +695,7 @@
 		// Outgoing: what is written (the out of office is a mail written in advance)
 		{ id: 'writing', key: 'InboxTabWriting', sections: ['identities', 'templates', 'away'] },
 		// Incoming: sorted at the arrival, classed, shown beside the mail
-		{ id: 'reception', key: 'InboxTabReception', sections: ['rules', 'tags', 'usage', 'consumers'] },
+		{ id: 'reception', key: 'InboxTabReception', sections: ['rules', 'tags', 'usage', 'consumers', 'create'] },
 		{ id: 'journal', key: 'InboxTabJournal', sections: ['journal'] },
 	];
 	/** Name of a section in its chip (the section « access » under the tab Access: the people) */
@@ -730,7 +731,7 @@
 	let card = null;
 	/** Mailbox whose test was asked from the head of the card (button beside the switch): run once its form is there */
 	let testAsked = 0;
-	const TAB_FNS = () => ({ overview: tabOverview, server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), consumers: (b, a) => I.consumers.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), protection: tabProtection, journal: tabJournal });
+	const TAB_FNS = () => ({ overview: tabOverview, server: tabServer, folders: tabFolders, identities: tabIdentities, templates: tabTemplates, access: tabAccess, tags: tabTags, usage: tabUsage, create: tabCreate, sync: tabSync, rules: (b, a) => I.rules.tab(b, a), consumers: (b, a) => I.consumers.tab(b, a), away: (b, a) => I.rules.awayTab(b, a), protection: tabProtection, journal: tabJournal });
 
 	/**
 	 * Content of a tab, without flash: made aside and put in place once loaded (or after 300 ms, then with its
@@ -2877,6 +2878,8 @@
 					return t('InboxLogPassword');
 				case 'create':
 					return t('InboxLogCreate');
+				case 'create_keep':
+					return t(l.after && l.after.keep ? 'InboxLogCreateKeep' : 'InboxLogCreateUnkeep', String((l.after && l.after.button) || ''));
 				case 'usage':
 					return t('InboxLogUsage', t('InboxUsage_' + (l.before.usage || 'auto')), t('InboxUsage_' + (l.after.usage || 'auto')));
 				case 'indicators':
@@ -3025,6 +3028,64 @@
 		return '<details class="ibx-guide__part" style="margin-top:1rem"><summary>' + th('InboxTagsThunderbird') + '</summary><div class="ibx-guide__body">'
 			+ '<p>' + th('InboxTagsThunderbirdWhy') + '</p><p>' + th('InboxTagsThunderbirdHow') + '</p>' + guideCode(lines)
 			+ '<p class="ibx-formrow__help">' + th('InboxTagsThunderbirdAfter') + '</p></div></details>';
+	}
+
+	// ---------- Mailbox: buttons of « Create from this mail » (1.161.0) ----------
+	const CREATE_GROUPS = ['contacts', 'sales', 'purchases', 'followup', 'other'];
+	/**
+	 * The buttons of the dialog « Create » in this mailbox, by group: shown, removed by a module (its technical name, as
+	 * it declares it), kept back by the admin of inbox. Only the admin keeps or lets a removal apply again
+	 */
+	async function tabCreate(box, account) {
+		box.innerHTML = skeleton();
+		let res;
+		try {
+			res = await api('account', 'createbuttons', { id: account.id });
+		} catch (err) {
+			box.innerHTML = I.html`<p class="ibx-muted">${I.raw(ic('warning'))} ${err.message}</p>`.toString();
+			return;
+		}
+		const list = Array.isArray(res.buttons) ? res.buttons : [];
+		const state = b => {
+			if (!b.removed_by && b.removed_by !== '') {
+				return I.html`<span class="ibx-badge ibx-badge--ok">${t('InboxCreateShown')}</span>`;
+			}
+			const by = b.removed_by || t('InboxCreateByModule');
+			return b.kept ? I.html`<span class="ibx-badge ibx-badge--info">${t('InboxCreateKept', by)}</span>`
+				: I.html`<span class="ibx-badge ibx-badge--warning">${t('InboxCreateRemovedBy', by)}</span>`;
+		};
+		const act = b => {
+			if (!res.admin || (!b.removed_by && b.removed_by !== '')) {
+				return '';
+			}
+			return b.kept ? I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-btn--ghost ibx-js-createkeep" data-button="${b.id}" data-keep="0">${t('InboxCreateUnkeep')}</button>`
+				: I.html`<button type="button" class="ibx-btn ibx-btn--sm ibx-js-createkeep" data-button="${b.id}" data-keep="1">${t('InboxCreateKeep')}</button>`;
+		};
+		box.innerHTML = String(I.html`<section class="ibx-section"><h2 class="ibx-section__title">${t('InboxTabCreate')}</h2>
+			<p class="ibx-section__help">${t('InboxCreateButtonsHelp')}</p>
+			${CREATE_GROUPS.map(g => {
+				const items = list.filter(b => (CREATE_GROUPS.includes(b.group) ? b.group : 'other') === g);
+				return items.length ? I.html`<h3 class="ibx-creategroup">${t('InboxCreateGroup_' + g)}</h3>
+					<ul class="ibx-createlist">${items.map(b => I.html`<li class="ibx-createlist__item">${I.raw(ic(b.icon || 'plus'))}
+						<span class="ibx-createlist__label">${b.label}</span>
+						<span class="ibx-muted ibx-createlist__source">${b.source || t('InboxCreateSourceCore')}</span>
+						${state(b)}${I.raw(String(act(b)))}</li>`)}</ul>` : '';
+			})}
+			${res.admin ? '' : I.html`<p class="ibx-section__help">${t('InboxCreateAdminOnly')}</p>`}</section>`);
+		box.onclick = async e => {
+			const k = e.target.closest('.ibx-js-createkeep');
+			if (!k) {
+				return;
+			}
+			k.disabled = true;
+			try {
+				await post('account', 'createkeep', { id: account.id, button: k.dataset.button, keep: +k.dataset.keep });
+				toast(t(+k.dataset.keep ? 'InboxCreateKeptToast' : 'InboxCreateUnkeptToast'));
+			} catch (err) {
+				toast(err.message, { error: true });
+			}
+			tabCreate(box, account);
+		};
 	}
 
 	// ---------- Mailbox: usage (1.67.0) and its own list of indicators (1.68.0) ----------

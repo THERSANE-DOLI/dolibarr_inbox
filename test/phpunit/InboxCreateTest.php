@@ -194,4 +194,58 @@ class InboxCreateTest extends InboxTestCase
 		}
 		$this->assertContains('agenda_create', InboxCreate::CAPABILITIES, 'announced to the hooks of a mail');
 	}
+
+	/**
+	 * Buttons of « Create » (1.161.0): the modules add buttons on the types of the core (several for a type), remove
+	 * any button for the mailbox of the mail, the admin keeps one back; groups in their order
+	 *
+	 * @return void
+	 */
+	public function testButtonsOfModules()
+	{
+		$core = array();
+		foreach (InboxCreate::creatable($this->admin) as $c) {
+			$core[] = array_merge($c, array('id' => $c['type'], 'group' => InboxCreate::TYPE_GROUPS[$c['type']], 'source' => '', 'url' => '', 'window' => false));
+		}
+		$add = array(
+			array('source' => 'quotes', 'id' => 'express', 'type' => 'propal', 'label' => 'Express quote', 'url' => '/custom/quotes/new.php?socid={socid}', 'group' => 'sales', 'window' => true),
+			array('source' => 'quotes', 'id' => 'bad', 'type' => 'propal', 'label' => 'Far', 'url' => '//evil.example/x'),
+			array('source' => 'quotes', 'id' => 'unknown', 'type' => 'nothing', 'label' => 'X', 'url' => '/x.php'),
+			array('source' => 'quotes', 'id' => 'norights', 'type' => 'propal', 'label' => 'Y', 'url' => '/y.php', 'rights' => array(array('nomodule', 'noright'))),
+			array('source' => 'other', 'id' => 'misc', 'type' => 'societe', 'label' => 'Misc', 'url' => '/m.php', 'group' => 'nogroup'),
+		);
+		// A module called first removes the button of a module called after it: both phases merged
+		$remove = array(array('id' => 'propal', 'source' => 'quotes'), array('id' => 'other:misc', 'source' => 'quotes'));
+		$shown = InboxCreate::assemble($this->admin, $core, $add, $remove, array(), false);
+		$ids = array_column($shown, 'id');
+		$this->assertContains('quotes:express', $ids, 'a second way to create a proposal');
+		$this->assertNotContains('propal', $ids, 'removed by a module for this mailbox');
+		$this->assertNotContains('other:misc', $ids, 'removed whatever the order of the modules');
+		$this->assertNotContains('quotes:bad', $ids, 'an address of another site');
+		$this->assertNotContains('quotes:unknown', $ids, 'a type inbox does not know');
+		$this->assertNotContains('quotes:norights', $ids, 'without the rights the module asks');
+		$groups = array_values(array_unique(array_column($shown, 'group')));
+		$this->assertSame(array_values(array_intersect(InboxCreate::GROUPS, $groups)), $groups, 'groups in their order');
+
+		$all = InboxCreate::assemble($this->admin, $core, $add, $remove, array('propal'), true);
+		$byId = array_column($all, null, 'id');
+		$this->assertSame('quotes', $byId['propal']['removed_by']);
+		$this->assertTrue($byId['propal']['kept']);
+		$this->assertSame('other', $byId['other:misc']['group'], 'an unknown group: Others');
+		$this->assertContains('propal', array_column(InboxCreate::assemble($this->admin, $core, $add, $remove, array('propal'), false), 'id'), 'kept by the admin: shown');
+
+		// Kept buttons of a mailbox, written in its journal
+		$box = $this->box(true, array('status' => InboxAccount::STATUS_ACTIVE));
+		$creator = new InboxCreate($this->db);
+		$this->assertSame(1, $creator->keep($this->admin, (int) $box->id, 'propal', true));
+		$this->assertSame(0, $creator->keep($this->admin, (int) $box->id, 'propal', true), 'already kept');
+		$this->assertSame(array('propal'), $creator->kept((int) $box->id));
+		$this->assertSame(-1, $creator->keep($this->admin, (int) $box->id, 'bad id!', true));
+		$this->assertSame(1, $creator->keep($this->admin, (int) $box->id, 'propal', false));
+		$this->assertSame(array(), $creator->kept((int) $box->id));
+		$this->assertSame(array('propal', 'propal'), array_values(array_map(function ($l) {
+			return json_decode((string) $l->value_after, true)['button'] ?? '';
+		}, $this->db->getRows("SELECT value_after FROM ".$this->db->prefix()."inbox_account_log WHERE fk_account = ".((int) $box->id)." AND action = 'create_keep' ORDER BY rowid LIMIT 10") ?: array())));
+		$this->assertContains('create_buttons', InboxCreate::CAPABILITIES);
+	}
 }

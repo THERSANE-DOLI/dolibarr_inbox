@@ -1,5 +1,10 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: buttons of « Create from this mail » open to the modules, in titled groups, mailbox by mailbox :   1.161.0
+  - hook inboxCreateButtons: a module adds buttons (several for a type of piece) and removes any, for each mailbox;
+    the piece created is linked to the mail as with the buttons of the core.
+  - Settings > the mailbox > Reception: the buttons with the module that removed them; the admin keeps one back.
+
 - NEW: « Create > Event » of a mail opens the page of the agenda module, the event linked to the mail :   1.160.0
   - in a window of inbox, filled from the mail; the page of Dolibarr when no agenda module declares one.
   - capabilities announced to the hooks of a mail (agenda_create): a module drops its duplicate action by itself.

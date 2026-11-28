@@ -66,11 +66,52 @@ never by the version of inbox (branches and backports make a version number wron
 | Word | Since | Meaning |
 |---|---|---|
 | `agenda_create` | 1.160.0 | « Create > Event » opens the page of creation of the agenda provider (`inboxAgendaProvider`) and links the event saved there to the mail ([agenda.md](agenda.md)) |
+| `create_buttons` | 1.161.0 | the hook `inboxCreateButtons` (below) adds and removes buttons of « Create from this mail » |
 
 ```php
 $caps = $parameters['capabilities'] ?? array();
 if (!in_array('agenda_create', $caps, true)) {
 	$this->results['actions'][] = array('label' => 'Plan a meeting', 'icon' => 'event-new', 'window' => true, 'url' => $url);
+}
+```
+
+## Buttons of « Create from this mail »
+
+Hook `inboxCreateButtons`, context `inbox` (1.161.0). The dialog « Create » of the Dolibarr panel creates a piece filled
+from the mail and links it to the mail. Your module may add buttons and remove buttons, **mailbox by mailbox**: the
+hook is called for each mail with its mailbox, and once without mail (`mail` = 0) for the list of the setup.
+
+`$parameters`: the parameters of the hooks of a mail (`mail`, `account`, `socid`, `contactid`, `capabilities`...),
+`user`, `mailbox` (`id`, `email`, `label`, `usage`: auto, sales, accounting, support, purchase, transport, none) and
+`buttons`: the buttons of the core (`id`, `type`, `label`, `group`, `source` empty). Answer in `$this->results`:
+
+- `add`: a list of buttons. `source` (your technical name, `[a-z0-9_]`), `id` (`[a-z0-9_-]`, the button is then
+  `source:id`), `type` (a type of piece of the core: `societe`, `contact`, `propal`, `commande`, `supplier_proposal`,
+  `order_supplier`, `action`, `ticket`, `project`), `label`, `icon` (usage name), `url` (an address of this site, with
+  the markers `{socid}`, `{contactids}`, `{projectid}`, `{elements}`, `{ctx}`), `window` (true: a window of inbox,
+  else a new tab), `group` (`contacts`, `sales`, `purchases`, `followup`, else `other`), `rights` (rights of Dolibarr
+  needed, each `array(module, permission[, sub permission])`). Several buttons may create the same type of piece.
+- `remove`: buttons to take away in this mailbox, each `array('id' => ..., 'source' => your technical name)`: a button
+  of the core (its type) or of another module (`source:id`). All the modules are asked first, then the removals apply:
+  the order of the modules does not matter. The admin of inbox may keep back a removed button for a mailbox
+  (Settings > the mailbox > Reception > Buttons of « Create »).
+
+Inbox checks the address (this site only), the rights you ask and the right to create the type. The piece is linked to
+the mail as for the buttons of the core: inbox adds `inboxintent` to your address; keep it in the address of the page
+that saves, and create the object with its `create()` method and its triggers (`PROPAL_CREATE`...). Check the rights in
+your page as well.
+
+```php
+public function inboxCreateButtons($parameters, &$object, &$action, $hookmanager)
+{
+	if (($parameters['mailbox']['usage'] ?? '') === 'support') {
+		$this->results['remove'][] = array('id' => 'propal', 'source' => 'mymodule');
+		return 0;
+	}
+	$this->results['add'][] = array('source' => 'mymodule', 'id' => 'express', 'type' => 'propal', 'label' => 'Express quote',
+		'icon' => 'quote', 'group' => 'sales', 'window' => true, 'rights' => array(array('propal', 'creer')),
+		'url' => dol_buildpath('/mymodule/express.php', 1).'?socid={socid}&inboxctx={ctx}');
+	return 0;
 }
 ```
 

@@ -360,7 +360,11 @@ switch ($action) {
 		inboxAjaxReply(array('sender' => $sender, 'requester' => $requester, 'activity' => $activity, 'conversation' => (new InboxThreadLink($db))->state($row), 'links' => $links, 'extra' => $extraLinks, 'notes' => $noteList, 'alerts' => $alerts, 'actions' => $actions, 'panels' => $panels,
 			// New customer from a mail (lot A1, 1.79.0): contacts left to create from their page
 			'lead_pending' => (new InboxLead($db))->pendingFor($user, (int) $row->rowid),
-			'create' => InboxCreate::creatable($user), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
+			// Buttons of « Create » for the mailbox of the mail (1.161.0): the core, then the modules (their pages read
+			// again on the server at the click, never sent)
+			'create' => array_map(function ($b) {
+				return array('id' => $b['id'], 'type' => $b['type'], 'label' => $b['label'], 'icon' => $b['icon'], 'group' => $b['group'], 'window' => $b['window']);
+			}, (new InboxCreate($db))->buttons($user, (int) $row->fk_account, $hookParams)), 'known' => array('soc' => $socId, 'contact' => $contactId), 'usage' => inboxDolibarrUsage((int) $row->fk_account), 'from' => $email,
 			'level' => $reader->level, 'types' => array_values(array_filter(array_keys(InboxElements::TYPES), function ($t) use ($user) {
 				return InboxElements::canReadType($user, $t);
 			}))));
@@ -370,13 +374,30 @@ switch ($action) {
 		// « Create ▾ »: the page of creation of Dolibarr, filled from the mail; the piece will be linked to it
 		$reader = inboxDolibarrMail();
 		$creator = new InboxCreate($db);
-		$url = $creator->intent($user, $reader, (string) inboxAjaxParam('type', 'aZ09'), (int) inboxAjaxParam('attach', 'int') === 1,
-			array('soc' => (int) inboxAjaxParam('soc', 'int'), 'contact' => (int) inboxAjaxParam('contact', 'int')));
+		$type = (string) inboxAjaxParam('type', 'aZ09');
+		$known = array('soc' => (int) inboxAjaxParam('soc', 'int'), 'contact' => (int) inboxAjaxParam('contact', 'int'));
+		// A button of a module (1.161.0): found again among the buttons of this mailbox, its page from the hook
+		$buttonId = (string) inboxAjaxParam('button', 'alphanohtml');
+		$button = null;
+		if (strpos($buttonId, ':') !== false) {
+			$params = array('mail' => (int) $reader->row->rowid, 'account' => (int) $reader->row->fk_account, 'message_id' => (string) $reader->row->message_id,
+				'subject' => (string) $reader->row->subject, 'socid' => $known['soc'], 'contactid' => $known['contact'], 'capabilities' => InboxCreate::CAPABILITIES);
+			foreach ($creator->buttons($user, (int) $reader->row->fk_account, $params) as $b) {
+				if ($b['id'] === $buttonId) {
+					$button = $b;
+				}
+			}
+			if (!$button) {
+				inboxDolibarrFail('InboxErrorCannotCreate');
+			}
+			$type = $button['type'];
+		}
+		$url = $creator->intent($user, $reader, $type, (int) inboxAjaxParam('attach', 'int') === 1, $known, $button);
 		if ($url === '') {
 			inboxDolibarrFail($creator->error);
 		}
-		// The page of the agenda module: in a window of inbox, its markers filled by the browser
-		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null));
+		// The page of a module (agenda, button): in a window of inbox or a tab, its markers filled by the browser
+		inboxAjaxReply(array('url' => $url, 'window' => $creator->provider !== null, 'module' => $button !== null || $creator->provider !== null));
 		// no break
 
 	case 'attach':

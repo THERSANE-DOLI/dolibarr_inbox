@@ -1864,6 +1864,14 @@ a.ibx-piece__link:hover { text-decoration: underline; }
 /* ===== Create from the mail, files to a piece (1.14.0) ===== */
 .ibx-dolibar__tools { display: inline-flex; flex-wrap: wrap; gap: var(--ibx-s1); }
 .ibx-creategrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: var(--ibx-s2); }
+/* Titled groups of « Create from this mail » (1.161.0) */
+.ibx-creategroup { margin: var(--ibx-s3) 0 var(--ibx-s1); font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); }
+.ibx-creategroup:first-of-type { margin-top: 0; }
+/* Buttons of « Create » in the settings of a mailbox (1.161.0) */
+.ibx-createlist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--ibx-s1); }
+.ibx-createlist__item { display: flex; align-items: center; gap: var(--ibx-s2); padding: var(--ibx-s1) var(--ibx-s2); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-createlist__label { flex: 1; min-width: 0; font-weight: 600; }
+.ibx-createlist__source { font-size: var(--ibx-fs-xs); }
 .ibx-createbtn { display: flex; align-items: center; gap: var(--ibx-s2); min-height: 2.75rem; padding: var(--ibx-s2) var(--ibx-s3); background: var(--ibx-bg); color: var(--ibx-text);
 	border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius-lg); font: inherit; text-align: left; cursor: pointer; }
 .ibx-createbtn:hover { border-color: var(--ibx-accent); background: var(--ibx-accent-soft); }
