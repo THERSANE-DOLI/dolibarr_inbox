@@ -7272,6 +7272,7 @@
 		const thread = $('.ibx-notes', box);
 		if (thread && dolibarRight()) {
 			thread.scrollTop = thread.scrollHeight;
+			stickNotes(box, thread);
 		}
 		if (!box._typing) {
 			// The field grows with its text (up to 6 lines); the button says when there is nothing to save
@@ -7370,6 +7371,35 @@
 			};
 			img.src = el.dataset.photo;
 		});
+	}
+	/**
+	 * The thread of the notes stays on its last note, like a chat, when its height changes after it is drawn (blocks
+	 * of modules read later, splitter, window): unless the user scrolled up to read older notes
+	 */
+	function stickNotes(box, thread) {
+		if (typeof ResizeObserver === 'undefined') {
+			return;
+		}
+		if (!box._notesObserver) {
+			box._notesObserver = new ResizeObserver(entries => entries.forEach(en => {
+				const el = en.target;
+				if (el.isConnected && el._atBottom !== false) {
+					el.scrollTop = el.scrollHeight;
+				}
+			}));
+		}
+		if (box._notesThread && box._notesThread !== thread) {
+			box._notesObserver.unobserve(box._notesThread);
+		}
+		box._notesThread = thread;
+		thread._atBottom = true;
+		if (!thread._stickBound) {
+			thread._stickBound = true;
+			thread.addEventListener('scroll', () => {
+				thread._atBottom = thread.scrollHeight - thread.clientHeight - thread.scrollTop < 8;
+			}, { passive: true });
+		}
+		box._notesObserver.observe(thread);
 	}
 	/** One box to write: the field grows, the send button inside it, a short help under it */
 	function composerHtml(cls, id, value, placeholder, hint) {
