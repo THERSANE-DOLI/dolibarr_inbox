@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: a widget of a list or of actions placed by itself in the Dolibarr panel shows its lines :   1.164.6
+  - its height was measured while its lines were still hidden by the short cell.
+
 - FIX: on a phone, the chips of Dolibarr under the head of a mail stay on one line :   1.164.5
   - only the name of the thirdparty shrinks; chips 44 px high under the finger.
 

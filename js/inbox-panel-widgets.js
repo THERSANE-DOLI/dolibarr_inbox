@@ -299,8 +299,12 @@
 				return;
 			}
 			const wg = $('.ibx-wg', cell);
-			// Natural height of the content: the widget freed of its cell for the time of the measure
+			// Natural height of the content: the widget freed of its cell for the time of the measure, the cell at its
+			// maximum so that its container queries hide nothing (the lines of a list, hidden in a short cell)
 			const rows = $('.ibx-ov-rows', wg);
+			const span = +((cell.style.gridRow.match(/span (\d+)/) || [])[1] || 1);
+			const before = cell.style.gridRow;
+			cell.style.gridRow = 'span ' + Math.max(span, +cell.dataset.maxh || 20);
 			wg.style.height = 'auto';
 			if (rows) {
 				rows.style.overflow = 'visible';
@@ -310,8 +314,8 @@
 			if (rows) {
 				rows.style.overflow = '';
 			}
+			cell.style.gridRow = before;
 			const need = Math.ceil((natural + GAP) / (unit + GAP));
-			const span = +((cell.style.gridRow.match(/span (\d+)/) || [])[1] || 1);
 			if (need > span) {
 				cell.style.gridRow = 'span ' + Math.min(+cell.dataset.maxh || need, need);
 			}
