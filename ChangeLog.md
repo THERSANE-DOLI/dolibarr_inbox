@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: the notes of the Dolibarr side panel could open on the oldest one instead of the last one :   1.151.5
+  - the thread stays on its last note when its height changes after it is drawn (blocks of modules read later,
+    window), unless the user scrolled up to read older notes.
+
 - FIX: the card of a thirdparty opened in the Dolibarr side panel went past the panel over the icon strip :   1.151.4
   - in the side panel it keeps the width of its place (it was 320 px at least, wider than the panel by default).
 
