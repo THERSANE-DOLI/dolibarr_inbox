@@ -3427,3 +3427,59 @@ p.ibx-protect__fp { font-size: 1.25rem; text-align: center; padding: var(--ibx-s
 }
 @media (prefers-reduced-motion: reduce) {
 }
+
+/* ---------- Widgets of the Dolibarr panel (1.154.0, js/inbox-widgets.js) ----------
+   One frame for every template; the content adapts to the size the grid gives (container queries on .ibx-wg-cell,
+   the box that holds a widget: a cell of the grid, a preview of the catalogue). */
+.ibx-wg-cell { container-type: size; min-width: 0; min-height: 0; }
+.ibx-wg { box-sizing: border-box; height: 100%; min-width: 0; overflow: hidden; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.375rem 0.5rem;
+	font-size: var(--ibx-fs-sm); color: var(--ibx-text); background: var(--ibx-bg); border: 1px solid var(--ibx-border); border-radius: var(--ibx-radius); }
+.ibx-wg a { color: inherit; text-decoration: none; }
+.ibx-wg a:hover, .ibx-wg a:focus-visible { color: var(--ibx-accent); text-decoration: underline; }
+.ibx-wg__head { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.ibx-wg__title { font-size: var(--ibx-fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-wg__sum { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibx-wg__sum .ibx-icon { width: 0.875em; height: 0.875em; margin-right: 0.25rem; vertical-align: -0.0625em; }
+.ibx-wg__sum--danger { color: var(--ibx-danger); }
+.ibx-wg__sum--warning { color: var(--ibx-warning); }
+.ibx-wg .ibx-ov-rows { overflow: auto; min-height: 0; }
+.ibx-wg--empty { align-items: center; justify-content: center; color: var(--ibx-text-faint); font-size: var(--ibx-fs-xs); text-align: center; }
+/* Mini: an icon, a number, a short label */
+.ibx-wg--mini { flex-direction: row; align-items: center; justify-content: center; padding: 0 0.375rem; }
+.ibx-wg__mini, .ibx-wg--mini > .ibx-icon { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; white-space: nowrap; }
+.ibx-wg--mini .ibx-icon { flex: none; width: 1rem; height: 1rem; }
+.ibx-wg__value { font-variant-numeric: tabular-nums; }
+.ibx-wg__label { color: var(--ibx-text-muted); overflow: hidden; text-overflow: ellipsis; }
+.ibx-wg--danger { color: var(--ibx-danger); border-color: color-mix(in srgb, var(--ibx-danger) 45%, var(--ibx-border)); }
+.ibx-wg--warning { color: var(--ibx-warning); }
+.ibx-wg--info .ibx-icon { color: var(--ibx-accent); }
+.ibx-wg--ok .ibx-icon { color: var(--ibx-success); }
+/* Line: one piece of information */
+.ibx-wg--line { flex-direction: row; align-items: center; gap: 0.375rem; white-space: nowrap; }
+.ibx-wg--line .ibx-icon { flex: none; width: 1rem; height: 1rem; color: var(--ibx-text-muted); }
+.ibx-wg__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ibx-wg__note { color: var(--ibx-text-faint); font-size: var(--ibx-fs-xs); overflow: hidden; text-overflow: ellipsis; }
+/* Figure: the key figure of the overview, without its own frame */
+.ibx-wg--figure { padding: 0; }
+.ibx-wg--figure .ibx-ov-kpis { display: block; height: 100%; }
+.ibx-wg--figure .ibx-ov-kpi { height: 100%; box-sizing: border-box; border: 0; }
+/* Action: the list then its buttons at the bottom */
+.ibx-wg__actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: auto; }
+.ibx-wg__actions .ibx-btn { flex: 1 1 auto; justify-content: center; text-decoration: none; }
+.ibx-wg__actions .ibx-btn[aria-disabled="true"] { opacity: .7; cursor: default; }
+/* Steps by the size obtained */
+@container (max-width: 6.5rem) {
+	.ibx-wg--mini .ibx-wg__label, .ibx-wg--line .ibx-wg__note { display: none; }
+	.ibx-wg--figure .ibx-ov-delta { display: none; }
+}
+@container (max-height: 3.25rem) {
+	.ibx-wg--figure .ibx-ov-kpi__label, .ibx-wg--figure .ibx-ov-kpi__note { display: none; }
+	.ibx-wg--figure .ibx-ov-kpi { justify-content: center; }
+}
+@container (max-height: 5rem) {
+	.ibx-wg--list .ibx-ov-rows, .ibx-wg--action .ibx-ov-rows { display: none; }
+	.ibx-wg--chart .ibx-ov-bar__val { display: none; }
+}
+@container (max-width: 12rem) {
+	.ibx-wg--line .ibx-wg__note { display: none; }
+}

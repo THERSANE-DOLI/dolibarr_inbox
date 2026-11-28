@@ -483,4 +483,6 @@
 	}));
 
 	I.sidePane = { sync, sheet };
+	// Drawing shared with the widgets of the Dolibarr panel (js/inbox-widgets.js, 1.154.0)
+	I.overviewDraw = { inside, mark, chip, delta, kpi, row, hero, bars, mails };
 })();

@@ -1,5 +1,9 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- NEW: registry of the widgets of the Dolibarr panel, with their templates, sizes and previews :   1.154.0
+  - mini, line, figure, list, chart, action: drawn from the data of the overview, by the rights of each section.
+  - ajax/widget.php gives the catalogue of the user and the data of the widgets of a mail; section Widgets in ux.php.
+
 - NEW: overview of the other side of a mail in its own column of the strip, and columns of the modules :   1.153.0
   - revenue, invoices, orders, proposals, tickets, mails exchanged...: the head when the column opens, each section
     only when unfolded, in the order of the usage of the mailbox; one switch per piece of information in the setup.

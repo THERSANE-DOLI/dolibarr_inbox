@@ -42,8 +42,8 @@ The overview never shows more than the user may see in Dolibarr:
   browser, and the user must be able to read it (right « Read thirdparties », restriction of the sales
   representatives included);
 - each section needs its module enabled and its right: invoices for the revenue, the invoices and the products;
-  margins; orders; shipments; proposals; tickets (with « Tickets assigned only », a user who does not manage the
-  tickets sees his own); agenda (without « read the events of the others », his own only); projects (without « read
+  margins; orders; shipments; proposals; tickets (with « Tickets assigned only », a user who is not an
+  administrator sees the tickets assigned to him, as in the list of the tickets); agenda (without « read the events of the others », his own only); projects (without « read
   all projects », the public ones); contracts; interventions; categories; supplier invoices and orders;
 - the weight and the rank of a customer read the invoices of every customer: computed only for a user who sees every
   thirdparty, and kept one hour per entity.

@@ -310,6 +310,76 @@ class InboxOverview
 	}
 
 	/**
+	 * Key figures alone (widgets, 1.154.0): the same short totals as the head, by priority (10 revenue, 15 purchases,
+	 * 20 left to pay, 25 to pay to the supplier, 30 last order, 40 previous mail)
+	 *
+	 * @param User                $user User
+	 * @param array<string,mixed> $ctx  context()
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function figures(User $user, array $ctx)
+	{
+		$this->loadLangs();
+		$this->alerts = array();
+		$this->kpis = array();
+		$this->headFigures($user, $ctx);
+
+		return $this->kpis;
+	}
+
+	/**
+	 * Sections offered to the user for this mail (widgets, 1.154.0)
+	 *
+	 * @param User                $user User
+	 * @param array<string,mixed> $ctx  context()
+	 * @return string[]
+	 */
+	public function offers(User $user, array $ctx)
+	{
+		return $this->offered($user, $ctx);
+	}
+
+	/**
+	 * Mails exchanged with the other side, in the mailboxes the user can read (widgets, 1.154.0)
+	 *
+	 * @param User                $user User
+	 * @param array<string,mixed> $ctx  context()
+	 * @return array{nIn:int,nOut:int,lastIn:int}|null
+	 */
+	public function mailCounts(User $user, array $ctx)
+	{
+		if (!$this->shown('MAILS')) {
+			return null;
+		}
+
+		return $this->mailTotals($user, $ctx['mail'], (int) $ctx['socId'], $ctx['email'], $ctx['ours']);
+	}
+
+	/**
+	 * Right on a module and its permissions (widgets, 1.154.0)
+	 *
+	 * @param User                         $user   User
+	 * @param string                       $module Module
+	 * @param array<int,array<int,string>> $rights Rights (any of them)
+	 * @return bool
+	 */
+	public function allows(User $user, $module, array $rights)
+	{
+		return $this->can($user, $module, $rights);
+	}
+
+	/**
+	 * A piece of information is not switched off (widgets, 1.154.0)
+	 *
+	 * @param string $key Key of settings()
+	 * @return bool
+	 */
+	public function isShown($key)
+	{
+		return $this->shown($key);
+	}
+
+	/**
 	 * Sections offered to the user for this mail: by the switches, the modules and the rights, in the order of the
 	 * usage of the mailbox; only the mails without a thirdparty
 	 *
@@ -1669,8 +1739,9 @@ class InboxOverview
 
 		$p = $this->db->prefix();
 		$where = "t.fk_soc = ".((int) $s)." AND t.entity IN (".getEntity('ticket').")";
-		// As the list of the core: with « assigned tickets only », a user who does not manage the tickets sees his own
-		if (getDolGlobalString('TICKET_LIMIT_VIEW_ASSIGNED_ONLY') && !$user->admin && !$user->hasRight('ticket', 'manage')) {
+		// As the list of the core (ticket/list.php): with « assigned tickets only », a user who is not an administrator
+		// sees the tickets assigned to him
+		if (getDolGlobalString('TICKET_LIMIT_VIEW_ASSIGNED_ONLY') && !$user->admin) {
 			$where .= " AND t.fk_user_assign = ".((int) $user->id);
 		}
 		// Closed (8) and cancelled (9) apart
