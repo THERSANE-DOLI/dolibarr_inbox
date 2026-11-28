@@ -1,5 +1,8 @@
 # CHANGELOG INBOX FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+- FIX: Escape while a widget is held in the layout cancels that gesture only, nothing is saved :   1.164.4
+  - the widget taken from the catalogue goes away, the one moved or taken out goes back to its place.
+
 - FIX: the bar above the notes explains itself in the bubble of the application, no longer in a bare title :   1.164.3
   - the bubble closes when the drag begins.
 

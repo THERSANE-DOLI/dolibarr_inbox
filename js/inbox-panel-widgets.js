@@ -652,7 +652,27 @@
 			}, el);
 			g.on('change', () => o.onChange());
 			g.on('removed', (e, nodes) => o.onRemoved(nodes));
+			// A widget held: Escape belongs to GridStack then (it puts everything back), not to the edit mode
+			g.on('dragstart resizestart', () => {
+				g.held = true;
+			});
+			g.on('dragstop resizestop', () => {
+				g.held = false;
+			});
 			return g;
+		},
+		/** A widget held by the pointer (moved, resized, or taken out of the grid) */
+		held(g) {
+			return !!g.held;
+		},
+		/** Positions of the widgets, to put them back */
+		snapshot(g) {
+			return g.engine.nodes.map(n => ({ el: n.el, x: n.x, y: n.y }));
+		},
+		restore(g, snap) {
+			g.batchUpdate();
+			snap.forEach(p => p.el && p.el.gridstackNode && g.update(p.el, { x: p.x, y: p.y }));
+			g.batchUpdate(false);
 		},
 		add(g, it, opts) {
 			return g.addWidget(Object.assign({ id: it.id, x: it.x, y: it.y, w: it.w, h: it.h, autoPosition: it.x === undefined }, opts));
@@ -841,6 +861,8 @@
 		let ghost = null;
 		let placed = null;
 		let cell = null;
+		// Positions before the widget is proposed: the others go back there when it goes away
+		let snap = null;
 		const over = ev => {
 			const r = grid.getBoundingClientRect();
 			return ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom ? r : null;
@@ -857,6 +879,9 @@
 				I.grid.remove(g, placed);
 				placed = null;
 				cell = null;
+				if (snap) {
+					I.grid.restore(g, snap);
+				}
 			}
 		};
 		const move = ev => {
@@ -871,6 +896,8 @@
 				document.body.appendChild(ghost);
 				// While the widget is only proposed, nothing is saved (the moves of the others neither)
 				P.edit.silent = true;
+				P.edit.proposing = true;
+				snap = I.grid.snapshot(g);
 			}
 			const r = over(ev);
 			if (r) {
@@ -907,6 +934,7 @@
 			}
 			if (P.edit) {
 				P.edit.silent = false;
+				P.edit.proposing = false;
 			}
 			if (placed) {
 				placed.classList.remove('is-dropping');
@@ -1304,7 +1332,8 @@
 		}
 	});
 	document.addEventListener('keydown', e => {
-		if (e.key === 'Escape' && P.edit && !document.querySelector('dialog[open]')) {
+		// A widget held or proposed: Escape cancels that gesture only (GridStack, dragPreview), the edit mode stays
+		if (e.key === 'Escape' && P.edit && !document.querySelector('dialog[open]') && !P.edit.proposing && !(P.edit.grid && I.grid.held(P.edit.grid))) {
 			e.stopPropagation();
 			endEdit();
 		}
